@@ -4,7 +4,8 @@ import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { validateQuestion, countBlanks } from "@/lib/exams/engine";
 import { randomToken } from "@/lib/crypto";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireCtx(ROLES.staff, "exams");
   if (ctx instanceof NextResponse) return ctx;
   const { data: exam } = await ctx.sb.from("exams").select("*").eq("tenant_id", ctx.tenant.id).eq("id", params.id).maybeSingle();
@@ -34,7 +35,8 @@ const Patch = z.object({
   }).partial().optional()
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireCtx(ROLES.staff, "exams");
   if (ctx instanceof NextResponse) return ctx;
   const parsed = Patch.safeParse(await readJson(req));
@@ -52,17 +54,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!qs?.length) return jsonError("add at least one question before publishing");
     const bad = qs.map((q: any, i: number) => ({ i, p: validateQuestion(q) })).filter((x: any) => x.p.length);
     if (bad.length) return jsonError(`Question ${bad[0].i + 1}: ${bad[0].p.join(" ")}`);
-    const s = (fields.settings ?? exam.settings) as any;
-    if (s.require_seb && !(s.seb_config_keys?.length || s.seb_browser_keys?.length)) {
-      // allowed (falls back to user-agent check) but make it explicit in the response
-      fields.settings = { ...s, seb_ua_only: true };
-    }
   }
   const { error } = await ctx.sb.from("exams").update(fields).eq("tenant_id", ctx.tenant.id).eq("id", params.id);
   return error ? jsonError(error.message) : NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireCtx(ROLES.staff, "exams");
   if (ctx instanceof NextResponse) return ctx;
   const { count } = await ctx.sb.from("exam_attempts").select("id", { count: "exact", head: true }).eq("exam_id", params.id);
@@ -83,7 +81,8 @@ const QuestionBody = z.object({
 });
 
 /** POST: upsert a question. PUT: { order: [ids] } reorder. DELETE: ?question_id= */
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireCtx(ROLES.staff, "exams");
   if (ctx instanceof NextResponse) return ctx;
   const parsed = QuestionBody.safeParse(await readJson(req));
@@ -109,7 +108,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   return error ? jsonError(error.message) : NextResponse.json(data, { status: 201 });
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireCtx(ROLES.staff, "exams");
   if (ctx instanceof NextResponse) return ctx;
   const { order } = await readJson<{ order?: string[] }>(req);

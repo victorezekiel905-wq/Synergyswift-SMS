@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useApi, send, Page, PageHeader, Alert, Badge, statusTone, Field, fmtDate, fmtTime, Modal } from "@/components/ui";
 import QrCode from "@/components/QrCode";
@@ -13,7 +13,8 @@ type Detail = {
   loans: { id: string; due_at: string; returned_at: string | null; library_books: { title: string } | null }[];
 };
 
-export default function StudentDetail({ params }: { params: { id: string } }) {
+export default function StudentDetail(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const { data, error, reload } = useApi<Detail>(`/api/sims/students/${params.id}`);
   const { data: structure } = useApi<{ class_groups: { id: string; name: string }[] }>("/api/school/structure");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import ActivityForm from "@/components/studio/ActivityForm";
 
 export default async function AssessPage() {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
 

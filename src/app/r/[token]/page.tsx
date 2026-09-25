@@ -17,7 +17,8 @@ type Subject = {
  * link. The 48-hex token is the only key; only PUBLISHED cards of ACTIVE
  * schools render. Staff can preview drafts while signed in via the same URL.
  */
-export default async function ReportCardPage({ params }: { params: { token: string } }) {
+export default async function ReportCardPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   if (!/^[0-9a-f]{32,128}$/i.test(params.token)) notFound();
   const svc = createServiceClient();
   const { data: card } = await svc.from("report_cards")
@@ -28,7 +29,7 @@ export default async function ReportCardPage({ params }: { params: { token: stri
   if (card.status !== "published") {
     // Drafts are only visible to signed-in staff of the same school.
     const { createClient } = await import("@/lib/supabase/server");
-    const sb = createClient();
+    const sb = await createClient();
     const { data: { user } } = await sb.auth.getUser();
     const { data: me } = user ? await sb.from("users").select("tenant_id,role").eq("id", user.id).maybeSingle() : { data: null };
     if (!me || me.tenant_id !== card.tenant_id || ["student", "parent"].includes(me.role)) notFound();

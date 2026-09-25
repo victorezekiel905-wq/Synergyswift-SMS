@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, use } from "react";
 import Link from "next/link";
 import { useApi, send, Page, PageHeader, Badge, statusTone, Alert, Field, fmtDate } from "@/components/ui";
 
@@ -16,7 +16,8 @@ type Detail = {
   audit: { id: string; action: string; ts: string; meta: Record<string, unknown> }[];
 };
 
-export default function TenantDetail({ params }: { params: { id: string } }) {
+export default function TenantDetail(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const { data, error, reload } = useApi<Detail>(`/api/platform/tenants/${params.id}`);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [admin, setAdmin] = useState({ full_name: "", email: "" });

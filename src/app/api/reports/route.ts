@@ -12,7 +12,7 @@ type AttendanceRow = {
 // §18 + §20 — Aggregate a report (participation / env_alerts / devices / attendance)
 // for a class, then persist a tenant-scoped row in `reports`.
 export async function POST(req: NextRequest) {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const { data: profile } = await sb.from("users").select("id,role").eq("id", user.id).maybeSingle();

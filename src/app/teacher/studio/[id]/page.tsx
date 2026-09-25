@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SlideEditor from "@/components/studio/SlideEditor";
 
-export default async function StudioLesson({ params }: { params: { id: string } }) {
-  const sb = createClient();
+export default async function StudioLesson(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
 

@@ -12,7 +12,8 @@ async function loadExam(ctx: any, id: string): Promise<ExamRow | null> {
 }
 
 /** Live monitor: every attempt with progress, time left and integrity events. ?format=csv for marks. */
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireCtx(ROLES.staff, "exams");
   if (ctx instanceof NextResponse) return ctx;
   const exam = await loadExam(ctx, params.id);
@@ -67,7 +68,8 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reset"), attempt_id: z.string().uuid() })
 ]);
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireCtx(ROLES.staff, "exams");
   if (ctx instanceof NextResponse) return ctx;
   const parsed = Body.safeParse(await readJson(req));

@@ -4,8 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 // §18 — Server-rendered PDF/CSV export. CSV is generated inline here; PDF uses
 // a minimal hand-rolled PDF generator (text-mode) so no extra npm dep is
 // required.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const sb = createClient();
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const { data: rep } = await sb.from("reports").select("*").eq("id", params.id).maybeSingle();

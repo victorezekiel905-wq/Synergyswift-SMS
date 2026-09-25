@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { GuardianInput } from "@/lib/validators";
 import { createServiceClient } from "@/lib/supabase/service";
-import { enqueue, dispatchDue, loadBrand, rowsForGuardian } from "@/lib/messaging/outbox";
+import { enqueue, tryDispatch, loadBrand, rowsForGuardian } from "@/lib/messaging/outbox";
 import { portalLink } from "@/lib/messaging/templates";
 import { provisionUser } from "@/lib/provision";
 import { appUrl, studentName } from "@/lib/school";
@@ -90,6 +90,6 @@ export async function POST(req: NextRequest) {
     portalLink(brand, { guardianName: g.full_name, studentNames: names, link }), g.id, ctx.userId);
   if (!rows.length) return jsonError("guardian has no valid email or WhatsApp number");
   await enqueue(svc, rows);
-  const stats = await dispatchDue(svc, { budgetMs: 8000 });
+  const stats = await tryDispatch(svc, { budgetMs: 8000 });
   return NextResponse.json({ ok: true, queued: rows.length, delivery: stats, link });
 }

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 /** POST — student raises hand (optional message). */
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const sb = createClient();
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();
@@ -15,8 +16,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 /** GET — open hands for the session. */
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const sb = createClient();
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const { data, error } = await sb.from("raise_hands")
@@ -30,8 +32,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 /** PATCH — teacher resolves a hand. */
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const sb = createClient();
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();

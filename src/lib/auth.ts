@@ -43,7 +43,7 @@ export function jsonError(message: string, status = 400) {
 
 /** Loads the signed-in user's profile and tenant. Returns null when signed out or not provisioned. */
 export async function getCtx(): Promise<Ctx | null> {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return null;
   const { data: profile } = await sb.from("users")
@@ -75,7 +75,7 @@ export async function requireCtx(roles?: readonly string[], module?: ModuleKey):
 
 /** Platform (super) admins live outside every tenant; checked via a security-definer RPC. */
 export async function requirePlatformAdmin(): Promise<{ sb: any; userId: string } | NextResponse> {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return jsonError("unauthenticated", 401);
   const { data: ok } = await sb.rpc("is_platform_admin");

@@ -24,7 +24,7 @@ type AttendanceRow = {
 // between a parent-style auth.users row and a student. Parents can then read
 // only their own linked students via their RLS policy.
 export async function POST(req: NextRequest) {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json().catch(() => ({}));
@@ -63,7 +63,7 @@ export async function DELETE(req: NextRequest) {
 }
 
 export async function GET() {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 

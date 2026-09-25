@@ -5,7 +5,8 @@ import { verifySeb, absoluteRequestUrl } from "@/lib/exams/seb";
 import { GRACE_MS } from "@/lib/exams/server";
 
 /** File-upload answers. Stored privately under <tenant>/<exam>/<attempt>/. */
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireCtx(["student"], "exams");
   if (ctx instanceof NextResponse) return ctx;
   const svc = createServiceClient();

@@ -40,7 +40,7 @@ export default function WelcomePage() {
       }
       const { data } = await sb.auth.getUser();
       if (!data.user) { setErr("This link has expired. Ask your school to resend the invitation."); setState("error"); return; }
-      setState(hash.get("type") === "invite" || hash.get("type") === "recovery" ? "password" : "password");
+      setState("password");
     })();
   }, []);
 

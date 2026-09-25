@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
  * Public: Safe Exam Browser downloads this .seb file (no cookies), so it only
  * contains the start URL and lockdown options, never questions or keys.
  */
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!/^[0-9a-f-]{36}$/i.test(params.id)) return new NextResponse("not found", { status: 404 });
   const svc = createServiceClient();
   const { data: exam } = await svc.from("exams").select("id,title,status,settings,tenants(status)").eq("id", params.id).maybeSingle();

@@ -4,7 +4,7 @@
  * All functions take the service client plus an explicit tenantId, and every
  * query filters on that tenant.
  */
-import { enqueue, dispatchDue, guardiansByStudent, loadBrand, rowsForGuardian, formatInZone, type OutboxRow } from "./messaging/outbox";
+import { enqueue, tryDispatch, guardiansByStudent, loadBrand, rowsForGuardian, formatInZone, type OutboxRow } from "./messaging/outbox";
 import { gateEvent, pickupCode as pickupCodeMsg, pickupDone } from "./messaging/templates";
 import { sendWhatsApp } from "./messaging/providers";
 import { isLate, startOfTodayIso, studentName } from "./school";
@@ -72,7 +72,7 @@ export async function recordGateEvent(svc: any, p: {
       gateEvent(brand, { guardianName: g.full_name, studentName: p.person.name, direction, time, date, via: p.viaLabel ?? null }), ev.id, p.recordedBy));
     if (rows.length) {
       await enqueue(svc, rows);
-      await dispatchDue(svc, { budgetMs: 6000 });
+      await tryDispatch(svc, { budgetMs: 6000 });
       notified = rows.length;
     }
   }
@@ -117,7 +117,7 @@ export async function createPickupCode(svc: any, p: {
   const collector = p.delegateName || g.full_name;
   const msg = pickupCodeMsg(brand, { guardianName: g.full_name, studentName: sName, code, expires: `${time}, ${date}`, collector });
   const rows = rowsForGuardian(p.tenantId, g, "pickup_code", msg, row.id, null);
-  if (rows.length) { await enqueue(svc, rows); await dispatchDue(svc, { budgetMs: 6000 }); }
+  if (rows.length) { await enqueue(svc, rows); await tryDispatch(svc, { budgetMs: 6000 }); }
   // The collector (driver, relative) gets the code directly on WhatsApp.
   if (p.delegatePhone) {
     await sendWhatsApp({ to: p.delegatePhone, text: `*${brand.schoolName}*\nYou have been authorised by ${g.full_name} to collect ${sName}. Pickup code: ${code}. Valid until ${time}, ${date}.` }).catch(() => null);
@@ -151,6 +151,6 @@ export async function releaseStudent(svc: any, p: { tenantId: string; timezone: 
   const { time } = formatInZone(new Date(), p.timezone);
   const gs = (await guardiansByStudent(svc, p.tenantId, [used.student_id])).get(used.student_id) ?? [];
   const rows = gs.flatMap(g => rowsForGuardian(p.tenantId, g, "pickup_done", pickupDone(brand, { guardianName: g.full_name, studentName: person.name, collector, time }), used.id, p.staffUserId));
-  if (rows.length) { await enqueue(svc, rows); await dispatchDue(svc, { budgetMs: 6000 }); }
+  if (rows.length) { await enqueue(svc, rows); await tryDispatch(svc, { budgetMs: 6000 }); }
   return { student: person, collector, at: ev.at, notified: rows.length };
 }

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import EnrollForm from "@/components/guard/EnrollForm";
 
 export default async function GuardPage() {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
   const [{ data: devices }, { data: events }] = await Promise.all([

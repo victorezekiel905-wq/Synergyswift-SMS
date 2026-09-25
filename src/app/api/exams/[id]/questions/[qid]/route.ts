@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCtx, ROLES, jsonError } from "@/lib/auth";
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string; qid: string } }) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string; qid: string }> }) {
+  const params = await props.params;
   const ctx = await requireCtx(ROLES.staff, "exams");
   if (ctx instanceof NextResponse) return ctx;
   const { data: exam } = await ctx.sb.from("exams").select("id,status").eq("tenant_id", ctx.tenant.id).eq("id", params.id).maybeSingle();

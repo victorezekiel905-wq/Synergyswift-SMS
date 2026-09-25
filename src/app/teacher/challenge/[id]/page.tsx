@@ -4,8 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import LiveLeaderboard from "@/components/challenge/LiveLeaderboard";
 import ChallengeControls from "@/components/challenge/ChallengeControls";
 
-export default async function ChallengeRoom({ params }: { params: { id: string } }) {
-  const sb = createClient();
+export default async function ChallengeRoom(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
   const { data: game } = await sb.from("game_sessions").select("*").eq("id", params.id).maybeSingle();

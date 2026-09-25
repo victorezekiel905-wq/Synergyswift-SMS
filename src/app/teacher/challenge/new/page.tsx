@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ChallengeForm } from "@/components/challenge/ChallengeForm";
 
 export default async function NewChallenge() {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
 

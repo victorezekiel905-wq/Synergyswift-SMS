@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, statusTone, fmtTime } from "@/components/ui";
 import QuestionEditor, { blankQuestion, TYPE_LABELS, type EditorQuestion, type QType } from "@/components/exams/QuestionEditor";
@@ -13,7 +13,8 @@ type Exam = {
 type Question = EditorQuestion & { id: string; position: number };
 type Tab = "questions" | "settings" | "monitor" | "marking";
 
-export default function ExamWorkspace({ params }: { params: { id: string } }) {
+export default function ExamWorkspace(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const { data, error, reload } = useApi<{ exam: Exam; questions: Question[] }>(`/api/exams/${params.id}`);
   const [tab, setTab] = useState<Tab>("questions");
   if (error) return <Page><Alert>{error}</Alert></Page>;

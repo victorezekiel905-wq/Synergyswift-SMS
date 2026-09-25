@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const next = safeNext(url.searchParams.get("next"));
   if (!code) return NextResponse.redirect(new URL(`/login?error=missing_oauth_code`, url));
 
-  const sb = createClient();
+  const sb = await createClient();
   const { error } = await sb.auth.exchangeCodeForSession(code);
   if (error) return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, url));
   return NextResponse.redirect(new URL(next, url));

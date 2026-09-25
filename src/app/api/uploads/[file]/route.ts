@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 
 // Secure media proxy for the lessons storage bucket. Returns a short-lived signed
 // URL when the bucket is private; otherwise falls back to the bucket public URL.
-export async function GET(_req: NextRequest, { params }: { params: { file: string } }) {
-  const sb = createClient();
+export async function GET(_req: NextRequest, props: { params: Promise<{ file: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const path = decodeURIComponent(params.file);
 
   const signed = await sb.storage.from("lessons").createSignedUrl(path, 60 * 10);

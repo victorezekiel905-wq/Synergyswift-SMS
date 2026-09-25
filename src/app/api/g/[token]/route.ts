@@ -6,7 +6,8 @@ import { createPickupCode } from "@/lib/gate";
 import { jsonError, readJson } from "@/lib/auth";
 
 /** Passwordless guardian portal (link sent on WhatsApp / email). The token is a 48-hex bearer secret. */
-export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const svc = createServiceClient();
   const g = await guardianByToken(svc, params.token);
   if (!g) return jsonError("This link is invalid or has been replaced. Ask the school for a new one.", 404);
@@ -21,7 +22,8 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("prefs"), notify_email: z.boolean(), notify_whatsapp: z.boolean() })
 ]);
 
-export async function POST(req: NextRequest, { params }: { params: { token: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const svc = createServiceClient();
   const g = await guardianByToken(svc, params.token);
   if (!g) return jsonError("This link is invalid or has been replaced.", 404);

@@ -61,7 +61,7 @@ function CreateTenant({ open, onClose, onCreated }: { open: boolean; onClose: ()
   const [err, setErr] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value;
-    setF(p => ({ ...p, [k]: v, ...(k === "name" && !p.slug ? {} : {}) }));
+    setF(p => ({ ...p, [k]: v }));
   };
   async function submit(e: React.FormEvent) {
     e.preventDefault();

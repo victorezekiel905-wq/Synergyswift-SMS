@@ -5,7 +5,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { provisionUser } from "@/lib/provision";
 import { appUrl } from "@/lib/school";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const gate = await requirePlatformAdmin();
   if (gate instanceof NextResponse) return gate;
   const svc = createServiceClient();
@@ -33,7 +34,8 @@ const Patch = z.object({
   add_admin: z.object({ full_name: z.string().trim().min(2), email: z.string().trim().email() }).optional()
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const gate = await requirePlatformAdmin();
   if (gate instanceof NextResponse) return gate;
   const parsed = Patch.safeParse(await readJson(req));

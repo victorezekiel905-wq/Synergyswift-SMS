@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import StudentSession from "@/components/student/StudentSession";
 
-export default async function StudentLive({ params }: { params: { id: string } }) {
-  const sb = createClient();
+export default async function StudentLive(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/student/join");
 

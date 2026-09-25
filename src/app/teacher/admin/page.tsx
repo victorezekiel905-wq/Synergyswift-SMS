@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import PolicyForm from "@/components/admin/PolicyForm";
 
 export default async function AdminPage() {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
   const [{ data: policies }, { data: logs }] = await Promise.all([

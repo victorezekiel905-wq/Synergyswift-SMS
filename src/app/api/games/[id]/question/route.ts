@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 /** POST — teacher advances to question idx (or -1 to end questions). */
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const sb = createClient();
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();
@@ -23,8 +24,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 /** GET — student-facing: current question only, answer key stripped (RPC). */
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const sb = createClient();
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 

@@ -6,7 +6,7 @@
  * outbox (branded email), so the school's name is on it, never the platform's.
  * An account can only ever belong to one tenant.
  */
-import { enqueue, loadBrand, dispatchDue } from "./messaging/outbox";
+import { enqueue, loadBrand, tryDispatch } from "./messaging/outbox";
 import { escapeHtml } from "./messaging/templates";
 
 export type ProvisionInput = {
@@ -60,7 +60,7 @@ export async function provisionUser(svc: any, p: ProvisionInput): Promise<{ user
       body_html: `<p>Hello ${escapeHtml(p.fullName)},</p><p>An account has been created for you at <b>${escapeHtml(brand.schoolName)}</b>.</p><p><a href="${escapeHtml(actionLink)}">Set up your account</a> (expires in 24 hours).</p>`,
       created_by: p.createdBy ?? null
     }]);
-    await dispatchDue(svc, { budgetMs: 8000 }).catch(() => null);
+    await tryDispatch(svc, { budgetMs: 8000 }).catch(() => null);
   }
   return { userId: user.id, actionLink };
 }

@@ -16,7 +16,7 @@ import { DEFAULT_SCHEME } from "@/lib/grading";
  * insert their own profile (that let anyone join any tenant with any role).
  */
 export async function POST(req: NextRequest) {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 

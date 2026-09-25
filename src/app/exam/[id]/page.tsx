@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, use } from "react";
 import Link from "next/link";
 import QuestionView, { type PublicQuestion } from "@/components/exams/QuestionView";
 import Calculator from "@/components/exams/Calculator";
@@ -23,7 +23,8 @@ async function api(id: string, body?: unknown) {
  * tracking, copy/paste blocking, automatic lock after too many violations,
  * server-authoritative timer, autosave with an offline backup in the browser.
  */
-export default function ExamRoom({ params }: { params: { id: string } }) {
+export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const id = params.id;
   const [exam, setExam] = useState<ExamInfo | null>(null);
   const [attempt, setAttempt] = useState<AttemptState | null>(null);

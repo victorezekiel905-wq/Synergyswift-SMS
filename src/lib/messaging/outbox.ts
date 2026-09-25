@@ -145,3 +145,13 @@ export async function requeueStale(svc: any) {
   const cutoff = new Date(Date.now() - 10 * 60_000).toISOString();
   await svc.from("message_outbox").update({ status: "queued" }).eq("status", "sending").lt("next_attempt_at", cutoff);
 }
+
+/**
+ * Best-effort immediate delivery for request handlers: never throws, so a
+ * provider or database hiccup cannot fail the action that queued the message.
+ * Anything not sent here is picked up by /api/cron/dispatch.
+ */
+export async function tryDispatch(svc: any, opts: { limit?: number; budgetMs?: number; concurrency?: number } = {}) {
+  try { return await dispatchDue(svc, opts); }
+  catch (e) { console.error("dispatch deferred to cron:", (e as Error).message); return null; }
+}

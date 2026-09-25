@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 
 const VALID = new Set(["present", "absent", "tardy", "excused"]);
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const sb = createClient();
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
@@ -59,8 +60,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   });
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const sb = createClient();
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 

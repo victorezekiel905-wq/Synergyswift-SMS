@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { guardiansByStudent, rowsForGuardian, enqueue, dispatchDue, loadBrand, type OutboxRow } from "@/lib/messaging/outbox";
+import { guardiansByStudent, rowsForGuardian, enqueue, tryDispatch, loadBrand, type OutboxRow } from "@/lib/messaging/outbox";
 import { resultPublished } from "@/lib/messaging/templates";
 import { appUrl } from "@/lib/school";
 
@@ -70,6 +70,6 @@ export async function POST(req: NextRequest) {
     if (rows.length === before) noContact.push(c.data?.student_name ?? c.student_id);
   }
   if (rows.length) await enqueue(svc, rows);
-  const delivery = rows.length ? await dispatchDue(svc, { budgetMs: 25_000, concurrency: 10 }) : null;
+  const delivery = rows.length ? await tryDispatch(svc, { budgetMs: 25_000, concurrency: 10 }) : null;
   return NextResponse.json({ published: toPublish.length, messages_queued: rows.length, delivery, students_without_contacts: noContact });
 }

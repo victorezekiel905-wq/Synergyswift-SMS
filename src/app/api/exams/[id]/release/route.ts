@@ -9,7 +9,8 @@ import { schemeFor } from "@/lib/school";
  * result sheet: score / max × component max, for the exam's term, subject
  * and assessment component.
  */
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireCtx(ROLES.staff, "exams");
   if (ctx instanceof NextResponse) return ctx;
   const { push_to_results = false, release = true } = await readJson<{ push_to_results?: boolean; release?: boolean }>(req);

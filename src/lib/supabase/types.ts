@@ -7,7 +7,7 @@ export type ActivityKind = "multiple_choice" | "open_ended" | "poll" | "draw" | 
 export type CommandKind = "open_tab" | "close_tab" | "redirect" | "focus" | "lock";
 export type EventKind = "navigation" | "domain_blocked" | "tab_changed" | "idle" | "offline" | "focus_lost";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// Rows are intentionally loosely typed; see the note above.
 type AnyRow = { [k: string]: any };
 type TableT = { Row: AnyRow; Insert: AnyRow; Update: AnyRow };
 type FnArgs = { [k: string]: any };

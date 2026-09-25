@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { guardiansByStudent, rowsForGuardian, enqueue, dispatchDue, loadBrand, type OutboxRow } from "@/lib/messaging/outbox";
+import { guardiansByStudent, rowsForGuardian, enqueue, tryDispatch, loadBrand, type OutboxRow } from "@/lib/messaging/outbox";
 import { broadcast } from "@/lib/messaging/templates";
 import { emailConfigured, whatsappConfigured } from "@/lib/messaging/providers";
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     const { error } = await svc.from("message_outbox").update({ status: "queued", next_attempt_at: new Date().toISOString(), attempts: 0 })
       .eq("tenant_id", tid).in("id", b.ids).in("status", ["failed", "skipped"]);
     if (error) return jsonError(error.message);
-    const delivery = await dispatchDue(svc, { budgetMs: 15_000 });
+    const delivery = await tryDispatch(svc, { budgetMs: 15_000 });
     return NextResponse.json({ ok: true, delivery });
   }
 
@@ -66,6 +66,6 @@ export async function POST(req: NextRequest) {
   if (!rows.length) return jsonError("no guardians with a valid email or WhatsApp number");
   await enqueue(svc, rows);
   await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "broadcast.sent", meta: { title: b.title, recipients: rows.length } });
-  const delivery = await dispatchDue(svc, { budgetMs: 25_000, concurrency: 10 });
+  const delivery = await tryDispatch(svc, { budgetMs: 25_000, concurrency: 10 });
   return NextResponse.json({ guardians: seen.size, messages_queued: rows.length, delivery });
 }

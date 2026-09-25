@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 // §19 — Bulk roster import. CSV is parsed client-side; rows sent here as JSONB.
 // Server applies the rows under the existing security-definer RPC, dedup'd.
 export async function POST(req: NextRequest) {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();

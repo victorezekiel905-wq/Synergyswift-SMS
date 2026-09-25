@@ -9,8 +9,9 @@ type RawSlide = {
   created_at?: string;
 };
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const sb = createClient();
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: slides, error } = await sb.from("lesson_slides")
     .select("id,idx,kind,payload,created_at")
     .eq("lesson_id", params.id)
@@ -19,8 +20,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json(((slides ?? []) as RawSlide[]).map((slide: RawSlide) => flattenSlide(slide)));
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const sb = createClient();
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();

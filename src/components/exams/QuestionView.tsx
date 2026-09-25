@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type PublicQuestion = {
   id: string; type: string; prompt: string; points: number; media_url: string | null; section: string | null;
@@ -132,6 +132,8 @@ function FillBlanks({ text, value, onChange, disabled, spellcheck }: { text: str
 }
 
 function Ordering({ items, value, onChange, disabled }: { items: { id: string; text: string }[]; value: string[]; onChange: (v: string[]) => void; disabled?: boolean }) {
+  // The order the student sees is their answer, even before they move anything.
+  useEffect(() => { if (!disabled && value.length) onChange(value); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const byId = new Map(items.map(i => [i.id, i]));
   const move = (i: number, d: number) => { const n = [...value]; const j = i + d; if (j < 0 || j >= n.length) return; [n[i], n[j]] = [n[j], n[i]]; onChange(n); };
   return (

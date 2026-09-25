@@ -154,5 +154,25 @@ const claimed = await q("select count(*) n from claim_outbox(10)");
 const again = await q("select count(*) n from claim_outbox(10)");
 if (Number(claimed[0].n) === 1 && Number(again[0].n) === 0) { pass++; console.log("  ✓ claim_outbox claims once"); } else { fail++; console.log("  ✗ claim_outbox", claimed, again); }
 
+console.log("\nHardening");
+await db.exec(`insert into exams (id, tenant_id, created_by, title, status, access_code, settings)
+  values ('ab000000-0000-0000-0000-000000000000', '${T.A}', '${U.teacherA}', 'Maths exam', 'published', 'SECRET', '{"quit_password":"pw"}')`);
+await expectRows("students cannot read exam rows (codes, SEB keys)", U.studentA, "select count(*) n from exams", 0);
+await expectRows("teachers can read exam rows", U.teacherA, "select count(*) n from exams", 1);
+await expectRows("parents cannot list students or other parents", U.parentA, "select count(*) n from users where role in ('student','parent') and id <> auth.uid()", 0);
+await expectRows("parents can still see staff", U.parentA, "select count(*) n from users where role = 'teacher'", 2);
+await expectError("device rows cannot be injected into another school", U.parentA,
+  `insert into devices (tenant_id, device_uid, kind) values ('${T.B}', 'ext-evil', 'browser')`, /row-level security/);
+
+// ---- module scenario tests (appended per module) ----
+await moduleTests({ db, as, q, expectRows, expectError, expectOk, U, T });
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
+
+async function moduleTests(ctx) {
+  for (const f of fs.readdirSync(new URL("./db-tests/", import.meta.url)).filter(x => x.endsWith(".mjs")).sort()) {
+    const mod = await import(new URL(`./db-tests/${f}`, import.meta.url));
+    await mod.default(ctx);
+  }
+}

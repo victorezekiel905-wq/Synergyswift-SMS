@@ -6,7 +6,8 @@ import { provisionUser } from "@/lib/provision";
 import { appUrl, studentName } from "@/lib/school";
 
 /** Full student profile: bio, guardians, recent gate events, report cards, library loans. */
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireCtx(ROLES.staff, "sims");
   if (ctx instanceof NextResponse) return ctx;
   const tid = ctx.tenant.id;
@@ -30,7 +31,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   });
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireCtx(ROLES.sims, "sims");
   if (ctx instanceof NextResponse) return ctx;
   const parsed = StudentInput.partial().safeParse(await readJson(req));
@@ -43,7 +45,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 /** POST { action: "create_login", email } → gives the student a portal/exam login. */
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await requireCtx(ROLES.sims, "sims");
   if (ctx instanceof NextResponse) return ctx;
   const body = await readJson<{ action?: string; email?: string }>(req);

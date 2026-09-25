@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import LiveRoom from "@/components/live/LiveRoom";
 
-export default async function LiveRoomPage({ params }: { params: { id: string } }) {
-  const sb = createClient();
+export default async function LiveRoomPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
 

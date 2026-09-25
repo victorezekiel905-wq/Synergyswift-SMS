@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import LessonImportPanel from "@/components/studio/LessonImportPanel";
 
 export default async function StudioList() {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
   const { data: lessons, error } = await sb

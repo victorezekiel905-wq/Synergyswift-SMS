@@ -46,7 +46,8 @@ function attemptPayload(exam: ExamRow, attempt: any, questions: Question[]) {
   };
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await context(req, params.id);
   if ("error" in c) return c.error;
   const { svc, exam, ctx } = c;
@@ -70,7 +71,8 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("submit"), answers: z.record(z.any()).optional() })
 ]);
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await context(req, params.id);
   if ("error" in c) return c.error;
   const { svc, exam, ctx } = c;

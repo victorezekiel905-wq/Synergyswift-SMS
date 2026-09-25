@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 // The browser uses the room id as the only signalling handle; recordings are
 // handled in-browser via MediaRecorder and posted back to /api/reports later.
 export async function POST(req: NextRequest) {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const sb = createClient();
+  const sb = await createClient();
   const session = req.nextUrl.searchParams.get("session_id");
   if (!session) return NextResponse.json({ error: "session_id required" }, { status: 400 });
   const { data } = await sb.from("rtc_rooms")
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();

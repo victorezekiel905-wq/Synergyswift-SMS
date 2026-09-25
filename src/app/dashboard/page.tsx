@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function Dashboard() {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
   const { data: me } = await sb.from("users").select("id,tenant_id,role,full_name").eq("id", user.id).maybeSingle();
