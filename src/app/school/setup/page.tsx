@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Field, Badge, Empty } from "@/components/ui";
+import { LANGUAGES } from "@/lib/languages";
 
 type Tab = "profile" | "academic" | "grading" | "classes";
 
@@ -40,7 +41,7 @@ function Profile() {
     e.preventDefault();
     const keys = ["school_name", "motto", "address", "phone", "email", "logo_url", "principal_name", "brand_color", "sender_name", "reply_to_email",
       "notify_gate_events", "notify_results", "staff_start_time", "student_start_time", "geofence_lat", "geofence_lng", "geofence_radius_m",
-      "library_loan_days", "library_fine_per_day", "currency", "pickup_code_ttl_min", "exam_violation_limit", "sms_mode"];
+      "library_loan_days", "library_fine_per_day", "currency", "pickup_code_ttl_min", "exam_violation_limit", "sms_mode", "require_mfa", "default_language"];
     const body = Object.fromEntries(keys.filter(k => s[k] !== undefined).map(k => [k, typeof s[k] === "string" && /time$/.test(k) ? s[k].slice(0, 5) : s[k]]));
     const r = await send("/api/school/settings", body, "PUT");
     flash(r.ok, r.ok ? "Settings saved." : r.error ?? "Save failed");
@@ -71,6 +72,14 @@ function Profile() {
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...bool("notify_results")} /> Send results by email and WhatsApp when published</label>
         <Field label="Pickup code validity (minutes)"><input className="input" min={10} max={1440} {...num("pickup_code_ttl_min")} /></Field>
         <Field label="SMS" hint="Fallback: send an SMS when a WhatsApp message cannot be delivered. Always: send SMS as well as WhatsApp."><select className="input" value={s.sms_mode ?? "fallback"} onChange={e => setS({ ...s, sms_mode: e.target.value })}><option value="fallback">Fallback when WhatsApp fails</option><option value="always">Always send SMS too</option><option value="off">Never send SMS</option></select></Field>
+        <Field label="School language" hint="Parents who choose another home language get messages translated from this one.">
+          <select className="input" value={s.default_language ?? "en"} onChange={e => setS({ ...s, default_language: e.target.value })}>
+            {Object.entries(LANGUAGES).map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></Field>
+        <Field label="Two-factor sign-in" hint="Staff enter a code from an authenticator app as well as their password. Set it up on your own account first (Account security).">
+          <select className="input" value={s.require_mfa ?? "off"} onChange={e => setS({ ...s, require_mfa: e.target.value })}>
+            <option value="off">Optional for everyone</option>
+            <option value="admins">Required for admins, bursars and HR</option>
+            <option value="staff">Required for all staff</option></select></Field>
       </section>
       <section className="card grid gap-4 p-5 md:grid-cols-3">
         <h2 className="font-semibold md:col-span-3">Attendance</h2>

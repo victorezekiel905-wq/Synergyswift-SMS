@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
+import { LANGUAGES } from "@/lib/languages";
 
 export async function GET() {
   const ctx = await requireCtx(ROLES.staff);
@@ -33,7 +34,9 @@ const Settings = z.object({
   currency: z.string().trim().max(8).optional(),
   pickup_code_ttl_min: z.number().int().min(10).max(1440).optional(),
   exam_violation_limit: z.number().int().min(1).max(50).optional(),
-  sms_mode: z.enum(["off", "fallback", "always"]).optional()
+  sms_mode: z.enum(["off", "fallback", "always"]).optional(),
+  require_mfa: z.enum(["off", "admins", "staff"]).optional(),
+  default_language: z.string().refine(l => l in LANGUAGES, "unsupported language").optional()
 });
 
 export async function PUT(req: NextRequest) {
@@ -41,6 +44,11 @@ export async function PUT(req: NextRequest) {
   if (ctx instanceof NextResponse) return ctx;
   const parsed = Settings.safeParse(await readJson(req));
   if (!parsed.success) return jsonError(parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "));
+  // Turning on two-factor sign-in from a session without it would lock this admin out at once.
+  if (parsed.data.require_mfa && parsed.data.require_mfa !== "off") {
+    const { data: aal } = await ctx.sb.rpc("session_aal");
+    if (aal !== "aal2") return jsonError("Set up two-factor sign-in on your own account first (Account security), then turn this on.", 409);
+  }
   const clean = Object.fromEntries(Object.entries(parsed.data).map(([k, v]) => [k, v === "" ? null : v]));
   const { data, error } = await ctx.sb.from("tenant_settings")
     .upsert({ ...clean, tenant_id: ctx.tenant.id, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" })

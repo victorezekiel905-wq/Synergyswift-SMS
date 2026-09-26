@@ -1,4 +1,4 @@
-# School operations platform (v45 and v46)
+# School operations platform (v45 to v47)
 
 This release turns EduClass Fusion from a classroom-engagement tool into a full school management system. It adds a hidden platform layer for the operator, and every school runs as a fully isolated tenant.
 
@@ -27,7 +27,7 @@ Isolation is enforced in the database, not only in the app.
 - Platform admins are stored in `platform_admins`, which tenants cannot read. The platform audit log is also invisible to tenants.
 - Tables that shipped earlier with row-level security switched off (`invoices`, `feature_flags`, `assignments`, and others) are now tenant-scoped. Policies that let any user read every school's audit log, announcements or leaderboards are fixed.
 
-`npm run test:db` applies every migration to a real Postgres engine (PGlite) and checks these rules as real users. It runs 104 scenario checks, covering cross-tenant reads and writes, self-promotion, self-approval, publishing rights, suspension, deactivation, fees, payroll, health records and outbox access. The full privilege matrix is in [ACCESS_AND_ISOLATION.md](ACCESS_AND_ISOLATION.md).
+`npm run test:db` applies every migration to a real Postgres engine (PGlite) and checks these rules as real users. It runs 152 scenario checks, covering cross-tenant reads and writes, self-promotion, self-approval, publishing rights, suspension, deactivation, two-factor enforcement, fees, payroll, health records, messaging, wallets, cover, live bus and outbox access. The full privilege matrix is in [ACCESS_AND_ISOLATION.md](ACCESS_AND_ISOLATION.md).
 
 ## Results: from score sheet to the parent's phone
 
@@ -116,14 +116,51 @@ v46 adds the modules that the leading systems sell separately, so one login runs
 - Students see their homework and timetable on `/student`.
 - The app can be installed on a phone's home screen. It shows an offline page when there is no connection, and it never caches school data.
 
+## v47: trust and family engagement
+
+v47 adds what the market leaders sell as separate products (ParentSquare, ParentPay, Edulog, Arbor cover), and closes the security gap behind the largest school-data breaches.
+
+### Security
+
+- **Two-factor sign-in** (`/account/security`) with any authenticator app. Always required for super admins. Each school can require it for admins or for all staff under **School setup → Profile**. The database enforces it, so no page or API can skip it.
+- **Student data export**: the **Export data** button on a student's record downloads everything the school holds about that child as one file, for access requests under the GDPR and Nigeria's NDPA. Every export is logged.
+- **Status endpoint**: `GET /api/status` for uptime monitors. It returns `{ ok }`, or queue depth and provider status with `Authorization: Bearer $CRON_SECRET`.
+
+### Talking with families
+
+- **Parent messages** (`/school/inbox`): private two-way conversations. Teachers message families of students they teach; parents write to their child's teachers or the school office from their portal. Admins can review every thread for safeguarding, and nothing can be edited or deleted.
+- **Translation**: each parent can choose a home language. Broadcasts and messages reach them translated, and their replies reach staff in the school's language, with the original one tap away.
+- **AI drafting**: on **Messages**, describe the notice and Claude drafts it, leaving [placeholders] rather than inventing details.
+- **App notifications**: free push notifications on phones and computers, for parents and staff. Parents turn them on in their portal; staff under **Account security**.
+
+### Cashless wallet
+
+- **Tuck shop & wallets** (`/school/shop`): parents top up online (Paystack or Flutterwave, paid into the school's account) or at the bursary. The cashier scans the ID card, taps items, and charges. The till shows the child's photo, balance and **food allergies**, and refuses a sale beyond the balance, the parent's daily limit, or a frozen card.
+- Parents see every purchase, set a daily limit and a low-balance alert, and freeze a lost card from their portal. The new **cashier** role can use the till and nothing else.
+
+### Staff cover
+
+- **Cover** (`/school/cover`): record who is away (approved leave appears automatically), see every lesson that needs cover, and pick from the free staff suggested for each one. Teachers come first, then whoever has covered least this week. The database refuses anyone teaching then, absent, or already covering that period. The cover teacher is told at once and sees their duties on the same page.
+
+### Live school bus
+
+- On **School buses**, the attendant taps **Start morning trip** or **Start afternoon trip** on their phone. The phone shares its location until **End trip**, and parents of children on that bus see it on a map in their portal.
+- Save each stop's location once (tap **📍 here** while standing at the stop in the route editor). Parents then get one alert per stop when the bus is about five minutes away.
+
+### Offline register
+
+- The class register keeps working when the connection drops. A register saved offline is kept on the device and sent automatically when the connection returns. The page and the class list also open without a connection once they have been used online. Signing out warns before deleting anything not yet sent.
+
 ## Going live checklist
 
 1. Apply all migrations in `supabase/migrations` in order (Supabase SQL editor or `psql`).
 2. Set the environment variables in `.env.example`. At minimum set the Supabase keys, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`, one email provider and one WhatsApp provider.
 3. Register the WhatsApp templates in [MESSAGING.md](MESSAGING.md) and set their names. Set an SMS provider for parents without WhatsApp.
    - For online fees, set `PAYSTACK_SECRET_KEY`, or `FLW_SECRET_KEY` and `FLW_SECRET_HASH`, and point the provider's webhook at `/api/pay/webhook/<provider>`. Each school then enters its own subaccount code under **Fees → Online payments**.
-   - For AI lesson notes and report comments, set `ANTHROPIC_API_KEY`. Everything else works without it.
+   - For AI lesson notes, report comments, notice drafts and translation, set `ANTHROPIC_API_KEY`. Everything else works without it.
+   - For app notifications, run `npx web-push generate-vapid-keys` and set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT`.
+   - Point an uptime monitor at `/api/status`.
 4. Schedule `/api/cron/dispatch` every minute and `/api/cron/daily` once a day.
-5. Create yourself as platform admin: `node --env-file=.env.local scripts/make-platform-admin.mjs you@company.com`.
+5. Create yourself as platform admin: `node --env-file=.env.local scripts/make-platform-admin.mjs you@company.com`. At first sign-in you set up two-factor sign-in, which super admins must use.
 6. Sign in, open `/platform`, and create the first school. Its admin receives an invitation branded with the school's name.
 7. The school admin sets up the profile, a session and terms, grading, classes and subjects. They then import students (CSV) and add staff, and send parents their portal links.

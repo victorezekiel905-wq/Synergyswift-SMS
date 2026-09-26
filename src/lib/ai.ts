@@ -15,6 +15,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
+import { languageName } from "./languages";
 
 export const AI_MODEL = "claude-opus-5";
 
@@ -143,6 +144,62 @@ export async function generateReportComments(p: { role: "form_teacher" | "princi
   const valid = new Set(p.students.map(s => s.student_id));
   for (const c of response.parsed_output?.comments ?? []) if (valid.has(c.student_id)) out.set(c.student_id, c.comment.trim().slice(0, 600));
   return out;
+}
+
+const TranslationSchema = z.object({ translations: z.array(z.string()) });
+
+/**
+ * Translates school messages into a parent's home language (and parents'
+ * replies back). Names, dates, amounts, codes and links are kept exactly.
+ * Returns the inputs unchanged when the output does not line up.
+ */
+export async function translateTexts(p: { texts: string[]; target: string; source?: string | null }): Promise<string[]> {
+  if (!p.texts.length) return [];
+  const response = await anthropic().messages.parse(
+    {
+      model: AI_MODEL,
+      max_tokens: 8000,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "low", format: zodOutputFormat(TranslationSchema) },
+      system:
+        "You translate messages between a school and families. Translate faithfully and naturally, keeping the tone polite and warm. " +
+        "Keep names, dates, times, amounts, codes, numbers and links exactly as written. Do not add or leave out anything. " +
+        "Return one translation per input, in the same order.",
+      messages: [{
+        role: "user",
+        content: `Translate from ${p.source ? languageName(p.source) : "the source language"} into ${languageName(p.target)}.\nInputs (JSON array):\n${JSON.stringify(p.texts)}`
+      }],
+      fallbacks: "default"
+    },
+    { headers: { "anthropic-beta": FALLBACK_BETA } }
+  );
+  const out = response.parsed_output?.translations;
+  if (response.stop_reason === "refusal" || !out || out.length !== p.texts.length) return p.texts;
+  return out.map((t, i) => t.trim() || p.texts[i]);
+}
+
+const NoticeSchema = z.object({ title: z.string(), body: z.string() });
+
+/** Drafts a notice to parents from a short instruction. The sender edits it before sending. */
+export async function draftNotice(p: { instruction: string; schoolName: string; tone?: "friendly" | "formal" | "urgent" }) {
+  const response = await anthropic().messages.parse(
+    {
+      model: AI_MODEL,
+      max_tokens: 4000,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "low", format: zodOutputFormat(NoticeSchema) },
+      system:
+        `You write notices from ${p.schoolName} to parents. Use plain, ${p.tone ?? "friendly"} English that reads well on a phone. ` +
+        "Keep it under 150 words, lead with what parents need to know or do, and include any date, time, place or cost given. " +
+        "Never invent facts that were not given; leave a clear [placeholder] instead. The title is at most 8 words.",
+      messages: [{ role: "user", content: p.instruction }],
+      fallbacks: "default"
+    },
+    { headers: { "anthropic-beta": FALLBACK_BETA } }
+  );
+  if (response.stop_reason === "refusal") throw new AiRefusal("The AI declined to draft this notice.");
+  if (!response.parsed_output) throw new Error("The AI response could not be read; please try again.");
+  return { title: response.parsed_output.title.slice(0, 120), body: response.parsed_output.body.slice(0, 3000) };
 }
 
 /** Maps SDK errors to messages a teacher can act on. */

@@ -163,6 +163,7 @@ export type Me = {
   platform: boolean;
   group?: boolean;
   account?: { state: string; school?: string };
+  platform_mfa?: boolean;
   is_guardian: boolean;
 };
 

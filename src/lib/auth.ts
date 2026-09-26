@@ -25,7 +25,7 @@ export const ROLES = {
   admin: ["school_admin", "principal", "platform_admin"],
   staff: ["teacher", "school_admin", "it_admin", "platform_admin", "principal", "bursar",
           "librarian", "hr_manager", "qa_officer", "gate_officer", "transport_officer",
-          "hostel_warden", "nurse", "admissions_officer"],
+          "hostel_warden", "nurse", "admissions_officer", "cashier"],
   sims: ["school_admin", "principal", "platform_admin", "it_admin"],
   gate: ["gate_officer", "school_admin", "principal", "platform_admin"],
   library: ["librarian", "school_admin", "principal", "platform_admin"],
@@ -39,17 +39,19 @@ export const ROLES = {
   hostel: ["hostel_warden", "school_admin", "principal", "platform_admin"],
   health: ["nurse", "hostel_warden", "school_admin", "principal", "platform_admin"],
   admissions: ["admissions_officer", "school_admin", "principal", "platform_admin"],
-  reviewer: ["school_admin", "principal", "qa_officer", "platform_admin"]
+  reviewer: ["school_admin", "principal", "qa_officer", "platform_admin"],
+  till: ["cashier", "bursar", "school_admin", "principal", "platform_admin"],
+  cover: ["school_admin", "principal", "platform_admin"]
 } as const;
 
 /** Every assignable staff role, in the order shown in HR. */
 export const STAFF_ROLE_OPTIONS = ["teacher", "school_admin", "principal", "it_admin", "bursar", "librarian",
-  "hr_manager", "qa_officer", "gate_officer", "transport_officer", "hostel_warden", "nurse", "admissions_officer"] as const;
+  "hr_manager", "qa_officer", "gate_officer", "transport_officer", "hostel_warden", "nurse", "admissions_officer", "cashier"] as const;
 
 export type ModuleKey = "lms" | "sims" | "results" | "exams" | "gate" | "pickup" | "library"
   | "requisitions" | "hr" | "qa" | "messaging" | "fees" | "payroll" | "inventory" | "admissions"
   | "attendance" | "behaviour" | "homework" | "health" | "events" | "meetings" | "timetable"
-  | "transport" | "hostel" | "visitors" | "lesson_notes" | "analytics";
+  | "transport" | "hostel" | "visitors" | "lesson_notes" | "analytics" | "wallet" | "inbox" | "cover";
 
 export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -99,4 +101,11 @@ export async function requirePlatformAdmin(): Promise<{ sb: any; userId: string 
 
 export async function readJson<T = Record<string, unknown>>(req: Request): Promise<T> {
   try { return (await req.json()) as T; } catch { return {} as T; }
+}
+
+/** The signed-in user's school and time zone, for routes that also accept a parent link token. */
+export async function sessionIdentity(): Promise<{ tenantId: string; userId: string; timezone: string } | null> {
+  const ctx = await getCtx();
+  if (!ctx || ctx.tenant.status !== "active") return null;
+  return { tenantId: ctx.tenant.id, userId: ctx.userId, timezone: ctx.tenant.timezone };
 }

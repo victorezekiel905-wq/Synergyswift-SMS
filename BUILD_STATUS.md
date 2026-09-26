@@ -94,3 +94,24 @@ Also fixed: ESLint had never run because no config existed. It now runs, and the
 Verified: `npm test` (66 unit tests), `npm run test:db` (19 migrations on a fresh database, the new ones re-run for idempotency, 104 checks), `npm run lint`, `next build`.
 
 Not verified here: live email, WhatsApp, SMS, payment and AI calls (these need real keys), and a real Safe Exam Browser client.
+
+## v47: trust and family engagement
+
+Built from research into about 25 leading school systems (see [docs/COMPETITIVE_POSITIONING.md](docs/COMPETITIVE_POSITIONING.md)).
+
+| Area | Status |
+|---|---|
+| Two-factor sign-in (authenticator app): mandatory for super admins, optional per school for admins or all staff, enforced by the database | ✅ built |
+| Two-way parent-staff messaging, safeguarding view for admins, permanent record, rate limits | ✅ built |
+| Translation of broadcasts and messages into 40 home languages; AI-drafted notices | ✅ built |
+| Free app push notifications for parents and staff | ✅ built |
+| Cashless wallet: online and bursary top-ups, tuck shop till with allergy warnings, daily limits, lost-card freeze, new cashier role | ✅ built |
+| Staff absence and cover with free-staff suggestions | ✅ built |
+| Live bus location during trips, and alerts about five minutes before each stop | ✅ built |
+| Offline class register | ✅ built |
+| Student data export (GDPR, NDPA), uptime status endpoint | ✅ built |
+| Platform console lists every module (19 were missing) | ✅ fixed |
+
+Verified: `npm test` (78 unit tests), `npm run test:db` (20 migrations on a fresh database, the new ones re-run for idempotency, 152 checks), `npm run lint`, `next build`.
+
+Not verified here: live email, WhatsApp, SMS, payment, AI and push delivery (these need real keys and devices), and a real Safe Exam Browser client.

@@ -6,7 +6,13 @@ import { useApi, send, Page, PageHeader, Badge, statusTone, Alert, Field, fmtDat
 const MODULES: [string, string][] = [
   ["lms", "LMS (lessons, live class, challenges)"], ["sims", "Student information"], ["results", "Results & report cards"],
   ["exams", "Secure exams"], ["gate", "Sign in / out"], ["pickup", "Pickup codes"], ["library", "Library"],
-  ["requisitions", "Requisitions"], ["hr", "HR & leave"], ["qa", "Quality assurance"], ["messaging", "Email & WhatsApp"]
+  ["requisitions", "Requisitions"], ["hr", "HR & leave"], ["qa", "Quality assurance"], ["messaging", "Email, WhatsApp & SMS broadcasts"],
+  ["inbox", "Parent-staff messaging"], ["fees", "Fees & online payments"], ["wallet", "Cashless wallet & tuck shop"],
+  ["payroll", "Payroll"], ["inventory", "Accounts, stock & assets"], ["admissions", "Admissions"],
+  ["attendance", "Class register"], ["behaviour", "Behaviour & houses"], ["homework", "Homework"], ["health", "Health & sick bay"],
+  ["events", "Events & consent"], ["meetings", "Parent meetings"], ["timetable", "Timetable"], ["cover", "Staff cover"],
+  ["transport", "School buses & live tracking"], ["hostel", "Boarding & exeat"], ["visitors", "Visitors"],
+  ["lesson_notes", "Lesson notes"], ["analytics", "Early warning"]
 ];
 
 type Detail = {

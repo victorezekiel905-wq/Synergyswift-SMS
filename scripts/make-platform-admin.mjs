@@ -38,4 +38,4 @@ if (profile) {
 }
 const { error } = await sb.from("platform_admins").upsert({ user_id: userId });
 if (error) { console.error(error.message); process.exit(1); }
-console.log(`${email} is now a platform admin. Sign in and you will land on /platform.`);
+console.log(`${email} is now a platform admin. Sign in, set up an authenticator app when asked (super admins must use two-factor sign-in), and you will land on /platform.`);

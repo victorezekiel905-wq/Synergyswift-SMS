@@ -32,7 +32,8 @@ export async function GET(req: NextRequest) {
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("save_route"), id: z.string().uuid().optional(), name: z.string().trim().min(1).max(60), vehicle: z.string().trim().max(40).nullish(),
     driver_name: z.string().trim().max(80).nullish(), driver_phone: z.string().trim().max(30).nullish(), attendant_id: z.string().uuid().nullish(),
-    capacity: z.number().int().positive().max(200).nullish(), stops: z.array(z.object({ name: z.string().trim().min(1).max(80), am: z.string().max(5).nullish(), pm: z.string().max(5).nullish() })).max(40) }),
+    capacity: z.number().int().positive().max(200).nullish(), stops: z.array(z.object({ name: z.string().trim().min(1).max(80), am: z.string().max(5).nullish(), pm: z.string().max(5).nullish(),
+      lat: z.number().min(-90).max(90).nullish(), lng: z.number().min(-180).max(180).nullish() })).max(40) }),
   z.object({ action: z.literal("delete_route"), id: z.string().uuid() }),
   z.object({ action: z.literal("assign"), route_id: z.string().uuid(), student_ids: z.array(z.string().uuid()).min(1).max(200), stop_name: z.string().trim().max(80).nullish(),
     direction: z.enum(["both", "morning", "afternoon"]).default("both") }),

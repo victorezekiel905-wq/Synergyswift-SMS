@@ -2,9 +2,10 @@
 import { useState } from "react";
 import { useApi, send, Alert, Badge, Empty, fmtDate, fmtTime } from "@/components/ui";
 import FamilyTabs, { type Extras } from "./FamilyTabs";
+import { NotificationsToggle, LanguagePicker } from "./FamilyConnect";
 
 type Overview = {
-  guardian: { id: string; full_name: string; notify_email: boolean; notify_whatsapp: boolean; email: string | null; phone: string | null };
+  guardian: { id: string; full_name: string; notify_email: boolean; notify_whatsapp: boolean; email: string | null; phone: string | null; language?: string | null };
   school: { school_name: string | null; logo_url: string | null; brand_color: string | null; phone: string | null } | null;
   extras?: Extras;
   children: {
@@ -133,6 +134,11 @@ export default function GuardianPortal({ api, act, mode, token }: { api: string;
         ))}
       </div>
       {data.extras && data.children.length > 0 && <FamilyTabs extras={data.extras} kids={data.children} token={token} onChange={reload} />}
+      <section className="card mt-5 space-y-3 p-4 text-sm">
+        <h3 className="font-semibold">Notifications and language</h3>
+        <NotificationsToggle token={token} />
+        <LanguagePicker token={token} value={data.guardian.language ?? null} />
+      </section>
       {mode === "token" && (
         <section className="card mt-5 p-4 text-sm">
           <h3 className="mb-2 font-semibold">How we contact you</h3>

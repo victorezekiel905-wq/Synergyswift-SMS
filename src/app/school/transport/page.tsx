@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, fmtTime, rolesOf, type Me } from "@/components/ui";
 
 type Route = { id: string; name: string; vehicle: string | null; driver_name: string | null; driver_phone: string | null; attendant_id: string | null; capacity: number | null;
-  stops: { name: string; am?: string | null; pm?: string | null }[]; users: { full_name: string } | null; transport_assignments: { count: number }[] };
+  stops: { name: string; am?: string | null; pm?: string | null; lat?: number | null; lng?: number | null }[]; users: { full_name: string } | null; transport_assignments: { count: number }[] };
 
 export default function TransportPage() {
   const { data: me } = useApi<Me>("/api/me");
@@ -19,10 +19,64 @@ export default function TransportPage() {
       {!data?.routes.length ? <Empty>No routes yet.{manager ? " Add one under Routes & riders." : ""}</Empty> : tab === "bus" ? (
         <>
           <select className="input mb-3 w-auto" value={routeId} onChange={e => setRouteId(e.target.value)} aria-label="Route">{data.routes.map(r => <option key={r.id} value={r.id}>{r.name}{r.vehicle ? ` (${r.vehicle})` : ""}</option>)}</select>
+          {routeId && <LiveTrip key={routeId} routeId={routeId} />}
           {routeId && <Bus routeId={routeId} route={data.routes.find(r => r.id === routeId)!} />}
         </>
       ) : <Routes routes={data.routes} reload={reload} />}
     </Page>
+  );
+}
+
+/**
+ * Shares this phone's location while a trip runs, so parents see the bus
+ * and get an alert as it nears their stop. Nothing is shared outside a trip.
+ */
+function LiveTrip({ routeId }: { routeId: string }) {
+  const [trip, setTrip] = useState<"morning" | "afternoon" | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const watch = useRef<number | null>(null);
+  const lastSent = useRef(0);
+  const wake = useRef<{ release: () => Promise<void> } | null>(null);
+
+  function stopWatching() {
+    if (watch.current !== null) navigator.geolocation.clearWatch(watch.current);
+    watch.current = null;
+    wake.current?.release().catch(() => undefined);
+    wake.current = null;
+  }
+  useEffect(() => stopWatching, []);
+
+  async function start(t: "morning" | "afternoon") {
+    setErr(null);
+    if (!("geolocation" in navigator)) { setErr("This device cannot share its location."); return; }
+    const r = await send("/api/transport/live", { action: "start", route_id: routeId, trip: t });
+    if (!r.ok) { setErr(r.error); return; }
+    setTrip(t); setStatus("Waiting for GPS…");
+    try { wake.current = await (navigator as unknown as { wakeLock: { request: (k: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock.request("screen"); } catch { /* keep going without */ }
+    watch.current = navigator.geolocation.watchPosition(async pos => {
+      if (Date.now() - lastSent.current < 15_000) return;
+      lastSent.current = Date.now();
+      const p = await send<{ alerted_stops?: string[] }>("/api/transport/live", { action: "ping", route_id: routeId, lat: pos.coords.latitude, lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy, speed: pos.coords.speed ?? null });
+      setStatus(p.ok ? `Location shared at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${p.data.alerted_stops?.length ? ` · parents alerted at ${p.data.alerted_stops.join(", ")}` : ""}` : p.error);
+    }, e => setErr(e.code === e.PERMISSION_DENIED ? "Location permission was refused. Allow it in the browser settings." : e.message), { enableHighAccuracy: true, maximumAge: 10_000, timeout: 30_000 });
+  }
+  async function end() {
+    stopWatching();
+    await send("/api/transport/live", { action: "end", route_id: routeId });
+    setTrip(null); setStatus("Trip ended. Location is no longer shared.");
+  }
+  return (
+    <section className="card mb-4 flex flex-wrap items-center gap-2 p-4">
+      <span className="mr-auto text-sm"><b>Live location</b>{trip ? <Badge tone="green">{trip} trip running</Badge> : null}
+        <span className="block text-xs text-slate-500">{status ?? "Start a trip on the attendant's phone so parents can see the bus."}</span></span>
+      {!trip ? (<>
+        <button className="btn btn-primary" onClick={() => start("morning")}>Start morning trip</button>
+        <button className="btn btn-ghost border border-slate-200" onClick={() => start("afternoon")}>Start afternoon trip</button>
+      </>) : <button className="btn btn-primary bg-rose-600" onClick={end}>End trip</button>}
+      {err && <div className="w-full"><Alert>{err}</Alert></div>}
+    </section>
   );
 }
 
@@ -100,6 +154,9 @@ function Routes({ routes, reload }: { routes: Route[]; reload: () => void }) {
             <p className="label">Stops in order (morning pickup time)</p>
             {(edit.stops ?? []).map((s, i) => <div key={i} className="mb-1 flex gap-2"><input className="input" value={s.name} onChange={e => setEdit({ ...edit, stops: edit.stops!.map((x, j) => j === i ? { ...x, name: e.target.value } : x) })} aria-label="Stop name" />
               <input className="input w-28" type="time" value={s.am ?? ""} onChange={e => setEdit({ ...edit, stops: edit.stops!.map((x, j) => j === i ? { ...x, am: e.target.value } : x) })} aria-label="Pickup time" />
+              <button type="button" className={"whitespace-nowrap text-xs " + (s.lat != null ? "text-emerald-700" : "text-slate-500")} title="Stand at the stop and tap to save its location for approach alerts"
+                onClick={() => navigator.geolocation?.getCurrentPosition(p => setEdit({ ...edit, stops: edit.stops!.map((x, j) => j === i ? { ...x, lat: p.coords.latitude, lng: p.coords.longitude } : x) }), () => setErr("Could not read this device's location."))}>
+                {s.lat != null ? "📍 set" : "📍 here"}</button>
               <button type="button" className="text-rose-600" onClick={() => setEdit({ ...edit, stops: edit.stops!.filter((_, j) => j !== i) })} aria-label="Remove stop">✕</button></div>)}
             <button type="button" className="btn btn-ghost text-xs" onClick={() => setEdit({ ...edit, stops: [...(edit.stops ?? []), { name: "", am: "" }] })}>+ Stop</button>
           </div>

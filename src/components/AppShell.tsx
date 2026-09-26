@@ -9,16 +9,17 @@ type NavLink = { href: string; label: string; roles: string[]; module?: string }
 type NavGroup = { title: string; links: NavLink[] };
 
 const STAFF = ["teacher", "school_admin", "it_admin", "platform_admin", "principal", "bursar", "librarian", "hr_manager", "qa_officer", "gate_officer",
-  "transport_officer", "hostel_warden", "nurse", "admissions_officer"];
+  "transport_officer", "hostel_warden", "nurse", "admissions_officer", "cashier"];
 const ADMIN = ["school_admin", "principal", "platform_admin"];
 const TEACH = ["teacher", "school_admin", "principal"];
 const FINANCE = ["bursar", ...ADMIN];
-const ACADEMIC = STAFF.filter(r => !["gate_officer", "librarian", "bursar", "transport_officer", "nurse", "admissions_officer", "hostel_warden"].includes(r));
+const ACADEMIC = STAFF.filter(r => !["gate_officer", "librarian", "bursar", "transport_officer", "nurse", "admissions_officer", "hostel_warden", "cashier"].includes(r));
 
 const GROUPS: NavGroup[] = [
   { title: "Home", links: [
     { href: "/dashboard", label: "Dashboard", roles: [...STAFF, "student"] },
-    { href: "/school", label: "School overview", roles: STAFF },
+    { href: "/school", label: "School overview", roles: STAFF.filter(r => r !== "cashier") },
+    { href: "/school/inbox", label: "Parent messages", roles: STAFF.filter(r => r !== "cashier"), module: "inbox" },
     { href: "/student", label: "My school", roles: ["student"] },
     { href: "/parent", label: "My children", roles: ["parent"] }
   ] },
@@ -28,6 +29,7 @@ const GROUPS: NavGroup[] = [
     { href: "/school/lesson-notes", label: "Lesson notes", roles: [...TEACH, "qa_officer"], module: "lesson_notes" },
     { href: "/school/homework", label: "Homework", roles: TEACH, module: "homework" },
     { href: "/school/timetable", label: "Timetable", roles: STAFF, module: "timetable" },
+    { href: "/school/cover", label: "Cover", roles: TEACH, module: "cover" },
     { href: "/exams", label: "Secure exams", roles: TEACH, module: "exams" },
     { href: "/teacher/studio", label: "Lesson studio", roles: TEACH, module: "lms" },
     { href: "/teacher/assess", label: "Assess", roles: TEACH, module: "lms" },
@@ -53,6 +55,7 @@ const GROUPS: NavGroup[] = [
   ] },
   { title: "Finance", links: [
     { href: "/school/fees", label: "Fees & payments", roles: FINANCE, module: "fees" },
+    { href: "/school/shop", label: "Tuck shop & wallets", roles: ["cashier", ...FINANCE], module: "wallet" },
     { href: "/school/finance", label: "Accounts & stock", roles: STAFF, module: "inventory" },
     { href: "/school/payroll", label: "Payroll & payslips", roles: STAFF, module: "payroll" },
     { href: "/school/requisitions", label: "Requisitions", roles: STAFF, module: "requisitions" }
@@ -67,6 +70,7 @@ const GROUPS: NavGroup[] = [
   ] },
   { title: "Administration", links: [
     { href: "/school/setup", label: "School setup", roles: ADMIN },
+    { href: "/account/security", label: "Account security", roles: [...STAFF, "parent", "student"] },
     { href: "/school/rollover", label: "Promote students", roles: ADMIN, module: "sims" },
     { href: "/teacher/admin", label: "Policies & audit", roles: [...ADMIN, "it_admin"] },
     { href: "/teacher/billing", label: "Billing", roles: [...ADMIN, "it_admin"] }
@@ -87,6 +91,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (bare) return;
     fetch("/api/me").then(r => r.json()).then((j: Me) => {
       setMe(j);
+      // A second factor is required before this account can see anything.
+      if ((j.platform_mfa || j.account?.state === "mfa_required") && !pathname.startsWith("/account/security")) {
+        router.replace(`/account/security?required=${j.platform_mfa ? "platform" : "school"}`);
+        return;
+      }
       if (pathname === "/") {
         if (j.platform) router.replace("/platform");
         else if (j.group && !j.profile) router.replace("/group");
@@ -100,7 +109,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (bare) return <>{children}</>;
 
   async function signOut() {
+    let unsent = 0;
+    try { unsent = JSON.parse(localStorage.getItem("educlass:register-queue") ?? "[]").length; } catch { /* storage blocked */ }
+    if (unsent && !confirm(`${unsent} register${unsent === 1 ? " has" : "s have"} not been sent yet. Signing out deletes ${unsent === 1 ? "it" : "them"} from this device. Sign out anyway?`)) return;
     await createClient().auth.signOut();
+    // Class lists and unsent registers kept for offline use belong to this user only.
+    try { Object.keys(localStorage).filter(k => k.startsWith("educlass:")).forEach(k => localStorage.removeItem(k)); } catch { /* storage blocked */ }
     router.push("/login");
     router.refresh();
   }
@@ -108,7 +122,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const roles = rolesOf(me);
   const modules = me?.tenant?.modules ?? {};
   const groups: NavGroup[] = me?.platform
-    ? [{ title: "Platform", links: [{ href: "/platform", label: "Schools", roles: [] }, { href: "/platform/groups", label: "School groups", roles: [] }] }]
+    ? [{ title: "Platform", links: [{ href: "/platform", label: "Schools", roles: [] }, { href: "/platform/groups", label: "School groups", roles: [] }, { href: "/account/security", label: "Account security", roles: [] }] }]
     : me?.group && !me.profile
     ? [{ title: "Group", links: [{ href: "/group", label: "All branches", roles: [] }] }]
     : GROUPS.map(g => ({ ...g, links: g.links.filter(l => l.roles.some(r => roles.has(r)) && (!l.module || modules[l.module] !== false)) }))

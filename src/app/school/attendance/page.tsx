@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Field, Badge } from "@/components/ui";
 
 type Status = "present" | "absent" | "late" | "excused";
@@ -9,8 +9,22 @@ type Report = { from: string; to: string; students: { id: string; admission_no: 
 
 const COLORS: Record<Status, string> = { present: "bg-emerald-600", absent: "bg-rose-600", late: "bg-amber-500", excused: "bg-slate-500" };
 
+// Offline register: the class list is kept on this device, and a register
+// saved without a connection waits here until it can be sent.
+type Entry = { student_id: string; status: Status; reason: string | null };
+type Queued = { cg: string; date: string; entries: Entry[]; at: string };
+const QUEUE = "educlass:register-queue";
+const local = {
+  get<T>(k: string, fallback: T): T { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) as T : fallback; } catch { return fallback; } },
+  set(k: string, v: unknown) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage full or blocked */ } }
+};
+const isNetworkError = (e: string | null) => !navigator.onLine || /fetch|network|load failed|offline/i.test(e ?? "");
+
 export default function AttendancePage() {
-  const { data: structure } = useApi<{ class_groups: { id: string; name: string }[] }>("/api/school/structure");
+  const { data: live } = useApi<{ class_groups: { id: string; name: string }[] }>("/api/school/structure");
+  const [cachedStructure, setCachedStructure] = useState<{ class_groups: { id: string; name: string }[] } | null>(null);
+  useEffect(() => { if (live) local.set("educlass:structure", live); else setCachedStructure(local.get("educlass:structure", null)); }, [live]);
+  const structure = live ?? cachedStructure;
   const [cg, setCg] = useState("");
   const [tab, setTab] = useState<"register" | "report">("register");
   useEffect(() => { if (!cg && structure?.class_groups[0]) setCg(structure.class_groups[0].id); }, [structure, cg]);
@@ -28,10 +42,42 @@ export default function AttendancePage() {
 
 function RegisterView({ cg }: { cg: string }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const { data, error, reload } = useApi<Register>(`/api/attendance?class_group_id=${cg}&date=${date}`, [cg, date]);
+  const { data: fresh, error, reload } = useApi<Register>(`/api/attendance?class_group_id=${cg}&date=${date}`, [cg, date]);
+  const [offlineCopy, setOfflineCopy] = useState<Register | null>(null);
+  const rosterKey = `educlass:register:${cg}`;
+  useEffect(() => {
+    if (fresh) { local.set(rosterKey, { ...fresh, students: fresh.students.map(s => ({ ...s, mark: null, signed_in_at_gate: false })) }); setOfflineCopy(null); }
+    else if (error) setOfflineCopy(local.get<Register | null>(rosterKey, null));
+  }, [fresh, error, rosterKey]);
+  const data = fresh ?? (offlineCopy ? { ...offlineCopy, date, taken: false } : null);
   const [marks, setMarks] = useState<Record<string, { status: Status; reason: string }>>({});
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState(0);
+
+  // Send registers saved while offline, as soon as the connection is back.
+  const flush = useCallback(async () => {
+    const queue = local.get<Queued[]>(QUEUE, []);
+    setPending(queue.length);
+    if (!queue.length || !navigator.onLine) return;
+    const left: Queued[] = [];
+    let sent = 0, rejected = 0;
+    for (const q of queue) {
+      try {
+        const res = await fetch("/api/attendance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ class_group_id: q.cg, date: q.date, entries: q.entries }) });
+        if (res.ok) sent++; else if (res.status >= 500 || res.status === 401) left.push(q); else rejected++;
+      } catch { left.push(q); }
+    }
+    local.set(QUEUE, left);
+    setPending(left.length);
+    if (sent || rejected) setMsg({ ok: !rejected, text: `${sent} register${sent === 1 ? "" : "s"} saved offline ${sent === 1 ? "has" : "have"} now been sent.${rejected ? ` ${rejected} could not be accepted; please take ${rejected === 1 ? "it" : "them"} again.` : ""}` });
+  }, []);
+  useEffect(() => {
+    flush();
+    window.addEventListener("online", flush);
+    const t = setInterval(flush, 60_000);
+    return () => { window.removeEventListener("online", flush); clearInterval(t); };
+  }, [flush]);
   useEffect(() => {
     if (!data) return;
     // Default: the saved mark, else present if they signed in at the gate (or if the gate is not used), else absent.
@@ -42,8 +88,16 @@ function RegisterView({ cg }: { cg: string }) {
   const counts = Object.values(marks).reduce((a, m) => ({ ...a, [m.status]: (a[m.status] ?? 0) + 1 }), {} as Record<string, number>);
   async function save() {
     setBusy(true);
-    const r = await send("/api/attendance", { class_group_id: cg, date, entries: Object.entries(marks).map(([student_id, m]) => ({ student_id, status: m.status, reason: m.reason || null })) });
+    const entries: Entry[] = Object.entries(marks).map(([student_id, m]) => ({ student_id, status: m.status, reason: m.reason || null }));
+    const r = navigator.onLine ? await send("/api/attendance", { class_group_id: cg, date, entries }) : { ok: false, data: {} as any, error: "offline" };
     setBusy(false);
+    if (!r.ok && isNetworkError(r.error)) {
+      const queue = local.get<Queued[]>(QUEUE, []).filter(q => !(q.cg === cg && q.date === date));
+      local.set(QUEUE, [...queue, { cg, date, entries, at: new Date().toISOString() }]);
+      setPending(queue.length + 1);
+      setMsg({ ok: true, text: "No connection. The register is saved on this device and will be sent automatically when you are back online." });
+      return;
+    }
     setMsg({ ok: r.ok, text: r.ok ? `Register saved.${r.data.messages_queued ? ` ${r.data.messages_queued} parent messages sent.` : ""}` : r.error ?? "failed" });
     if (r.ok) reload();
   }
@@ -54,7 +108,9 @@ function RegisterView({ cg }: { cg: string }) {
         <div className="flex gap-2 pb-2 text-sm">{(["present", "late", "absent", "excused"] as Status[]).map(s => <Badge key={s} tone={s === "present" ? "green" : s === "absent" ? "red" : s === "late" ? "amber" : "slate"}>{counts[s] ?? 0} {s}</Badge>)}</div>
         <button className="btn btn-primary ml-auto" disabled={busy || !data?.students.length} onClick={save}>{busy ? "Saving…" : data?.taken ? "Update register" : "Save register"}</button>
       </div>
-      {error && <Alert>{error}</Alert>}
+      {error && !offlineCopy && <Alert>{error}</Alert>}
+      {offlineCopy && !fresh && <div className="mb-3"><Alert tone="amber">You are offline. This is the class list saved on this device; the register will be sent when you reconnect.</Alert></div>}
+      {pending > 0 && <div className="mb-3"><Alert tone="blue">{pending} register{pending === 1 ? "" : "s"} waiting to be sent from this device.</Alert></div>}
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
       {!data?.students.length ? <Empty>No students in this class.</Empty> : (
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">

@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { confirmOnlinePayment } from "@/lib/fees";
 import { verifyWebhook, type Provider } from "@/lib/payments";
 import { appUrl } from "@/lib/school";
+import { confirmWalletTopUp } from "@/lib/wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ provider
   let body: any = {};
   try { body = JSON.parse(raw); } catch { return new NextResponse("bad body", { status: 400 }); }
   const reference = provider === "paystack" ? body?.data?.reference : body?.data?.tx_ref ?? body?.txRef;
-  if (reference) await confirmOnlinePayment(createServiceClient(), String(reference), appUrl(req));
+  if (reference && String(reference).startsWith("WAL-")) await confirmWalletTopUp(createServiceClient(), String(reference));
+  else if (reference) await confirmOnlinePayment(createServiceClient(), String(reference), appUrl(req));
   return NextResponse.json({ ok: true });
 }

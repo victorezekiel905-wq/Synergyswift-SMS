@@ -7,15 +7,17 @@
  * failed with a retryable error) is picked up by /api/cron/dispatch.
  */
 import { sendEmail, sendWhatsApp, sendSms, smsText, normalizePhone } from "./providers";
+import { sendPush, pushPayload } from "./push";
 import type { Brand, Rendered } from "./templates";
 
 export type Guardian = {
   id: string; full_name: string; email: string | null; phone: string | null; whatsapp_phone: string | null;
   notify_email: boolean; notify_whatsapp: boolean; notify_sms?: boolean; portal_token?: string;
+  user_id?: string | null; language?: string | null; push_subscriptions?: { id: string }[];
 };
 
 export type OutboxRow = {
-  tenant_id: string; channel: "email" | "whatsapp" | "sms"; to_address: string; to_name?: string | null;
+  tenant_id: string; channel: "email" | "whatsapp" | "sms" | "push"; to_address: string; to_name?: string | null;
   kind: string; subject?: string | null; body_text: string; body_html?: string | null;
   template_name?: string | null; template_params?: string[]; ref_id?: string | null; created_by?: string | null;
 };
@@ -61,6 +63,12 @@ export function rowsForGuardian(tenantId: string, g: Guardian, kind: string, r: 
     rows.push({ tenant_id: tenantId, channel: "sms", to_address: sms, to_name: g.full_name, kind,
       subject: r.subject, body_text: smsText(r.wa.text), ref_id: refId, created_by: createdBy });
   }
+  // Push to every device where the parent turned notifications on. Free, so always sent.
+  const url = g.user_id ? "/parent" : g.portal_token ? `/g/${g.portal_token}` : "/";
+  for (const sub of g.push_subscriptions ?? []) {
+    rows.push({ tenant_id: tenantId, channel: "push", to_address: sub.id, to_name: g.full_name, kind,
+      subject: r.subject, body_text: smsText(r.wa.text).slice(0, 240), template_params: [url], ref_id: refId, created_by: createdBy });
+  }
   return rows;
 }
 
@@ -71,7 +79,7 @@ export async function guardiansByStudent(svc: any, tenantId: string, studentIds:
   for (let i = 0; i < studentIds.length; i += 200) {
     const chunk = studentIds.slice(i, i + 200);
     const { data } = await svc.from("student_guardians")
-      .select("student_id, guardians(id,full_name,email,phone,whatsapp_phone,notify_email,notify_whatsapp,notify_sms,portal_token)")
+      .select("student_id, guardians(id,user_id,full_name,email,phone,whatsapp_phone,notify_email,notify_whatsapp,notify_sms,portal_token,language,push_subscriptions(id))")
       .eq("tenant_id", tenantId).in("student_id", chunk);
     for (const row of data ?? []) {
       if (!row.guardians) continue;
@@ -109,6 +117,7 @@ type Claimed = OutboxRow & { id: string; attempts: number };
 async function deliver(svc: any, m: Claimed, brandCache: Map<string, Awaited<ReturnType<typeof loadBrand>>>) {
   let brand = brandCache.get(m.tenant_id);
   if (!brand) { brand = await loadBrand(svc, m.tenant_id); brandCache.set(m.tenant_id, brand); }
+  if (m.channel === "push") return deliverPush(svc, m);
   const res = m.channel === "email"
     ? await sendEmail({ to: m.to_address, toName: m.to_name, subject: m.subject ?? brand.schoolName, text: m.body_text, html: m.body_html, fromName: brand.senderName, replyTo: brand.replyTo })
     : m.channel === "sms"
@@ -134,6 +143,57 @@ async function deliver(svc: any, m: Claimed, brandCache: Map<string, Awaited<Ret
   await svc.from("message_outbox").update({ status: "failed", last_error: res.error }).eq("id", m.id);
   await smsFallback(svc, m);
   return "failed" as const;
+}
+
+async function deliverPush(svc: any, m: Claimed) {
+  const { data: sub } = await svc.from("push_subscriptions").select("id,endpoint,p256dh,auth").eq("id", m.to_address).maybeSingle();
+  if (!sub) {
+    await svc.from("message_outbox").update({ status: "skipped", last_error: "device unsubscribed" }).eq("id", m.id);
+    return "skipped" as const;
+  }
+  const res = await sendPush(sub, pushPayload({ title: m.subject ?? "School update", body: m.body_text, url: m.template_params?.[0], tag: m.kind }));
+  if (res.ok) {
+    await svc.from("message_outbox").update({ status: "sent", sent_at: new Date().toISOString(), last_error: null }).eq("id", m.id);
+    return "sent" as const;
+  }
+  if (res.gone) {
+    await svc.from("push_subscriptions").delete().eq("id", sub.id);
+    await svc.from("message_outbox").update({ status: "skipped", last_error: res.error }).eq("id", m.id);
+    return "skipped" as const;
+  }
+  if (res.notConfigured) {
+    await svc.from("message_outbox").update({ status: "skipped", last_error: res.error }).eq("id", m.id);
+    return "skipped" as const;
+  }
+  if (res.retryable && m.attempts < MAX_ATTEMPTS) {
+    await svc.from("message_outbox").update({ status: "queued", last_error: res.error,
+      next_attempt_at: new Date(Date.now() + Math.pow(2, m.attempts) * 60_000).toISOString() }).eq("id", m.id);
+    return "retry" as const;
+  }
+  await svc.from("message_outbox").update({ status: "failed", last_error: res.error }).eq("id", m.id);
+  return "failed" as const;
+}
+
+/** Push to a member of staff's devices, falling back to email when they have none. */
+export async function staffRows(svc: any, p: { tenantId: string; userIds: string[]; kind: string; subject: string; text: string; url: string; refId?: string | null }): Promise<OutboxRow[]> {
+  if (!p.userIds.length) return [];
+  const [{ data: users }, { data: subs }] = await Promise.all([
+    svc.from("users").select("id,full_name,email").eq("tenant_id", p.tenantId).in("id", p.userIds),
+    svc.from("push_subscriptions").select("id,user_id").eq("tenant_id", p.tenantId).in("user_id", p.userIds)
+  ]);
+  const rows: OutboxRow[] = [];
+  for (const u of users ?? []) {
+    const mine = (subs ?? []).filter((x: { user_id: string }) => x.user_id === u.id);
+    for (const sub of mine) {
+      rows.push({ tenant_id: p.tenantId, channel: "push", to_address: sub.id, to_name: u.full_name, kind: p.kind,
+        subject: p.subject, body_text: p.text.slice(0, 240), template_params: [p.url], ref_id: p.refId ?? null });
+    }
+    if (!mine.length && u.email) {
+      rows.push({ tenant_id: p.tenantId, channel: "email", to_address: u.email, to_name: u.full_name, kind: p.kind,
+        subject: p.subject, body_text: `${p.text}\n\nOpen: ${p.url}`, ref_id: p.refId ?? null });
+    }
+  }
+  return rows;
 }
 
 /**

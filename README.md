@@ -4,6 +4,15 @@ Multi-tenant SaaS platform that fuses **interactive learning** with **classroom 
 
 > No mocks. Every UI hits real Supabase tables; every screen writes real rows; every leaderboard is live; every device event is persisted.
 
+## New in v47: trust and family engagement
+
+- **Two-factor sign-in**, mandatory for super admins and optional per school, enforced by the database. This closes the gap behind the 2024 PowerSchool breach.
+- **Two-way parent messaging** with translation into 40 languages, a safeguarding view for admins, and AI-drafted notices.
+- **Free app notifications** on phones and computers.
+- **Cashless wallet and tuck shop till**: online top-ups, allergy warnings at the till, daily limits, lost-card freeze.
+- **Staff cover** with free-staff suggestions, a **live bus map** with alerts before each stop, and an **offline class register**.
+- **Student data export** for access requests, and a **status endpoint** for uptime monitoring.
+
 ## New in v46: the whole school on one login
 
 - **Fees and payments**: invoices with pay links, Paystack and Flutterwave paid into each school's own account, receipts, reminders, and optional withholding of results for debtors.
@@ -31,7 +40,7 @@ Read [docs/SCHOOL_OPERATIONS.md](docs/SCHOOL_OPERATIONS.md) first, then [docs/ME
 **Super admin access, role privileges and tenant isolation** are explained in [docs/ACCESS_AND_ISOLATION.md](docs/ACCESS_AND_ISOLATION.md).
 
 ```bash
-npm test          # unit tests: grading, exams, messaging, fees, payments, payroll, timetable, risk, behaviour
+npm test          # unit tests: grading, exams, messaging, fees, payments, payroll, timetable, risk, behaviour, bus, cover, wallet
 npm run test:db   # applies every migration to real Postgres (PGlite) and checks tenant isolation
 node --env-file=.env.local scripts/make-platform-admin.mjs you@company.com
 ```

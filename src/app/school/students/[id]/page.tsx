@@ -2,9 +2,10 @@
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useApi, send, Page, PageHeader, Alert, Badge, statusTone, Field, fmtDate, fmtTime, Modal } from "@/components/ui";
+import { LANGUAGES } from "@/lib/languages";
 import QrCode from "@/components/QrCode";
 
-type Guardian = { id: string; full_name: string; email: string | null; phone: string | null; whatsapp_phone: string | null; notify_email: boolean; notify_whatsapp: boolean; notify_sms?: boolean; user_id: string | null };
+type Guardian = { id: string; full_name: string; email: string | null; phone: string | null; whatsapp_phone: string | null; notify_email: boolean; notify_whatsapp: boolean; notify_sms?: boolean; language?: string | null; user_id: string | null };
 type Detail = {
   student: Record<string, any> & { class_groups: { id: string; name: string } | null };
   guardians: { relation: string; is_primary: boolean; can_pickup: boolean; guardians: Guardian }[];
@@ -58,6 +59,7 @@ export default function StudentDetail(props: { params: Promise<{ id: string }> }
           <HousePicker studentId={s.id} houseId={s.house_id ?? null} onChange={reload} />
           <button className="btn btn-ghost border border-slate-200" onClick={() => setCard(true)}>ID card / QR</button>
           {!s.user_id && <button className="btn btn-ghost border border-slate-200" onClick={createLogin}>Create student login</button>}
+          <a className="btn btn-ghost border border-slate-200" href={`/api/sims/students/${s.id}/export`} title="Everything held about this student, for a data access request">Export data</a>
         </>} />
       {msg && <div className="mb-4"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
 
@@ -91,6 +93,9 @@ export default function StudentDetail(props: { params: Promise<{ id: string }> }
                   <Badge tone={g.notify_email && g.email ? "green" : "slate"}>Email {g.notify_email ? "on" : "off"}</Badge>
                   <button type="button" onClick={() => guardianAction({ action: "update", guardian_id: g.id, guardian: { notify_sms: !g.notify_sms } }, g.notify_sms ? "SMS turned off" : "SMS turned on")}>
                     <Badge tone={g.notify_sms ? "green" : "slate"}>SMS {g.notify_sms ? "on" : "off"}</Badge></button>
+                  <select className="rounded border border-slate-200 bg-white px-1 text-xs" value={g.language ?? ""} aria-label={`Language for ${g.full_name}`}
+                    onChange={e => guardianAction({ action: "update", guardian_id: g.id, guardian: { language: e.target.value || null } }, "Language saved")}>
+                    <option value="">School language</option>{Object.entries(LANGUAGES).map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select>
                   <Badge tone={can_pickup ? "blue" : "red"}>{can_pickup ? "may collect" : "may not collect"}</Badge>
                   {g.user_id && <Badge tone="violet">has login</Badge>}
                 </div>

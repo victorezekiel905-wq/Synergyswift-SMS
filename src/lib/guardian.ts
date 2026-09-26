@@ -15,7 +15,7 @@ export async function guardianByToken(svc: any, token: string) {
 
 export async function guardianOverview(svc: any, tenantId: string, guardianId: string, timezone: string) {
   const [{ data: g }, { data: school }] = await Promise.all([
-    svc.from("guardians").select("id,full_name,email,phone,whatsapp_phone,notify_email,notify_whatsapp")
+    svc.from("guardians").select("id,full_name,email,phone,whatsapp_phone,notify_email,notify_whatsapp,language")
       .eq("tenant_id", tenantId).eq("id", guardianId).maybeSingle(),
     svc.from("tenant_settings").select("school_name,logo_url,brand_color,phone,email,address").eq("tenant_id", tenantId).maybeSingle()
   ]);
@@ -61,4 +61,30 @@ export async function guardianOverview(svc: any, tenantId: string, guardianId: s
       };
     })
   };
+}
+
+export type GuardianIdentity = { tenantId: string; guardianId: string; timezone: string; name: string };
+
+/**
+ * Identifies the parent behind a request: by the private link token when one
+ * is given, otherwise by the signed-in session. Returns an error message when
+ * neither identifies a guardian.
+ */
+export async function identifyGuardian(svc: any, token: string | null | undefined, session: () => Promise<{ tenantId: string; userId: string; timezone: string } | null>): Promise<GuardianIdentity | { error: string; status: number }> {
+  if (token) {
+    const g = await guardianByToken(svc, token);
+    if (!g) return { error: "This link is invalid or has been replaced.", status: 404 };
+    return { tenantId: g.tenant_id, guardianId: g.id, timezone: g.tenants.timezone, name: g.full_name };
+  }
+  const s = await session();
+  if (!s) return { error: "unauthenticated", status: 401 };
+  const { data: g } = await svc.from("guardians").select("id,full_name").eq("tenant_id", s.tenantId).eq("user_id", s.userId).maybeSingle();
+  if (!g) return { error: "no guardian record is linked to this account", status: 403 };
+  return { tenantId: s.tenantId, guardianId: g.id, timezone: s.timezone, name: g.full_name };
+}
+
+/** True when the guardian is linked to the student. */
+export async function guardianHasChild(svc: any, tenantId: string, guardianId: string, studentId: string): Promise<boolean> {
+  const { data } = await svc.from("student_guardians").select("student_id").eq("tenant_id", tenantId).eq("guardian_id", guardianId).eq("student_id", studentId).maybeSingle();
+  return Boolean(data);
 }

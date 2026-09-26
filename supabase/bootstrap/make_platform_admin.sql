@@ -7,7 +7,8 @@
 -- 2. Supabase dashboard → SQL editor → paste this file, change the email
 --    on the marked line, and run it.
 -- 3. Sign in at https://your-domain.com/login with that email and password.
---    You land on /platform (the super-admin console).
+--    You are asked to set up an authenticator app (required for super admins),
+--    then you land on /platform (the super-admin console).
 -- =========================================================================
 
 do $$

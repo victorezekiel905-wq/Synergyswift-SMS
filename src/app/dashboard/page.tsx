@@ -17,10 +17,13 @@ export default async function Dashboard() {
         </main>
       );
     }
-    const { data: platform } = await sb.rpc("is_platform_admin");
-    redirect(platform === true ? "/platform" : "/student/join");
+    if (state?.state === "mfa_required") redirect("/account/security?required=school");
+    const { data: platform } = await sb.rpc("platform_admin_state");
+    if (platform === "mfa_required") redirect("/account/security?required=platform");
+    redirect(platform === "ok" ? "/platform" : "/student/join");
   }
   if (me.role === "parent") redirect("/parent");
+  if (me.role === "cashier") redirect("/school/shop");
   // School operations roles land on the school overview; teachers keep the teaching dashboard.
   if (!["student", "teacher", "it_admin"].includes(me.role)) redirect("/school");
 

@@ -16,9 +16,10 @@ create role anon nologin; create role authenticated nologin; create role service
 create schema auth; create schema storage;
 create table auth.users (id uuid primary key, email text);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
 create table storage.buckets (id text primary key, name text, public boolean);
 grant usage on schema public, auth, storage to anon, authenticated, service_role;
-grant execute on function auth.uid() to anon, authenticated;
+grant execute on function auth.uid(), auth.jwt() to anon, authenticated;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
@@ -75,9 +76,13 @@ insert into library_books (id, tenant_id, title, total_copies, available_copies)
 `);
 
 let pass = 0, fail = 0;
+// Session assurance level: "aal2" once a second factor was verified.
+let AAL = "aal1";
+function setAal(v) { AAL = v; }
 async function as(uid, fn) {
-  await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub', '${uid}', false);`);
-  try { return await fn(); } finally { await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`); }
+  const claims = JSON.stringify({ sub: uid, aal: AAL });
+  await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub', '${uid}', false); select set_config('request.jwt.claims', '${claims}', false);`);
+  try { return await fn(); } finally { await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false); select set_config('request.jwt.claims', '', false);`); }
 }
 async function q(sql) { return (await db.query(sql)).rows; }
 async function expectRows(name, uid, sql, n) {
@@ -105,7 +110,10 @@ await expectError("tenant A cannot insert a student into tenant B", U.adminA, `i
 await expectError("tenant users cannot read platform_admins", U.adminA, "select * from platform_admins", /permission denied/);
 await expectError("tenant users cannot read platform audit", U.adminA, "select * from platform_audit_logs", /permission denied/);
 await expectRows("is_platform_admin false for tenant admin", U.adminA, "select 1 from (select is_platform_admin() v) x where v", 0);
-await expectRows("is_platform_admin true for platform admin", U.platform, "select 1 from (select is_platform_admin() v) x where v", 1);
+await expectRows("platform admin without a second factor is not a platform admin", U.platform, "select 1 from (select is_platform_admin() v) x where v", 0);
+setAal("aal2");
+await expectRows("is_platform_admin true for platform admin with a second factor", U.platform, "select 1 from (select is_platform_admin() v) x where v", 1);
+setAal("aal1");
 await expectRows("platform admin (no profile) sees no tenant data through RLS", U.platform, "select count(*) n from students", 0);
 await expectError("nobody can create tenants from the client", U.adminA, "insert into tenants (name, slug) values ('x', 'x-y')", /row-level security/);
 
@@ -168,7 +176,7 @@ await expectError("device rows cannot be injected into another school", U.parent
 function check(name, ok, detail) {
   if (ok) { pass++; console.log("  ✓", name); } else { fail++; console.log("  ✗", name, JSON.stringify(detail ?? null)); }
 }
-await moduleTests({ db, as, q, expectRows, expectError, expectOk, check, U, T });
+await moduleTests({ db, as, q, expectRows, expectError, expectOk, check, setAal, U, T });
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

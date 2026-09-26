@@ -26,8 +26,11 @@ export async function POST(req: NextRequest) {
   const { data: state } = await sb.rpc("my_account_state");
   if (state?.state === "suspended") return NextResponse.json({ error: `${state.school} is suspended. Please contact your school.`, code: "suspended" }, { status: 403 });
   if (state?.state === "deactivated") return NextResponse.json({ error: "Your account has been deactivated. Please contact your school.", code: "deactivated" }, { status: 403 });
-  const { data: isPlatform } = await sb.rpc("is_platform_admin");
-  if (isPlatform === true) return NextResponse.json({ ok: true, platform: true, already: true, next: "/platform" });
+  // The school (or the platform) requires a second factor this session does not have yet.
+  if (state?.state === "mfa_required") return NextResponse.json({ ok: true, already: true, mfa: true, next: "/account/security?required=school" });
+  const { data: platformState } = await sb.rpc("platform_admin_state");
+  if (platformState === "mfa_required") return NextResponse.json({ ok: true, already: true, mfa: true, next: "/account/security?required=platform" });
+  if (platformState === "ok") return NextResponse.json({ ok: true, platform: true, already: true, next: "/platform" });
   const { data: groups } = await sb.rpc("my_group_ids");
   if (Array.isArray(groups) && groups.length) return NextResponse.json({ ok: true, group: true, already: true, next: "/group" });
 

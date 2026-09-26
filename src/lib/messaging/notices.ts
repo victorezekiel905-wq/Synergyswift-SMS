@@ -138,3 +138,39 @@ export function staffNotice(b: Brand, p: { name: string; subject: string; line: 
     cta: p.link ? { href: p.link, label: "Open" } : undefined, tplEnv: "WHATSAPP_TPL_STAFF", params: [b.schoolName, p.line]
   });
 }
+
+export function newMessage(b: Brand, p: { guardianName: string; from: string; subject: string; text: string; link: string }) {
+  return simple(b, {
+    subject: `New message: ${p.subject}`, title: "New message", greeting: `Dear ${p.guardianName},`,
+    lines: [`${p.from} sent you a message about "${p.subject}":`, p.text.length > 600 ? `${p.text.slice(0, 600)}…` : p.text],
+    cta: { href: p.link, label: "Read and reply" },
+    tplEnv: "WHATSAPP_TPL_MESSAGE", params: [b.schoolName, p.from, p.subject, p.link]
+  });
+}
+
+export function walletTopUp(b: Brand, p: { guardianName: string; studentName: string; amount: string; balance: string }) {
+  return simple(b, {
+    subject: `Wallet topped up: ${p.studentName}`, title: "Wallet top-up", greeting: `Dear ${p.guardianName},`,
+    lines: [`${p.amount} was added to ${p.studentName}'s school wallet. New balance: ${p.balance}.`],
+    tplEnv: "WHATSAPP_TPL_WALLET", params: [b.schoolName, p.studentName, p.amount, p.balance]
+  });
+}
+
+export function walletLow(b: Brand, p: { guardianName: string; studentName: string; balance: string; link: string }) {
+  return simple(b, {
+    subject: `Low wallet balance: ${p.studentName}`, title: "Low wallet balance", greeting: `Dear ${p.guardianName},`,
+    lines: [`${p.studentName}'s school wallet balance is down to ${p.balance}.`, "You can top up from your parent portal."],
+    cta: { href: p.link, label: "Top up" },
+    tplEnv: "WHATSAPP_TPL_WALLET_LOW", params: [b.schoolName, p.studentName, p.balance, p.link]
+  });
+}
+
+export function busApproaching(b: Brand, p: { guardianName: string; studentName: string; route: string; stop: string; trip: "morning" | "afternoon" }) {
+  const line = p.trip === "morning"
+    ? `The ${p.route} bus is about 5 minutes from ${p.stop}. Please have ${p.studentName} ready.`
+    : `The ${p.route} bus with ${p.studentName} is about 5 minutes from ${p.stop}.`;
+  return simple(b, {
+    subject: `Bus nearly at ${p.stop}`, title: "School bus", greeting: `Dear ${p.guardianName},`, lines: [line],
+    tplEnv: "WHATSAPP_TPL_BUS_NEAR", params: [b.schoolName, p.route, p.stop, p.studentName]
+  });
+}

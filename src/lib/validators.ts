@@ -10,7 +10,8 @@ export const GuardianInput = z.object({
   can_pickup: z.boolean().default(true),
   notify_email: z.boolean().default(true),
   notify_whatsapp: z.boolean().default(true),
-  notify_sms: z.boolean().default(false)
+  notify_sms: z.boolean().default(false),
+  language: z.string().max(5).regex(/^[a-z]{2}$/).nullish()
 });
 
 export const StudentInput = z.object({
