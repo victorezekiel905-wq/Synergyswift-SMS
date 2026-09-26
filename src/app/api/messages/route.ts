@@ -4,7 +4,7 @@ import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { guardiansByStudent, rowsForGuardian, enqueue, tryDispatch, loadBrand, type OutboxRow } from "@/lib/messaging/outbox";
 import { broadcast } from "@/lib/messaging/templates";
-import { emailConfigured, whatsappConfigured } from "@/lib/messaging/providers";
+import { emailConfigured, whatsappConfigured, smsConfigured } from "@/lib/messaging/providers";
 
 /** Delivery log + provider status. */
 export async function GET(req: NextRequest) {
@@ -19,13 +19,13 @@ export async function GET(req: NextRequest) {
   if (kind) q = q.eq("kind", kind);
   const { data, error } = await q;
   if (error) return jsonError(error.message);
-  return NextResponse.json({ items: data ?? [], providers: { email: emailConfigured(), whatsapp: whatsappConfigured() } });
+  return NextResponse.json({ items: data ?? [], providers: { email: emailConfigured(), whatsapp: whatsappConfigured(), sms: smsConfigured() } });
 }
 
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("broadcast"), title: z.string().trim().min(2).max(120), body: z.string().trim().min(2).max(3000),
     class_group_ids: z.array(z.string().uuid()).default([]),   // empty = whole school
-    channels: z.array(z.enum(["email", "whatsapp"])).min(1).default(["email", "whatsapp"]) }),
+    channels: z.array(z.enum(["email", "whatsapp", "sms"])).min(1).default(["email", "whatsapp"]) }),
   z.object({ action: z.literal("retry"), ids: z.array(z.string().uuid()).min(1).max(500) })
 ]);
 

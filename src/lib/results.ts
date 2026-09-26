@@ -51,6 +51,23 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
     }
     days.forEach((v, k) => present.set(k, v.size));
   }
+  // The class register is the official record when it has been taken: it wins over gate sign-ins.
+  const register = new Map<string, { present: number; absent: number; opened: number }>();
+  if (term.starts_on) {
+    const { data: att } = await sb.from("class_attendance").select("student_id,status").eq("tenant_id", tenantId).in("student_id", studentIds)
+      .gte("date", term.starts_on).lte("date", term.ends_on ?? new Date().toISOString().slice(0, 10)).limit(200000);
+    for (const a of att ?? []) {
+      const m = register.get(a.student_id) ?? { present: 0, absent: 0, opened: 0 };
+      m.opened++;
+      if (a.status === "present" || a.status === "late") m.present++; else if (a.status === "absent") m.absent++;
+      register.set(a.student_id, m);
+    }
+  }
+  // Character and skills ratings for the report card.
+  const { data: traitDefs } = await sb.from("trait_definitions").select("id,domain,name,position").eq("tenant_id", tenantId).order("position");
+  const { data: traitRows } = (traitDefs ?? []).length
+    ? await sb.from("trait_ratings").select("student_id,trait_id,rating").eq("term_id", termId).in("student_id", studentIds)
+    : { data: [] };
 
   const { data: existing } = await sb.from("report_cards").select("student_id,status").eq("tenant_id", tenantId).eq("term_id", termId).in("student_id", studentIds);
   const published = new Set((existing ?? []).filter((r: any) => r.status === "published").map((r: any) => r.student_id));
@@ -72,7 +89,11 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
           show_class_average: scheme.show_class_average, bands: scheme.bands },
         components: scheme.components.map(c => ({ id: c.id, name: c.name, max_score: c.max_score, weight: c.weight })),
         subjects: r.subjects, gpa: r.gpa, subjects_taken: r.subjects_taken, subjects_passed: r.subjects_passed,
-        days_present: term.starts_on ? present.get(r.student_id) ?? 0 : null
+        days_present: register.has(r.student_id) ? register.get(r.student_id)!.present : term.starts_on ? present.get(r.student_id) ?? 0 : null,
+        days_absent: register.get(r.student_id)?.absent ?? null,
+        days_opened: register.get(r.student_id)?.opened ?? null,
+        traits: (traitDefs ?? []).map((t: any) => ({ domain: t.domain, name: t.name,
+          rating: (traitRows ?? []).find((x: any) => x.student_id === r.student_id && x.trait_id === t.id)?.rating ?? null }))
       }
     }));
   for (let i = 0; i < rows.length; i += 200) {

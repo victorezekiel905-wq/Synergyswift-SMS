@@ -7,16 +7,18 @@ type Overview = {
   counts: Record<string, number>;
 };
 
-const QUICK: { href: string; label: string; desc: string; roles?: string[] }[] = [
-  { href: "/school/results", label: "Enter scores", desc: "Score sheets, compile and publish report cards" },
+const QUICK: { href: string; label: string; desc: string }[] = [
+  { href: "/school/attendance", label: "Class register", desc: "Morning register; parents told about absences" },
+  { href: "/school/results", label: "Results", desc: "Score sheets, report cards, publish to parents" },
+  { href: "/school/fees", label: "Fees & payments", desc: "Invoices, online payment, receipts, reminders" },
+  { href: "/school/analytics", label: "Early warning", desc: "Students who need support, with reasons" },
   { href: "/school/gate", label: "Sign in / out", desc: "Gate kiosk, today's log, staff sign-in" },
   { href: "/school/students", label: "Students & parents", desc: "Records, guardians, portal links, import" },
+  { href: "/school/timetable", label: "Timetable", desc: "Auto-generated, clash-free" },
+  { href: "/school/lesson-notes", label: "Lesson notes", desc: "Write or AI-draft, then approve" },
   { href: "/exams", label: "Secure exams", desc: "Build, proctor and mark exams" },
-  { href: "/school/pickup", label: "Pickup desk", desc: "Verify parent pickup codes" },
-  { href: "/school/library", label: "Library", desc: "Catalogue, issue and return" },
-  { href: "/school/requisitions", label: "Requisitions", desc: "Request and approve purchases" },
-  { href: "/school/hr", label: "HR & leave", desc: "Staff records, roles and leave" },
-  { href: "/school/qa", label: "Quality assurance", desc: "Observations and school-health indicators" },
+  { href: "/school/admissions", label: "Admissions", desc: "Online applications to enrolment" },
+  { href: "/school/events", label: "Events & trips", desc: "Consent and payment in one step" },
   { href: "/school/messages", label: "Messages", desc: "Broadcast to parents, delivery log" }
 ];
 

@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useApi, Page, PageHeader, Alert, Empty, Badge, statusTone, fmtDate } from "@/components/ui";
+import { StudentHomework, StudentTimetable } from "@/components/student/StudentExtras";
 
 type Exam = { id: string; title: string; subject: string | null; duration_minutes: number; opens_at: string | null; closes_at: string | null; window: string; require_seb: boolean; attempt_status: string | null; score: { total: number; max: number } | null };
 type Result = { id: string; term: string; class_name: string; average: number | null; position: number | null; class_size: number | null; published_at: string; access_token: string };
@@ -10,7 +11,7 @@ export default function StudentHome() {
   const results = useApi<Result[]>("/api/student/results");
   return (
     <Page>
-      <PageHeader eyebrow="Student" title="My exams & results" />
+      <PageHeader eyebrow="Student" title="My school" />
       <section className="mb-8">
         <h2 className="mb-3 text-lg font-semibold">Exams</h2>
         {exams.error && <Alert tone="amber">{exams.error}</Alert>}
@@ -29,6 +30,14 @@ export default function StudentHome() {
             </div>
           ))}
         </div>
+      </section>
+      <section className="mb-8">
+        <h2 className="mb-3 text-lg font-semibold">Homework</h2>
+        <StudentHomework />
+      </section>
+      <section className="mb-8">
+        <h2 className="mb-3 text-lg font-semibold">My timetable</h2>
+        <StudentTimetable />
       </section>
       <section>
         <h2 className="mb-3 text-lg font-semibold">Report cards</h2>

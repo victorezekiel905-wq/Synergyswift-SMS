@@ -26,7 +26,7 @@ export default function ResultsPage() {
   const { data: me } = useApi<{ profile: { id: string; role: string; extra_roles: string[] } | null }>("/api/me");
   const [termId, setTermId] = useState("");
   const [cg, setCg] = useState("");
-  const [tab, setTab] = useState<"scores" | "cards">("scores");
+  const [tab, setTab] = useState<"scores" | "traits" | "cards">("scores");
 
   useEffect(() => {
     if (termId || !sessions) return;
@@ -57,7 +57,8 @@ export default function ResultsPage() {
       {!sessions?.length && sessions && <Alert tone="amber">Create an academic session under School setup first.</Alert>}
       {termId && cg && (
         <>
-          <Tabs value={tab} onChange={setTab} tabs={[{ id: "scores", label: "Score entry" }, { id: "cards", label: "Report cards & publishing" }]} />
+          <Tabs value={tab} onChange={setTab} tabs={[{ id: "scores", label: "Score entry" }, { id: "traits", label: "Character & skills" }, { id: "cards", label: "Report cards & publishing" }]} />
+          {tab === "traits" && <Traits termId={termId} cg={cg} isAdmin={isAdmin} />}
           {tab === "scores" && <ScoreEntry termId={termId} cg={cg} structure={structure} myId={me?.profile?.id} isAdmin={isAdmin} />}
           {tab === "cards" && <ReportCards termId={termId} cg={cg} isAdmin={isAdmin} isFormTeacher={structure?.class_groups.find(g => g.id === cg)?.form_teacher_id === me?.profile?.id} />}
         </>
@@ -210,6 +211,13 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
     setMsg({ ok: true, text: `Published ${d.published}. ${d.messages_queued} messages queued.${del}${missing}` });
     reload();
   }
+  async function aiComments(role: "form_teacher" | "principal") {
+    setBusy("ai_" + role);
+    const r = await send("/api/results/ai-comments", { term_id: termId, class_group_id: cg, role });
+    setBusy(null);
+    setMsg({ ok: r.ok, text: r.ok ? `Drafted ${r.data.drafted} comments${r.data.note ? ` (${r.data.note})` : ""}. Read and edit them before publishing.` : r.error ?? "failed" });
+    if (r.ok) reload();
+  }
   async function patch(id: string, body: Record<string, unknown>) {
     const r = await send("/api/results/report-cards", { id, ...body }, "PATCH");
     if (!r.ok) setMsg({ ok: false, text: r.error ?? "failed" });
@@ -224,6 +232,8 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
         {isAdmin && <button className="btn btn-ghost border border-slate-200" disabled={busy !== null} onClick={() => confirm("Recompute published report cards too? Parents will see the new figures on their link.") && compile(true)}>Recompute all</button>}
         {isAdmin && <button className="btn btn-primary" disabled={busy !== null || !data?.length} onClick={() => publish(false)}>{busy === "publish" ? "Publishing and sending…" : "Publish & send to parents"}</button>}
         {isAdmin && <button className="btn btn-ghost" disabled={busy !== null} onClick={() => publish(true)}>Resend</button>}
+        {(isAdmin || isFormTeacher) && <button className="btn btn-ghost border border-violet-200 text-violet-800" disabled={busy !== null || !data?.length} onClick={() => aiComments("form_teacher")}>{busy === "ai_form_teacher" ? "Writing comments…" : "AI: draft teacher comments"}</button>}
+        {isAdmin && <button className="btn btn-ghost border border-violet-200 text-violet-800" disabled={busy !== null || !data?.length} onClick={() => aiComments("principal")}>{busy === "ai_principal" ? "Writing comments…" : "AI: draft principal comments"}</button>}
         <a className="btn btn-ghost ml-auto" href={`/api/results/report-cards?term_id=${termId}&class_group_id=${cg}&format=csv`}>Download broadsheet (CSV)</a>
       </div>
       {error && <Alert>{error}</Alert>}
@@ -275,5 +285,40 @@ function CommentForm({ card, isAdmin, onSave }: { card: Card; isAdmin: boolean; 
       {isAdmin && <Field label="Principal's comment"><textarea className="input h-24" value={p} onChange={e => setP(e.target.value)} maxLength={600} /></Field>}
       <div className="flex justify-end"><button className="btn btn-primary">Save</button></div>
     </form>
+  );
+}
+
+type TraitData = { traits: { id: string; domain: string; name: string }[]; students?: { id: string; first_name: string; last_name: string; admission_no: string }[]; ratings?: { student_id: string; trait_id: string; rating: number }[] };
+
+function Traits({ termId, cg, isAdmin }: { termId: string; cg: string; isAdmin: boolean }) {
+  const { data, reload } = useApi<TraitData>(`/api/traits?term_id=${termId}&class_group_id=${cg}`, [termId, cg]);
+  const [grid, setGrid] = useState<Record<string, number | null>>({});
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => {
+    if (!data) return;
+    setGrid(Object.fromEntries((data.ratings ?? []).map(r => [`${r.student_id}|${r.trait_id}`, r.rating])));
+  }, [data]);
+  if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (!data.traits.length) return (
+    <Empty>No character or skills traits set up.{isAdmin && <button className="btn btn-primary ml-2 text-xs" onClick={async () => { await send("/api/traits", { action: "seed_defaults" }); reload(); }}>Add the standard list</button>}</Empty>
+  );
+  async function save() {
+    const ratings = Object.entries(grid).map(([k, rating]) => { const [student_id, trait_id] = k.split("|"); return { student_id, trait_id, rating }; });
+    const r = await send("/api/traits", { action: "rate", term_id: termId, ratings });
+    setMsg({ ok: r.ok, text: r.ok ? `Saved ${r.data.saved} ratings. Recompile report cards to include them.` : r.error ?? "failed" });
+  }
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between"><p className="text-sm text-slate-600">Rate each student 1 (needs improvement) to 5 (excellent). These print on the report card.</p><button className="btn btn-primary" onClick={save}>Save ratings</button></div>
+      {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
+      <div className="card overflow-x-auto"><table className="w-full text-xs">
+        <thead className="bg-slate-50"><tr><th className="p-2 text-left">Student</th>{data.traits.map(t => <th key={t.id} className="p-1" title={t.domain}><span className="block max-w-[80px] truncate">{t.name}</span></th>)}</tr></thead>
+        <tbody>{(data.students ?? []).map(s => (
+          <tr key={s.id} className="border-t border-slate-100"><td className="whitespace-nowrap p-2 text-sm">{s.last_name}, {s.first_name}</td>
+            {data.traits.map(t => { const k = `${s.id}|${t.id}`; return (
+              <td key={t.id} className="p-1 text-center"><select className="rounded border border-slate-300 px-1 py-0.5" value={grid[k] ?? ""} aria-label={`${s.first_name} ${t.name}`}
+                onChange={e => setGrid({ ...grid, [k]: e.target.value ? Number(e.target.value) : null })}><option value="">—</option>{[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n}</option>)}</select></td>); })}
+          </tr>))}</tbody></table></div>
+    </div>
   );
 }

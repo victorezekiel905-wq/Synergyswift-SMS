@@ -3,6 +3,7 @@
  * logged-in parent portal and the passwordless /g/<token> portal.
  */
 import { startOfTodayIso, studentName } from "./school";
+import { familyExtras } from "./family";
 
 export async function guardianByToken(svc: any, token: string) {
   if (!/^[0-9a-f]{32,128}$/i.test(token)) return null;
@@ -20,7 +21,7 @@ export async function guardianOverview(svc: any, tenantId: string, guardianId: s
   ]);
   if (!g) return null;
   const { data: links } = await svc.from("student_guardians")
-    .select("relation,can_pickup,students(id,first_name,last_name,other_names,admission_no,photo_url,status,class_groups(name))")
+    .select("relation,can_pickup,students(id,first_name,last_name,other_names,admission_no,photo_url,status,class_group_id,class_groups(name))")
     .eq("tenant_id", tenantId).eq("guardian_id", guardianId);
   const students = (links ?? []).filter((l: any) => l.students && l.students.status === "active");
   const ids = students.map((l: any) => l.students.id);
@@ -36,15 +37,17 @@ export async function guardianOverview(svc: any, tenantId: string, guardianId: s
     svc.from("library_loans").select("student_id,due_at,library_books(title)").eq("tenant_id", tenantId).in("student_id", ids).is("returned_at", null)
   ]) : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
+  const extras = await familyExtras(svc, tenantId, guardianId, ids, [...new Set(students.map((l: any) => l.students.class_group_id).filter(Boolean))] as string[]);
   return {
     guardian: g,
     school: school ?? null,
+    extras,
     children: students.map((l: any) => {
       const s = l.students;
       const events = (gate.data ?? []).filter((e: any) => e.student_id === s.id);
       const todays = events.filter((e: any) => e.at >= today);
       return {
-        id: s.id, name: studentName(s), admission_no: s.admission_no, photo_url: s.photo_url,
+        id: s.id, name: studentName(s), admission_no: s.admission_no, photo_url: s.photo_url, class_group_id: s.class_group_id,
         class_name: s.class_groups?.name ?? null, relation: l.relation, can_pickup: l.can_pickup,
         on_site: todays.length ? todays[0].direction === "in" : false,
         today: todays.reverse(),

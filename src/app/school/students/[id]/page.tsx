@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useApi, send, Page, PageHeader, Alert, Badge, statusTone, Field, fmtDate, fmtTime, Modal } from "@/components/ui";
 import QrCode from "@/components/QrCode";
 
-type Guardian = { id: string; full_name: string; email: string | null; phone: string | null; whatsapp_phone: string | null; notify_email: boolean; notify_whatsapp: boolean; user_id: string | null };
+type Guardian = { id: string; full_name: string; email: string | null; phone: string | null; whatsapp_phone: string | null; notify_email: boolean; notify_whatsapp: boolean; notify_sms?: boolean; user_id: string | null };
 type Detail = {
   student: Record<string, any> & { class_groups: { id: string; name: string } | null };
   guardians: { relation: string; is_primary: boolean; can_pickup: boolean; guardians: Guardian }[];
@@ -55,6 +55,7 @@ export default function StudentDetail(props: { params: Promise<{ id: string }> }
       <PageHeader title={`${s.first_name} ${s.other_names ?? ""} ${s.last_name}`} subtitle={`${s.admission_no} · ${s.class_groups?.name ?? "No class"}`}
         actions={<>
           <Badge tone={statusTone(s.status)}>{s.status}</Badge>
+          <HousePicker studentId={s.id} houseId={s.house_id ?? null} onChange={reload} />
           <button className="btn btn-ghost border border-slate-200" onClick={() => setCard(true)}>ID card / QR</button>
           {!s.user_id && <button className="btn btn-ghost border border-slate-200" onClick={createLogin}>Create student login</button>}
         </>} />
@@ -88,6 +89,8 @@ export default function StudentDetail(props: { params: Promise<{ id: string }> }
                 <div className="mt-1 flex flex-wrap gap-1">
                   <Badge tone={g.notify_whatsapp && (g.phone || g.whatsapp_phone) ? "green" : "slate"}>WhatsApp {g.notify_whatsapp ? "on" : "off"}</Badge>
                   <Badge tone={g.notify_email && g.email ? "green" : "slate"}>Email {g.notify_email ? "on" : "off"}</Badge>
+                  <button type="button" onClick={() => guardianAction({ action: "update", guardian_id: g.id, guardian: { notify_sms: !g.notify_sms } }, g.notify_sms ? "SMS turned off" : "SMS turned on")}>
+                    <Badge tone={g.notify_sms ? "green" : "slate"}>SMS {g.notify_sms ? "on" : "off"}</Badge></button>
                   <Badge tone={can_pickup ? "blue" : "red"}>{can_pickup ? "may collect" : "may not collect"}</Badge>
                   {g.user_id && <Badge tone="violet">has login</Badge>}
                 </div>
@@ -156,5 +159,16 @@ function AddGuardian({ open, onClose, onSave }: { open: boolean; onClose: () => 
         <div className="flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button className="btn btn-primary">Add</button></div>
       </form>
     </Modal>
+  );
+}
+
+function HousePicker({ studentId, houseId, onChange }: { studentId: string; houseId: string | null; onChange: () => void }) {
+  const { data } = useApi<{ houses: { id: string; name: string }[] }>("/api/behaviour");
+  if (!data?.houses.length) return null;
+  return (
+    <select className="input w-auto py-1 text-xs" value={houseId ?? ""} aria-label="House"
+      onChange={async e => { await send("/api/behaviour", { action: "assign_houses", student_ids: [studentId], house_id: e.target.value || null }); onChange(); }}>
+      <option value="">No house</option>{data.houses.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+    </select>
   );
 }

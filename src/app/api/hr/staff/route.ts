@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
+import { requireCtx, ROLES, readJson, jsonError, STAFF_ROLE_OPTIONS } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { provisionUser } from "@/lib/provision";
 import { appUrl } from "@/lib/school";
 
-const ASSIGNABLE = ["teacher", "school_admin", "principal", "it_admin", "bursar", "librarian", "hr_manager", "qa_officer", "gate_officer"] as const;
+const ASSIGNABLE = STAFF_ROLE_OPTIONS;
 
 /** Staff directory with login + role info and leave taken this year. */
 export async function GET() {

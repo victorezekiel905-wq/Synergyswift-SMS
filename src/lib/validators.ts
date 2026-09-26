@@ -9,7 +9,8 @@ export const GuardianInput = z.object({
   is_primary: z.boolean().default(false),
   can_pickup: z.boolean().default(true),
   notify_email: z.boolean().default(true),
-  notify_whatsapp: z.boolean().default(true)
+  notify_whatsapp: z.boolean().default(true),
+  notify_sms: z.boolean().default(false)
 });
 
 export const StudentInput = z.object({

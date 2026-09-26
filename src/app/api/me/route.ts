@@ -9,12 +9,19 @@ export async function GET() {
     .select("id,tenant_id,email,full_name,role,extra_roles").eq("id", user.id).maybeSingle();
   let tenant = null;
   let platform = false;
+  let group = false;
   if (profile) {
     const { data } = await sb.from("tenants").select("id,name,status,modules").eq("id", profile.tenant_id).maybeSingle();
     tenant = data;
   } else {
+    const { data: state } = await sb.rpc("my_account_state");
+    if (state?.state === "suspended" || state?.state === "deactivated") {
+      return NextResponse.json({ user: { id: user.id, email: user.email }, profile: null, tenant: null, platform: false, group: false, account: state });
+    }
     const { data } = await sb.rpc("is_platform_admin");
     platform = data === true;
+    const { data: g } = await sb.rpc("my_group_ids");
+    group = Array.isArray(g) && g.length > 0;
   }
   const [{ data: guardian }, { data: staff }] = profile ? await Promise.all([
     sb.from("guardians").select("id").eq("user_id", user.id).maybeSingle(),
@@ -25,6 +32,7 @@ export async function GET() {
     profile: profile ?? null,
     tenant,
     platform,
+    group,
     is_guardian: Boolean(guardian),
     is_staff_record: Boolean(staff)
   });

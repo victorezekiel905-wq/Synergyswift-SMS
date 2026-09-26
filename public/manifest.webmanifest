@@ -1,0 +1,13 @@
+{
+  "name": "EduClass Fusion",
+  "short_name": "EduClass",
+  "description": "School management, results, fees, attendance and parent updates in one app.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1d5ddb",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

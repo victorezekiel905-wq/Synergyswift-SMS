@@ -23,8 +23,13 @@ export async function POST(req: NextRequest) {
   const { data: existing } = await sb.from("users").select("id,tenant_id,role").eq("id", user.id).maybeSingle();
   if (existing) return NextResponse.json({ ok: true, role: existing.role, already: true, next: "/dashboard" });
 
+  const { data: state } = await sb.rpc("my_account_state");
+  if (state?.state === "suspended") return NextResponse.json({ error: `${state.school} is suspended. Please contact your school.`, code: "suspended" }, { status: 403 });
+  if (state?.state === "deactivated") return NextResponse.json({ error: "Your account has been deactivated. Please contact your school.", code: "deactivated" }, { status: 403 });
   const { data: isPlatform } = await sb.rpc("is_platform_admin");
   if (isPlatform === true) return NextResponse.json({ ok: true, platform: true, already: true, next: "/platform" });
+  const { data: groups } = await sb.rpc("my_group_ids");
+  if (Array.isArray(groups) && groups.length) return NextResponse.json({ ok: true, group: true, already: true, next: "/group" });
 
   const body = await req.json().catch(() => ({}));
   const role = String(body.role ?? "");

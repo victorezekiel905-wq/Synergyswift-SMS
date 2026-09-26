@@ -151,3 +151,64 @@ export async function sendWhatsApp(m: WhatsAppMessage): Promise<SendResult> {
     return { ok: false, error: `whatsapp network error: ${(e as Error).message}`, retryable: true };
   }
 }
+
+// ---------------------------------------------------------------------------
+// SMS: reaches parents without WhatsApp or data. SMS_PROVIDER=termii|twilio|africastalking
+//   termii:          TERMII_API_KEY, SMS_SENDER_ID (registered sender name), TERMII_CHANNEL (generic|dnd)
+//   twilio:          TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_SMS_FROM
+//   africastalking:  AT_USERNAME, AT_API_KEY, SMS_SENDER_ID (optional)
+// ---------------------------------------------------------------------------
+export type SmsMessage = { to: string; text: string };
+
+export function smsConfigured(): boolean {
+  const p = env("SMS_PROVIDER");
+  if (p === "termii") return Boolean(env("TERMII_API_KEY") && env("SMS_SENDER_ID"));
+  if (p === "twilio") return Boolean(env("TWILIO_ACCOUNT_SID") && env("TWILIO_AUTH_TOKEN") && env("TWILIO_SMS_FROM"));
+  if (p === "africastalking") return Boolean(env("AT_USERNAME") && env("AT_API_KEY"));
+  return false;
+}
+
+/** Plain text suitable for SMS: no WhatsApp formatting, trimmed to 3 segments. */
+export function smsText(s: string): string {
+  return s.replace(/[*_~]/g, "").replace(/\n{2,}/g, "\n").trim().slice(0, 459);
+}
+
+export async function sendSms(m: SmsMessage): Promise<SendResult> {
+  if (!smsConfigured()) return { ok: false, error: "sms provider not configured", retryable: false, notConfigured: true };
+  const to = normalizePhone(m.to);
+  if (!to) return { ok: false, error: `invalid phone number: ${m.to}`, retryable: false };
+  const text = smsText(m.text);
+  const p = env("SMS_PROVIDER");
+  try {
+    if (p === "termii") {
+      const r = await fetch("https://api.ng.termii.com/api/sms/send", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, from: env("SMS_SENDER_ID"), sms: text, type: "plain", channel: env("TERMII_CHANNEL") ?? "dnd", api_key: env("TERMII_API_KEY") })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && (j.message_id || j.code === "ok")) return { ok: true, providerId: j.message_id };
+      return { ok: false, error: `termii ${r.status}: ${JSON.stringify(j).slice(0, 300)}`, retryable: classify(r.status) };
+    }
+    if (p === "twilio") {
+      const sid = env("TWILIO_ACCOUNT_SID")!;
+      const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+        method: "POST",
+        headers: { Authorization: "Basic " + Buffer.from(`${sid}:${env("TWILIO_AUTH_TOKEN")}`).toString("base64"), "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ From: env("TWILIO_SMS_FROM")!, To: `+${to}`, Body: text })
+      });
+      if (r.ok) { const j = await r.json().catch(() => ({})); return { ok: true, providerId: j.sid }; }
+      return { ok: false, error: `twilio sms ${r.status}: ${await safeText(r)}`, retryable: classify(r.status) };
+    }
+    const form = new URLSearchParams({ username: env("AT_USERNAME")!, to: `+${to}`, message: text });
+    if (env("SMS_SENDER_ID")) form.set("from", env("SMS_SENDER_ID")!);
+    const r = await fetch("https://api.africastalking.com/version1/messaging", {
+      method: "POST", headers: { apiKey: env("AT_API_KEY")!, Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" }, body: form
+    });
+    const j = await r.json().catch(() => ({}));
+    const rec = j?.SMSMessageData?.Recipients?.[0];
+    if (r.ok && rec && /success/i.test(rec.status)) return { ok: true, providerId: rec.messageId };
+    return { ok: false, error: `africastalking ${r.status}: ${JSON.stringify(j).slice(0, 300)}`, retryable: classify(r.status) };
+  } catch (e) {
+    return { ok: false, error: `sms network error: ${(e as Error).message}`, retryable: true };
+  }
+}

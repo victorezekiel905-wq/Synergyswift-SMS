@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { guardiansByStudent, rowsForGuardian, enqueue, tryDispatch, loadBrand, type OutboxRow } from "@/lib/messaging/outbox";
 import { resultPublished } from "@/lib/messaging/templates";
 import { appUrl } from "@/lib/school";
+import { financeSettings, debtorsForTerm } from "@/lib/fees";
 
 const Body = z.object({
   term_id: z.string().uuid(),
@@ -32,8 +33,22 @@ export async function POST(req: NextRequest) {
   if (b.student_ids?.length) q = q.in("student_id", b.student_ids);
   const { data: cards, error } = await q;
   if (error) return jsonError(error.message);
-  const toPublish = (cards ?? []).filter((c: any) => c.status === "draft" || c.status === "approved");
-  const toNotify = b.resend ? (cards ?? []).filter((c: any) => c.status !== "withheld") : toPublish;
+  let toPublish = (cards ?? []).filter((c: any) => c.status === "draft" || c.status === "approved");
+  // Schools can hold back results for students with unpaid fees for this term.
+  const svcEarly = createServiceClient();
+  const fin = await financeSettings(svcEarly, tid);
+  const heldIds = new Set<string>();
+  const withheldForFees: string[] = [];
+  if (fin.withholdResults) {
+    const debtors = await debtorsForTerm(svcEarly, tid, b.term_id);
+    const held = toPublish.filter((c: any) => debtors.has(c.student_id));
+    if (held.length) {
+      await ctx.sb.from("report_cards").update({ status: "withheld" }).in("id", held.map((c: any) => c.id));
+      for (const c of held as any[]) { heldIds.add(c.id); withheldForFees.push(c.data?.student_name ?? c.student_id); }
+      toPublish = toPublish.filter((c: any) => !heldIds.has(c.id));
+    }
+  }
+  const toNotify = b.resend ? (cards ?? []).filter((c: any) => c.status !== "withheld" && !heldIds.has(c.id)) : toPublish;
   if (!toNotify.length) return jsonError("nothing to publish; compile results first (withheld cards are skipped)");
 
   if (toPublish.length) {
@@ -71,5 +86,5 @@ export async function POST(req: NextRequest) {
   }
   if (rows.length) await enqueue(svc, rows);
   const delivery = rows.length ? await tryDispatch(svc, { budgetMs: 25_000, concurrency: 10 }) : null;
-  return NextResponse.json({ published: toPublish.length, messages_queued: rows.length, delivery, students_without_contacts: noContact });
+  return NextResponse.json({ published: toPublish.length, messages_queued: rows.length, delivery, students_without_contacts: noContact, withheld_for_fees: withheldForFees });
 }

@@ -16,7 +16,7 @@ export type Rendered = {
 
 export type Brand = { schoolName: string; color?: string | null; logoUrl?: string | null; address?: string | null };
 
-const tpl = (k: string) => {
+export const tpl = (k: string) => {
   const v = process.env[k];
   return v && v.trim() ? v.trim() : null;
 };
@@ -25,7 +25,7 @@ export function escapeHtml(s: unknown): string {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }
 
-function layout(brand: Brand, title: string, bodyHtml: string, cta?: { href: string; label: string }) {
+export function layout(brand: Brand, title: string, bodyHtml: string, cta?: { href: string; label: string }) {
   const color = brand.color && /^#[0-9a-f]{3,8}$/i.test(brand.color) ? brand.color : "#1d5ddb";
   return `<!doctype html><html><body style="margin:0;background:#f1f5f9;font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#0f172a">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px"><tr><td align="center">

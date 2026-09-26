@@ -10,7 +10,7 @@ type Staff = {
 };
 type Leave = { id: string; leave_type: string; starts_on: string; ends_on: string; days: number; reason: string | null; status: string; decision_note: string | null; staff: { full_name: string; staff_no: string; user_id: string | null } | null };
 
-const ROLE_OPTIONS = ["teacher", "school_admin", "principal", "it_admin", "bursar", "librarian", "hr_manager", "qa_officer", "gate_officer"];
+const ROLE_OPTIONS = ["teacher", "school_admin", "principal", "it_admin", "bursar", "librarian", "hr_manager", "qa_officer", "gate_officer", "transport_officer", "hostel_warden", "nurse", "admissions_officer"];
 
 export default function HrPage() {
   const { data: me } = useApi<Me>("/api/me");

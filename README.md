@@ -1,8 +1,21 @@
 # EduClass Fusion — v0.1
 
-Multi-tenant SaaS platform that fuses **interactive learning** with **classroom device control**, built strictly from the `EduClass_Fusion_SaaS_Blueprint.docx` spec (Aug 2026). Stack: **Next.js 14 (App Router) + TypeScript + Tailwind + Supabase** against your live project `ysvqcrhkmaajsqujekzr.supabase.co`.
+Multi-tenant SaaS platform that fuses **interactive learning** with **classroom device control**, built strictly from the `EduClass_Fusion_SaaS_Blueprint.docx` spec (Aug 2026). Stack: **Next.js 15 (App Router) + React 19 + TypeScript + Tailwind + Supabase** against your live project `ysvqcrhkmaajsqujekzr.supabase.co`.
 
 > No mocks. Every UI hits real Supabase tables; every screen writes real rows; every leaderboard is live; every device event is persisted.
+
+## New in v46: the whole school on one login
+
+- **Fees and payments**: invoices with pay links, Paystack and Flutterwave paid into each school's own account, receipts, reminders, and optional withholding of results for debtors.
+- **Finance and payroll**: expenses, stock, assets, and payroll with approval and self-service payslips.
+- **Student life**: class register with absence alerts, homework, behaviour points with automatic rules, houses, health and sick bay, events and consent, parent-teacher meeting booking.
+- **Logistics**: clash-free timetable generator, school buses with scan alerts, boarding and exeat, visitors.
+- **Growth**: online admissions with tracking, session rollover, multi-branch school groups.
+- **Insight and AI**: early-warning risk scores with interventions, and AI-drafted report comments and lesson notes.
+- **SMS** for parents without WhatsApp, and an installable web app.
+- **Security**: Next.js 15.5 (fixes critical advisories), tighter data rules, and suspension that locks every module.
+
+See [docs/COMPETITIVE_POSITIONING.md](docs/COMPETITIVE_POSITIONING.md) for how this compares with PowerSchool, Veracross, Arbor, Toddle, Fedena, SAFSMS and Zeraki.
 
 ## New in v45: full school management
 
@@ -15,8 +28,10 @@ Multi-tenant SaaS platform that fuses **interactive learning** with **classroom 
 
 Read [docs/SCHOOL_OPERATIONS.md](docs/SCHOOL_OPERATIONS.md) first, then [docs/MESSAGING.md](docs/MESSAGING.md) to connect email and WhatsApp.
 
+**Super admin access, role privileges and tenant isolation** are explained in [docs/ACCESS_AND_ISOLATION.md](docs/ACCESS_AND_ISOLATION.md).
+
 ```bash
-npm test          # unit tests: grading, exam marking, messaging, attendance helpers
+npm test          # unit tests: grading, exams, messaging, fees, payments, payroll, timetable, risk, behaviour
 npm run test:db   # applies every migration to real Postgres (PGlite) and checks tenant isolation
 node --env-file=.env.local scripts/make-platform-admin.mjs you@company.com
 ```

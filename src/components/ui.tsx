@@ -161,6 +161,8 @@ export type Me = {
   profile: { id: string; tenant_id: string; full_name: string; role: string; extra_roles: string[] } | null;
   tenant: { id: string; name: string; status: string; modules: Record<string, boolean> } | null;
   platform: boolean;
+  group?: boolean;
+  account?: { state: string; school?: string };
   is_guardian: boolean;
 };
 

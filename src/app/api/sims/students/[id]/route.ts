@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, props: { params: Promise<{ id: stri
   if (!student) return jsonError("not found", 404);
   const [guardians, gate, reports, loans] = await Promise.all([
     ctx.sb.from("student_guardians")
-      .select("relation,is_primary,can_pickup,guardians(id,full_name,email,phone,whatsapp_phone,notify_email,notify_whatsapp,user_id)")
+      .select("relation,is_primary,can_pickup,guardians(id,full_name,email,phone,whatsapp_phone,notify_email,notify_whatsapp,notify_sms,user_id)")
       .eq("tenant_id", tid).eq("student_id", params.id),
     ctx.sb.from("gate_events").select("id,direction,method,late,at,note").eq("tenant_id", tid).eq("student_id", params.id)
       .order("at", { ascending: false }).limit(30),

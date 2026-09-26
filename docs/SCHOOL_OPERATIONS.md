@@ -1,4 +1,4 @@
-# School operations platform (v45)
+# School operations platform (v45 and v46)
 
 This release turns EduClass Fusion from a classroom-engagement tool into a full school management system. It adds a hidden platform layer for the operator, and every school runs as a fully isolated tenant.
 
@@ -27,7 +27,7 @@ Isolation is enforced in the database, not only in the app.
 - Platform admins are stored in `platform_admins`, which tenants cannot read. The platform audit log is also invisible to tenants.
 - Tables that shipped earlier with row-level security switched off (`invoices`, `feature_flags`, `assignments`, and others) are now tenant-scoped. Policies that let any user read every school's audit log, announcements or leaderboards are fixed.
 
-`npm run test:db` applies every migration to a real Postgres engine (PGlite) and checks these rules as real users. It runs 42 scenario checks, covering cross-tenant reads and writes, self-promotion, self-approval, publishing rights, suspension and outbox access.
+`npm run test:db` applies every migration to a real Postgres engine (PGlite) and checks these rules as real users. It runs 104 scenario checks, covering cross-tenant reads and writes, self-promotion, self-approval, publishing rights, suspension, deactivation, fees, payroll, health records and outbox access. The full privilege matrix is in [ACCESS_AND_ISOLATION.md](ACCESS_AND_ISOLATION.md).
 
 ## Results: from score sheet to the parent's phone
 
@@ -70,11 +70,59 @@ A guardian can only generate codes for children the school has marked "may colle
 - **HR**: staff directory, roles and extra duties, login invitations, enable or disable access, ID cards, leave requests counted in working days, and an approval workflow with no self-approval.
 - **Quality assurance**: configurable observation checklists and scored lesson observations with action plans. Live indicators cover score-entry progress per class and subject, staff punctuality, overdue books, pending approvals and message delivery rate.
 
+## v46: the rest of the school
+
+v46 adds the modules that the leading systems sell separately, so one login runs the whole school.
+
+### Money
+
+- **Fees** (`/school/fees`): fee items, class-specific amounts, optional extras and discounts. Invoices are generated for a whole class or term in one step. Every invoice and receipt gets a number (`INV-2026-000001`, `RCT-2026-000001`).
+- **Online payment**: each invoice has a private pay link (`/pay/…`) sent by WhatsApp, email or SMS. Paystack and Flutterwave are supported, and money settles straight into the school's own subaccount. The server confirms every payment with the provider and checks the exact amount before marking it paid. Signed webhooks catch payments made after the parent closes the page.
+- **Bursary**: record cash, transfer and POS payments, see debtors by class, and send reminders in one step. A school can choose to **withhold report cards from debtors**. Their parents then see a "please clear fees" notice instead of the result.
+- **Finance** (`/school/finance`): expenses by category, income against spend, stock with issue and restock history, and a fixed-asset register.
+- **Payroll** (`/school/payroll`): salary profiles with allowances, deductions, pension and tax. Unpaid leave is prorated automatically. A run is prepared, then approved by someone else, then released. Staff see only their own released payslips.
+
+### Teaching and learning
+
+- **Class register** (`/school/attendance`): take the register by class. Parents get an absence or lateness alert. Report cards show days present, absent and opened.
+- **Timetable** (`/school/timetable`): set periods and lessons per week, then generate. The generator never double-books a teacher, class or room, spreads each subject across the week, keeps locked cells and lists anything that could not fit. Teachers and students see their own timetable.
+- **Homework**: set, collect and mark. Late submissions are flagged, and parents see what is due.
+- **Lesson notes**: teachers write or generate weekly notes with AI, and the principal or QA officer approves or returns them.
+- **Traits and AI comments**: rate affective and psychomotor traits on the report card. AI drafts form-teacher and principal comments from each student's scores, which the teacher edits before saving.
+- **Early warning** (`/school/analytics`): every student gets a risk score from attendance, average, falling grades, failed subjects, behaviour and missing homework, with the reasons listed. Staff open an intervention with a plan, owner and review date, and close it with an outcome.
+
+### Pastoral care
+
+- **Behaviour**: positive and negative points by category, and house points. Rules act automatically, for example "3 lateness incidents in 14 days → detention and tell the parent".
+- **Health** (`/school/health`): medical profiles (allergies, conditions, medication, emergency contact) and a sick-bay log. Parents are told about each visit and can update medical notes themselves.
+- **Events and consent**: trips and events with cost and consent. Parents accept or decline from their portal.
+- **Parent-teacher meetings**: teachers publish slots, and parents book and cancel them.
+
+### Logistics
+
+- **School buses** (`/school/transport`): routes, stops and riders. The driver's phone scans each child on and off, and parents get an alert each time.
+- **Boarding** (`/school/hostel`): hostels, rooms and beds, with one bed per student. Parents request an exeat, the warden approves it, and parents are told when the child leaves and returns.
+- **Visitors** (`/school/visitors`): sign visitors in and out, with host, purpose and badge.
+
+### Growth
+
+- **Admissions** (`/school/admissions`): a public application form at `/apply/<school>`, open only while admissions are open. Applicants get a tracking link. Staff move each application through review, assessment, interview, offer and enrolment, and enrolling creates the student record.
+- **Session rollover** (`/school/rollover`): promote every class to the next level, keep repeating students back, and graduate the final year. Each class shows its suggested next class to check, and nothing moves until you confirm.
+- **School groups** (`/group`): an owner of several branches sees headcount, attendance, fee collection and average results per branch. Branches still cannot see each other.
+
+### Parents and students
+
+- The parent portal adds tabs for **Fees**, **Events**, **Meetings**, **Learning** (homework, timetable, behaviour, attendance) and **Boarding**. It works both after sign-in and through the private WhatsApp link.
+- Students see their homework and timetable on `/student`.
+- The app can be installed on a phone's home screen. It shows an offline page when there is no connection, and it never caches school data.
+
 ## Going live checklist
 
 1. Apply all migrations in `supabase/migrations` in order (Supabase SQL editor or `psql`).
 2. Set the environment variables in `.env.example`. At minimum set the Supabase keys, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`, one email provider and one WhatsApp provider.
-3. Register the WhatsApp templates in [MESSAGING.md](MESSAGING.md) and set their names.
+3. Register the WhatsApp templates in [MESSAGING.md](MESSAGING.md) and set their names. Set an SMS provider for parents without WhatsApp.
+   - For online fees, set `PAYSTACK_SECRET_KEY`, or `FLW_SECRET_KEY` and `FLW_SECRET_HASH`, and point the provider's webhook at `/api/pay/webhook/<provider>`. Each school then enters its own subaccount code under **Fees → Online payments**.
+   - For AI lesson notes and report comments, set `ANTHROPIC_API_KEY`. Everything else works without it.
 4. Schedule `/api/cron/dispatch` every minute and `/api/cron/daily` once a day.
 5. Create yourself as platform admin: `node --env-file=.env.local scripts/make-platform-admin.mjs you@company.com`.
 6. Sign in, open `/platform`, and create the first school. Its admin receives an invitation branded with the school's name.

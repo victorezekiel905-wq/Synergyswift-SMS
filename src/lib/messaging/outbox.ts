@@ -6,16 +6,16 @@
  * time budget, so messages leave within seconds. Anything left over (or
  * failed with a retryable error) is picked up by /api/cron/dispatch.
  */
-import { sendEmail, sendWhatsApp, normalizePhone } from "./providers";
+import { sendEmail, sendWhatsApp, sendSms, smsText, normalizePhone } from "./providers";
 import type { Brand, Rendered } from "./templates";
 
 export type Guardian = {
   id: string; full_name: string; email: string | null; phone: string | null; whatsapp_phone: string | null;
-  notify_email: boolean; notify_whatsapp: boolean; portal_token?: string;
+  notify_email: boolean; notify_whatsapp: boolean; notify_sms?: boolean; portal_token?: string;
 };
 
 export type OutboxRow = {
-  tenant_id: string; channel: "email" | "whatsapp"; to_address: string; to_name?: string | null;
+  tenant_id: string; channel: "email" | "whatsapp" | "sms"; to_address: string; to_name?: string | null;
   kind: string; subject?: string | null; body_text: string; body_html?: string | null;
   template_name?: string | null; template_params?: string[]; ref_id?: string | null; created_by?: string | null;
 };
@@ -56,6 +56,11 @@ export function rowsForGuardian(tenantId: string, g: Guardian, kind: string, r: 
       subject: r.subject, body_text: r.wa.text, template_name: r.wa.template, template_params: r.wa.params,
       ref_id: refId, created_by: createdBy });
   }
+  const sms = normalizePhone(g.phone || g.whatsapp_phone);
+  if (g.notify_sms && sms) {
+    rows.push({ tenant_id: tenantId, channel: "sms", to_address: sms, to_name: g.full_name, kind,
+      subject: r.subject, body_text: smsText(r.wa.text), ref_id: refId, created_by: createdBy });
+  }
   return rows;
 }
 
@@ -66,7 +71,7 @@ export async function guardiansByStudent(svc: any, tenantId: string, studentIds:
   for (let i = 0; i < studentIds.length; i += 200) {
     const chunk = studentIds.slice(i, i + 200);
     const { data } = await svc.from("student_guardians")
-      .select("student_id, guardians(id,full_name,email,phone,whatsapp_phone,notify_email,notify_whatsapp,portal_token)")
+      .select("student_id, guardians(id,full_name,email,phone,whatsapp_phone,notify_email,notify_whatsapp,notify_sms,portal_token)")
       .eq("tenant_id", tenantId).in("student_id", chunk);
     for (const row of data ?? []) {
       if (!row.guardians) continue;
@@ -77,8 +82,20 @@ export async function guardiansByStudent(svc: any, tenantId: string, studentIds:
   return map;
 }
 
-export async function enqueue(svc: any, rows: OutboxRow[]): Promise<string[]> {
+export async function enqueue(svc: any, input: OutboxRow[]): Promise<string[]> {
   const ids: string[] = [];
+  // Schools in "always" SMS mode get an SMS copy of every WhatsApp message.
+  const rows = [...input];
+  const tenants = [...new Set(input.filter(r => r.channel === "whatsapp").map(r => r.tenant_id))];
+  if (tenants.length) {
+    const { data: modes } = await svc.from("tenant_settings").select("tenant_id,sms_mode").in("tenant_id", tenants);
+    const always = new Set((modes ?? []).filter((m: { sms_mode: string }) => m.sms_mode === "always").map((m: { tenant_id: string }) => m.tenant_id));
+    for (const r of input) {
+      if (r.channel !== "whatsapp" || !always.has(r.tenant_id)) continue;
+      if (rows.some(x => x.channel === "sms" && x.to_address === r.to_address && x.kind === r.kind && x.ref_id === r.ref_id)) continue;
+      rows.push({ ...r, channel: "sms", body_text: smsText(r.body_text), template_name: null, template_params: [] });
+    }
+  }
   for (let i = 0; i < rows.length; i += 500) {
     const { data, error } = await svc.from("message_outbox").insert(rows.slice(i, i + 500)).select("id");
     if (error) throw new Error(`outbox insert failed: ${error.message}`);
@@ -94,7 +111,9 @@ async function deliver(svc: any, m: Claimed, brandCache: Map<string, Awaited<Ret
   if (!brand) { brand = await loadBrand(svc, m.tenant_id); brandCache.set(m.tenant_id, brand); }
   const res = m.channel === "email"
     ? await sendEmail({ to: m.to_address, toName: m.to_name, subject: m.subject ?? brand.schoolName, text: m.body_text, html: m.body_html, fromName: brand.senderName, replyTo: brand.replyTo })
-    : await sendWhatsApp({ to: m.to_address, text: m.body_text, template: m.template_name, params: m.template_params ?? [] });
+    : m.channel === "sms"
+      ? await sendSms({ to: m.to_address, text: m.body_text })
+      : await sendWhatsApp({ to: m.to_address, text: m.body_text, template: m.template_name, params: m.template_params ?? [] });
 
   if (res.ok) {
     await svc.from("message_outbox").update({ status: "sent", sent_at: new Date().toISOString(), provider_message_id: res.providerId ?? null, last_error: null }).eq("id", m.id);
@@ -113,7 +132,28 @@ async function deliver(svc: any, m: Claimed, brandCache: Map<string, Awaited<Ret
     return "retry" as const;
   }
   await svc.from("message_outbox").update({ status: "failed", last_error: res.error }).eq("id", m.id);
+  await smsFallback(svc, m);
   return "failed" as const;
+}
+
+/**
+ * WhatsApp failed for good (number not on WhatsApp, template rejected, retries
+ * exhausted): send the same message by SMS when the school allows it.
+ */
+async function smsFallback(svc: any, m: Claimed) {
+  if (m.channel !== "whatsapp") return;
+  const { data: s } = await svc.from("tenant_settings").select("sms_mode").eq("tenant_id", m.tenant_id).maybeSingle();
+  if ((s?.sms_mode ?? "fallback") === "off") return;
+  // Do not double up if an SMS for the same message already exists (e.g. "always" mode).
+  let dup = svc.from("message_outbox").select("id").eq("tenant_id", m.tenant_id).eq("channel", "sms")
+    .eq("to_address", m.to_address).eq("kind", m.kind).gte("created_at", new Date(Date.now() - 86400_000).toISOString());
+  dup = m.ref_id ? dup.eq("ref_id", m.ref_id) : dup.eq("body_text", smsText(m.body_text));
+  const { data: existing } = await dup.limit(1);
+  if (existing?.length) return;
+  await svc.from("message_outbox").insert({
+    tenant_id: m.tenant_id, channel: "sms", to_address: m.to_address, to_name: m.to_name ?? null, kind: m.kind,
+    subject: m.subject ?? null, body_text: smsText(m.body_text), ref_id: m.ref_id ?? null, created_by: m.created_by ?? null
+  });
 }
 
 /** Sends due messages with bounded concurrency until the batch or time budget runs out. */

@@ -70,7 +70,7 @@ export default async function ReportCardPage(props: { params: Promise<{ token: s
         <Info label="Name" value={d.student_name} />
         <Info label="Admission no" value={d.admission_no} />
         <Info label="Class" value={d.class_name} />
-        <Info label="Days present" value={d.days_present ?? "—"} />
+        <Info label="Days present" value={d.days_opened ? `${d.days_present} of ${d.days_opened}` : d.days_present ?? "—"} />
         <Info label="Total" value={card.total ?? "—"} />
         <Info label="Average" value={card.average !== null ? `${card.average}%` : "—"} />
         {showPos && <Info label="Position" value={card.position ? `${ordinal(card.position)} of ${card.class_size}` : "—"} />}
@@ -105,6 +105,24 @@ export default async function ReportCardPage(props: { params: Promise<{ token: s
           </tbody>
         </table>
       </div>
+
+      {Array.isArray(d.traits) && d.traits.some((t: { rating: number | null }) => t.rating !== null) && (
+        <section className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+          {(["affective", "psychomotor"] as const).map(domain => {
+            const rows = d.traits.filter((t: { domain: string }) => t.domain === domain);
+            if (!rows.length) return null;
+            return (
+              <table key={domain} className="w-full border-collapse">
+                <thead><tr><th className="border border-slate-300 p-1.5 text-left text-xs uppercase">{domain === "affective" ? "Character" : "Skills"}</th><th className="border border-slate-300 p-1.5 text-xs">Rating (1–5)</th></tr></thead>
+                <tbody>{rows.map((t: { name: string; rating: number | null }) => (
+                  <tr key={t.name}><td className="border border-slate-300 p-1.5">{t.name}</td><td className="border border-slate-300 p-1.5 text-center font-semibold">{t.rating ?? "—"}</td></tr>
+                ))}</tbody>
+              </table>
+            );
+          })}
+          <p className="text-xs text-slate-500 sm:col-span-2">5 Excellent · 4 Very good · 3 Good · 2 Fair · 1 Needs improvement</p>
+        </section>
+      )}
 
       <section className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
         <div className="rounded border border-slate-300 p-3">

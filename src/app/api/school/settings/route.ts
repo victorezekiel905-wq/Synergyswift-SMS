@@ -32,7 +32,8 @@ const Settings = z.object({
   library_fine_per_day: z.number().min(0).optional(),
   currency: z.string().trim().max(8).optional(),
   pickup_code_ttl_min: z.number().int().min(10).max(1440).optional(),
-  exam_violation_limit: z.number().int().min(1).max(50).optional()
+  exam_violation_limit: z.number().int().min(1).max(50).optional(),
+  sms_mode: z.enum(["off", "fallback", "always"]).optional()
 });
 
 export async function PUT(req: NextRequest) {

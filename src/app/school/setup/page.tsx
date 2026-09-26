@@ -40,7 +40,7 @@ function Profile() {
     e.preventDefault();
     const keys = ["school_name", "motto", "address", "phone", "email", "logo_url", "principal_name", "brand_color", "sender_name", "reply_to_email",
       "notify_gate_events", "notify_results", "staff_start_time", "student_start_time", "geofence_lat", "geofence_lng", "geofence_radius_m",
-      "library_loan_days", "library_fine_per_day", "currency", "pickup_code_ttl_min", "exam_violation_limit"];
+      "library_loan_days", "library_fine_per_day", "currency", "pickup_code_ttl_min", "exam_violation_limit", "sms_mode"];
     const body = Object.fromEntries(keys.filter(k => s[k] !== undefined).map(k => [k, typeof s[k] === "string" && /time$/.test(k) ? s[k].slice(0, 5) : s[k]]));
     const r = await send("/api/school/settings", body, "PUT");
     flash(r.ok, r.ok ? "Settings saved." : r.error ?? "Save failed");
@@ -70,6 +70,7 @@ function Profile() {
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...bool("notify_gate_events")} /> Tell parents when their child signs in and out</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...bool("notify_results")} /> Send results by email and WhatsApp when published</label>
         <Field label="Pickup code validity (minutes)"><input className="input" min={10} max={1440} {...num("pickup_code_ttl_min")} /></Field>
+        <Field label="SMS" hint="Fallback: send an SMS when a WhatsApp message cannot be delivered. Always: send SMS as well as WhatsApp."><select className="input" value={s.sms_mode ?? "fallback"} onChange={e => setS({ ...s, sms_mode: e.target.value })}><option value="fallback">Fallback when WhatsApp fails</option><option value="always">Always send SMS too</option><option value="off">Never send SMS</option></select></Field>
       </section>
       <section className="card grid gap-4 p-5 md:grid-cols-3">
         <h2 className="font-semibold md:col-span-3">Attendance</h2>

@@ -1,6 +1,6 @@
 # EduClass Fusion — Build Status
 
-Contract for the active build. Stack: **Next.js 14 (App Router, TypeScript, Tailwind) + Supabase (PostgreSQL, RLS, Realtime)** + **MV3 browser extension (Chrome/Edge)**. Original implementation per `EduClass_Fusion_SaaS_Blueprint.docx` v1.0 — no cloned vendor code/UI.
+Contract for the active build. Stack: **Next.js 15 (App Router, TypeScript, Tailwind) + Supabase (PostgreSQL, RLS, Realtime)** + **MV3 browser extension (Chrome/Edge)**. Original implementation per `EduClass_Fusion_SaaS_Blueprint.docx` v1.0 — no cloned vendor code/UI.
 
 ## Blueprint inventory → build mapping
 
@@ -70,3 +70,27 @@ Also fixed: migration `000800` referenced a column that does not exist (`activit
 Verified: `npm test` (49 unit tests), `npm run test:db` (14 migrations on a fresh database, the 4 new ones re-run for idempotency, 42 RLS scenario checks), `next build`.
 
 Not verified here: live delivery through Resend, SendGrid, Meta or Twilio (needs real credentials), and a real Safe Exam Browser client.
+
+## v46: full school ERP, security fixes and access guide
+
+| Area | Status |
+|---|---|
+| Next.js 14.2 → 15.5.26 (fixes critical advisories), React 19, async request APIs | ✅ upgraded |
+| Security fixes: students and parents could list each other, students could read exam keys, cross-tenant device inserts, broken report aggregate and roster import | ✅ fixed in `001500_hardening` |
+| Suspension now locks the older LMS tables too; deactivated staff lose access at once; sign-in explains why | ✅ `001900_suspension_lock` |
+| Fees, invoices, receipts, Paystack / Flutterwave with verified amounts, debtor reminders, withhold results | ✅ built |
+| Expenses, stock, assets, payroll with approval and self-service payslips | ✅ built |
+| Class register, homework, behaviour rules and houses, health and sick bay, events and consent, meeting booking, traits, lesson notes | ✅ built |
+| Timetable generator, school buses, boarding and exeat, visitors | ✅ built |
+| Admissions with public form and tracking, session rollover, school groups | ✅ built |
+| Early-warning risk scores with interventions, AI report comments and lesson notes | ✅ built |
+| SMS channel (Termii, Twilio, Africa's Talking) with fallback and per-parent opt-in | ✅ built |
+| Parent portal tabs, student homework and timetable, installable web app | ✅ built |
+| Super admin access, role matrix and isolation guide | ✅ [docs/ACCESS_AND_ISOLATION.md](docs/ACCESS_AND_ISOLATION.md) |
+| Competitor comparison | ✅ [docs/COMPETITIVE_POSITIONING.md](docs/COMPETITIVE_POSITIONING.md) |
+
+Also fixed: ESLint had never run because no config existed. It now runs, and the rule-of-hooks errors it found in the activity renderer are fixed.
+
+Verified: `npm test` (66 unit tests), `npm run test:db` (19 migrations on a fresh database, the new ones re-run for idempotency, 104 checks), `npm run lint`, `next build`.
+
+Not verified here: live email, WhatsApp, SMS, payment and AI calls (these need real keys), and a real Safe Exam Browser client.

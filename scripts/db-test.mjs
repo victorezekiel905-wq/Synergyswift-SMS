@@ -165,7 +165,10 @@ await expectError("device rows cannot be injected into another school", U.parent
   `insert into devices (tenant_id, device_uid, kind) values ('${T.B}', 'ext-evil', 'browser')`, /row-level security/);
 
 // ---- module scenario tests (appended per module) ----
-await moduleTests({ db, as, q, expectRows, expectError, expectOk, U, T });
+function check(name, ok, detail) {
+  if (ok) { pass++; console.log("  ✓", name); } else { fail++; console.log("  ✗", name, JSON.stringify(detail ?? null)); }
+}
+await moduleTests({ db, as, q, expectRows, expectError, expectOk, check, U, T });
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

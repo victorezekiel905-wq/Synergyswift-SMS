@@ -1,12 +1,14 @@
 "use client";
 import { useState } from "react";
 import { useApi, send, Alert, Badge, Empty, fmtDate, fmtTime } from "@/components/ui";
+import FamilyTabs, { type Extras } from "./FamilyTabs";
 
 type Overview = {
   guardian: { id: string; full_name: string; notify_email: boolean; notify_whatsapp: boolean; email: string | null; phone: string | null };
   school: { school_name: string | null; logo_url: string | null; brand_color: string | null; phone: string | null } | null;
+  extras?: Extras;
   children: {
-    id: string; name: string; admission_no: string; photo_url: string | null; class_name: string | null; can_pickup: boolean; on_site: boolean;
+    id: string; name: string; admission_no: string; photo_url: string | null; class_name: string | null; class_group_id?: string | null; can_pickup: boolean; on_site: boolean;
     today: { direction: string; at: string; method: string; late: boolean; note: string | null }[];
     recent_events: { direction: string; at: string; method: string; late: boolean }[];
     results: { id: string; term: string; average: number | null; position: number | null; class_size: number | null; access_token: string; published_at: string }[];
@@ -19,7 +21,7 @@ type Overview = {
  * Parent view. `api` is either /api/parent/overview (logged-in parent) or
  * /api/g/<token> (passwordless link); `act` is where actions are POSTed.
  */
-export default function GuardianPortal({ api, act, mode }: { api: string; act: (body: Record<string, unknown>) => Promise<{ ok: boolean; data: any; error: string | null }>; mode: "token" | "session" }) {
+export default function GuardianPortal({ api, act, mode, token }: { api: string; act: (body: Record<string, unknown>) => Promise<{ ok: boolean; data: any; error: string | null }>; mode: "token" | "session"; token?: string }) {
   const { data, error, reload } = useApi<Overview>(api);
   const [code, setCode] = useState<{ student: string; code: string; expires: string; collector: string } | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -130,6 +132,7 @@ export default function GuardianPortal({ api, act, mode }: { api: string; act: (
           </section>
         ))}
       </div>
+      {data.extras && data.children.length > 0 && <FamilyTabs extras={data.extras} kids={data.children} token={token} onChange={reload} />}
       {mode === "token" && (
         <section className="card mt-5 p-4 text-sm">
           <h3 className="mb-2 font-semibold">How we contact you</h3>
