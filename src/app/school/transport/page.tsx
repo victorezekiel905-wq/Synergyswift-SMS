@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, fmtTime, rolesOf, type Me } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, Icon, fmtTime, rolesOf, type Me } from "@/components/ui";
 
 type Route = { id: string; name: string; vehicle: string | null; driver_name: string | null; driver_phone: string | null; attendant_id: string | null; capacity: number | null;
   stops: { name: string; am?: string | null; pm?: string | null; lat?: number | null; lng?: number | null }[]; users: { full_name: string } | null; transport_assignments: { count: number }[] };
@@ -73,8 +73,8 @@ function LiveTrip({ routeId }: { routeId: string }) {
         <span className="block text-xs text-slate-500">{status ?? "Start a trip on the attendant's phone so parents can see the bus."}</span></span>
       {!trip ? (<>
         <button className="btn btn-primary" onClick={() => start("morning")}>Start morning trip</button>
-        <button className="btn btn-ghost border border-slate-200" onClick={() => start("afternoon")}>Start afternoon trip</button>
-      </>) : <button className="btn btn-primary bg-rose-600" onClick={end}>End trip</button>}
+        <button className="btn btn-outline" onClick={() => start("afternoon")}>Start afternoon trip</button>
+      </>) : <button className="btn btn-danger" onClick={end}>End trip</button>}
       {err && <div className="w-full"><Alert>{err}</Alert></div>}
     </section>
   );
@@ -154,10 +154,10 @@ function Routes({ routes, reload }: { routes: Route[]; reload: () => void }) {
             <p className="label">Stops in order (morning pickup time)</p>
             {(edit.stops ?? []).map((s, i) => <div key={i} className="mb-1 flex gap-2"><input className="input" value={s.name} onChange={e => setEdit({ ...edit, stops: edit.stops!.map((x, j) => j === i ? { ...x, name: e.target.value } : x) })} aria-label="Stop name" />
               <input className="input w-28" type="time" value={s.am ?? ""} onChange={e => setEdit({ ...edit, stops: edit.stops!.map((x, j) => j === i ? { ...x, am: e.target.value } : x) })} aria-label="Pickup time" />
-              <button type="button" className={"whitespace-nowrap text-xs " + (s.lat != null ? "text-emerald-700" : "text-slate-500")} title="Stand at the stop and tap to save its location for approach alerts"
+              <button type="button" className={"inline-flex items-center gap-1 whitespace-nowrap text-xs " + (s.lat != null ? "text-emerald-700" : "text-slate-500")} title="Stand at the stop and tap to save its location for approach alerts"
                 onClick={() => navigator.geolocation?.getCurrentPosition(p => setEdit({ ...edit, stops: edit.stops!.map((x, j) => j === i ? { ...x, lat: p.coords.latitude, lng: p.coords.longitude } : x) }), () => setErr("Could not read this device's location."))}>
-                {s.lat != null ? "📍 set" : "📍 here"}</button>
-              <button type="button" className="text-rose-600" onClick={() => setEdit({ ...edit, stops: edit.stops!.filter((_, j) => j !== i) })} aria-label="Remove stop">✕</button></div>)}
+                <Icon name="pin" className="h-3.5 w-3.5" />{s.lat != null ? "Location set" : "Set to here"}</button>
+              <button type="button" className="text-rose-600" onClick={() => setEdit({ ...edit, stops: edit.stops!.filter((_, j) => j !== i) })} aria-label="Remove stop"><Icon name="x" className="h-4 w-4" /></button></div>)}
             <button type="button" className="btn btn-ghost text-xs" onClick={() => setEdit({ ...edit, stops: [...(edit.stops ?? []), { name: "", am: "" }] })}>+ Stop</button>
           </div>
           {err && <div className="sm:col-span-2"><Alert>{err}</Alert></div>}

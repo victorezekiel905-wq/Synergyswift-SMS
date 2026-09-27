@@ -7,7 +7,7 @@ Multi-tenant SaaS platform that fuses **interactive learning** with **classroom 
 ## New in v47: trust and family engagement
 
 - **Two-factor sign-in**, mandatory for super admins and optional per school, enforced by the database. This closes the gap behind the 2024 PowerSchool breach.
-- **Two-way parent messaging** with translation into 40 languages, a safeguarding view for admins, and AI-drafted notices.
+- **Two-way parent messaging** with translation into 40 languages, a safeguarding view for admins, and notice drafting.
 - **Free app notifications** on phones and computers.
 - **Cashless wallet and tuck shop till**: online top-ups, allergy warnings at the till, daily limits, lost-card freeze.
 - **Staff cover** with free-staff suggestions, a **live bus map** with alerts before each stop, and an **offline class register**.
@@ -20,7 +20,7 @@ Multi-tenant SaaS platform that fuses **interactive learning** with **classroom 
 - **Student life**: class register with absence alerts, homework, behaviour points with automatic rules, houses, health and sick bay, events and consent, parent-teacher meeting booking.
 - **Logistics**: clash-free timetable generator, school buses with scan alerts, boarding and exeat, visitors.
 - **Growth**: online admissions with tracking, session rollover, multi-branch school groups.
-- **Insight and AI**: early-warning risk scores with interventions, and AI-drafted report comments and lesson notes.
+- **Insight and drafting**: early-warning risk scores with interventions, and drafted report comments and lesson notes.
 - **SMS** for parents without WhatsApp, and an installable web app.
 - **Security**: Next.js 15.5 (fixes critical advisories), tighter data rules, and suspension that locks every module.
 

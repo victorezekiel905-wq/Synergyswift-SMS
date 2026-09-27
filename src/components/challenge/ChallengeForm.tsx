@@ -8,19 +8,20 @@ export function ChallengeForm({ classes, activities }: {
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const [classId, setClassId] = useState(classes[0]?.id ?? "");
   const [activityId, setActivityId] = useState(activities[0]?.id ?? "");
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    setBusy(true); setErr(null);
     const r = await fetch("/api/games", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ class_id: classId, quiz_id: activityId })
     });
     setBusy(false);
-    if (!r.ok) { alert("Failed to create game"); return; }
+    if (!r.ok) { const j = await r.json().catch(() => ({})); setErr(j.error ?? "The game could not be created."); return; }
     const { id } = await r.json();
     router.push(`/teacher/challenge/${id}`);
   }
@@ -41,6 +42,7 @@ export function ChallengeForm({ classes, activities }: {
           {activities.map(a => <option key={a.id} value={a.id}>{a.title} ({a.kind})</option>)}
         </select>
       </div>
+      {err && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{err}</p>}
       <button className="btn btn-primary" disabled={busy || !classId || !activityId}>{busy ? "Starting…" : "Open lobby"}</button>
     </form>
   );

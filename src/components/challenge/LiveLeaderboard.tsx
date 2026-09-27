@@ -29,7 +29,7 @@ export default function LiveLeaderboard({ gameId, initial }: { gameId: string; i
   return (
     <section className="card p-6">
       <h2 className="mb-4 text-lg font-semibold">Leaderboard</h2>
-      <table className="w-full text-left">
+      <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-left">
         <thead className="text-xs uppercase text-slate-500"><tr><th className="py-2">#</th><th>Nickname</th><th>Score</th><th>Streak</th></tr></thead>
         <tbody>
           {players.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-slate-500">Waiting for players…</td></tr>}
@@ -42,7 +42,7 @@ export default function LiveLeaderboard({ gameId, initial }: { gameId: string; i
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </section>
   );
 }

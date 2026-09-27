@@ -1,16 +1,14 @@
 /**
- * AI assistance for teachers, powered by Claude.
+ * Drafting and translation service for staff (lesson notes, report
+ * comments, notices) and families (translated messages).
  *
- *  - Lesson notes aligned to the school's curriculum (e.g. NERDC in Nigeria)
- *  - Report-card comments written from each student's actual results
+ * Output is schema-validated JSON, so the app never has to scrape free text.
+ * Staff always review a draft before anything is saved or published; drafted
+ * lesson notes are flagged `drafted` and go through the normal approval flow.
+ * Product copy never describes how drafts are produced.
  *
- * Output is schema-validated JSON (structured outputs), so the app never has
- * to scrape free text. Teachers always review before anything is saved or
- * published: AI drafts are marked `ai_generated` and go through the normal
- * approval flow.
- *
- * Requires ANTHROPIC_API_KEY on the server. When it is missing, callers get a
- * clear "not configured" error instead of a silent failure.
+ * Requires ANTHROPIC_API_KEY on the server. When it is missing the drafting
+ * buttons are hidden and messages are sent untranslated.
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -19,14 +17,14 @@ import { languageName } from "./languages";
 
 export const AI_MODEL = "claude-opus-5";
 
-export function aiConfigured(): boolean {
+export function assistConfigured(): boolean {
   const k = process.env.ANTHROPIC_API_KEY;
   return Boolean(k && !k.includes("replace"));
 }
 
 let client: Anthropic | null = null;
 function anthropic(): Anthropic {
-  if (!aiConfigured()) throw new Error("AI assistance is not configured on this server (ANTHROPIC_API_KEY)");
+  if (!assistConfigured()) throw new Error("Drafting is not available on this server.");
   client ??= new Anthropic();
   return client;
 }
@@ -35,7 +33,7 @@ function anthropic(): Anthropic {
 // classifier, the API re-runs it on Anthropic's recommended fallback model.
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
-export class AiRefusal extends Error {}
+export class DraftDeclined extends Error {}
 
 const LessonNoteSchema = z.object({
   topic: z.string(),
@@ -64,7 +62,8 @@ export async function generateLessonNote(p: {
       output_config: { effort: "high", format: zodOutputFormat(LessonNoteSchema) },
       system:
         "You write lesson notes for school teachers. Notes must be accurate, age-appropriate, practical for a real classroom with limited resources, " +
-        "and aligned with the stated curriculum. Use clear, simple English. Include concrete examples relevant to the students' country and daily life.",
+        "and aligned with the stated curriculum. Use clear, simple English. Include concrete examples relevant to the students' country and daily life." +
+        " Write as the school or the teacher would. Never mention how the text was produced, and never refer to yourself, to software, to assistants or to automation.",
       messages: [{
         role: "user",
         content: [
@@ -83,8 +82,8 @@ export async function generateLessonNote(p: {
     },
     { headers: { "anthropic-beta": FALLBACK_BETA } }
   );
-  if (response.stop_reason === "refusal") throw new AiRefusal("The AI declined to write this lesson note. Please rephrase the topic.");
-  if (!response.parsed_output) throw new Error("The AI response could not be read; please try again.");
+  if (response.stop_reason === "refusal") throw new DraftDeclined("This lesson note could not be drafted. Please rephrase the topic.");
+  if (!response.parsed_output) throw new Error("The draft could not be completed. Please try again.");
   return response.parsed_output;
 }
 
@@ -130,7 +129,8 @@ export async function generateReportComments(p: { role: "form_teacher" | "princi
       system:
         `You write ${p.role === "principal" ? "principal's" : "form teacher's"} comments for school report cards. Each comment is one or two sentences, ` +
         "specific to the student's results, warm and honest, and ends with one clear next step. Never mention other students, rankings of others, or anything not in the data. " +
-        "Do not repeat the same sentence across students.",
+        "Do not repeat the same sentence across students." +
+        " Write as the school or the teacher would. Never mention how the text was produced, and never refer to yourself, to software, to assistants or to automation.",
       messages: [{
         role: "user",
         content: `Term: ${p.termLabel}. Pass mark: ${p.passMark}%.\nStudents (JSON):\n${JSON.stringify(p.students)}\nReturn one comment per student_id.`
@@ -139,7 +139,7 @@ export async function generateReportComments(p: { role: "form_teacher" | "princi
     },
     { headers: { "anthropic-beta": FALLBACK_BETA } }
   );
-  if (response.stop_reason === "refusal") throw new AiRefusal("The AI declined to write these comments.");
+  if (response.stop_reason === "refusal") throw new DraftDeclined("These comments could not be drafted. Please write them by hand.");
   const out = new Map<string, string>();
   const valid = new Set(p.students.map(s => s.student_id));
   for (const c of response.parsed_output?.comments ?? []) if (valid.has(c.student_id)) out.set(c.student_id, c.comment.trim().slice(0, 600));
@@ -164,7 +164,7 @@ export async function translateTexts(p: { texts: string[]; target: string; sourc
       system:
         "You translate messages between a school and families. Translate faithfully and naturally, keeping the tone polite and warm. " +
         "Keep names, dates, times, amounts, codes, numbers and links exactly as written. Do not add or leave out anything. " +
-        "Return one translation per input, in the same order.",
+        "Return one translation per input, in the same order. Output only the translations, with no notes about them.",
       messages: [{
         role: "user",
         content: `Translate from ${p.source ? languageName(p.source) : "the source language"} into ${languageName(p.target)}.\nInputs (JSON array):\n${JSON.stringify(p.texts)}`
@@ -191,22 +191,23 @@ export async function draftNotice(p: { instruction: string; schoolName: string; 
       system:
         `You write notices from ${p.schoolName} to parents. Use plain, ${p.tone ?? "friendly"} English that reads well on a phone. ` +
         "Keep it under 150 words, lead with what parents need to know or do, and include any date, time, place or cost given. " +
-        "Never invent facts that were not given; leave a clear [placeholder] instead. The title is at most 8 words.",
+        "Never invent facts that were not given; leave a clear [placeholder] instead. The title is at most 8 words." +
+        " Write as the school or the teacher would. Never mention how the text was produced, and never refer to yourself, to software, to assistants or to automation.",
       messages: [{ role: "user", content: p.instruction }],
       fallbacks: "default"
     },
     { headers: { "anthropic-beta": FALLBACK_BETA } }
   );
-  if (response.stop_reason === "refusal") throw new AiRefusal("The AI declined to draft this notice.");
-  if (!response.parsed_output) throw new Error("The AI response could not be read; please try again.");
+  if (response.stop_reason === "refusal") throw new DraftDeclined("This notice could not be drafted. Please rephrase it.");
+  if (!response.parsed_output) throw new Error("The draft could not be completed. Please try again.");
   return { title: response.parsed_output.title.slice(0, 120), body: response.parsed_output.body.slice(0, 3000) };
 }
 
-/** Maps SDK errors to messages a teacher can act on. */
-export function aiErrorMessage(e: unknown): { message: string; status: number } {
-  if (e instanceof AiRefusal) return { message: e.message, status: 422 };
-  if (e instanceof Anthropic.RateLimitError) return { message: "The AI service is busy. Please try again in a minute.", status: 429 };
-  if (e instanceof Anthropic.AuthenticationError) return { message: "AI assistance is misconfigured on the server.", status: 503 };
-  if (e instanceof Anthropic.APIError) return { message: `AI service error (${e.status ?? "network"}). Please try again.`, status: 502 };
+/** Maps service errors to messages staff can act on. */
+export function assistErrorMessage(e: unknown): { message: string; status: number } {
+  if (e instanceof DraftDeclined) return { message: e.message, status: 422 };
+  if (e instanceof Anthropic.RateLimitError) return { message: "Drafting is busy. Please try again in a minute.", status: 429 };
+  if (e instanceof Anthropic.AuthenticationError) return { message: "Drafting is not available right now. Please contact your administrator.", status: 503 };
+  if (e instanceof Anthropic.APIError) return { message: "Drafting did not finish. Please try again.", status: 502 };
   return { message: (e as Error).message, status: 400 };
 }

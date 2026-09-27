@@ -51,8 +51,9 @@ export async function POST(req: NextRequest) {
     tenant_id: (me as Me).tenant_id,
     room_id: room.id,
     user_id: user.id,
-    display_name: body.display_name || (me as Me).full_name || user.email || "Participant",
-    role: body.role || (me as Me).role,
+    // Name and role come from the profile, never the client, so nobody can join as someone else.
+    display_name: (me as Me).full_name || user.email || "Participant",
+    role: (me as Me).role,
     state: "joined",
     media: body.media && typeof body.media === "object" ? body.media : { audio: true, video: true },
     last_seen_at: new Date().toISOString()

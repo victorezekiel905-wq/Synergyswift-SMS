@@ -96,7 +96,7 @@ export default async function Dashboard() {
       <header className="mb-8">
         <p className="text-sm font-medium text-brand-600">Teacher Dashboard</p>
         <h1 className="text-2xl font-semibold">Good to see you, {me.full_name}</h1>
-        <div className="mt-3 flex flex-wrap gap-2"><Link href="/school/results" className="btn btn-primary text-xs">Enter scores</Link><Link href="/exams" className="btn btn-ghost border border-slate-200 text-xs">Secure exams</Link><Link href="/school/gate" className="btn btn-ghost border border-slate-200 text-xs">Sign in / out</Link></div>
+        <div className="mt-3 flex flex-wrap gap-2"><Link href="/school/results" className="btn btn-primary text-xs">Enter scores</Link><Link href="/exams" className="btn btn-outline text-xs">Secure exams</Link><Link href="/school/gate" className="btn btn-outline text-xs">Sign in / out</Link></div>
       </header>
 
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">

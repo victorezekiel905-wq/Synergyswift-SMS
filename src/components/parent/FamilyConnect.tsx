@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useApi, send, Alert, Badge, Empty, Field, fmtDate, fmtTime, money } from "@/components/ui";
+import { useApi, send, Alert, Badge, Empty, Field, fmtDate, fmtTime, money, Loading } from "@/components/ui";
 import { LANGUAGES } from "@/lib/languages";
 
 const withToken = (url: string, token?: string) => token ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}` : url;
@@ -21,7 +21,7 @@ export function ParentMessages({ token }: { token?: string }) {
   const [orig, setOrig] = useState<Set<string>>(new Set());
   useEffect(() => { const t = setInterval(reload, 30_000); return () => clearInterval(t); }, [reload]);
   if (error) return <Alert>{error}</Alert>;
-  if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (!data) return <Loading />;
   const thread = data.threads.find(t => t.id === open);
   const kid = data.children.find(c => c.id === f.student_id) ?? data.children[0];
 
@@ -96,7 +96,7 @@ export function ParentWallet({ token, kids }: { token?: string; kids: { id: stri
   const [result, setResult] = useState<string | null>(null);
   useEffect(() => { setResult(new URLSearchParams(window.location.search).get("wallet")); }, []);
   if (error) return <Alert>{error}</Alert>;
-  if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (!data) return <Loading />;
   const cur = data.currency;
   const returnPath = token ? `/g/${token}` : "/parent";
   return (
@@ -156,7 +156,7 @@ export function ParentBus({ token, kids }: { token?: string; kids: { id: string;
   const { data, error, reload } = useApi<{ buses: Bus[] }>(withToken("/api/family/bus", token));
   useEffect(() => { const t = setInterval(reload, 20_000); return () => clearInterval(t); }, [reload]);
   if (error) return <Alert>{error}</Alert>;
-  if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (!data) return <Loading />;
   if (!data.buses.length) return <Empty>Your children are not on a school bus.</Empty>;
   return (
     <div className="space-y-4">{data.buses.map(b => {
@@ -215,7 +215,7 @@ export function NotificationsToggle({ token }: { token?: string }) {
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className="mr-auto">App notifications on this device: <b>{state === "on" ? "on" : "off"}</b></span>
-      {state === "on" ? <button className="btn btn-ghost border border-slate-200 px-3 py-1 text-xs" onClick={disable}>Turn off</button>
+      {state === "on" ? <button className="btn btn-outline px-3 py-1 text-xs" onClick={disable}>Turn off</button>
         : <button className="btn btn-primary px-3 py-1 text-xs" onClick={enable}>Turn on</button>}
       {msg && <p className="w-full text-xs text-rose-600">{msg}</p>}
     </div>

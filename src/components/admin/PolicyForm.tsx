@@ -10,10 +10,11 @@ export default function PolicyForm() {
   const [block, setBlock] = useState("youtube.com\ntiktok.com\nfacebook.com\ninstagram.com");
   const [req, setReq] = useState("");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    setBusy(true); setErr(null);
     const res = await fetch("/api/environments", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -24,7 +25,7 @@ export default function PolicyForm() {
       })
     });
     setBusy(false);
-    if (!res.ok) { alert("Failed"); return; }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? "The policy could not be saved."); return; }
     r.refresh();
   }
 
@@ -43,6 +44,7 @@ export default function PolicyForm() {
         <textarea className="input" rows={4} value={block} onChange={(e)=>setBlock(e.target.value)} /></div>
       <div><label className="label">Required URLs (one per line)</label>
         <textarea className="input" rows={2} value={req} onChange={(e)=>setReq(e.target.value)} /></div>
+      {err && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">{err}</p>}
       <button className="btn btn-primary w-full" disabled={busy}>{busy ? "Saving…" : "Save policy"}</button>
     </form>
   );

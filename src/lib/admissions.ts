@@ -46,6 +46,6 @@ export async function enrollApplication(svc: any, p: { tenantId: string; applica
   }
   await svc.from("student_guardians").upsert({ tenant_id: p.tenantId, student_id: st.id, guardian_id: gid, relation: app.guardian_relation ?? "parent", is_primary: true, can_pickup: true },
     { onConflict: "student_id,guardian_id" });
-  await svc.from("applications").update({ status: "enrolled", student_id: st.id, updated_at: new Date().toISOString() }).eq("id", app.id);
+  await svc.from("applications").update({ status: "enrolled", student_id: st.id, updated_at: new Date().toISOString() }).eq("tenant_id", p.tenantId).eq("id", app.id);
   return { student_id: st.id, guardian_id: gid, already: false };
 }

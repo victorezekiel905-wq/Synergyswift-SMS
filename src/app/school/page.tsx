@@ -15,7 +15,7 @@ const QUICK: { href: string; label: string; desc: string }[] = [
   { href: "/school/gate", label: "Sign in / out", desc: "Gate kiosk, today's log, staff sign-in" },
   { href: "/school/students", label: "Students & parents", desc: "Records, guardians, portal links, import" },
   { href: "/school/timetable", label: "Timetable", desc: "Auto-generated, clash-free" },
-  { href: "/school/lesson-notes", label: "Lesson notes", desc: "Write or AI-draft, then approve" },
+  { href: "/school/lesson-notes", label: "Lesson notes", desc: "Write or draft in seconds, then approve" },
   { href: "/exams", label: "Secure exams", desc: "Build, proctor and mark exams" },
   { href: "/school/admissions", label: "Admissions", desc: "Online applications to enrolment" },
   { href: "/school/events", label: "Events & trips", desc: "Consent and payment in one step" },

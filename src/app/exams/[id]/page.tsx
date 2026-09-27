@@ -1,7 +1,7 @@
 "use client";
 import { Fragment, useEffect, useState, use } from "react";
 import Link from "next/link";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, statusTone, fmtTime } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, statusTone, fmtTime, Loading } from "@/components/ui";
 import QuestionEditor, { blankQuestion, TYPE_LABELS, type EditorQuestion, type QType } from "@/components/exams/QuestionEditor";
 import QuestionView from "@/components/exams/QuestionView";
 
@@ -18,7 +18,7 @@ export default function ExamWorkspace(props: { params: Promise<{ id: string }> }
   const { data, error, reload } = useApi<{ exam: Exam; questions: Question[] }>(`/api/exams/${params.id}`);
   const [tab, setTab] = useState<Tab>("questions");
   if (error) return <Page><Alert>{error}</Alert></Page>;
-  if (!data) return <Page><p className="text-sm text-slate-500">Loading…</p></Page>;
+  if (!data) return <Page><Loading /></Page>;
   const { exam, questions } = data;
   const total = questions.reduce((a, q) => a + Number(q.points), 0);
   return (
@@ -206,7 +206,7 @@ function Settings({ exam, reload }: { exam: Exam; reload: () => void }) {
 
       <div className="flex flex-wrap items-center gap-2">
         <button className="btn btn-primary" onClick={() => save()}>Save settings</button>
-        {exam.status === "draft" && <button className="btn btn-primary bg-emerald-600 hover:bg-emerald-700" onClick={() => save({ status: "published" }, "Published. Students can now start with the exam code.")}>Publish exam</button>}
+        {exam.status === "draft" && <button className="btn btn-success" onClick={() => save({ status: "published" }, "Published. Students can now start with the exam code.")}>Publish exam</button>}
         {exam.status === "published" && <button className="btn btn-danger" onClick={() => confirm("Close the exam? Students still writing will be submitted when their time ends.") && save({ status: "closed" }, "Exam closed.")}>Close exam</button>}
         {exam.status !== "draft" && <button className="btn btn-ghost" onClick={() => save({ status: "draft" }, "Back to draft.")}>Unpublish</button>}
         <button className="btn btn-ghost" onClick={() => save({ regenerate_code: true }, "New exam code generated.")}>New exam code</button>
@@ -322,7 +322,7 @@ function Marking({ exam, reload: reloadExam }: { exam: Exam; reload: () => void 
     <div>
       <div className="mb-4 flex flex-wrap gap-2">
         <button className="btn btn-primary" onClick={() => release(false)}>Release results to students</button>
-        <button className="btn btn-ghost border border-slate-200" onClick={() => confirm("Push every graded score into the term score sheet for the chosen component?") && release(true)}>Release and push to report cards</button>
+        <button className="btn btn-outline" onClick={() => confirm("Push every graded score into the term score sheet for the chosen component?") && release(true)}>Release and push to report cards</button>
         <a className="btn btn-ghost ml-auto" href={`/api/exams/${exam.id}/attempts?format=csv`}>Download marks (CSV)</a>
       </div>
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}

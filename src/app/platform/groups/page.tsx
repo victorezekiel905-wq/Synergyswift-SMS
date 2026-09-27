@@ -37,7 +37,7 @@ export default function PlatformGroups() {
               <ul className="mb-2 space-y-1 text-sm">{g.admins.map(a => <li key={a.user_id} className="flex justify-between">{a.email}<button className="text-xs text-rose-600" onClick={() => act({ action: "remove_admin", group_id: g.id, user_id: a.user_id }, "Removed.")}>Remove</button></li>)}</ul>
               <form className="flex gap-2" onSubmit={e => { e.preventDefault(); const em = (e.currentTarget.elements.namedItem("email") as HTMLInputElement).value; act({ action: "add_admin", group_id: g.id, email: em }, "Admin added."); e.currentTarget.reset(); }}>
                 <Field label=""><input name="email" className="input" type="email" placeholder="proprietor@email.com" required /></Field>
-                <button className="btn btn-ghost border border-slate-200">Add</button>
+                <button className="btn btn-outline">Add</button>
               </form>
             </div>
           </div>

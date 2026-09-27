@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Field, Badge, Empty } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Field, Badge, Empty, Icon } from "@/components/ui";
 import { LANGUAGES } from "@/lib/languages";
 
 type Tab = "profile" | "academic" | "grading" | "classes";
@@ -165,7 +165,7 @@ function Grading() {
   const { data, reload } = useApi<Scheme[]>("/api/school/grading");
   const [edit, setEdit] = useState<Scheme | null>(null);
   const { flash, node } = useFlash();
-  useEffect(() => { if (data && !edit) setEdit(data[0] ?? null); /* eslint-disable-next-line */ }, [data]);
+  useEffect(() => { if (data) setEdit(e => e ?? data[0] ?? null); }, [data]);
 
   async function save() {
     if (!edit) return;
@@ -214,7 +214,7 @@ function Grading() {
                 <h3 className="font-semibold">Assessment components</h3>
                 <span className={"text-xs font-semibold " + (Math.abs(weight - 100) < 0.001 ? "text-emerald-600" : "text-rose-600")}>Weights total {weight}% (must be 100)</span>
               </div>
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
                 <thead className="text-left text-xs uppercase text-slate-500"><tr><th>Name</th><th>Max score</th><th>Weight %</th><th /></tr></thead>
                 <tbody>
                   {comps.map((c, i) => (
@@ -222,18 +222,18 @@ function Grading() {
                       <td className="pr-2 py-1"><input className="input py-1" value={c.name} onChange={e => setComp(i, "name", e.target.value)} aria-label="Component name" /></td>
                       <td className="pr-2"><input className="input py-1" type="number" value={c.max_score} onChange={e => setComp(i, "max_score", e.target.value)} aria-label="Max score" /></td>
                       <td className="pr-2"><input className="input py-1" type="number" value={c.weight} onChange={e => setComp(i, "weight", e.target.value)} aria-label="Weight" /></td>
-                      <td><button className="btn btn-ghost px-2 text-rose-600" onClick={() => setEdit({ ...edit, grading_components: comps.filter((_, j) => j !== i) })} aria-label="Remove component">✕</button></td>
+                      <td><button type="button" className="btn btn-ghost px-2 text-rose-600" onClick={() => setEdit({ ...edit, grading_components: comps.filter((_, j) => j !== i) })} aria-label="Remove component"><Icon name="x" className="h-4 w-4" /></button></td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
               <button className="btn btn-ghost mt-2 text-xs" onClick={() => setEdit({ ...edit, grading_components: [...comps, { name: `CA ${comps.length + 1}`, max_score: 10, weight: 10 }] })}>+ Add component</button>
               <p className="mt-2 text-xs text-slate-500">Each component can have any max score. Its contribution is score ÷ max × weight, so a 30-mark test worth 20% works as expected.</p>
             </div>
           </section>
           <section className="card p-5">
             <h3 className="mb-2 font-semibold">Grade bands</h3>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
               <thead className="text-left text-xs uppercase text-slate-500"><tr><th>Grade</th><th>From</th><th>To</th><th>Remark</th><th>Points</th><th /></tr></thead>
               <tbody>
                 {bands.map((b, i) => (
@@ -243,11 +243,11 @@ function Grading() {
                     <td className="pr-1"><input className="input w-20 py-1" type="number" step="any" value={b.max_score} onChange={e => setBand(i, "max_score", e.target.value)} aria-label="To" /></td>
                     <td className="pr-1"><input className="input py-1" value={b.remark ?? ""} onChange={e => setBand(i, "remark", e.target.value)} aria-label="Remark" /></td>
                     <td className="pr-1"><input className="input w-16 py-1" type="number" step="any" value={b.grade_point ?? ""} onChange={e => setBand(i, "grade_point", e.target.value)} aria-label="Grade point" /></td>
-                    <td><button className="btn btn-ghost px-2 text-rose-600" onClick={() => setEdit({ ...edit, grade_bands: bands.filter((_, j) => j !== i) })} aria-label="Remove band">✕</button></td>
+                    <td><button type="button" className="btn btn-ghost px-2 text-rose-600" onClick={() => setEdit({ ...edit, grade_bands: bands.filter((_, j) => j !== i) })} aria-label="Remove band"><Icon name="x" className="h-4 w-4" /></button></td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
             <button className="btn btn-ghost mt-2 text-xs" onClick={() => setEdit({ ...edit, grade_bands: [...bands, { grade: "", min_score: 0, max_score: 0, remark: "", grade_point: null }] })}>+ Add band</button>
             <div className="mt-5 flex gap-2"><button className="btn btn-primary" onClick={save}>Save scheme</button></div>
           </section>
@@ -311,7 +311,7 @@ function Classes() {
             {(data?.subjects ?? []).map(s => (
               <span key={s.id} className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-sm">
                 {s.name}
-                <button className="text-slate-400 hover:text-rose-600" aria-label={`Delete ${s.name}`} onClick={() => confirm(`Delete ${s.name}? Scores for it will be deleted too.`) && act({ kind: "delete", table: "subjects", id: s.id }, "Subject deleted")}>✕</button>
+                <button type="button" className="text-slate-400 hover:text-rose-600" aria-label={`Delete ${s.name}`} onClick={() => confirm(`Delete ${s.name}? Scores for it will be deleted too.`) && act({ kind: "delete", table: "subjects", id: s.id }, "Subject deleted")}><Icon name="x" className="h-4 w-4" /></button>
               </span>
             ))}
           </div>
@@ -333,10 +333,10 @@ function Classes() {
                 {(schemes ?? []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </Field>
-            <button className="btn btn-ghost border border-slate-200" onClick={() => act({ kind: "offer_all", class_group_id: group.id }, "All subjects added")}>Offer all subjects</button>
+            <button className="btn btn-outline" onClick={() => act({ kind: "offer_all", class_group_id: group.id }, "All subjects added")}>Offer all subjects</button>
             <button className="btn btn-ghost text-rose-600" onClick={() => confirm(`Delete ${group.name}? Students stay but lose their class.`) && act({ kind: "delete", table: "class_groups", id: group.id }, "Class deleted").then(() => setSel(""))}>Delete class</button>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
             <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-2">Subject</th><th>Subject teacher (can enter scores)</th><th /></tr></thead>
             <tbody>
               {(data?.subjects ?? []).map(s => {
@@ -361,7 +361,7 @@ function Classes() {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         </section>
       )}
     </div>

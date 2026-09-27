@@ -108,7 +108,7 @@ where added; init migration enables everything).
 - Off-task ML classifier (rule-based detector is the foundation; ML is §3.7/§24
   Phase 3 and is gated behind accuracy/privacy evaluation).
 - SSO adapters (Google/Microsoft/ClassLink); CSV roster importer.
-- AI lesson/question summarisation.
+- Automatic lesson/question summarisation.
 - Real payment processor wiring (subscriptions table + plans seeded; UI shows
   preview invoice).
 

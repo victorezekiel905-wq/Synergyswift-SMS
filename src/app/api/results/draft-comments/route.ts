@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
-import { generateReportComments, aiErrorMessage, type CommentInput } from "@/lib/ai";
+import { generateReportComments, assistErrorMessage, type CommentInput } from "@/lib/assist";
 
 export const maxDuration = 180;
 
@@ -69,10 +69,10 @@ export async function POST(req: NextRequest) {
         if (!error) drafted++;
       }
     }
-    await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "ai.report_comments", meta: { class_group_id: b.class_group_id, role: b.role, drafted } });
+    await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "report_comments.drafted", meta: { class_group_id: b.class_group_id, role: b.role, drafted } });
     return NextResponse.json({ drafted });
   } catch (e) {
-    const { message, status } = aiErrorMessage(e);
+    const { message, status } = assistErrorMessage(e);
     return jsonError(message, status);
   }
 }

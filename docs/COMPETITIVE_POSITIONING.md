@@ -29,9 +29,9 @@ Large US districts run **PowerSchool**, **Infinite Campus** or **Skyward**. Inde
 |---|---|---|---|
 | **ParentSquare** (US) | Two-way messaging translated into 100+ languages; text, email, app and voice. The vendor says it reaches 99.4% of families. | Separate product from the SIS. | Two-way messaging with translation both ways, email, WhatsApp, SMS and app push, all inside the same system as results and fees. |
 | **ClassDojo** | Much-loved classroom culture and behaviour points. | A classroom-level tool; a competitor reports that several family features sit behind a per-parent subscription. | Behaviour points, houses and parent messaging are included for every family at no extra cost. |
-| **Seesaw** | Student portfolios, a family app with translation into 100+ languages, AI-generated newsletters. | No significant problems found in this research. | Translation and AI-drafted notices. Portfolios are not yet offered (see gaps). |
+| **Seesaw** | Student portfolios, a family app with translation into 100+ languages, automatically drafted newsletters. | No significant problems found in this research. | Translation and automatically drafted notices. Portfolios are not yet offered (see gaps). |
 | **ParentPay** (UK) | Cashless payments in 11,000+ UK schools: meals, trips, clubs; parents see what their child bought in the canteen. | Separate product from the SIS. | A cashless wallet with online top-up, a till that scans the ID card, every purchase visible to parents, daily limits, a lost-card freeze, and **allergies shown at the till**. |
-| **d6** (South Africa) | Notices by WhatsApp, SMS, email and app from one portal; AI-drafted notices; cashless payments. | No significant problems found in this research. | The same channels, AI drafting and online payments, plus results, exams and the rest of the school in one product. |
+| **d6** (South Africa) | Notices by WhatsApp, SMS, email and app from one portal; automatically drafted notices; cashless payments. | No significant problems found in this research. | The same channels, notice drafting and online payments, plus results, exams and the rest of the school in one product. |
 | **Edulog** (US) | Live bus GPS, alerts when the bus enters a zone; one case study reported 75% fewer parent phone calls. | Separate product from the SIS. | Live bus location from the attendant's phone during a trip, alerts about five minutes before each stop, and a scan when each child gets on and off. |
 
 ### Admissions and learning
@@ -39,7 +39,7 @@ Large US districts run **PowerSchool**, **Infinite Campus** or **Skyward**. Inde
 | System | Known for | Reported problems | How EduClass Fusion answers |
 |---|---|---|---|
 | **SchoolMint / Finalsite** | Online applications, fair lotteries, waitlists with sibling priority. | Separate products from the SIS. | Online applications with tracking and an enrolment pipeline. Lotteries and ranked waitlists are not yet offered (see gaps). |
-| **Toddle / ManageBac** (IB) | Curriculum planning, portfolios, AI-drafted report comments. | No significant problems found in this research. | AI report comments and lesson notes, reviewed by the teacher. |
+| **Toddle / ManageBac** (IB) | Curriculum planning, portfolios, automatically drafted report comments. | No significant problems found in this research. | Drafted report comments and lesson notes, always reviewed by the teacher. |
 | **Canvas / Schoology** | Deep gradebooks, rubrics, outcomes; Schoology adds state standards and SCORM. | Separate from the SIS. | An LMS and secure exams share the results records. Standards alignment and SCORM are not yet offered (see gaps). |
 | **Google Classroom** | Free and simple. | Reviewers describe a weak gradebook and no real rubric system. | A full per-school grading engine feeding report cards. |
 
@@ -59,7 +59,7 @@ Large US districts run **PowerSchool**, **Infinite Campus** or **Skyward**. Inde
 | Market lesson | What we built |
 |---|---|
 | PowerSchool and Blackbaud: the biggest risk is one stolen password | Two-factor sign-in, mandatory for super admins and optional per school for admins or all staff, enforced by the database |
-| ParentSquare, ClassDojo, Seesaw, d6: families want two-way conversation in their own language | Private parent-staff messaging with safeguarding oversight and permanent records, translation both ways, AI-drafted notices |
+| ParentSquare, ClassDojo, Seesaw, d6: families want two-way conversation in their own language | Private parent-staff messaging with safeguarding oversight and permanent records, translation both ways, drafted notices |
 | Compass: app log-outs and outages frustrate parents | Free push notifications, parents signed in by private link, and a status endpoint for uptime monitoring |
 | ParentPay, d6: cashless schools | Wallet, online top-up, tuck shop till with allergy warnings, daily limits and a lost-card freeze |
 | Edulog: live bus tracking cuts parent calls | Live bus location during trips and alerts about five minutes before each stop |
@@ -77,7 +77,7 @@ Large US districts run **PowerSchool**, **Infinite Campus** or **Skyward**. Inde
 6. **Money is collected, and cash disappears.** Fee pay links and wallet top-ups settle straight into the school's own account after verification, and the till takes cards, not cash.
 7. **Exams that can be trusted.** 12 question types, lockdown, live proctoring and Safe Exam Browser, feeding the same results records.
 8. **Each school runs things its own way.** Grading schemes, report-card traits, fee structures, languages, SMS rules, two-factor rules, roles and modules are set per school.
-9. **AI that saves staff time.** Lesson notes, report comments and parent notices are drafted by AI and always reviewed by a person.
+9. **Drafting that saves staff time.** Lesson notes, report comments and parent notices are drafted in seconds and always reviewed by a person.
 10. **Works on any phone, even offline.** Parents need no app download or password. Staff can install the app, get push notifications and take the register without a connection.
 
 ## Honest gaps
@@ -92,7 +92,7 @@ These are areas where a competitor is still ahead. It is safer to sell around th
 - **Portfolios and standards.** Seesaw and Toddle offer student portfolios; Schoology aligns work to state standards and plays SCORM packages.
 - **Voice calls.** ParentSquare can phone families. We do not.
 - **Interface languages.** Parents' messages are translated, but the app itself is in English. Gulf schools expect a full Arabic interface.
-- **Not yet proven live.** Email, WhatsApp, SMS, payment, AI and push integrations are built and unit-tested against the providers' documented formats, but have not run against live accounts.
+- **Not yet proven live.** Email, WhatsApp, SMS, payment, drafting, translation and push integrations are built and unit-tested against the providers' documented formats, but have not run against live accounts.
 
 ## Sources
 

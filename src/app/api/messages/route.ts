@@ -6,7 +6,7 @@ import { guardiansByStudent, rowsForGuardian, enqueue, tryDispatch, loadBrand, t
 import { broadcast } from "@/lib/messaging/templates";
 import { emailConfigured, whatsappConfigured, smsConfigured } from "@/lib/messaging/providers";
 import { pushConfigured } from "@/lib/messaging/push";
-import { aiConfigured, translateTexts, draftNotice, aiErrorMessage } from "@/lib/ai";
+import { assistConfigured, translateTexts, draftNotice, assistErrorMessage } from "@/lib/assist";
 import { needsTranslation } from "@/lib/languages";
 
 /** Delivery log + provider status. */
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   if (kind) q = q.eq("kind", kind);
   const { data, error } = await q;
   if (error) return jsonError(error.message);
-  return NextResponse.json({ items: data ?? [], providers: { email: emailConfigured(), whatsapp: whatsappConfigured(), sms: smsConfigured(), push: pushConfigured(), ai: aiConfigured() } });
+  return NextResponse.json({ items: data ?? [], providers: { email: emailConfigured(), whatsapp: whatsappConfigured(), sms: smsConfigured(), push: pushConfigured(), drafting: assistConfigured() } });
 }
 
 const Body = z.discriminatedUnion("action", [
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
 
   if (b.action === "draft") {
     try { return NextResponse.json(await draftNotice({ instruction: b.instruction, schoolName: ctx.tenant.name, tone: b.tone })); }
-    catch (e) { const m = aiErrorMessage(e); return jsonError(m.message, m.status); }
+    catch (e) { const m = assistErrorMessage(e); return jsonError(m.message, m.status); }
   }
 
   if (b.action === "retry") {
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
   const { data: settings } = await svc.from("tenant_settings").select("default_language").eq("tenant_id", tid).maybeSingle();
   const schoolLang = settings?.default_language ?? "en";
   const versions = new Map<string, { title: string; body: string }>();
-  if (b.translate && aiConfigured()) {
+  if (b.translate && assistConfigured()) {
     const langs = [...new Set([...guardians.values()].map(g => g.language).filter(l => needsTranslation(l, schoolLang)))].slice(0, 12) as string[];
     await Promise.all(langs.map(async lang => {
       try {

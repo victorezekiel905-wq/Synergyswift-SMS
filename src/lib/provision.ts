@@ -39,10 +39,13 @@ export async function provisionUser(svc: any, p: ProvisionInput): Promise<{ user
   }
   const user = link.data?.user;
   if (!user?.id) throw new Error("could not create the login");
+  // Platform admins never get an account inside a school, so no school can see them.
+  const { data: platform } = await svc.from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle();
+  if (platform) throw new Error("this email is already registered to another account; use a different email");
   const actionLink: string | null = link.data?.properties?.action_link ?? null;
 
   if (existingProfile) {
-    const { error } = await svc.from("users").update({ full_name: p.fullName, role: p.role, extra_roles: p.extraRoles ?? [], active: true }).eq("id", user.id);
+    const { error } = await svc.from("users").update({ full_name: p.fullName, role: p.role, extra_roles: p.extraRoles ?? [], active: true }).eq("tenant_id", p.tenantId).eq("id", user.id);
     if (error) throw new Error(error.message);
   } else {
     const { error } = await svc.from("users").insert({

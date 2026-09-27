@@ -7,7 +7,7 @@ type Msg = { id: string; channel: string; to_address: string; to_name: string | 
 export default function MessagesPage() {
   const [status, setStatus] = useState("");
   const [kind, setKind] = useState("");
-  const { data, error, reload } = useApi<{ items: Msg[]; providers: { email: boolean; whatsapp: boolean; sms?: boolean; push?: boolean; ai?: boolean } }>(`/api/messages?${new URLSearchParams({ ...(status ? { status } : {}), ...(kind ? { kind } : {}) })}`, [status, kind]);
+  const { data, error, reload } = useApi<{ items: Msg[]; providers: { email: boolean; whatsapp: boolean; sms?: boolean; push?: boolean; drafting?: boolean } }>(`/api/messages?${new URLSearchParams({ ...(status ? { status } : {}), ...(kind ? { kind } : {}) })}`, [status, kind]);
   const { data: structure } = useApi<{ class_groups: { id: string; name: string }[] }>("/api/school/structure");
   const [b, setB] = useState({ title: "", body: "", class_group_ids: [] as string[], email: true, whatsapp: true, sms: false, push: true, translate: true });
   const [ask, setAsk] = useState("");
@@ -54,12 +54,12 @@ export default function MessagesPage() {
       <div className="grid gap-5 xl:grid-cols-3">
         <form onSubmit={broadcast} className="card h-fit space-y-3 p-5">
           <h2 className="font-semibold">Broadcast</h2>
-          {data?.providers.ai && (
-            <div className="rounded-lg bg-violet-50 p-3">
-              <Field label="Draft with AI" hint="Say what parents need to know. Nothing is invented; missing details are left as [placeholders].">
+          {data?.providers.drafting && (
+            <div className="rounded-lg border border-brand-100 bg-brand-50/60 p-3">
+              <Field label="Write it for me" hint="Say what parents need to know. Missing details are left as [placeholders] for you to fill in.">
                 <textarea className="input h-16" maxLength={1500} value={ask} onChange={e => setAsk(e.target.value)} placeholder="e.g. Sports day is Friday 10 Oct from 9am, children wear house colours, parents welcome" />
               </Field>
-              <button type="button" className="btn btn-ghost mt-1 border border-violet-200 text-xs" disabled={drafting || ask.trim().length < 5} onClick={draft}>{drafting ? "Drafting…" : "Draft"}</button>
+              <button type="button" className="btn btn-outline mt-2 px-3 py-1.5 text-xs" disabled={drafting || ask.trim().length < 5} onClick={draft}>{drafting ? "Drafting…" : "Draft notice"}</button>
             </div>
           )}
           <Field label="Title"><input className="input" required maxLength={120} value={b.title} onChange={e => setB({ ...b, title: e.target.value })} /></Field>
@@ -79,7 +79,7 @@ export default function MessagesPage() {
             <label className="flex items-center gap-2"><input type="checkbox" checked={b.sms} onChange={e => setB({ ...b, sms: e.target.checked })} /> SMS</label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={b.push} onChange={e => setB({ ...b, push: e.target.checked })} /> App</label>
           </div>
-          {data?.providers.ai && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={b.translate} onChange={e => setB({ ...b, translate: e.target.checked })} /> Translate for parents who chose another language</label>}
+          {data?.providers.drafting && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={b.translate} onChange={e => setB({ ...b, translate: e.target.checked })} /> Translate for parents who chose another language</label>}
           <button className="btn btn-primary w-full" disabled={busy || (!b.email && !b.whatsapp && !b.sms && !b.push)}>{busy ? "Sending…" : "Send"}</button>
         </form>
         <section className="xl:col-span-2">

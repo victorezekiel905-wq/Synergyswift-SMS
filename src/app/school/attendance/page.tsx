@@ -1,6 +1,6 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Field, Badge } from "@/components/ui";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Field, Badge, localDate } from "@/components/ui";
 
 type Status = "present" | "absent" | "late" | "excused";
 type Register = { date: string; taken: boolean; students: { id: string; admission_no: string; first_name: string; last_name: string; photo_url: string | null;
@@ -41,7 +41,7 @@ export default function AttendancePage() {
 }
 
 function RegisterView({ cg }: { cg: string }) {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => localDate());
   const { data: fresh, error, reload } = useApi<Register>(`/api/attendance?class_group_id=${cg}&date=${date}`, [cg, date]);
   const [offlineCopy, setOfflineCopy] = useState<Register | null>(null);
   const rosterKey = `educlass:register:${cg}`;
@@ -49,7 +49,7 @@ function RegisterView({ cg }: { cg: string }) {
     if (fresh) { local.set(rosterKey, { ...fresh, students: fresh.students.map(s => ({ ...s, mark: null, signed_in_at_gate: false })) }); setOfflineCopy(null); }
     else if (error) setOfflineCopy(local.get<Register | null>(rosterKey, null));
   }, [fresh, error, rosterKey]);
-  const data = fresh ?? (offlineCopy ? { ...offlineCopy, date, taken: false } : null);
+  const data = useMemo(() => fresh ?? (offlineCopy ? { ...offlineCopy, date, taken: false } : null), [fresh, offlineCopy, date]);
   const [marks, setMarks] = useState<Record<string, { status: Status; reason: string }>>({});
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -104,7 +104,7 @@ function RegisterView({ cg }: { cg: string }) {
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-end gap-3">
-        <Field label="Date"><input className="input" type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={e => setDate(e.target.value)} /></Field>
+        <Field label="Date"><input className="input" type="date" value={date} max={localDate()} onChange={e => setDate(e.target.value)} /></Field>
         <div className="flex gap-2 pb-2 text-sm">{(["present", "late", "absent", "excused"] as Status[]).map(s => <Badge key={s} tone={s === "present" ? "green" : s === "absent" ? "red" : s === "late" ? "amber" : "slate"}>{counts[s] ?? 0} {s}</Badge>)}</div>
         <button className="btn btn-primary ml-auto" disabled={busy || !data?.students.length} onClick={save}>{busy ? "Saving…" : data?.taken ? "Update register" : "Save register"}</button>
       </div>
@@ -140,14 +140,14 @@ function RegisterView({ cg }: { cg: string }) {
 }
 
 function ReportView({ cg }: { cg: string }) {
-  const [range, setRange] = useState({ from: new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) });
+  const [range, setRange] = useState(() => ({ from: localDate(30), to: localDate() }));
   const { data } = useApi<Report>(`/api/attendance?class_group_id=${cg}&from=${range.from}&to=${range.to}`, [cg, range.from, range.to]);
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-end gap-2">
         <Field label="From"><input className="input" type="date" value={range.from} onChange={e => setRange({ ...range, from: e.target.value })} /></Field>
         <Field label="To"><input className="input" type="date" value={range.to} onChange={e => setRange({ ...range, to: e.target.value })} /></Field>
-        <a className="btn btn-ghost border border-slate-200" href={`/api/attendance?class_group_id=${cg}&from=${range.from}&to=${range.to}&format=csv`}>CSV</a>
+        <a className="btn btn-outline" href={`/api/attendance?class_group_id=${cg}&from=${range.from}&to=${range.to}&format=csv`}>CSV</a>
       </div>
       {!data?.students.length ? <Empty>No data.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">

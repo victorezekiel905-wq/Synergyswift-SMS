@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useApi, send, Page, PageHeader, Badge, statusTone, Empty, Alert, Modal, Field, fmtDate } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Badge, statusTone, Empty, Alert, Modal, Field, fmtDate, Loading } from "@/components/ui";
 
 type Tenant = {
   id: string; name: string; slug: string; status: string; country: string | null; created_at: string;
@@ -28,7 +28,7 @@ export default function PlatformPage() {
         <div className="card p-4"><p className="text-xs uppercase text-slate-500">Messages sent (30 days)</p><p className="text-2xl font-bold">{totals.msgs}</p></div>
       </div>
       <input className="input mb-3 max-w-sm" placeholder="Search schools" value={q} onChange={e => setQ(e.target.value)} aria-label="Search schools" />
-      {loading && !data ? <p className="text-sm text-slate-500">Loading…</p> : list.length === 0 ? <Empty>No schools yet. Create the first one.</Empty> : (
+      {loading && !data ? <Loading /> : list.length === 0 ? <Empty>No schools yet. Create the first one.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">

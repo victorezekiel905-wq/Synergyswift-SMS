@@ -48,8 +48,8 @@ Contract for the active build. Stack: **Next.js 15 (App Router, TypeScript, Tail
 
 - Interactive video with timestamped questions already built; next media slice is binary asset ingest/transcoding for uploaded videos/images.
 - Matching/drag-drop/collab-board/code-execution activity kinds are built; the next slice is richer grading/rubrics and teacher review UX.
-- WebRTC audio/video hardening · SSO/OIDC · real payment processing · AI generation · ML off-task classification
-- AI lesson/question generation · ML off-task classification (explicitly gated behind privacy/accuracy testing in blueprint §3.8/§24)
+- WebRTC audio/video hardening · SSO/OIDC · real payment processing · automatic content generation · automatic off-task classification
+- Automatic lesson/question generation · automatic off-task classification (explicitly gated behind privacy/accuracy testing in blueprint §3.8/§24)
 
 ## v45: school operations platform
 
@@ -83,7 +83,7 @@ Not verified here: live delivery through Resend, SendGrid, Meta or Twilio (needs
 | Class register, homework, behaviour rules and houses, health and sick bay, events and consent, meeting booking, traits, lesson notes | ✅ built |
 | Timetable generator, school buses, boarding and exeat, visitors | ✅ built |
 | Admissions with public form and tracking, session rollover, school groups | ✅ built |
-| Early-warning risk scores with interventions, AI report comments and lesson notes | ✅ built |
+| Early-warning risk scores with interventions, drafted report comments and lesson notes | ✅ built |
 | SMS channel (Termii, Twilio, Africa's Talking) with fallback and per-parent opt-in | ✅ built |
 | Parent portal tabs, student homework and timetable, installable web app | ✅ built |
 | Super admin access, role matrix and isolation guide | ✅ [docs/ACCESS_AND_ISOLATION.md](docs/ACCESS_AND_ISOLATION.md) |
@@ -93,7 +93,7 @@ Also fixed: ESLint had never run because no config existed. It now runs, and the
 
 Verified: `npm test` (66 unit tests), `npm run test:db` (19 migrations on a fresh database, the new ones re-run for idempotency, 104 checks), `npm run lint`, `next build`.
 
-Not verified here: live email, WhatsApp, SMS, payment and AI calls (these need real keys), and a real Safe Exam Browser client.
+Not verified here: live email, WhatsApp, SMS, payment and drafting calls (these need real keys), and a real Safe Exam Browser client.
 
 ## v47: trust and family engagement
 
@@ -103,7 +103,7 @@ Built from research into about 25 leading school systems (see [docs/COMPETITIVE_
 |---|---|
 | Two-factor sign-in (authenticator app): mandatory for super admins, optional per school for admins or all staff, enforced by the database | ✅ built |
 | Two-way parent-staff messaging, safeguarding view for admins, permanent record, rate limits | ✅ built |
-| Translation of broadcasts and messages into 40 home languages; AI-drafted notices | ✅ built |
+| Translation of broadcasts and messages into 40 home languages; notice drafting | ✅ built |
 | Free app push notifications for parents and staff | ✅ built |
 | Cashless wallet: online and bursary top-ups, tuck shop till with allergy warnings, daily limits, lost-card freeze, new cashier role | ✅ built |
 | Staff absence and cover with free-staff suggestions | ✅ built |
@@ -114,4 +114,21 @@ Built from research into about 25 leading school systems (see [docs/COMPETITIVE_
 
 Verified: `npm test` (78 unit tests), `npm run test:db` (20 migrations on a fresh database, the new ones re-run for idempotency, 152 checks), `npm run lint`, `next build`.
 
-Not verified here: live email, WhatsApp, SMS, payment, AI and push delivery (these need real keys and devices), and a real Safe Exam Browser client.
+Not verified here: live email, WhatsApp, SMS, payment, drafting, translation and push delivery (these need real keys and devices), and a real Safe Exam Browser client.
+
+## Quality pass
+
+| Area | Fix |
+|---|---|
+| Neutral product language | No screen, message, error, route or data field describes how drafts or translations are produced. Drafting uses "Draft it for me", "Write it for me" and "Draft teacher comments". Generated text is instructed never to refer to itself. |
+| Layout bug across the app | Shared styles (buttons, inputs, cards) were declared after Tailwind utilities, so size and colour tweaks on pages were ignored (inputs stayed full width, small buttons stayed large). They now sit in the components layer. |
+| Offline register | Fixed a render loop while offline. |
+| Environment policies | New policies were saved without a school and vanished; the database now requires the creator's school. |
+| Provisioning | A school can no longer invite a super admin's email, which would have given the super admin a visible school account. |
+| Video rooms | Participant name and role come from the profile, not the browser. |
+| Hooks | Six effects with missing dependencies fixed properly (no suppressions). |
+| Dates | "Today" and date-only values use the viewer's local date, not UTC. |
+| Phones | 26 tables scroll sideways instead of breaking the layout. |
+| Interface | Shared icon set, dialogs that lock scrolling and move focus, keyboard tabs, closable mobile menu, loading indicators, page titles, inline error messages instead of alerts, and every remove button is a non-submitting button. |
+
+Verified: `npm test` (78), `npm run test:db` (22 migrations, 159 checks), lint with no warnings, `next build`.

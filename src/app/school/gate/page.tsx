@@ -23,7 +23,7 @@ export default function GatePage() {
     <Page wide>
       <PageHeader eyebrow="Attendance" title="Sign in / sign out"
         subtitle="Scan ID cards at the gate. Parents get a WhatsApp and email the moment their child signs in or out."
-        actions={canKiosk ? <Link className="btn btn-ghost border border-slate-200" href="/school/gate/kiosk">Open full-screen kiosk</Link> : undefined} />
+        actions={canKiosk ? <Link className="btn btn-outline" href="/school/gate/kiosk">Open full-screen kiosk</Link> : undefined} />
       <div className="grid gap-5 xl:grid-cols-3">
         <div className="space-y-5 xl:col-span-2">
           {canKiosk && <section className="card p-5"><h2 className="mb-3 font-semibold">Gate kiosk</h2><GateScanner onRecorded={log.reload} /></section>}
@@ -48,7 +48,7 @@ export default function GatePage() {
               )}
               {!log.data?.events.length ? <Empty>No sign-ins recorded.</Empty> : (
                 <div className="max-h-[480px] overflow-y-auto">
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
                     <thead className="sticky top-0 bg-white text-left text-xs uppercase text-slate-500"><tr><th className="py-2">Time</th><th>Name</th><th>Class / no.</th><th>Direction</th><th>How</th></tr></thead>
                     <tbody>
                       {log.data.events.map(e => (
@@ -61,7 +61,7 @@ export default function GatePage() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                  </table></div>
                 </div>
               )}
             </section>

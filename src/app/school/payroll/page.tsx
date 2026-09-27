@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, statusTone, money, fmtDate, rolesOf, type Me } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, statusTone, money, fmtDate, rolesOf, type Me, Loading } from "@/components/ui";
 
 type Profile = { staff_id: string; basic: number; allowances: { name: string; amount: number }[]; deductions: { name: string; amount?: number | null; percent?: number | null }[];
   tax_percent: number; pension_percent: number; bank_name: string | null; account_no: string | null; account_name: string | null };
@@ -62,7 +62,7 @@ function Runs({ currency }: { currency: string }) {
 
 function RunDetail({ id, currency }: { id: string; currency: string }) {
   const { data } = useApi<{ run: Run; payslips: any[] }>(`/api/payroll?view=run&id=${id}`, [id]);
-  if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (!data) return <Loading />;
   return (
     <div className="overflow-x-auto">
       <p className="mb-2 text-sm">{data.run.period} · {data.payslips.length} staff · net {money(data.run.net, currency)}</p>
@@ -146,13 +146,13 @@ function Mine({ currency }: { currency: string }) {
       <Modal open={Boolean(open)} onClose={() => setOpen(null)} title="Payslip">
         {open && <div className="text-sm">
           <p className="font-semibold">{open.staff?.full_name} · {open.staff?.staff_no}</p><p className="text-slate-500">{open.staff?.position} · {open.payroll_runs?.period}{open.payroll_runs?.paid_at ? ` · paid ${fmtDate(open.payroll_runs.paid_at)}` : ""}</p>
-          <table className="mt-3 w-full"><tbody>
+          <div className="overflow-x-auto print:overflow-visible"><table className="mt-3 w-full"><tbody>
             <tr><td className="py-1">Basic</td><td className="text-right tabular-nums">{money(open.basic, currency)}</td></tr>
             {(open.allowances ?? []).map((a: any) => <tr key={a.name}><td className="py-1">{a.name}</td><td className="text-right tabular-nums">{money(a.amount, currency)}</td></tr>)}
             <tr className="border-t font-semibold"><td className="py-1">Gross</td><td className="text-right tabular-nums">{money(open.gross, currency)}</td></tr>
             {(open.deductions ?? []).filter((d: any) => d.amount > 0).map((d: any) => <tr key={d.name}><td className="py-1">{d.name}</td><td className="text-right tabular-nums">−{money(d.amount, currency)}</td></tr>)}
             <tr className="border-t-2 text-base font-bold"><td className="py-1">Net pay</td><td className="text-right tabular-nums">{money(open.net, currency)}</td></tr>
-          </tbody></table>
+          </tbody></table></div>
           <button className="btn btn-ghost mt-3 border border-slate-200" onClick={() => window.print()}>Print</button>
         </div>}
       </Modal>

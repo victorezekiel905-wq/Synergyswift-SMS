@@ -87,8 +87,8 @@ v46 adds the modules that the leading systems sell separately, so one login runs
 - **Class register** (`/school/attendance`): take the register by class. Parents get an absence or lateness alert. Report cards show days present, absent and opened.
 - **Timetable** (`/school/timetable`): set periods and lessons per week, then generate. The generator never double-books a teacher, class or room, spreads each subject across the week, keeps locked cells and lists anything that could not fit. Teachers and students see their own timetable.
 - **Homework**: set, collect and mark. Late submissions are flagged, and parents see what is due.
-- **Lesson notes**: teachers write or generate weekly notes with AI, and the principal or QA officer approves or returns them.
-- **Traits and AI comments**: rate affective and psychomotor traits on the report card. AI drafts form-teacher and principal comments from each student's scores, which the teacher edits before saving.
+- **Lesson notes**: teachers write weekly notes or get a complete first draft in seconds, and the principal or QA officer approves or returns them.
+- **Traits and drafted comments**: rate affective and psychomotor traits on the report card. Form-teacher and principal comments can be drafted from each student's scores, and the teacher edits them before saving.
 - **Early warning** (`/school/analytics`): every student gets a risk score from attendance, average, falling grades, failed subjects, behaviour and missing homework, with the reasons listed. Staff open an intervention with a plan, owner and review date, and close it with an outcome.
 
 ### Pastoral care
@@ -130,7 +130,7 @@ v47 adds what the market leaders sell as separate products (ParentSquare, Parent
 
 - **Parent messages** (`/school/inbox`): private two-way conversations. Teachers message families of students they teach; parents write to their child's teachers or the school office from their portal. Admins can review every thread for safeguarding, and nothing can be edited or deleted.
 - **Translation**: each parent can choose a home language. Broadcasts and messages reach them translated, and their replies reach staff in the school's language, with the original one tap away.
-- **AI drafting**: on **Messages**, describe the notice and Claude drafts it, leaving [placeholders] rather than inventing details.
+- **Notice drafting**: on **Messages**, describe the notice under **Write it for me** and a draft appears, with [placeholders] rather than invented details.
 - **App notifications**: free push notifications on phones and computers, for parents and staff. Parents turn them on in their portal; staff under **Account security**.
 
 ### Cashless wallet
@@ -157,7 +157,7 @@ v47 adds what the market leaders sell as separate products (ParentSquare, Parent
 2. Set the environment variables in `.env.example`. At minimum set the Supabase keys, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`, one email provider and one WhatsApp provider.
 3. Register the WhatsApp templates in [MESSAGING.md](MESSAGING.md) and set their names. Set an SMS provider for parents without WhatsApp.
    - For online fees, set `PAYSTACK_SECRET_KEY`, or `FLW_SECRET_KEY` and `FLW_SECRET_HASH`, and point the provider's webhook at `/api/pay/webhook/<provider>`. Each school then enters its own subaccount code under **Fees → Online payments**.
-   - For AI lesson notes, report comments, notice drafts and translation, set `ANTHROPIC_API_KEY`. Everything else works without it.
+   - For drafted lesson notes, report comments and notices, and for translation, set the service key `ANTHROPIC_API_KEY`. Everything else works without it, and the drafting buttons stay hidden.
    - For app notifications, run `npx web-push generate-vapid-keys` and set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT`.
    - Point an uptime monitor at `/api/status`.
 4. Schedule `/api/cron/dispatch` every minute and `/api/cron/daily` once a day.

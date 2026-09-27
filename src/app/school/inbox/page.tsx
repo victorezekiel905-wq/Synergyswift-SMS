@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useApi, send, Page, PageHeader, Alert, Badge, Empty, Field, Modal, fmtDate, fmtTime } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Badge, Empty, Field, Modal, fmtDate, fmtTime, Loading } from "@/components/ui";
 import { languageName } from "@/lib/languages";
 
 type Thread = { id: string; subject: string; status: string; unread: number; last_message_at: string; started_by: string; guardian: string; student: string; staff: string; mine: boolean };
@@ -70,7 +70,7 @@ export default function InboxPage() {
         </section>
 
         <section className="card flex min-h-[60vh] flex-col">
-          {!open ? <div className="grid flex-1 place-items-center p-6 text-sm text-slate-500">Choose a conversation.</div> : !d ? <div className="p-6 text-sm text-slate-500">Loading…</div> : (
+          {!open ? <div className="grid flex-1 place-items-center p-6 text-sm text-slate-500">Choose a conversation.</div> : !d ? <Loading /> : (
             <>
               <header className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-4">
                 <div className="mr-auto">

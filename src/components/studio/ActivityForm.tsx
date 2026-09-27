@@ -7,6 +7,7 @@ const KINDS = ["multiple_choice","open_ended","poll","draw","fill_blank","matchi
 export default function ActivityForm({ lessons }: { lessons: { id: string; title: string }[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const [lessonId, setLessonId] = useState(lessons[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<typeof KINDS[number]>("multiple_choice");
@@ -16,7 +17,7 @@ export default function ActivityForm({ lessons }: { lessons: { id: string; title
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    setBusy(true); setErr(null);
     const r = await fetch("/api/activities", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -26,7 +27,7 @@ export default function ActivityForm({ lessons }: { lessons: { id: string; title
       })
     });
     setBusy(false);
-    if (!r.ok) { alert("Failed"); return; }
+    if (!r.ok) { const j = await r.json().catch(() => ({})); setErr(j.error ?? "The activity could not be saved."); return; }
     router.refresh();
   }
 
@@ -61,6 +62,7 @@ export default function ActivityForm({ lessons }: { lessons: { id: string; title
         <label className="label">Correct answer (must match an option)</label>
         <input className="input" value={correct} onChange={(e)=>setCorrect(e.target.value)} />
       </div>
+      {err && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{err}</p>}
       <button className="btn btn-primary w-full" disabled={busy || lessons.length === 0}>
         {busy ? "Saving…" : "Save activity + question"}
       </button>

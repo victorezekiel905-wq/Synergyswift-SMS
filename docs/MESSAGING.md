@@ -179,7 +179,7 @@ Each parent can choose a home language in their portal, or staff can set it on t
 - **Broadcasts** are translated once per language and each family receives its own version. Turn this off per broadcast with the **Translate** tick box.
 - **Messages** are translated both ways: parents read staff messages in their language, and staff read parents' replies in the school's language. The original is always one tap away.
 - Names, dates, amounts, codes and links are kept exactly as written.
-- Translation uses Claude and needs `ANTHROPIC_API_KEY`. If it is missing or a translation fails, the original text is sent.
+- Translation needs the drafting and translation service key, `ANTHROPIC_API_KEY`. If it is missing or a translation fails, the original text is sent.
 
 ## Scheduling the worker
 

@@ -37,7 +37,7 @@ export default async function AdminPage() {
 
       <section className="card mt-6 p-4">
         <h2 className="mb-3 text-sm font-semibold uppercase text-slate-600">Audit log</h2>
-        <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-left text-sm">
           <thead className="text-xs uppercase text-slate-500"><tr><th>When</th><th>Actor</th><th>Action</th><th>Target</th></tr></thead>
           <tbody>
             {(logs ?? []).length === 0 && <tr><td colSpan={4} className="py-6 text-slate-400 text-center">No audits.</td></tr>}
@@ -50,7 +50,7 @@ export default async function AdminPage() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </section>
     </main>
   );

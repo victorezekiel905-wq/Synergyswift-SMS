@@ -76,7 +76,7 @@ export default function BillingClient({ initialPlans }: { initialPlans: Plan[] }
       <section className="card p-5">
         <h2 className="mb-3 text-lg font-semibold">Invoices</h2>
         {invoices.length === 0 && <p className="py-3 text-sm text-slate-400">No invoices yet.</p>}
-        <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-left text-sm">
           <thead className="text-xs uppercase text-slate-500"><tr><th className="py-2">Date</th><th>Amount</th><th>Status</th></tr></thead>
           <tbody>
             {invoices.map(i => (
@@ -87,7 +87,7 @@ export default function BillingClient({ initialPlans }: { initialPlans: Plan[] }
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         <p className="mt-3 text-xs text-slate-400">Paid plans use Stripe Checkout when configured; local development keeps an RLS-backed subscription record.</p>
       </section>
     </div>

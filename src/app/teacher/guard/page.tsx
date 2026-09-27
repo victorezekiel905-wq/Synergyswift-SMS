@@ -17,7 +17,7 @@ export default async function GuardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 mt-6">
         <section className="card lg:col-span-2 p-4">
           <h2 className="mb-3 text-sm font-semibold uppercase text-slate-600">Enrolled devices</h2>
-          <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-slate-500"><tr><th>UID</th><th>Kind</th><th>Status</th><th>Last seen</th></tr></thead>
             <tbody>
               {(devices ?? []).length === 0 && <tr><td colSpan={4} className="py-6 text-slate-400 text-center">No devices. Install the browser extension and call /api/devices/enroll.</td></tr>}
@@ -30,7 +30,7 @@ export default async function GuardPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </section>
         <aside className="card p-4">
           <h2 className="mb-3 text-sm font-semibold uppercase text-slate-600">Enroll new device</h2>

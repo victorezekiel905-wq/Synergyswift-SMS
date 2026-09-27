@@ -1,5 +1,5 @@
 "use client";
-import { useApi, Page, PageHeader, Alert, Empty, Stat, money } from "@/components/ui";
+import { useApi, Page, PageHeader, Alert, Empty, Stat, money, Loading } from "@/components/ui";
 
 type School = { id: string; name: string; status: string; term: string | null; students: number; staff: number;
   fees: { billed: number; paid: number; outstanding: number; collection_rate: number | null }; collected_30d: number; attendance_30d: number | null; average_score: number | null };
@@ -8,7 +8,7 @@ type School = { id: string; name: string; status: string; term: string | null; s
 export default function GroupPage() {
   const { data, error } = useApi<{ groups: { id: string; name: string }[]; schools: School[] }>("/api/group");
   if (error) return <Page><Alert>{error === "not found" ? "You do not have access to a school group." : error}</Alert></Page>;
-  if (!data) return <Page><p className="text-sm text-slate-500">Loading…</p></Page>;
+  if (!data) return <Page><Loading /></Page>;
   const t = data.schools.reduce((a, s) => ({ students: a.students + s.students, staff: a.staff + s.staff, billed: a.billed + s.fees.billed, paid: a.paid + s.fees.paid, c30: a.c30 + s.collected_30d }),
     { students: 0, staff: 0, billed: 0, paid: 0, c30: 0 });
   return (

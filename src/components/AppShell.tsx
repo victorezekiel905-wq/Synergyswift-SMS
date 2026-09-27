@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { rolesOf, type Me } from "@/components/ui";
+import { Icon, rolesOf, type Me } from "@/components/ui";
 
 type NavLink = { href: string; label: string; roles: string[]; module?: string };
 type NavGroup = { title: string; links: NavLink[] };
@@ -105,6 +105,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bare]);
   useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [open]);
 
   if (bare) return <>{children}</>;
 
@@ -155,7 +161,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex items-center justify-between gap-4 px-4 py-2.5">
           <div className="flex items-center gap-3">
-            <button className="btn btn-ghost px-2 py-1 lg:hidden" onClick={() => setOpen(o => !o)} aria-label="Toggle navigation" aria-expanded={open}>☰</button>
+            <button className="btn btn-ghost px-2 py-1 lg:hidden" onClick={() => setOpen(o => !o)} aria-label="Toggle navigation" aria-expanded={open}><Icon name="menu" className="h-5 w-5" /></button>
             <Link href={me?.platform ? "/platform" : "/dashboard"} className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-500 to-violet-600 text-sm font-black text-white">E</span>
               <span className="text-sm font-bold">{me?.tenant?.name ?? (me?.platform ? "Platform console" : "EduClass Fusion")}</span>
@@ -172,7 +178,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <div className="flex">
-        <aside className={(open ? "fixed inset-y-0 left-0 z-20 block pt-16" : "hidden") + " w-60 shrink-0 overflow-y-auto border-r border-slate-200 bg-white px-2 py-5 lg:sticky lg:top-[53px] lg:block lg:h-[calc(100vh-53px)] lg:pt-5"}>
+        {open && <div className="fixed inset-0 z-10 bg-slate-900/30 lg:hidden" aria-hidden onClick={() => setOpen(false)} />}
+        <aside className={(open ? "fixed inset-y-0 left-0 z-20 block pt-16 shadow-xl" : "hidden") + " w-60 shrink-0 overflow-y-auto border-r border-slate-200 bg-white px-2 py-5 lg:sticky lg:top-[53px] lg:block lg:h-[calc(100vh-53px)] lg:pt-5"}>
           {nav}
         </aside>
         <div className="min-w-0 flex-1">

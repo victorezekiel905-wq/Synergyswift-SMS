@@ -1,34 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 
+/** Browsing policies for live classes in the caller's school. */
 export async function GET() {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return NextResponse.json([], { status: 401 });
-  const { data: policies, error } = await sb.from("environment_policies")
+  const ctx = await requireCtx(ROLES.staff);
+  if (ctx instanceof NextResponse) return ctx;
+  const { data: policies, error } = await ctx.sb.from("environment_policies")
     .select("id,name,mode,allowlist,blocklist,required_urls,class_id")
+    .eq("tenant_id", ctx.tenant.id)
     .order("created_at", { ascending: false })
     .limit(50);
-  if (error) return NextResponse.json([], { status: 400 });
+  if (error) return jsonError(error.message);
   return NextResponse.json(policies ?? []);
 }
 
+const Url = z.string().trim().min(1).max(300);
+const Body = z.object({
+  name: z.string().trim().min(1).max(120),
+  mode: z.enum(["monitor", "focus", "lock"]),
+  class_id: z.string().uuid().nullish(),
+  allowlist: z.array(Url).max(200).default([]),
+  blocklist: z.array(Url).max(200).default([]),
+  required_urls: z.array(Url).max(50).default([])
+});
+
+/** Creates a policy. The school is always the caller's own, never taken from the request. */
 export async function POST(req: NextRequest) {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
-  const body = await req.json();
-  if (!body.name || !body.mode) return NextResponse.json({ error: "name, mode required" }, { status: 400 });
-  const { data, error } = await sb.from("environment_policies").insert({
-    tenant_id: body.tenant_id ?? null, class_id: body.class_id ?? null,
-    name: body.name, mode: body.mode,
-    allowlist: body.allowlist ?? [], blocklist: body.blocklist ?? [],
-    required_urls: body.required_urls ?? []
+  const ctx = await requireCtx(ROLES.staff);
+  if (ctx instanceof NextResponse) return ctx;
+  const parsed = Body.safeParse(await readJson(req));
+  if (!parsed.success) return jsonError(parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "));
+  const b = parsed.data;
+  const tid = ctx.tenant.id;
+  if (b.class_id) {
+    const { data: cls } = await ctx.sb.from("classes").select("id").eq("tenant_id", tid).eq("id", b.class_id).maybeSingle();
+    if (!cls) return jsonError("class not found", 404);
+  }
+  const { data, error } = await ctx.sb.from("environment_policies").insert({
+    tenant_id: tid, class_id: b.class_id ?? null, name: b.name, mode: b.mode,
+    allowlist: b.allowlist, blocklist: b.blocklist, required_urls: b.required_urls
   }).select("id,name").single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  await sb.from("audit_logs").insert({
-    tenant_id: body.tenant_id ?? null, actor_id: user.id,
-    action: "policy.created", target: data.id, meta: { mode: body.mode }
-  });
-  return NextResponse.json(data);
+  if (error) return jsonError(error.message);
+  await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "policy.created", target: data.id, meta: { mode: b.mode } });
+  return NextResponse.json(data, { status: 201 });
 }

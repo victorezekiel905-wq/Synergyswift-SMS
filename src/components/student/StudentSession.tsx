@@ -163,6 +163,7 @@ export default function StudentSession(props: {
               </div>
             )}
             {cur.kind === "text" && <pre className="whitespace-pre-wrap text-sm">{cur.payload.markdown}</pre>}
+            {/* eslint-disable-next-line @next/next/no-img-element -- data URL / uploaded file, nothing for next/image to optimise */}
             {cur.kind === "image" && cur.payload.url && <img src={cur.payload.url} alt={cur.payload.alt ?? ""} className="rounded" />}
             {cur.kind === "video" && cur.payload.url && <video src={cur.payload.url} controls className="w-full rounded" />}
             {cur.kind === "embed" && <div dangerouslySetInnerHTML={{ __html: cur.payload.html ?? "" }} />}

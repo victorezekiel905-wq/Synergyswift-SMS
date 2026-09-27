@@ -1,7 +1,7 @@
 "use client";
 import { useState, use } from "react";
 import Link from "next/link";
-import { useApi, send, Page, PageHeader, Badge, statusTone, Alert, Field, fmtDate } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Badge, statusTone, Alert, Field, fmtDate, Loading } from "@/components/ui";
 
 const MODULES: [string, string][] = [
   ["lms", "LMS (lessons, live class, challenges)"], ["sims", "Student information"], ["results", "Results & report cards"],
@@ -34,7 +34,7 @@ export default function TenantDetail(props: { params: Promise<{ id: string }> })
     if (r.ok) reload();
   }
   if (error) return <Page><Alert>{error}</Alert></Page>;
-  if (!data) return <Page><p className="text-sm text-slate-500">Loading…</p></Page>;
+  if (!data) return <Page><Loading /></Page>;
   const t = data.tenant;
 
   return (

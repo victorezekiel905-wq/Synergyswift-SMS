@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Stat, fmtDate } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Stat, fmtDate, localDate, Icon } from "@/components/ui";
 
 type Criterion = { id: string; label: string; max: number };
 type QA = {
@@ -78,7 +78,7 @@ function Observations({ data, onSaved }: { data: QA; onSaved: () => void }) {
   const { data: structure } = useApi<Structure>("/api/school/structure");
   const [open, setOpen] = useState(false);
   const [f, setF] = useState<{ checklist_id: string; staff_id: string; subject_id: string; class_group_id: string; observed_on: string; scores: Record<string, number>; strengths: string; improvements: string; action_plan: string; follow_up_on: string }>({
-    checklist_id: "", staff_id: "", subject_id: "", class_group_id: "", observed_on: new Date().toISOString().slice(0, 10), scores: {}, strengths: "", improvements: "", action_plan: "", follow_up_on: "" });
+    checklist_id: "", staff_id: "", subject_id: "", class_group_id: "", observed_on: localDate(), scores: {}, strengths: "", improvements: "", action_plan: "", follow_up_on: "" });
   const [err, setErr] = useState<string | null>(null);
   const cl = data.checklists.find(c => c.id === f.checklist_id);
   async function save(e: React.FormEvent) {
@@ -116,7 +116,7 @@ function Observations({ data, onSaved }: { data: QA; onSaved: () => void }) {
             <Field label="Subject"><select className="input" value={f.subject_id} onChange={e => setF({ ...f, subject_id: e.target.value })}><option value="">—</option>{(structure?.subjects ?? []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
             <Field label="Class"><select className="input" value={f.class_group_id} onChange={e => setF({ ...f, class_group_id: e.target.value })}><option value="">—</option>{(structure?.class_groups ?? []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
             <tbody>
               {(cl?.criteria ?? []).map(c => (
                 <tr key={c.id} className="border-t border-slate-100">
@@ -132,7 +132,7 @@ function Observations({ data, onSaved }: { data: QA; onSaved: () => void }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           <Field label="Strengths"><textarea className="input h-16" value={f.strengths} onChange={e => setF({ ...f, strengths: e.target.value })} /></Field>
           <Field label="Areas to improve"><textarea className="input h-16" value={f.improvements} onChange={e => setF({ ...f, improvements: e.target.value })} /></Field>
           <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
@@ -173,7 +173,7 @@ function Checklists({ data, onSaved }: { data: QA; onSaved: () => void }) {
               <div key={i} className="flex gap-2">
                 <input className="input" value={c.label} onChange={e => setEdit({ ...edit, criteria: edit.criteria.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} aria-label="Criterion" />
                 <input className="input w-20" type="number" min={1} max={10} value={c.max} onChange={e => setEdit({ ...edit, criteria: edit.criteria.map((x, j) => j === i ? { ...x, max: Number(e.target.value) } : x) })} aria-label="Max points" />
-                <button className="btn btn-ghost px-2 text-rose-600" onClick={() => setEdit({ ...edit, criteria: edit.criteria.filter((_, j) => j !== i) })} aria-label="Remove">✕</button>
+                <button type="button" className="btn btn-ghost px-2 text-rose-600" onClick={() => setEdit({ ...edit, criteria: edit.criteria.filter((_, j) => j !== i) })} aria-label="Remove"><Icon name="x" className="h-4 w-4" /></button>
               </div>
             ))}
             <button className="btn btn-ghost text-xs" onClick={() => setEdit({ ...edit, criteria: [...edit.criteria, { id: `c${Date.now().toString(36)}`, label: "", max: 5 }] })}>+ Add criterion</button>

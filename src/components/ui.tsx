@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 /** Fetch JSON with loading / error state. `reload()` re-fetches. */
 export function useApi<T>(url: string | null, deps: unknown[] = []) {
@@ -38,11 +38,13 @@ export async function send<T = any>(url: string, body?: unknown, method = "POST"
 }
 
 export function PageHeader({ eyebrow, title, subtitle, actions }: { eyebrow?: string; title: string; subtitle?: string; actions?: React.ReactNode }) {
+  // Tabs, history and bookmarks show the page name, not just the product name.
+  useEffect(() => { document.title = `${title} · EduClass Fusion`; }, [title]);
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
         {eyebrow && <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">{eyebrow}</p>}
-        <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1>
         {subtitle && <p className="mt-1 max-w-3xl text-sm text-slate-600">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -81,6 +83,16 @@ export function statusTone(s: string): "slate" | "green" | "amber" | "red" | "bl
   return "blue";
 }
 
+/** Spinner with a live-region label, for data that is on its way. */
+export function Loading({ label = "Loading…" }: { label?: string }) {
+  return (
+    <div role="status" aria-live="polite" className="flex items-center justify-center gap-2 p-6 text-sm text-slate-500">
+      <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-brand-600" />
+      {label}
+    </div>
+  );
+}
+
 export function Empty({ children }: { children: React.ReactNode }) {
   return <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">{children}</div>;
 }
@@ -92,10 +104,19 @@ export function Alert({ tone = "red", children }: { tone?: "red" | "green" | "am
 }
 
 export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { id: T; label: string }[]; value: T; onChange: (t: T) => void }) {
+  // Arrow keys move between tabs, as screen-reader and keyboard users expect.
+  function onKey(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key)) return;
+    e.preventDefault();
+    const i = tabs.findIndex(t => t.id === value);
+    const next = e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : (i + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+    onChange(tabs[next].id);
+    (e.currentTarget.children[next] as HTMLElement | undefined)?.focus();
+  }
   return (
-    <div role="tablist" className="mb-5 flex gap-1 overflow-x-auto border-b border-slate-200">
+    <div role="tablist" onKeyDown={onKey} className="mb-5 flex gap-1 overflow-x-auto border-b border-slate-200">
       {tabs.map(t => (
-        <button key={t.id} role="tab" aria-selected={value === t.id} onClick={() => onChange(t.id)}
+        <button key={t.id} role="tab" aria-selected={value === t.id} tabIndex={value === t.id ? 0 : -1} onClick={() => onChange(t.id)}
           className={"whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition " +
             (value === t.id ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800")}>
           {t.label}
@@ -116,20 +137,30 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 }
 
 export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; wide?: boolean }) {
+  const titleId = useId();
+  const box = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  useEffect(() => { close.current = onClose; }, [onClose]);
   useEffect(() => {
     if (!open) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const before = document.activeElement as HTMLElement | null;
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") close.current(); };
     window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [open, onClose]);
+    // Keep the page behind still, and put focus inside the dialog.
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const first = box.current?.querySelector<HTMLElement>("input, select, textarea, button:not([data-close]), [href], [tabindex]:not([tabindex='-1'])");
+    (first ?? box.current)?.focus();
+    return () => { window.removeEventListener("keydown", h); document.body.style.overflow = overflow; before?.focus?.(); };
+  }, [open]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-8" onMouseDown={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={title} onMouseDown={e => e.stopPropagation()}
-        className={`card w-full ${wide ? "max-w-3xl" : "max-w-lg"} p-5`}>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} className="btn btn-ghost px-2 py-1" aria-label="Close">✕</button>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-[2px] sm:p-8" onMouseDown={onClose}>
+      <div ref={box} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} onMouseDown={e => e.stopPropagation()}
+        className={`card w-full outline-none ${wide ? "max-w-3xl" : "max-w-lg"} p-5 shadow-xl`}>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 id={titleId} className="text-lg font-semibold tracking-tight">{title}</h2>
+          <button data-close onClick={onClose} className="btn btn-ghost -mr-2 p-1.5" aria-label="Close"><Icon name="x" /></button>
         </div>
         {children}
       </div>
@@ -137,9 +168,43 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   );
 }
 
+const ICONS = {
+  x: "M6 6l12 12M18 6L6 18",
+  menu: "M4 6h16M4 12h16M4 18h16",
+  pin: "M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21zm0-9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z",
+  alert: "M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z",
+  check: "M5 13l4 4L19 7",
+  send: "M4 12l16-8-6 16-2.5-6.5L4 12z",
+  plus: "M12 5v14M5 12h14"
+} as const;
+
+/** Small line icons, sized to the text around them. Decorative unless given a label. */
+export function Icon({ name, className = "h-4 w-4", label }: { name: keyof typeof ICONS; className?: string; label?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+      className={className} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
+      <path d={ICONS[name]} />
+    </svg>
+  );
+}
+
+/** Parses a timestamp, or a YYYY-MM-DD date as that calendar day in local time (not UTC midnight). */
+function toDate(v: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(v);
+}
+
+/** Today (or `daysAgo` days before) as YYYY-MM-DD in the viewer's local time. */
+export function localDate(daysAgo = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function fmtDate(v: string | null | undefined, withTime = false) {
   if (!v) return "—";
-  const d = new Date(v);
+  const d = toDate(v);
+  if (Number.isNaN(d.getTime())) return "—";
   return withTime
     ? d.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })
     : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });

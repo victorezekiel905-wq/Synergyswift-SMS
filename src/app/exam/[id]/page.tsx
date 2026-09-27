@@ -205,7 +205,7 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
         <p role="alert" className="rounded-lg bg-amber-50 p-4 text-amber-900">{error}</p>
         <div className="mt-4 flex flex-wrap gap-2">
           <a className="btn btn-primary" href={exam.seb_launch_url}>Open in Safe Exam Browser</a>
-          <a className="btn btn-ghost border border-slate-200" href={exam.seb_config_url}>Download exam file (.seb)</a>
+          <a className="btn btn-outline" href={exam.seb_config_url}>Download exam file (.seb)</a>
         </div>
         <p className="mt-3 text-sm text-slate-500">Install Safe Exam Browser from safeexambrowser.org if you do not have it.</p>
       </Shell>

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useApi, send, Page, PageHeader, Alert, Empty, Modal, Field, Badge, statusTone, fmtDate, money } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Empty, Modal, Field, Badge, statusTone, fmtDate, money, Icon } from "@/components/ui";
 
 type Req = {
   id: string; title: string; department: string | null; justification: string | null; needed_by: string | null; status: string;
@@ -47,10 +47,10 @@ export default function RequisitionsPage() {
               <div className="mt-3 border-t border-slate-100 pt-3 text-sm">
                 {r.justification && <p className="mb-2 text-slate-700">{r.justification}</p>}
                 {r.needed_by && <p className="mb-2 text-xs text-slate-500">Needed by {fmtDate(r.needed_by)}</p>}
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
                   <thead className="text-left text-xs uppercase text-slate-500"><tr><th>Item</th><th className="text-right">Qty</th><th className="text-right">Unit</th><th className="text-right">Amount</th></tr></thead>
                   <tbody>{r.requisition_items.map(i => <tr key={i.id}><td>{i.description}</td><td className="text-right">{i.quantity}</td><td className="text-right">{money(i.unit_cost, currency)}</td><td className="text-right">{money(i.quantity * i.unit_cost, currency)}</td></tr>)}</tbody>
-                </table>
+                </table></div>
                 {r.decider && <p className="mt-2 text-xs text-slate-500">Decided by {r.decider.full_name} on {fmtDate(r.decided_at)}{r.decision_note ? `: ${r.decision_note}` : ""}</p>}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {data.can_approve && r.status === "submitted" && r.requested_by !== data.me && <>
@@ -90,7 +90,7 @@ function NewRequisition({ open, onClose, onDone, currency }: { open: boolean; on
         </div>
         <Field label="Why is it needed?"><textarea className="input h-20" value={f.justification} onChange={e => setF({ ...f, justification: e.target.value })} /></Field>
         <Field label="Needed by"><input className="input max-w-xs" type="date" value={f.needed_by} onChange={e => setF({ ...f, needed_by: e.target.value })} /></Field>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
           <thead className="text-left text-xs uppercase text-slate-500"><tr><th>Item</th><th>Qty</th><th>Unit cost</th><th /></tr></thead>
           <tbody>
             {items.map((i, k) => (
@@ -98,11 +98,11 @@ function NewRequisition({ open, onClose, onDone, currency }: { open: boolean; on
                 <td className="pr-2 py-1"><input className="input py-1" value={i.description} onChange={e => setItems(items.map((x, j) => j === k ? { ...x, description: e.target.value } : x))} aria-label="Item" /></td>
                 <td className="pr-2"><input className="input w-20 py-1" type="number" min={0} step="any" value={i.quantity} onChange={e => setItems(items.map((x, j) => j === k ? { ...x, quantity: e.target.value } : x))} aria-label="Quantity" /></td>
                 <td className="pr-2"><input className="input w-32 py-1" type="number" min={0} step="any" value={i.unit_cost} onChange={e => setItems(items.map((x, j) => j === k ? { ...x, unit_cost: e.target.value } : x))} aria-label="Unit cost" /></td>
-                <td><button type="button" className="btn btn-ghost px-2 text-rose-600" onClick={() => setItems(items.filter((_, j) => j !== k))} aria-label="Remove item">✕</button></td>
+                <td><button type="button" className="btn btn-ghost px-2 text-rose-600" onClick={() => setItems(items.filter((_, j) => j !== k))} aria-label="Remove item"><Icon name="x" className="h-4 w-4" /></button></td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         <div className="flex items-center justify-between">
           <button type="button" className="btn btn-ghost text-xs" onClick={() => setItems([...items, { description: "", quantity: "1", unit_cost: "0" }])}>+ Add item</button>
           <span className="font-semibold">Total {money(total, currency)}</span>

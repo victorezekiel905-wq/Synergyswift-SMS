@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, Stat, statusTone, money, fmtDate } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, Stat, statusTone, money, fmtDate, Loading } from "@/components/ui";
 
 type Term = { id: string; name: string; is_current: boolean };
 type Session = { id: string; name: string; terms: Term[] };
@@ -49,10 +49,10 @@ export default function FeesPage() {
             <section className="card p-5">
               <h2 className="mb-3 font-semibold">By class</h2>
               {!Object.keys(s.by_class).length ? <Empty>No invoices this term.</Empty> : (
-                <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Class</th><th className="text-right">Billed</th><th className="text-right">Paid</th><th className="text-right">Rate</th></tr></thead>
+                <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Class</th><th className="text-right">Billed</th><th className="text-right">Paid</th><th className="text-right">Rate</th></tr></thead>
                   <tbody>{Object.entries(s.by_class).sort().map(([k, v]) => (
                     <tr key={k} className="border-t border-slate-100"><td className="py-1.5">{k}</td><td className="text-right tabular-nums">{money(v.billed, cur)}</td><td className="text-right tabular-nums">{money(v.paid, cur)}</td>
-                      <td className="text-right tabular-nums">{v.billed ? Math.round((v.paid / v.billed) * 100) : 0}%</td></tr>))}</tbody></table>
+                      <td className="text-right tabular-nums">{v.billed ? Math.round((v.paid / v.billed) * 100) : 0}%</td></tr>))}</tbody></table></div>
               )}
             </section>
             <section className="card p-5">
@@ -115,15 +115,15 @@ function Setup({ ov, termId, groups, sessions, reload }: { ov: Overview; termId:
             <button className="btn btn-primary">Save</button>
           </form>
           {!ov.schedules.length ? <Empty>No fees set for this term.{terms.length ? " You can copy them from another term." : ""}</Empty> : (
-            <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Item</th><th>Class</th><th className="text-right">Amount</th><th /></tr></thead>
+            <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Item</th><th>Class</th><th className="text-right">Amount</th><th /></tr></thead>
               <tbody>{ov.schedules.map(sc => <tr key={sc.id} className="border-t border-slate-100"><td className="py-1.5">{itemName(sc.fee_item_id)} {sc.optional && <Badge>optional</Badge>}</td><td>{groupName(sc.class_group_id)}</td>
-                <td className="text-right tabular-nums">{money(sc.amount, cur)}</td><td className="text-right"><button className="text-xs text-rose-600" onClick={() => act({ action: "delete_schedule", id: sc.id }, "Removed.")}>Remove</button></td></tr>)}</tbody></table>
+                <td className="text-right tabular-nums">{money(sc.amount, cur)}</td><td className="text-right"><button className="text-xs text-rose-600" onClick={() => act({ action: "delete_schedule", id: sc.id }, "Removed.")}>Remove</button></td></tr>)}</tbody></table></div>
           )}
           <p className="mt-2 text-xs text-slate-500">A class-specific amount replaces the &ldquo;All classes&rdquo; amount for that class. Optional fees (bus, boarding) are added per student on the invoice.</p>
           {terms.length > 0 && (
             <div className="mt-3 flex gap-2">
               <select className="input max-w-xs" value={copyFrom} onChange={e => setCopyFrom(e.target.value)} aria-label="Copy from term"><option value="">Copy fees from…</option>{terms.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select>
-              <button className="btn btn-ghost border border-slate-200 text-xs" disabled={!copyFrom} onClick={() => act({ action: "copy_schedule", from_term_id: copyFrom, to_term_id: termId }, "Copied.")}>Copy</button>
+              <button className="btn btn-outline text-xs" disabled={!copyFrom} onClick={() => act({ action: "copy_schedule", from_term_id: copyFrom, to_term_id: termId }, "Copied.")}>Copy</button>
             </div>
           )}
         </section>
@@ -140,7 +140,7 @@ function Setup({ ov, termId, groups, sessions, reload }: { ov: Overview; termId:
           <button className="btn btn-primary" onClick={() => confirm(`Generate invoices for ${gen.classes.length ? `${gen.classes.length} classes` : "every class"}?`) && act({ action: "generate_invoices", term_id: termId, class_group_ids: gen.classes, due_date: gen.due || null }, "Invoices generated.")}>
             Generate for {gen.classes.length ? `${gen.classes.length} classes` : "all classes"}
           </button>
-          <button className="btn btn-ghost border border-slate-200" onClick={() => confirm("Send a fee reminder with a pay link to every parent with a balance?") && act({ action: "send_reminders", term_id: termId, class_group_ids: gen.classes }, "Reminders queued.")}>Send reminders to debtors</button>
+          <button className="btn btn-outline" onClick={() => confirm("Send a fee reminder with a pay link to every parent with a balance?") && act({ action: "send_reminders", term_id: termId, class_group_ids: gen.classes }, "Reminders queued.")}>Send reminders to debtors</button>
         </div>
       </section>
     </div>
@@ -190,7 +190,7 @@ function InvoiceDetail({ id, currency, onChange }: { id: string; currency: strin
   const [pay, setPay] = useState({ amount: "", method: "cash", reference: "", payer_name: "" });
   const [line, setLine] = useState({ kind: "discount", description: "", amount: "" });
   const { flash, node } = useFlash();
-  if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (!data) return <Loading />;
   const balance = Number(data.total) - Number(data.amount_paid);
   const act = async (body: Record<string, unknown>, ok: string) => { const r = await send("/api/fees", body); flash(r.ok, r.ok ? ok : r.error ?? "failed"); if (r.ok) { reload(); onChange(); } };
   const payLink = typeof window !== "undefined" ? `${window.location.origin}/pay/${data.pay_token}` : "";
@@ -201,17 +201,17 @@ function InvoiceDetail({ id, currency, onChange }: { id: string; currency: strin
         <div><p className="font-mono text-xs">{data.invoice_no}</p><p className="text-lg font-semibold">{data.students?.first_name} {data.students?.last_name}</p><p className="text-slate-500">{data.title} · {data.students?.class_groups?.name}</p></div>
         <div className="text-right"><p className="text-xs uppercase text-slate-500">Balance</p><p className="text-2xl font-bold tabular-nums">{money(balance, currency)}</p><Badge tone={statusTone(data.status === "part_paid" ? "pending" : data.status)}>{data.status.replace("_", " ")}</Badge></div>
       </div>
-      <table className="w-full"><tbody>{(data.fee_invoice_lines ?? []).map((l: any) => (
+      <div className="overflow-x-auto print:overflow-visible"><table className="w-full"><tbody>{(data.fee_invoice_lines ?? []).map((l: any) => (
         <tr key={l.id} className="border-t border-slate-100"><td className="py-1.5">{l.description} {l.kind !== "charge" && <Badge tone="violet">{l.kind}</Badge>}</td><td className="text-right tabular-nums">{money(l.amount, currency)}</td>
           <td className="w-16 text-right">{data.status !== "void" && <button className="text-xs text-rose-600" onClick={() => act({ action: "remove_line", line_id: l.id }, "Removed.")}>Remove</button>}</td></tr>))}
-        <tr className="border-t-2 border-slate-300 font-semibold"><td className="py-1.5">Total</td><td className="text-right tabular-nums">{money(data.total, currency)}</td><td /></tr></tbody></table>
+        <tr className="border-t-2 border-slate-300 font-semibold"><td className="py-1.5">Total</td><td className="text-right tabular-nums">{money(data.total, currency)}</td><td /></tr></tbody></table></div>
       {data.status !== "void" && (
         <>
           <form className="grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-4" onSubmit={e => { e.preventDefault(); act({ action: "add_line", invoice_id: id, kind: line.kind, description: line.description, amount: Number(line.amount) }, "Line added."); setLine({ ...line, description: "", amount: "" }); }}>
             <select className="input" value={line.kind} onChange={e => setLine({ ...line, kind: e.target.value })} aria-label="Line type"><option value="discount">Discount</option><option value="scholarship">Scholarship</option><option value="charge">Extra charge</option><option value="adjustment">Adjustment</option></select>
             <input className="input" placeholder="Description" required value={line.description} onChange={e => setLine({ ...line, description: e.target.value })} aria-label="Description" />
             <input className="input" type="number" step="any" placeholder="Amount" required value={line.amount} onChange={e => setLine({ ...line, amount: e.target.value })} aria-label="Amount" />
-            <button className="btn btn-ghost border border-slate-200">Add line</button>
+            <button className="btn btn-outline">Add line</button>
           </form>
           {balance > 0 && (
             <form className="grid gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 sm:grid-cols-5" onSubmit={e => { e.preventDefault(); act({ action: "record_payment", invoice_id: id, amount: Number(pay.amount), method: pay.method, reference: pay.reference || null, payer_name: pay.payer_name || null }, "Payment recorded and receipt sent."); setPay({ amount: "", method: "cash", reference: "", payer_name: "" }); }}>
@@ -227,15 +227,15 @@ function InvoiceDetail({ id, currency, onChange }: { id: string; currency: strin
       <div>
         <h3 className="mb-1 font-semibold">Payments</h3>
         {!(data.fee_payments ?? []).length ? <p className="text-slate-500">None yet.</p> : (
-          <table className="w-full"><tbody>{data.fee_payments.map((p: any) => (
+          <div className="overflow-x-auto print:overflow-visible"><table className="w-full"><tbody>{data.fee_payments.map((p: any) => (
             <tr key={p.id} className="border-t border-slate-100"><td className="py-1.5">{fmtDate(p.paid_at ?? p.created_at, true)}</td><td>{p.method}{p.provider ? ` (${p.provider})` : ""}</td><td className="font-mono text-xs">{p.receipt_no ?? p.reference}</td>
               <td className="text-right tabular-nums">{money(p.amount, currency)}</td><td><Badge tone={statusTone(p.status === "success" ? "sent" : p.status)}>{p.status}</Badge></td>
-              <td className="text-right">{p.status === "success" && <button className="text-xs text-rose-600" onClick={() => { const r = prompt("Reason for reversing this payment?"); if (r) act({ action: "reverse_payment", payment_id: p.id, reason: r }, "Payment reversed."); }}>Reverse</button>}</td></tr>))}</tbody></table>
+              <td className="text-right">{p.status === "success" && <button className="text-xs text-rose-600" onClick={() => { const r = prompt("Reason for reversing this payment?"); if (r) act({ action: "reverse_payment", payment_id: p.id, reason: r }, "Payment reversed."); }}>Reverse</button>}</td></tr>))}</tbody></table></div>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-        <a className="btn btn-ghost border border-slate-200 text-xs" href={`/pay/${data.pay_token}`} target="_blank" rel="noreferrer">Open parent view / print</a>
-        <button className="btn btn-ghost border border-slate-200 text-xs" onClick={() => { navigator.clipboard?.writeText(payLink); flash(true, "Pay link copied."); }}>Copy pay link</button>
+        <a className="btn btn-outline text-xs" href={`/pay/${data.pay_token}`} target="_blank" rel="noreferrer">Open parent view / print</a>
+        <button className="btn btn-outline text-xs" onClick={() => { navigator.clipboard?.writeText(payLink); flash(true, "Pay link copied."); }}>Copy pay link</button>
         {data.status !== "void" && Number(data.amount_paid) === 0 && <button className="btn btn-ghost ml-auto text-xs text-rose-600" onClick={() => { const r = prompt("Reason for voiding this invoice?"); if (r) act({ action: "void_invoice", invoice_id: id, reason: r }, "Invoice voided."); }}>Void invoice</button>}
       </div>
     </div>

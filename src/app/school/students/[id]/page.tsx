@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { useApi, send, Page, PageHeader, Alert, Badge, statusTone, Field, fmtDate, fmtTime, Modal } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Badge, statusTone, Field, fmtDate, fmtTime, Modal, Loading } from "@/components/ui";
 import { LANGUAGES } from "@/lib/languages";
 import QrCode from "@/components/QrCode";
 
@@ -46,7 +46,7 @@ export default function StudentDetail(props: { params: Promise<{ id: string }> }
   }
 
   if (error) return <Page><Alert>{error}</Alert></Page>;
-  if (!data || !edit) return <Page><p className="text-sm text-slate-500">Loading…</p></Page>;
+  if (!data || !edit) return <Page><Loading /></Page>;
   const s = data.student;
   const bind = (k: string) => ({ value: edit[k] ?? "", onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setEdit({ ...edit, [k]: e.target.value }) });
 
@@ -57,9 +57,9 @@ export default function StudentDetail(props: { params: Promise<{ id: string }> }
         actions={<>
           <Badge tone={statusTone(s.status)}>{s.status}</Badge>
           <HousePicker studentId={s.id} houseId={s.house_id ?? null} onChange={reload} />
-          <button className="btn btn-ghost border border-slate-200" onClick={() => setCard(true)}>ID card / QR</button>
-          {!s.user_id && <button className="btn btn-ghost border border-slate-200" onClick={createLogin}>Create student login</button>}
-          <a className="btn btn-ghost border border-slate-200" href={`/api/sims/students/${s.id}/export`} title="Everything held about this student, for a data access request">Export data</a>
+          <button className="btn btn-outline" onClick={() => setCard(true)}>ID card / QR</button>
+          {!s.user_id && <button className="btn btn-outline" onClick={createLogin}>Create student login</button>}
+          <a className="btn btn-outline" href={`/api/sims/students/${s.id}/export`} title="Everything held about this student, for a data access request">Export data</a>
         </>} />
       {msg && <div className="mb-4"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
 

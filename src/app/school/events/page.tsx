@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useApi, send, Page, PageHeader, Alert, Empty, Modal, Field, Badge, fmtDate, money, rolesOf, type Me } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Empty, Modal, Field, Badge, fmtDate, money, rolesOf, type Me, Loading } from "@/components/ui";
 
 type Ev = { id: string; title: string; description: string | null; kind: string; starts_at: string; ends_at: string | null; location: string | null; requires_consent: boolean; fee: number; capacity: number | null; yes: number; no: number };
 
@@ -74,10 +74,10 @@ function NewEvent({ groups, onDone }: { groups: { id: string; name: string }[]; 
 
 function Responses({ id }: { id: string }) {
   const { data } = useApi<{ event: Ev; responses: any[] }>(`/api/events?id=${id}`, [id]);
-  if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (!data) return <Loading />;
   return (
-    <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Student</th><th>Class</th><th>Consent</th><th>Payment</th><th>Note</th></tr></thead>
+    <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Student</th><th>Class</th><th>Consent</th><th>Payment</th><th>Note</th></tr></thead>
       <tbody>{data.responses.map((r: any) => <tr key={r.student_id} className="border-t border-slate-100"><td className="py-1.5">{r.students?.first_name} {r.students?.last_name}</td><td>{r.students?.class_groups?.name}</td>
-        <td><Badge tone={r.consent ? "green" : "red"}>{r.consent ? "yes" : "no"}</Badge></td><td>{r.fee_invoices ? <Badge tone={r.fee_invoices.status === "paid" ? "green" : "amber"}>{r.fee_invoices.status}</Badge> : "—"}</td><td className="text-xs">{r.note}</td></tr>)}</tbody></table>
+        <td><Badge tone={r.consent ? "green" : "red"}>{r.consent ? "yes" : "no"}</Badge></td><td>{r.fee_invoices ? <Badge tone={r.fee_invoices.status === "paid" ? "green" : "amber"}>{r.fee_invoices.status}</Badge> : "—"}</td><td className="text-xs">{r.note}</td></tr>)}</tbody></table></div>
   );
 }

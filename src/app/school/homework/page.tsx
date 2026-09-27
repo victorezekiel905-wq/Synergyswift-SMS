@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useApi, send, Page, PageHeader, Alert, Empty, Modal, Field, Badge, fmtDate } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Empty, Modal, Field, Badge, fmtDate, Loading } from "@/components/ui";
 
 type Hw = { id: string; title: string; due_at: string; max_score: number | null; class_groups: { name: string } | null; subjects: { name: string } | null; homework_submissions: { count: number }[] };
 
@@ -58,7 +58,7 @@ function NewHomework({ groups, subjects, onDone }: { groups: { id: string; name:
 function Submissions({ id, onChange }: { id: string; onChange: () => void }) {
   const { data, reload } = useApi<{ homework: any; students: { id: string; name: string; admission_no: string; submission: any }[] }>(`/api/homework?id=${id}`, [id]);
   const [marks, setMarks] = useState<Record<string, { score: string; feedback: string }>>({});
-  if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (!data) return <Loading />;
   const done = data.students.filter(s => s.submission).length;
   return (
     <div className="space-y-3 text-sm">

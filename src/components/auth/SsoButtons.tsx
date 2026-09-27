@@ -20,10 +20,10 @@ export default function SsoButtons() {
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" className="btn btn-ghost border border-slate-200" disabled={!!busy} onClick={() => signIn("google")}>
+        <button type="button" className="btn btn-outline" disabled={!!busy} onClick={() => signIn("google")}>
           {busy === "google" ? "Opening…" : "Continue with Google"}
         </button>
-        <button type="button" className="btn btn-ghost border border-slate-200" disabled={!!busy} onClick={() => signIn("azure")}>
+        <button type="button" className="btn btn-outline" disabled={!!busy} onClick={() => signIn("azure")}>
           {busy === "azure" ? "Opening…" : "Continue with Microsoft"}
         </button>
       </div>

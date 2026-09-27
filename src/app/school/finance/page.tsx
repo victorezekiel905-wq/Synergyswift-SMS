@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, Stat, money, fmtDate, rolesOf, type Me } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, Stat, money, fmtDate, localDate, rolesOf, type Me } from "@/components/ui";
 
 type Tab = "cashbook" | "expenses" | "stock" | "assets";
 
@@ -28,7 +28,7 @@ export default function FinancePage() {
 }
 
 function Cashbook({ currency }: { currency: string }) {
-  const [range, setRange] = useState({ from: new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) });
+  const [range, setRange] = useState(() => ({ from: localDate(30), to: localDate() }));
   const { data, error } = useApi<{ income: number; spent: number; net: number; rows: { date: string; kind: string; description: string; method: string | null; amount: number; balance: number }[] }>(
     `/api/finance?view=cashbook&from=${range.from}&to=${range.to}`, [range.from, range.to]);
   return (
@@ -36,7 +36,7 @@ function Cashbook({ currency }: { currency: string }) {
       <div className="flex flex-wrap items-end gap-2">
         <Field label="From"><input className="input" type="date" value={range.from} onChange={e => setRange({ ...range, from: e.target.value })} /></Field>
         <Field label="To"><input className="input" type="date" value={range.to} onChange={e => setRange({ ...range, to: e.target.value })} /></Field>
-        <a className="btn btn-ghost border border-slate-200" href={`/api/finance?view=cashbook&from=${range.from}&to=${range.to}&format=csv`}>CSV</a>
+        <a className="btn btn-outline" href={`/api/finance?view=cashbook&from=${range.from}&to=${range.to}&format=csv`}>CSV</a>
       </div>
       {error && <Alert>{error}</Alert>}
       {data && <div className="grid grid-cols-3 gap-3"><Stat label="Income" value={money(data.income, currency)} tone="good" /><Stat label="Expenses" value={money(data.spent, currency)} tone="warn" /><Stat label="Net" value={money(data.net, currency)} tone={data.net >= 0 ? "good" : "bad"} /></div>}
@@ -53,7 +53,7 @@ function Cashbook({ currency }: { currency: string }) {
 
 function Expenses({ currency }: { currency: string }) {
   const { data, reload } = useApi<any[]>("/api/finance?view=expenses");
-  const [f, setF] = useState({ category: "Supplies", description: "", amount: "", spent_on: new Date().toISOString().slice(0, 10), payee: "", method: "transfer", reference: "" });
+  const [f, setF] = useState({ category: "Supplies", description: "", amount: "", spent_on: localDate(), payee: "", method: "transfer", reference: "" });
   const [err, setErr] = useState<string | null>(null);
   return (
     <div className="grid gap-5 xl:grid-cols-3">
@@ -80,7 +80,7 @@ function Expenses({ currency }: { currency: string }) {
         <button className="btn btn-primary w-full">Save expense</button>
       </form>
       <div className="xl:col-span-2">
-        <div className="mb-2 flex justify-end"><a className="btn btn-ghost border border-slate-200 text-xs" href="/api/finance?view=expenses&format=csv">CSV</a></div>
+        <div className="mb-2 flex justify-end"><a className="btn btn-outline text-xs" href="/api/finance?view=expenses&format=csv">CSV</a></div>
         {!data?.length ? <Empty>No expenses recorded.</Empty> : (
           <div className="card overflow-x-auto"><table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Date</th><th className="p-2">Category</th><th className="p-2">Description</th><th className="p-2">Payee</th><th className="p-2 text-right">Amount</th><th className="p-2" /></tr></thead>

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { localDate } from "@/components/ui";
 
 type Student = { id: string; full_name: string; email: string };
 type AttendanceRecord = { id: string; student_id: string; date: string; status: AttendanceStatus };
@@ -16,7 +17,7 @@ const STATUS_STYLES: Record<AttendanceStatus, string> = {
 export default function AttendanceTracker({ classId }: { classId: string }) {
   const [students, setStudents] = useState<Student[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(() => localDate());
   const [draft, setDraft] = useState<Record<string, AttendanceStatus>>({});
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);

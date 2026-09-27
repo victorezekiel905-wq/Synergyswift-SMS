@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 // §18/§20 — Reports export runner. Pick a class + report kind, choose
 // format (csv / pdf / json), server writes a row to `reports` and returns
@@ -13,17 +13,17 @@ export default function ReportsPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const r = await fetch("/api/classes");
     if (r.ok) {
       const j = await r.json();
       setClasses(Array.isArray(j) ? j : []);
-      if (!classId && Array.isArray(j) && j.length) setClassId((j[0] as { id: string }).id);
+      if (Array.isArray(j) && j.length) setClassId(c => c || (j[0] as { id: string }).id);
     }
     const rep = await fetch("/api/reports");
     if (rep.ok) setReports(await rep.json());
-  }
-  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, []);
+  }, []);
+  useEffect(() => { refresh(); }, [refresh]);
 
   async function generate() {
     if (!classId) return;

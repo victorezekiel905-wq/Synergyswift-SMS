@@ -226,7 +226,7 @@ parent.postMessage({edu_out:logs.join("\\n")||"(no output)"},"*");<\/script>`);
   }
   return (
     <div className="space-y-2">
-      <button className="btn btn-ghost border border-slate-200 text-xs" onClick={run}>Run</button>
+      <button className="btn btn-outline text-xs" onClick={run}>Run</button>
       <pre className="rounded-lg border border-slate-200 bg-slate-900 p-3 text-xs text-slate-100">{out || "// click Run"}</pre>
       {doc !== null && <iframe ref={frame} title="Code output" sandbox="allow-scripts" srcDoc={doc}
         className={language === "javascript" ? "hidden" : "h-48 w-full rounded border border-slate-200 bg-white"} />}

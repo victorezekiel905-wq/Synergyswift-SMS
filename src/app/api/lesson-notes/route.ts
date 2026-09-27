@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
-import { generateLessonNote, lessonNoteToText, aiConfigured, aiErrorMessage } from "@/lib/ai";
+import { generateLessonNote, lessonNoteToText, assistConfigured, assistErrorMessage } from "@/lib/assist";
 
 export const maxDuration = 120;
 
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   if (ctx instanceof NextResponse) return ctx;
   const u = new URL(req.url);
   const reviewer = hasAny(ctx, ROLES.reviewer);
-  let q = ctx.sb.from("lesson_notes").select("id,author_id,subject_id,class_group_id,term_id,week,topic,status,ai_generated,review_comment,submitted_at,reviewed_at,updated_at,subjects(name),class_groups(name),author:users!lesson_notes_author_id_fkey(full_name)")
+  let q = ctx.sb.from("lesson_notes").select("id,author_id,subject_id,class_group_id,term_id,week,topic,status,drafted,review_comment,submitted_at,reviewed_at,updated_at,subjects(name),class_groups(name),author:users!lesson_notes_author_id_fkey(full_name)")
     .eq("tenant_id", ctx.tenant.id).order("updated_at", { ascending: false }).limit(300);
   if (u.searchParams.get("queue") === "1" && reviewer) q = q.eq("status", "submitted");
   else if (!reviewer || u.searchParams.get("mine") === "1") q = q.eq("author_id", ctx.userId);
@@ -22,13 +22,13 @@ export async function GET(req: NextRequest) {
   }
   const { data, error } = await q;
   if (error) return jsonError(error.message);
-  return NextResponse.json({ items: data ?? [], reviewer, ai: aiConfigured(), me: ctx.userId });
+  return NextResponse.json({ items: data ?? [], reviewer, drafting: assistConfigured(), me: ctx.userId });
 }
 
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("save"), id: z.string().uuid().optional(), subject_id: z.string().uuid().nullish(), class_group_id: z.string().uuid().nullish(),
     term_id: z.string().uuid().nullish(), week: z.number().int().min(1).max(20).nullish(), topic: z.string().trim().min(2).max(200), content: z.string().max(60000),
-    ai_generated: z.boolean().optional(), submit: z.boolean().default(false) }),
+    drafted: z.boolean().optional(), submit: z.boolean().default(false) }),
   z.object({ action: z.literal("review"), id: z.string().uuid(), decision: z.enum(["approved", "returned"]), comment: z.string().trim().max(2000).nullish() }),
   z.object({ action: z.literal("delete"), id: z.string().uuid() }),
   z.object({ action: z.literal("generate"), subject: z.string().trim().min(1).max(80), level: z.string().trim().min(1).max(60), topic: z.string().trim().min(2).max(200),
@@ -49,10 +49,10 @@ export async function POST(req: NextRequest) {
       const { data: t } = await ctx.sb.from("tenants").select("country").eq("id", tid).maybeSingle();
       const note = await generateLessonNote({ subject: b.subject, level: b.level, topic: b.topic, week: b.week, durationMinutes: b.duration_minutes,
         curriculum: b.curriculum, notes: b.notes, country: t?.country ?? null });
-      await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "ai.lesson_note_generated", meta: { subject: b.subject, topic: b.topic } });
+      await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "lesson_note.drafted", meta: { subject: b.subject, topic: b.topic } });
       return NextResponse.json({ note, text: lessonNoteToText(note) });
     } catch (e) {
-      const { message, status } = aiErrorMessage(e);
+      const { message, status } = assistErrorMessage(e);
       return jsonError(message, status);
     }
   }

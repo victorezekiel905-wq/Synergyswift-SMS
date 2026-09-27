@@ -20,7 +20,7 @@ export async function respondToEvent(svc: any, p: { tenantId: string; guardianId
   const { data: ev } = await svc.from("school_events").select("*").eq("tenant_id", p.tenantId).eq("id", p.eventId).maybeSingle();
   if (!ev) throw new Error("event not found");
   if (ev.respond_by && new Date(ev.respond_by) < new Date()) throw new Error("responses for this event have closed");
-  const { data: st } = await svc.from("students").select("id,class_group_id,first_name,last_name,other_names").eq("id", p.studentId).maybeSingle();
+  const { data: st } = await svc.from("students").select("id,class_group_id,first_name,last_name,other_names").eq("tenant_id", p.tenantId).eq("id", p.studentId).maybeSingle();
   if (ev.class_group_ids?.length && !ev.class_group_ids.includes(st?.class_group_id)) throw new Error("this event is not for your child's class");
   if (p.consent && ev.capacity) {
     const { count } = await svc.from("event_responses").select("id", { count: "exact", head: true }).eq("event_id", ev.id).eq("consent", true).neq("student_id", p.studentId);
@@ -33,8 +33,8 @@ export async function respondToEvent(svc: any, p: { tenantId: string; guardianId
     const inv = await createInvoice(svc, { tenantId: p.tenantId, studentId: p.studentId, title: ev.title, lines: [{ description: ev.title, amount: Number(ev.fee), fee_item_id: ev.fee_item_id }] });
     invoiceId = inv.id; payToken = inv.pay_token;
   } else if (invoiceId) {
-    const { data: inv } = await svc.from("fee_invoices").select("pay_token,status").eq("id", invoiceId).maybeSingle();
-    if (!p.consent && inv && inv.status === "issued") { await svc.from("fee_invoices").update({ status: "void", voided_at: new Date().toISOString(), notes: "Consent withdrawn" }).eq("id", invoiceId); invoiceId = null; }
+    const { data: inv } = await svc.from("fee_invoices").select("pay_token,status").eq("tenant_id", p.tenantId).eq("id", invoiceId).maybeSingle();
+    if (!p.consent && inv && inv.status === "issued") { await svc.from("fee_invoices").update({ status: "void", voided_at: new Date().toISOString(), notes: "Consent withdrawn" }).eq("tenant_id", p.tenantId).eq("id", invoiceId); invoiceId = null; }
     else payToken = inv?.pay_token ?? null;
   }
   await svc.from("event_responses").upsert({ event_id: ev.id, tenant_id: p.tenantId, student_id: p.studentId, guardian_id: p.guardianId, consent: p.consent,

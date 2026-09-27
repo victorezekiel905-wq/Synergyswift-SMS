@@ -134,7 +134,7 @@ export default function GamePlayer({ gameId }: { gameId: string }) {
                   ))}
                 </div>
               )}
-              <table className="w-full text-left text-sm">
+              <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-left text-sm">
                 <thead className="text-xs uppercase text-slate-500"><tr><th className="py-2">#</th><th>Player</th><th>Score</th><th>Streak</th></tr></thead>
                 <tbody>
                   {board.ranking.map((p, i) => (
@@ -146,7 +146,7 @@ export default function GamePlayer({ gameId }: { gameId: string }) {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </section>
           )}
         </div>

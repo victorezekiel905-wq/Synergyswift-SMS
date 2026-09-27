@@ -22,7 +22,7 @@ export default function AdmissionsPage() {
     <Page wide>
       <PageHeader eyebrow="Growth" title="Admissions"
         subtitle="Online applications from your own admissions page, a clear pipeline from enquiry to enrolment, automatic updates to families, and one-click enrolment."
-        actions={<><button className="btn btn-ghost border border-slate-200" onClick={() => setWalkIn(true)}>+ Walk-in application</button><a className="btn btn-ghost" href="/api/admissions?format=csv">CSV</a></>} />
+        actions={<><button className="btn btn-outline" onClick={() => setWalkIn(true)}>+ Walk-in application</button><a className="btn btn-ghost" href="/api/admissions?format=csv">CSV</a></>} />
       {error && <Alert>{error}</Alert>}
       {data && (
         <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -85,8 +85,8 @@ function AppDetail({ app, currency, fee, onDone }: { app: App; currency: string;
             assessment_at: f.assessment_at ? new Date(f.assessment_at).toISOString() : undefined, interview_at: f.interview_at ? new Date(f.interview_at).toISOString() : undefined }, "Updated; the family has been told.")) onDone(); }}>Save and tell the family</button>
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <Field label="Entrance assessment score"><input className="input w-32" type="number" min={0} value={f.score} onChange={e => setF({ ...f, score: e.target.value })} /></Field>
-            <button className="btn btn-ghost border border-slate-200" onClick={() => act({ action: "score", id: app.id, assessment_score: Number(f.score) }, "Score saved.")}>Save score</button>
-            {fee > 0 && <button className="btn btn-ghost border border-slate-200" onClick={() => act({ action: "fee", id: app.id, fee_paid: !app.fee_paid, fee_reference: app.fee_paid ? null : prompt("Payment reference (teller, transfer id)") }, "Fee status updated.")}>{app.fee_paid ? "Mark fee unpaid" : "Mark fee paid"}</button>}
+            <button className="btn btn-outline" onClick={() => act({ action: "score", id: app.id, assessment_score: Number(f.score) }, "Score saved.")}>Save score</button>
+            {fee > 0 && <button className="btn btn-outline" onClick={() => act({ action: "fee", id: app.id, fee_paid: !app.fee_paid, fee_reference: app.fee_paid ? null : prompt("Payment reference (teller, transfer id)") }, "Fee status updated.")}>{app.fee_paid ? "Mark fee unpaid" : "Mark fee paid"}</button>}
           </div>
         </section>
       )}
@@ -101,7 +101,7 @@ function AppDetail({ app, currency, fee, onDone }: { app: App; currency: string;
           <p className="mt-1 text-xs text-slate-600">Creates the student record and links the parent (reusing an existing parent record for siblings).</p>
         </section>
       )}
-      {app.student_id && <a className="btn btn-ghost border border-slate-200" href={`/school/students/${app.student_id}`}>Open student record</a>}
+      {app.student_id && <a className="btn btn-outline" href={`/school/students/${app.student_id}`}>Open student record</a>}
     </div>
   );
 }

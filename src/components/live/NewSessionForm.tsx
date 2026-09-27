@@ -13,17 +13,18 @@ export default function NewSessionForm({ classes, lessons, policies }: {
   const [policyId, setPolicyId] = useState(policies[0]?.id ?? "");
   const [mode, setMode] = useState<"live_participation"|"student_paced"|"front_of_class">("live_participation");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    setBusy(true); setErr(null);
     const r = await fetch("/api/class-sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ class_id: classId, lesson_id: lessonId || null, mode })
     });
     setBusy(false);
-    if (!r.ok) { alert("Failed"); return; }
+    if (!r.ok) { const j = await r.json().catch(() => ({})); setErr(j.error ?? "The session could not be started."); return; }
     const { id, join_code } = await r.json();
     if (policyId) {
       await fetch(`/api/class-sessions/${id}/environment/start`, {
@@ -65,6 +66,7 @@ export default function NewSessionForm({ classes, lessons, policies }: {
           {policies.map(p => <option key={p.id} value={p.id}>{p.name} ({p.mode})</option>)}
         </select>
       </div>
+      {err && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{err}</p>}
       <button className="btn btn-primary" disabled={busy || !classId}>{busy ? "Starting…" : "Start session"}</button>
     </form>
   );

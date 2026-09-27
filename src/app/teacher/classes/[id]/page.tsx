@@ -37,7 +37,7 @@ export default function ClassRosterPage({ params }: { params: Promise<{ id: stri
           <h2 className="text-lg font-semibold">Roster</h2>
           <p className="mt-1 text-sm text-slate-600">See every enrolled learner, then import or update the roster in bulk.</p>
         </div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
               <th className="p-3">Name</th>
@@ -57,7 +57,7 @@ export default function ClassRosterPage({ params }: { params: Promise<{ id: stri
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </section>
 
       <section className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr,0.9fr]">

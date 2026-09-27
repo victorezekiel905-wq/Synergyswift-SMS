@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Field, rolesOf, type Me } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Field, rolesOf, type Me, Loading, Icon } from "@/components/ui";
 
 type Period = { id: string; name: string; starts_at: string; ends_at: string; is_break: boolean; position: number };
 type Entry = { id: string; class_group_id: string; day: number; period_id: string; subject_id: string | null; teacher_id: string | null; room: string | null; locked: boolean;
@@ -29,7 +29,7 @@ function Grid({ url, editable, cg, showClass }: { url: string; editable?: boolea
   const { data, reload } = useApi<{ periods: Period[]; entries: Entry[] }>(url, [url]);
   const { data: structure } = useApi<{ subjects: { id: string; name: string }[]; offerings: { class_group_id: string; subject_id: string }[] }>(editable ? "/api/school/structure" : null);
   const [err, setErr] = useState<string | null>(null);
-  if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (!data) return <Loading />;
   if (!data.periods.length) return <Empty>The school day has not been set up yet.</Empty>;
   const days = [1, 2, 3, 4, 5, ...(data.entries.some(e => e.day >= 6) ? [6] : [])];
   const at = (d: number, p: string) => data.entries.find(e => e.day === d && e.period_id === p);
@@ -133,12 +133,12 @@ function Periods() {
   return (
     <div className="card max-w-2xl p-5">
       {!list.length && <button className="btn btn-ghost mb-3 border border-slate-200" onClick={() => setRows(starter)}>Start from a typical school day</button>}
-      <table className="w-full text-sm"><tbody>{list.map((p, i) => (
+      <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><tbody>{list.map((p, i) => (
         <tr key={i}><td className="py-1 pr-2"><input className="input py-1" value={p.name} onChange={e => set(i, "name", e.target.value)} aria-label="Period name" /></td>
           <td className="pr-2"><input className="input py-1" type="time" value={p.starts_at} onChange={e => set(i, "starts_at", e.target.value)} aria-label="Starts" /></td>
           <td className="pr-2"><input className="input py-1" type="time" value={p.ends_at} onChange={e => set(i, "ends_at", e.target.value)} aria-label="Ends" /></td>
           <td className="pr-2"><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={p.is_break} onChange={e => set(i, "is_break", e.target.checked)} />Break</label></td>
-          <td><button className="text-rose-600" onClick={() => setRows(list.filter((_, j) => j !== i))} aria-label="Remove">✕</button></td></tr>))}</tbody></table>
+          <td><button type="button" className="text-rose-600" onClick={() => setRows(list.filter((_, j) => j !== i))} aria-label="Remove"><Icon name="x" className="h-4 w-4" /></button></td></tr>))}</tbody></table></div>
       <button className="btn btn-ghost mt-2 text-xs" onClick={() => setRows([...list, { id: "", name: `Period ${list.length + 1}`, starts_at: "14:20", ends_at: "15:00", is_break: false }])}>+ Add period</button>
       {msg && <div className="mt-2"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
       <div className="mt-3"><button className="btn btn-primary" onClick={async () => {

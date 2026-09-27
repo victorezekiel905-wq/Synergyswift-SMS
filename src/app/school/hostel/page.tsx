@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, statusTone, fmtDate, fmtTime } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, statusTone, fmtDate, fmtTime, Icon } from "@/components/ui";
 
 type Hostel = { id: string; name: string; gender: string | null; users: { full_name: string } | null;
   hostel_rooms: { id: string; name: string; capacity: number; occupants: { id: string; student_id: string; name: string; bed_label: string | null; students: { admission_no: string; class_groups: { name: string } | null } }[] }[] };
@@ -56,7 +56,7 @@ function Rooms({ data, reload }: { data: { hostels: Hostel[]; can_manage: boolea
             <div key={r.id} className="rounded-lg border border-slate-200 p-3 text-sm">
               <div className="flex justify-between"><b>{r.name}</b><Badge tone={r.occupants.length >= r.capacity ? "red" : "green"}>{r.occupants.length}/{r.capacity}</Badge></div>
               <ul className="mt-1 space-y-0.5 text-xs">{r.occupants.map(o => <li key={o.id} className="flex justify-between">{o.name}{o.bed_label ? ` (${o.bed_label})` : ""}
-                {data.can_manage && <button className="text-rose-600" onClick={() => confirm(`Move ${o.name} out?`) && act({ action: "vacate", allocation_id: o.id })}>✕</button>}</li>)}</ul>
+                {data.can_manage && <button aria-label={`Move ${o.name} out`} type="button" className="text-rose-600" onClick={() => confirm(`Move ${o.name} out?`) && act({ action: "vacate", allocation_id: o.id })}><Icon name="x" className="h-4 w-4" /></button>}</li>)}</ul>
               {data.can_manage && r.occupants.length < r.capacity && <button className="mt-1 text-xs text-brand-700" onClick={() => setAlloc({ room_id: r.id, room: r.name })}>+ Add boarder</button>}
             </div>))}</div>
         </section>))}

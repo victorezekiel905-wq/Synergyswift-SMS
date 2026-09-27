@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useApi, send, Alert, Badge, Empty, fmtDate, fmtTime } from "@/components/ui";
+import { useApi, send, Alert, Badge, Empty, fmtDate, fmtTime, Loading } from "@/components/ui";
 import FamilyTabs, { type Extras } from "./FamilyTabs";
 import { NotificationsToggle, LanguagePicker } from "./FamilyConnect";
 
@@ -29,7 +29,7 @@ export default function GuardianPortal({ api, act, mode, token }: { api: string;
   const [delegate, setDelegate] = useState<Record<string, { name: string; phone: string }>>({});
 
   if (error) return <div className="mx-auto max-w-2xl p-6"><Alert>{error}</Alert></div>;
-  if (!data) return <div className="p-10 text-center text-sm text-slate-500">Loading…</div>;
+  if (!data) return <Loading />;
   const color = data.school?.brand_color ?? "#1d5ddb";
 
   async function generate(studentId: string) {

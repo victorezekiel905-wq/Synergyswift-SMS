@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { send } from "@/components/ui";
+import { send, Icon } from "@/components/ui";
 
 type Result = {
   person: { type: "student" | "staff"; name: string; photo_url: string | null; class_name: string | null };
@@ -74,7 +74,7 @@ export default function GateScanner({ big = false, onRecorded }: { big?: boolean
             {d === "auto" ? "Auto in/out" : d === "in" ? "Sign IN" : "Sign OUT"}
           </button>
         ))}
-        <button className="btn btn-ghost border border-slate-200" onClick={() => setCamera(c => !c)}>{camera ? "Stop camera" : "Use camera"}</button>
+        <button className="btn btn-outline" onClick={() => setCamera(c => !c)}>{camera ? "Stop camera" : "Use camera"}</button>
       </div>
       <form onSubmit={e => { e.preventDefault(); submit(code); }} className="flex gap-2">
         <input ref={inputRef} value={code} onChange={e => setCode(e.target.value)} autoComplete="off"
@@ -82,7 +82,7 @@ export default function GateScanner({ big = false, onRecorded }: { big?: boolean
         <button className="btn btn-primary" disabled={busy}>{busy ? "…" : "Record"}</button>
       </form>
       {camera && <video ref={videoRef} className="w-full max-w-md rounded-lg bg-black" muted playsInline />}
-      {err && <div role="alert" className={"rounded-xl bg-rose-600 p-5 text-white " + (big ? "text-2xl" : "text-lg")}>✕ {err}</div>}
+      {err && <div role="alert" className={"rounded-xl bg-rose-600 p-5 text-white " + (big ? "text-2xl" : "text-lg")}><span className="inline-flex items-center gap-2"><Icon name="x" className="h-6 w-6 shrink-0" />{err}</span></div>}
       {last && (
         <div role="status" className={"flex items-center gap-4 rounded-xl p-5 text-white " + (last.direction === "in" ? "bg-emerald-600" : "bg-slate-700")}>
           {last.person.photo_url

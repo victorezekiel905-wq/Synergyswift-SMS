@@ -10,7 +10,7 @@
  *
  * All writes use the service role after the caller has been authorised here.
  */
-import { aiConfigured, translateTexts } from "./ai";
+import { assistConfigured, translateTexts } from "./assist";
 import { needsTranslation } from "./languages";
 import { enqueue, tryDispatch, loadBrand, rowsForGuardian, staffRows, type Guardian } from "./messaging/outbox";
 import { newMessage } from "./messaging/notices";
@@ -51,7 +51,7 @@ async function languages(svc: any, tenantId: string, guardianId: string) {
 }
 
 async function translateFor(body: string, from: string | null, to: string | null) {
-  if (!to || !aiConfigured()) return null;
+  if (!to || !assistConfigured()) return null;
   try { const [t] = await translateTexts({ texts: [body], target: to, source: from }); return t !== body ? t : null; }
   catch { return null; }
 }
@@ -87,7 +87,7 @@ export async function postMessage(svc: any, p: { tenantId: string; conversationI
   if (error) throw new MessagingError(error.message);
   await svc.from("conversations").update(p.sender.kind === "staff"
     ? { guardian_unread: c.guardian_unread + 1, last_message_at: msg.created_at }
-    : { staff_unread: c.staff_unread + 1, last_message_at: msg.created_at }).eq("id", c.id);
+    : { staff_unread: c.staff_unread + 1, last_message_at: msg.created_at }).eq("tenant_id", p.tenantId).eq("id", c.id);
 
   // Tell the other side. Failures here never lose the message itself.
   try {
@@ -161,7 +161,7 @@ export async function guardianInbox(svc: any, tenantId: string, guardianId: stri
     // Parents read the translated version of staff messages; their own messages as written.
     messages = (data ?? []).map((m: any) => ({ id: m.id, mine: m.sender_kind === "guardian", sender: m.sender_name,
       text: m.sender_kind === "staff" ? (m.translated_body ?? m.body) : m.body, original: m.sender_kind === "staff" && m.translated_body ? m.body : null, at: m.created_at }));
-    await svc.from("conversations").update({ guardian_unread: 0 }).eq("id", conversationId);
+    await svc.from("conversations").update({ guardian_unread: 0 }).eq("tenant_id", tenantId).eq("id", conversationId);
   }
   return { threads, messages };
 }

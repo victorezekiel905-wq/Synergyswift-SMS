@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { Field, Alert } from "@/components/ui";
+import { Field, Alert, Icon } from "@/components/ui";
 
 export type QType = "mcq_single" | "mcq_multi" | "true_false" | "short_answer" | "numeric" | "fill_blanks" | "matching" | "ordering" | "hotspot" | "essay" | "code" | "file_upload";
 export type EditorQuestion = { id?: string; type: QType; prompt: string; points: number; media_url?: string | null; section?: string | null; data: Record<string, any>; answer: Record<string, any> };
@@ -93,7 +93,7 @@ export default function QuestionEditor({ initial, onSave, onCancel }: { initial:
                   : setAnswer({ correct: e.target.checked ? [...(q.answer.correct ?? []), o.id] : (q.answer.correct ?? []).filter((x: string) => x !== o.id) })} />
               <span className="w-5 text-xs font-bold text-slate-400">{String.fromCharCode(65 + i)}</span>
               <input className="input" value={o.text} onChange={e => setData({ options: opts.map(x => x.id === o.id ? { ...x, text: e.target.value } : x) })} aria-label={`Option ${i + 1}`} />
-              <button className="btn btn-ghost px-2 text-rose-600" onClick={() => setData({ options: opts.filter(x => x.id !== o.id) })} aria-label="Remove option">✕</button>
+              <button type="button" className="btn btn-ghost px-2 text-rose-600" onClick={() => setData({ options: opts.filter(x => x.id !== o.id) })} aria-label="Remove option"><Icon name="x" className="h-4 w-4" /></button>
             </div>
           ))}
           <button className="btn btn-ghost text-xs" onClick={() => setData({ options: [...opts, { id: uid(), text: "" }] })}>+ Add option</button>
@@ -144,10 +144,10 @@ export default function QuestionEditor({ initial, onSave, onCancel }: { initial:
                 const rows = pairsFrom(q).map(x => x.l.id === p.l.id ? { ...x, r: { ...x.r, text: e.target.value } } : x);
                 setQ({ ...q, data: { left: rows.map(x => x.l), right: rows.map(x => x.r) }, answer: { pairs: Object.fromEntries(rows.map(x => [x.l.id, x.r.id])) } });
               }} />
-              <button className="btn btn-ghost px-2 text-rose-600" aria-label="Remove pair" onClick={() => {
+              <button type="button" className="btn btn-ghost px-2 text-rose-600" aria-label="Remove pair" onClick={() => {
                 const rows = pairsFrom(q).filter(x => x.l.id !== p.l.id);
                 setQ({ ...q, data: { left: rows.map(x => x.l), right: rows.map(x => x.r) }, answer: { pairs: Object.fromEntries(rows.map(x => [x.l.id, x.r.id])) } });
-              }}>✕</button>
+              }}><Icon name="x" className="h-4 w-4" /></button>
             </div>
           ))}
           <button className="btn btn-ghost text-xs" onClick={() => { const id = uid(); setQ({ ...q, data: { left: [...(q.data.left ?? []), { id, text: "" }], right: [...(q.data.right ?? []), { id: `r${id}`, text: "" }] }, answer: { pairs: { ...(q.answer.pairs ?? {}), [id]: `r${id}` } } }); }}>+ Add pair</button>
@@ -161,7 +161,7 @@ export default function QuestionEditor({ initial, onSave, onCancel }: { initial:
             <div key={it.id} className="flex items-center gap-2">
               <span className="w-6 text-center text-xs font-bold text-slate-400">{i + 1}</span>
               <input className="input" value={it.text} aria-label={`Item ${i + 1}`} onChange={e => setData({ items: q.data.items.map((x: { id: string }) => x.id === it.id ? { ...x, text: e.target.value } : x) })} />
-              <button className="btn btn-ghost px-2 text-rose-600" aria-label="Remove item" onClick={() => setData({ items: q.data.items.filter((x: { id: string }) => x.id !== it.id) })}>✕</button>
+              <button type="button" className="btn btn-ghost px-2 text-rose-600" aria-label="Remove item" onClick={() => setData({ items: q.data.items.filter((x: { id: string }) => x.id !== it.id) })}><Icon name="x" className="h-4 w-4" /></button>
             </div>
           ))}
           <button className="btn btn-ghost text-xs" onClick={() => setData({ items: [...(q.data.items ?? []), { id: uid(), text: "" }] })}>+ Add item</button>

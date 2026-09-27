@@ -43,8 +43,8 @@ export default function VisitorsPage() {
           <section className="card p-5">
             <div className="mb-2 flex items-center gap-2"><h2 className="mr-auto font-semibold">Log</h2><input className="input w-auto" type="date" value={day} onChange={e => setDay(e.target.value)} aria-label="Date" /><a className="btn btn-ghost text-xs" href={`/api/visitors?format=csv${day ? `&date=${day}` : ""}`}>CSV</a></div>
             {!data?.log.length ? <Empty>No visitors.</Empty> : (
-              <table className="w-full text-sm"><tbody>{data.log.map(v => <tr key={v.id} className="border-t border-slate-100"><td className="py-1.5">{v.full_name}<div className="text-xs text-slate-400">{v.organisation}</div></td><td>{v.purpose}</td>
-                <td className="text-xs tabular-nums">{fmtTime(v.signed_in_at)}–{v.signed_out_at ? fmtTime(v.signed_out_at) : "on site"}</td></tr>)}</tbody></table>
+              <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><tbody>{data.log.map(v => <tr key={v.id} className="border-t border-slate-100"><td className="py-1.5">{v.full_name}<div className="text-xs text-slate-400">{v.organisation}</div></td><td>{v.purpose}</td>
+                <td className="text-xs tabular-nums">{fmtTime(v.signed_in_at)}–{v.signed_out_at ? fmtTime(v.signed_out_at) : "on site"}</td></tr>)}</tbody></table></div>
             )}
           </section>
         </div>

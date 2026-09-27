@@ -86,6 +86,10 @@ export default function WebRtcMesh(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room?.id, peer?.id]);
 
+  // Always call the latest startOffer, which reads current room and stream state.
+  const startOfferRef = useRef(startOffer);
+  useEffect(() => { startOfferRef.current = startOffer; });
+
   useEffect(() => {
     if (!peer?.id) return;
     const others = peers.filter((p) => p.id !== peer.id);
@@ -93,7 +97,7 @@ export default function WebRtcMesh(props: {
 
     for (const remote of others) {
       if (!pcsRef.current[remote.id] && peer.id < remote.id && localStreamRef.current) {
-        void startOffer(remote.id);
+        void startOfferRef.current(remote.id);
       }
     }
 

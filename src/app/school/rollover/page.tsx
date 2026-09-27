@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useApi, send, Page, PageHeader, Alert, Empty } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Empty, Loading } from "@/components/ui";
 
 type Cls = { id: string; name: string; level: string | null; suggested: string | null; students: { id: string; name: string; admission_no: string; average: number | null }[] };
 
@@ -17,7 +17,7 @@ export default function RolloverPage() {
     setRepeat(new Set());
   }, [data]);
   if (error) return <Page><Alert>{error}</Alert></Page>;
-  if (!data) return <Page><p className="text-sm text-slate-500">Loading…</p></Page>;
+  if (!data) return <Page><Loading /></Page>;
   const total = data.classes.reduce((a, c) => a + c.students.length, 0);
   async function run() {
     if (!confirm(`Promote ${total - repeat.size} students and keep ${repeat.size} in their class? This cannot be undone automatically.`)) return;

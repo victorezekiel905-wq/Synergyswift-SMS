@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useApi, send, Page, PageHeader, Alert, Empty, Modal, Field, Badge, statusTone } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Empty, Modal, Field, Badge, statusTone, Loading } from "@/components/ui";
 
 type Student = {
   id: string; admission_no: string; first_name: string; last_name: string; other_names: string | null; status: string;
@@ -24,7 +24,7 @@ export default function StudentsPage() {
     <Page wide>
       <PageHeader eyebrow="Student information" title="Students & parents"
         subtitle="Every student record, their guardians and how parents are reached. Guardians get results, sign-in alerts and pickup codes on WhatsApp and email."
-        actions={<><button className="btn btn-ghost border border-slate-200" onClick={() => setImp(true)}>Import CSV</button><button className="btn btn-primary" onClick={() => setAdd(true)}>+ Add student</button></>} />
+        actions={<><button className="btn btn-outline" onClick={() => setImp(true)}>Import CSV</button><button className="btn btn-primary" onClick={() => setAdd(true)}>+ Add student</button></>} />
       <div className="mb-4 flex flex-wrap gap-2">
         <input className="input max-w-xs" placeholder="Search name or admission no" value={q} onChange={e => setQ(e.target.value)} aria-label="Search students" />
         <select className="input max-w-[200px]" value={cg} onChange={e => setCg(e.target.value)} aria-label="Class">
@@ -36,7 +36,7 @@ export default function StudentsPage() {
         </select>
       </div>
       {error && <Alert>{error}</Alert>}
-      {loading && !data ? <p className="text-sm text-slate-500">Loading…</p> : !data?.length ? <Empty>No students match.</Empty> : (
+      {loading && !data ? <Loading /> : !data?.length ? <Empty>No students match.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">

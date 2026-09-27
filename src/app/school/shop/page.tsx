@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { useApi, send, Page, PageHeader, Alert, Badge, Empty, Field, Tabs, Stat, money, fmtTime, fmtDate } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Badge, Empty, Field, Tabs, Stat, Icon, money, fmtTime, fmtDate } from "@/components/ui";
 
 type Item = { id: string; name: string; price: number; category: string | null; active: boolean };
 type Overview = { currency: string; can_credit: boolean; items: Item[];
@@ -51,7 +51,7 @@ function StudentCard({ c }: { c: Card }) {
           <p className="text-xs text-slate-500">spent today {money(w.spent_today, cur)}{w.daily_limit != null ? ` of ${money(w.daily_limit, cur)}` : ""}</p>
         </div>
       </div>
-      {c.allergies && <div role="alert" className="rounded-lg border-2 border-rose-400 bg-rose-50 p-2 text-sm font-semibold text-rose-800">⚠ Allergies: {c.allergies}</div>}
+      {c.allergies && <div role="alert" className="flex items-start gap-2 rounded-lg border-2 border-rose-400 bg-rose-50 p-2.5 text-sm font-semibold text-rose-800"><Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0" />Allergies: {c.allergies}</div>}
       {w.frozen && <Alert>This wallet is frozen. Do not sell.</Alert>}
       {!w.has_wallet && <Alert tone="amber">No money in this wallet yet.</Alert>}
     </div>
@@ -140,10 +140,10 @@ function Items({ items, currency, reload }: { items: Item[]; currency: string; r
     <div className="grid gap-4 lg:grid-cols-[1fr,20rem]">
       <section className="card p-4">
         {!items.length ? <Empty>No items yet.</Empty> : (
-          <table className="w-full text-sm"><thead><tr className="text-left text-xs text-slate-500"><th>Item</th><th>Category</th><th className="text-right">Price</th><th /></tr></thead>
+          <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><thead><tr className="text-left text-xs text-slate-500"><th>Item</th><th>Category</th><th className="text-right">Price</th><th /></tr></thead>
             <tbody>{items.map(i => <tr key={i.id} className={`border-t border-slate-100 ${i.active ? "" : "opacity-50"}`}><td className="py-1.5">{i.name}</td><td>{i.category}</td>
               <td className="text-right tabular-nums">{money(i.price, currency)}</td>
-              <td className="text-right"><button className="text-xs text-brand-700" onClick={() => setF({ id: i.id, name: i.name, price: String(i.price), category: i.category ?? "", active: i.active })}>Edit</button></td></tr>)}</tbody></table>
+              <td className="text-right"><button className="text-xs text-brand-700" onClick={() => setF({ id: i.id, name: i.name, price: String(i.price), category: i.category ?? "", active: i.active })}>Edit</button></td></tr>)}</tbody></table></div>
         )}
       </section>
       <form className="card h-fit space-y-2 p-4" onSubmit={async e => {
@@ -219,10 +219,10 @@ function Wallets({ currency }: { currency: string }) {
           <section className="card p-4">
             <h3 className="mb-2 font-semibold">History</h3>
             {!w.transactions.length ? <Empty>No transactions.</Empty> : (
-              <table className="w-full text-sm"><tbody>{w.transactions.map(t => <tr key={t.id} className="border-t border-slate-100">
+              <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><tbody>{w.transactions.map(t => <tr key={t.id} className="border-t border-slate-100">
                 <td className="py-1.5">{fmtDate(t.created_at)} {fmtTime(t.created_at)}</td><td>{t.description}{t.status === "pending" ? " (pending)" : ""}</td>
                 <td className={`text-right tabular-nums ${Number(t.amount) > 0 ? "text-emerald-700" : ""}`}>{money(t.amount, currency)}</td>
-                <td className="text-right tabular-nums text-slate-500">{t.balance_after != null ? money(t.balance_after, currency) : ""}</td></tr>)}</tbody></table>
+                <td className="text-right tabular-nums text-slate-500">{t.balance_after != null ? money(t.balance_after, currency) : ""}</td></tr>)}</tbody></table></div>
             )}
           </section>
         </div>

@@ -49,18 +49,18 @@ export default function PayPage(props: { params: Promise<{ token: string }> }) {
         <div><p className="text-xs uppercase text-slate-500">Student</p><p className="font-semibold">{inv.student.name}</p><p className="text-slate-600">{inv.student.admission_no} · {inv.student.class_name}</p></div>
         <div className="text-right"><p className="text-xs uppercase text-slate-500">{inv.title}</p><p className="text-3xl font-black tabular-nums">{money(inv.balance, data.currency)}</p><p className="text-xs text-slate-500">balance{inv.due_date ? ` · due ${fmtDate(inv.due_date)}` : ""}</p></div>
       </section>
-      <table className="mt-4 w-full text-sm">
+      <div className="overflow-x-auto print:overflow-visible"><table className="mt-4 w-full text-sm">
         <tbody>
           {inv.lines.map((l, i) => <tr key={i} className="border-t border-slate-100"><td className="py-1.5">{l.description}</td><td className="text-right tabular-nums">{money(l.amount, data.currency)}</td></tr>)}
           <tr className="border-t-2 border-slate-300 font-semibold"><td className="py-1.5">Total</td><td className="text-right tabular-nums">{money(inv.total, data.currency)}</td></tr>
           <tr><td className="py-1.5">Paid</td><td className="text-right tabular-nums">{money(inv.amount_paid, data.currency)}</td></tr>
         </tbody>
-      </table>
+      </table></div>
       {inv.payments.length > 0 && (
         <section className="mt-4">
           <h2 className="text-sm font-semibold">Receipts</h2>
-          <table className="w-full text-sm"><tbody>{inv.payments.map((p, i) => (
-            <tr key={i} className="border-t border-slate-100"><td className="py-1.5 font-mono text-xs">{p.receipt_no}</td><td>{fmtDate(p.paid_at, true)}</td><td className="capitalize">{p.method}</td><td className="text-right tabular-nums">{money(p.amount, data.currency)}</td></tr>))}</tbody></table>
+          <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><tbody>{inv.payments.map((p, i) => (
+            <tr key={i} className="border-t border-slate-100"><td className="py-1.5 font-mono text-xs">{p.receipt_no}</td><td>{fmtDate(p.paid_at, true)}</td><td className="capitalize">{p.method}</td><td className="text-right tabular-nums">{money(p.amount, data.currency)}</td></tr>))}</tbody></table></div>
         </section>
       )}
       {inv.balance > 0 && inv.status !== "void" && (
@@ -81,7 +81,7 @@ export default function PayPage(props: { params: Promise<{ token: string }> }) {
           {data.bank_details && <div className="rounded-lg bg-slate-50 p-3 text-sm"><p className="font-semibold">Pay by bank transfer</p><p className="whitespace-pre-wrap">{data.bank_details}</p><p className="mt-1 text-xs text-slate-500">Use <b>{inv.invoice_no}</b> as the transfer narration.</p></div>}
         </section>
       )}
-      <div className="mt-6 text-center print:hidden"><button className="btn btn-ghost border border-slate-200" onClick={() => window.print()}>Print or save as PDF</button></div>
+      <div className="mt-6 text-center print:hidden"><button className="btn btn-outline" onClick={() => window.print()}>Print or save as PDF</button></div>
     </main>
   );
 }

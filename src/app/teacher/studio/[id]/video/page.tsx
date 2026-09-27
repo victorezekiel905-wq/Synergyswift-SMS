@@ -1,5 +1,5 @@
 "use client";
-import { use, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 
 // §3.1 — Interactive video: a YouTube/HTML5 <video> URL plus a list of
 // questions fired at fixed seconds; on playback the player surfaces them.
@@ -11,11 +11,11 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
   const [draftTs, setDraftTs] = useState({ t_seconds: 30, kind: "question", text: "" });
   const ref = useRef<HTMLVideoElement | null>(null);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const r = await fetch(`/api/video-timestamps?lesson_id=${id}`);
     if (r.ok) setStamps(await r.json());
-  }
-  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [id]);
+  }, [id]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   async function addStamp() {
     const body = {

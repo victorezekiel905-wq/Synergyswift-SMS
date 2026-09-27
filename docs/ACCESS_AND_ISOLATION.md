@@ -158,7 +158,7 @@ Database triggers enforce these rules, so they hold even if someone calls the AP
 | Parents see only the bus their child rides, and only while a trip runs | `transport_live` policy, and the attendant's phone shares location only between Start and End trip |
 | App notification subscriptions are server-only | `push_subscriptions` has no policies |
 
-Important actions (role changes, results published, payments recorded or reversed, invoices voided, payroll approved, timetable generated, AI use, wallet top-ups and refunds, parent wallet limits, conversations closed, student data exported) are written to the school's audit log. Platform actions go to the platform audit log.
+Important actions (role changes, results published, payments recorded or reversed, invoices voided, payroll approved, timetable generated, drafts requested, wallet top-ups and refunds, parent wallet limits, conversations closed, student data exported) are written to the school's audit log. Platform actions go to the platform audit log.
 
 ## 6. How this is verified
 

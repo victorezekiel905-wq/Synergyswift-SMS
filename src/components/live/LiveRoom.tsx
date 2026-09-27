@@ -75,7 +75,6 @@ export default function LiveRoom(props: {
       setEvents(ev ?? []);
       setHands(h ?? []);
       setPolicies(Array.isArray(p) ? p : []);
-      if (Array.isArray(p) && p.length) setPolicyId((cur) => cur || "");
     }).catch(() => {});
   }, [props.session.id]);
 
@@ -182,7 +181,8 @@ export default function LiveRoom(props: {
             {snapList.length === 0 && <p className="col-span-full py-4 text-center text-xs text-slate-400">No thumbnails yet — pair the browser agent to this session.</p>}
             {snapList.map((s) => (
               <button key={s.id} onClick={() => setSpot(s)} className="group relative overflow-hidden rounded-md border border-slate-200">
-                {s.data_url ? <img src={s.data_url} alt="screen" className="h-20 w-full object-cover" /> : <div className="h-20 bg-slate-100" />}
+                {/* eslint-disable-next-line @next/next/no-img-element -- data URL / uploaded file, nothing for next/image to optimise */}
+                {s.data_url ? <img src={s.data_url} alt={`Screen of ${s.url ?? "a student device"}`} className="h-20 w-full object-cover" /> : <div className="h-20 bg-slate-100" />}
                 <span className="absolute inset-x-0 bottom-0 truncate bg-black/50 px-1 text-[9px] text-white">{s.url ?? s.device_id.slice(0, 8)}</span>
               </button>
             ))}
@@ -242,7 +242,7 @@ export default function LiveRoom(props: {
 
           <div className="card p-4">
             <h2 className="mb-3 text-sm font-semibold uppercase text-slate-600">Recent teacher commands</h2>
-            <table className="w-full text-left text-sm">
+            <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-left text-sm">
               <thead className="text-xs uppercase text-slate-500"><tr><th className="py-2">When</th><th>Kind</th><th>Target</th><th>State</th></tr></thead>
               <tbody>
                 {cmds.length === 0 && <tr><td colSpan={4} className="py-4 text-center text-xs text-slate-400">No commands sent.</td></tr>}
@@ -255,7 +255,7 @@ export default function LiveRoom(props: {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
         </section>
       </div>
@@ -263,7 +263,8 @@ export default function LiveRoom(props: {
       {spot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8" onClick={() => setSpot(null)}>
           <div className="max-w-4xl">
-            {spot.data_url && <img src={spot.data_url} alt="spotlight" className="max-h-[80vh] w-full rounded-md" />}
+            {/* eslint-disable-next-line @next/next/no-img-element -- data URL / uploaded file, nothing for next/image to optimise */}
+            {spot.data_url && <img src={spot.data_url} alt={`Spotlighted screen: ${spot.url ?? "student device"}`} className="max-h-[80vh] w-full rounded-md" />}
             <p className="mt-2 text-center text-xs text-white">Spotlight: {spot.url ?? "screen"}{" "}
               <span className="text-slate-400">— click anywhere to close. Student is informed of sharing per blueprint §3.7.</span></p>
           </div>

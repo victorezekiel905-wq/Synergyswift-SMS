@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Badge, statusTone, Empty, Field, Modal } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Badge, statusTone, Empty, Field, Modal, Loading } from "@/components/ui";
 
 type Session = { id: string; name: string; terms: { id: string; name: string; is_current: boolean }[] };
 type Structure = {
@@ -72,7 +72,11 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
   const subjects = (structure?.subjects ?? []).filter(s => !offered.length || offered.some(o => o.subject_id === s.id));
   const mine = subjects.filter(s => isAdmin || offered.some(o => o.subject_id === s.id && o.teacher_id === myId) || structure?.class_groups.find(g => g.id === cg)?.form_teacher_id === myId);
   const [subject, setSubject] = useState("");
-  useEffect(() => { if (!mine.some(s => s.id === subject)) setSubject(mine[0]?.id ?? ""); /* eslint-disable-next-line */ }, [cg, structure]);
+  const mineKey = mine.map(s => s.id).join(",");
+  useEffect(() => {
+    const ids = mineKey ? mineKey.split(",") : [];
+    if (!ids.includes(subject)) setSubject(ids[0] ?? "");
+  }, [mineKey, subject]);
   const { data, error, reload } = useApi<Sheet>(subject ? `/api/results/scores?term_id=${termId}&class_group_id=${cg}&subject_id=${subject}` : null, [termId, cg, subject]);
   const [grid, setGrid] = useState<Record<string, Record<string, string>>>({});
   const [dirty, setDirty] = useState(false);
@@ -211,9 +215,9 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
     setMsg({ ok: true, text: `Published ${d.published}. ${d.messages_queued} messages queued.${del}${missing}` });
     reload();
   }
-  async function aiComments(role: "form_teacher" | "principal") {
-    setBusy("ai_" + role);
-    const r = await send("/api/results/ai-comments", { term_id: termId, class_group_id: cg, role });
+  async function draftComments(role: "form_teacher" | "principal") {
+    setBusy("draft_" + role);
+    const r = await send("/api/results/draft-comments", { term_id: termId, class_group_id: cg, role });
     setBusy(null);
     setMsg({ ok: r.ok, text: r.ok ? `Drafted ${r.data.drafted} comments${r.data.note ? ` (${r.data.note})` : ""}. Read and edit them before publishing.` : r.error ?? "failed" });
     if (r.ok) reload();
@@ -228,12 +232,12 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
   return (
     <div>
       <div className="mb-4 flex flex-wrap gap-2">
-        {(isAdmin || isFormTeacher) && <button className="btn btn-ghost border border-slate-200" disabled={busy !== null} onClick={() => compile(false)}>{busy === "compile" ? "Compiling…" : "Compile report cards"}</button>}
-        {isAdmin && <button className="btn btn-ghost border border-slate-200" disabled={busy !== null} onClick={() => confirm("Recompute published report cards too? Parents will see the new figures on their link.") && compile(true)}>Recompute all</button>}
+        {(isAdmin || isFormTeacher) && <button className="btn btn-outline" disabled={busy !== null} onClick={() => compile(false)}>{busy === "compile" ? "Compiling…" : "Compile report cards"}</button>}
+        {isAdmin && <button className="btn btn-outline" disabled={busy !== null} onClick={() => confirm("Recompute published report cards too? Parents will see the new figures on their link.") && compile(true)}>Recompute all</button>}
         {isAdmin && <button className="btn btn-primary" disabled={busy !== null || !data?.length} onClick={() => publish(false)}>{busy === "publish" ? "Publishing and sending…" : "Publish & send to parents"}</button>}
         {isAdmin && <button className="btn btn-ghost" disabled={busy !== null} onClick={() => publish(true)}>Resend</button>}
-        {(isAdmin || isFormTeacher) && <button className="btn btn-ghost border border-violet-200 text-violet-800" disabled={busy !== null || !data?.length} onClick={() => aiComments("form_teacher")}>{busy === "ai_form_teacher" ? "Writing comments…" : "AI: draft teacher comments"}</button>}
-        {isAdmin && <button className="btn btn-ghost border border-violet-200 text-violet-800" disabled={busy !== null || !data?.length} onClick={() => aiComments("principal")}>{busy === "ai_principal" ? "Writing comments…" : "AI: draft principal comments"}</button>}
+        {(isAdmin || isFormTeacher) && <button className="btn btn-outline" disabled={busy !== null || !data?.length} onClick={() => draftComments("form_teacher")}>{busy === "draft_form_teacher" ? "Drafting comments…" : "Draft teacher comments"}</button>}
+        {isAdmin && <button className="btn btn-outline" disabled={busy !== null || !data?.length} onClick={() => draftComments("principal")}>{busy === "draft_principal" ? "Drafting comments…" : "Draft principal comments"}</button>}
         <a className="btn btn-ghost ml-auto" href={`/api/results/report-cards?term_id=${termId}&class_group_id=${cg}&format=csv`}>Download broadsheet (CSV)</a>
       </div>
       {error && <Alert>{error}</Alert>}
@@ -298,7 +302,7 @@ function Traits({ termId, cg, isAdmin }: { termId: string; cg: string; isAdmin: 
     if (!data) return;
     setGrid(Object.fromEntries((data.ratings ?? []).map(r => [`${r.student_id}|${r.trait_id}`, r.rating])));
   }, [data]);
-  if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (!data) return <Loading />;
   if (!data.traits.length) return (
     <Empty>No character or skills traits set up.{isAdmin && <button className="btn btn-primary ml-2 text-xs" onClick={async () => { await send("/api/traits", { action: "seed_defaults" }); reload(); }}>Add the standard list</button>}</Empty>
   );
