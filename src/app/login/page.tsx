@@ -25,7 +25,7 @@ export default function LoginPage() {
     const j = await r.json().catch(() => ({}));
     setBusy(false);
     if (!r.ok && !j.already) {
-      if (["not_provisioned", "suspended", "deactivated"].includes(j.code)) await sb.auth.signOut();
+      if (["not_provisioned", "suspended", "paused", "deactivated"].includes(j.code)) await sb.auth.signOut();
       setErr(j.error ?? "profile setup failed");
       return;
     }

@@ -83,7 +83,7 @@ export function hasAny(ctx: Ctx, roles: readonly string[]) {
 export async function requireCtx(roles?: readonly string[], module?: ModuleKey): Promise<Ctx | NextResponse> {
   const ctx = await getCtx();
   if (!ctx) return jsonError("unauthenticated", 401);
-  if (ctx.tenant.status !== "active") return jsonError("this school account is suspended", 403);
+  if (ctx.tenant.status !== "active") return jsonError(ctx.tenant.status === "paused" ? "this school is closed for now" : "this school account is suspended", 403);
   if (module && ctx.tenant.modules?.[module] === false) return jsonError(`the ${module} module is not enabled for this school`, 403);
   if (roles && !hasAny(ctx, roles)) return jsonError("forbidden", 403);
   return ctx;

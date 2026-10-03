@@ -77,7 +77,7 @@ export function Badge({ children, tone = "slate" }: { children: React.ReactNode;
 
 export function statusTone(s: string): "slate" | "green" | "amber" | "red" | "blue" | "violet" {
   if (["published", "approved", "sent", "graded", "active", "fulfilled", "in"].includes(s)) return "green";
-  if (["submitted", "pending", "queued", "sending", "draft", "in_progress"].includes(s)) return "amber";
+  if (["submitted", "pending", "queued", "sending", "draft", "in_progress", "paused"].includes(s)) return "amber";
   if (["rejected", "failed", "locked", "withheld", "suspended", "cancelled", "revoked", "out"].includes(s)) return "red";
   if (["skipped", "closed", "expired", "used"].includes(s)) return "slate";
   return "blue";
@@ -227,7 +227,7 @@ export type Me = {
   tenant: { id: string; name: string; status: string; modules: Record<string, boolean> } | null;
   platform: boolean;
   group?: boolean;
-  account?: { state: string; school?: string };
+  account?: { state: string; school?: string; message?: string | null };
   platform_mfa?: boolean;
   is_guardian: boolean;
 };

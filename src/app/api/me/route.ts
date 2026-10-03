@@ -15,7 +15,7 @@ export async function GET() {
     tenant = data;
   } else {
     const { data: state } = await sb.rpc("my_account_state");
-    if (state?.state === "suspended" || state?.state === "deactivated" || state?.state === "mfa_required") {
+    if (["suspended", "paused", "deactivated", "mfa_required"].includes(state?.state)) {
       return NextResponse.json({ user: { id: user.id, email: user.email }, profile: null, tenant: null, platform: false, group: false, account: state });
     }
     const { data: pstate } = await sb.rpc("platform_admin_state");

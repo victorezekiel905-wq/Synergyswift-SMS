@@ -9,11 +9,11 @@ export default async function Dashboard() {
   const { data: me } = await sb.from("users").select("id,tenant_id,role,full_name").eq("id", user.id).maybeSingle();
   if (!me) {
     const { data: state } = await sb.rpc("my_account_state");
-    if (state?.state === "suspended" || state?.state === "deactivated") {
+    if (state?.state === "suspended" || state?.state === "paused" || state?.state === "deactivated") {
       return (
         <main className="mx-auto max-w-xl px-6 py-16 text-center">
-          <h1 className="text-2xl font-semibold">{state.state === "suspended" ? "School account suspended" : "Account deactivated"}</h1>
-          <p className="mt-2 text-slate-600">{state.state === "suspended" ? `${state.school} is not available right now. Please contact the school office.` : "Please contact your school office to restore access."}</p>
+          <h1 className="text-2xl font-semibold">{state.state === "paused" ? `${state.school} is closed for now` : state.state === "suspended" ? "School account suspended" : "Account deactivated"}</h1>
+          <p className="mt-2 text-slate-600">{state.state === "deactivated" ? "Please contact your school office to restore access." : state.message || (state.state === "paused" ? "Please check back later or contact the school office." : `${state.school} is not available right now. Please contact the school office.`)}</p>
         </main>
       );
     }

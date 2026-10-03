@@ -28,7 +28,7 @@ If the email has no account yet, the script creates one and prints a one-time li
 | Page | What it does |
 |---|---|
 | `/platform` | Every school with students, staff, users and messages sent. Create a new school and invite its first admin. |
-| `/platform/<school>` | Suspend or reactivate the school, switch modules on or off, set the student limit, invite more school admins, see message delivery and the platform audit log. |
+| `/platform/<school>` | **Overview**: pause (temporary closure), suspend, restart, and an optional message users see while the school is closed; student limit; delete the school (it must be paused or suspended first, and you type its name). **Settings**: every school setting, the same ones its admins see. **Staff & admins**: invite admins, make any staff member an admin or change their role, turn accounts off or on (a school always keeps one active admin). **Modules**: turn features on or off. **History**: everything done to the school from the platform. |
 | `/platform/groups` | Group branches owned by one proprietor and give that proprietor a read-only console across those branches. |
 
 ### Removing or adding super admins

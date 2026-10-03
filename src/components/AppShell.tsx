@@ -133,7 +133,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     ? [{ title: "Group", links: [{ href: "/group", label: "All branches", roles: [] }] }]
     : GROUPS.map(g => ({ ...g, links: g.links.filter(l => l.roles.some(r => roles.has(r)) && (!l.module || modules[l.module] !== false)) }))
         .filter(g => g.links.length);
-  const suspended = me?.tenant?.status === "suspended" || me?.account?.state === "suspended";
+  const closedState = me?.account?.state === "paused" || me?.account?.state === "suspended" ? me.account.state : me?.tenant?.status !== "active" && me?.tenant ? me.tenant.status : null;
   const isActive = (href: string) => pathname === href || (href !== "/school" && href !== "/dashboard" && pathname.startsWith(href + "/")) || (href === "/school" && pathname === "/school");
 
   const nav = (
@@ -183,9 +183,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {nav}
         </aside>
         <div className="min-w-0 flex-1">
-          {suspended && (
-            <div className="border-b border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-800">
-              This school account is suspended. Contact your provider to restore access.
+          {closedState && (
+            <div role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+              {closedState === "paused" ? "This school is closed for now." : "This school account is suspended."} {me?.account?.message ?? "Contact the school office."}
             </div>
           )}
           {children}
