@@ -39,6 +39,8 @@ Read [docs/SCHOOL_OPERATIONS.md](docs/SCHOOL_OPERATIONS.md) first, then [docs/ME
 
 **Super admin access, role privileges and tenant isolation** are explained in [docs/ACCESS_AND_ISOLATION.md](docs/ACCESS_AND_ISOLATION.md).
 
+**To put it online**, follow [docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md). The repository includes a Render Blueprint (`render.yaml`) for the app and its scheduled jobs.
+
 ```bash
 npm test          # unit tests: grading, exams, messaging, fees, payments, payroll, timetable, risk, behaviour, bus, cover, wallet
 npm run test:db   # applies every migration to real Postgres (PGlite) and checks tenant isolation

@@ -1,0 +1,106 @@
+# Render Blueprint for EduClass Fusion.
+# In Render: New → Blueprint → pick this repository. Render reads this file,
+# creates the web app and the two scheduled jobs, and asks for every value
+# marked `sync: false`. See docs/DEPLOY_RENDER.md.
+
+envVarGroups:
+  # Shared by the app and the scheduled jobs.
+  - name: educlass-shared
+    envVars:
+      - key: CRON_SECRET
+        generateValue: true
+
+services:
+  - type: web
+    name: educlass-fusion
+    runtime: node
+    region: frankfurt          # closest Render region to West Africa; match your Supabase region
+    plan: starter              # free instances sleep after 15 minutes; schools need it always on
+    branch: main
+    autoDeploy: true
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/status
+    envVars:
+      - fromGroup: educlass-shared
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      # ---- Required ----
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL      # e.g. https://educlass-fusion.onrender.com, or your own domain
+        sync: false
+      # ---- Email (Resend) ----
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM               # e.g. "School Updates <updates@yourdomain.com>"
+        sync: false
+      # ---- WhatsApp (Meta Cloud API) ----
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: DEFAULT_COUNTRY_CODE
+        value: "234"
+      # ---- Online payments ----
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      # ---- SMS ----
+      - key: SMS_PROVIDER
+        value: termii
+      - key: TERMII_API_KEY
+        sync: false
+      - key: SMS_SENDER_ID
+        sync: false
+      # ---- App notifications (npx web-push generate-vapid-keys) ----
+      - key: NEXT_PUBLIC_VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT            # e.g. mailto:ops@yourdomain.com
+        sync: false
+      # ---- Drafting and translation ----
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+  # Sends queued messages and retries failures, every minute.
+  - type: cron
+    name: educlass-dispatch
+    runtime: node
+    region: frankfurt
+    plan: starter
+    schedule: "* * * * *"
+    buildCommand: "true"
+    startCommand: node scripts/cron-call.mjs /api/cron/dispatch
+    envVars:
+      - fromGroup: educlass-shared
+      - key: APP_HOST
+        fromService:
+          type: web
+          name: educlass-fusion
+          property: host
+
+  # Daily housekeeping: expire pickup codes, close finished exams, library reminders.
+  - type: cron
+    name: educlass-daily
+    runtime: node
+    region: frankfurt
+    plan: starter
+    schedule: "0 5 * * *"            # 05:00 UTC = 06:00 in Lagos
+    buildCommand: "true"
+    startCommand: node scripts/cron-call.mjs /api/cron/daily
+    envVars:
+      - fromGroup: educlass-shared
+      - key: APP_HOST
+        fromService:
+          type: web
+          name: educlass-fusion
+          property: host
