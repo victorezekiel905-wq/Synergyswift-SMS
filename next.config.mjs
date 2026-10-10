@@ -8,6 +8,8 @@ const nextConfig = {
       { protocol: "https", hostname: "*.supabase.in" }
     ]
   },
+  // The exam code sandbox loads its WebAssembly at runtime; keep it out of the server bundle.
+  serverExternalPackages: ["quickjs-emscripten"],
   experimental: {
     serverActions: { bodySizeLimit: "4mb" }
   }

@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-
-type FaceDetectorLike = { detect: (src: CanvasImageSource) => Promise<unknown[]> };
+import { faceCounter } from "@/lib/exams/faces";
 
 /** Asks for the camera. Call from a click so browsers show the prompt. */
 export async function requestCamera(): Promise<MediaStream> {
@@ -13,8 +12,8 @@ export async function requestCamera(): Promise<MediaStream> {
  * Webcam proctoring during an exam: a small preview in the corner and a photo
  * every `intervalSec` seconds sent to the server. If the camera stops, the
  * exam is covered until it is back on, and the event is recorded.
- * Where the browser supports face detection, photos with no face or several
- * faces are flagged for the teacher (never locked automatically).
+ * Each photo is checked for faces (in every modern browser); photos with no
+ * face or several faces are flagged for the teacher, never locked automatically.
  */
 export default function WebcamProctor({ examId, intervalSec, initialStream, onEvent }: {
   examId: string; intervalSec: number; initialStream?: MediaStream | null;
@@ -49,8 +48,7 @@ export default function WebcamProctor({ examId, intervalSec, initialStream, onEv
   // Periodic photo.
   useEffect(() => {
     if (!stream) return;
-    const Detector = (window as unknown as { FaceDetector?: new () => FaceDetectorLike }).FaceDetector;
-    const detector = Detector ? new Detector() : null;
+    const counting = faceCounter();
     const snap = async () => {
       const v = video.current;
       if (!v || v.readyState < 2) return;
@@ -58,7 +56,7 @@ export default function WebcamProctor({ examId, intervalSec, initialStream, onEv
       c.width = 320; c.height = Math.round((320 * (v.videoHeight || 240)) / (v.videoWidth || 320));
       c.getContext("2d")?.drawImage(v, 0, 0, c.width, c.height);
       let faces = -1;
-      if (detector) { try { faces = (await detector.detect(c)).length; } catch { faces = -1; } }
+      try { faces = await (await counting)(c); } catch { faces = -1; }
       if (faces === 0) onEvent("no_face");
       if (faces > 1) onEvent("multiple_faces", { faces });
       const blob: Blob | null = await new Promise(res => c.toBlob(res, "image/jpeg", 0.6));

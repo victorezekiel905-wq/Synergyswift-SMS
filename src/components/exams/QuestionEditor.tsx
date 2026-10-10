@@ -211,6 +211,7 @@ export default function QuestionEditor({ initial, onSave, onCancel, extra }: { i
           <Field label="Language"><select className="input" value={q.data.language} onChange={e => setData({ language: e.target.value })}>{["python", "javascript", "java", "c", "cpp", "csharp", "html", "sql", "pseudocode"].map(l => <option key={l}>{l}</option>)}</select></Field>
           <div className="sm:col-span-2"><Field label="Starter code"><textarea className="input h-24 font-mono text-xs" value={q.data.starter ?? ""} onChange={e => setData({ starter: e.target.value })} /></Field></div>
           <div className="sm:col-span-3"><Field label="Reference solution (teachers only)"><textarea className="input h-24 font-mono text-xs" value={q.answer.reference ?? ""} onChange={e => setAnswer({ reference: e.target.value })} /></Field></div>
+          <div className="sm:col-span-3"><CodeTests q={q} setAnswer={setAnswer} /></div>
         </div>
       )}
 
@@ -227,6 +228,42 @@ export default function QuestionEditor({ initial, onSave, onCancel, extra }: { i
         <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
         <button className="btn btn-primary" disabled={busy} onClick={save}>{busy ? "Saving…" : "Save question"}</button>
       </div>
+    </div>
+  );
+}
+
+type CodeTest = { input: string; expected: string; hidden?: boolean };
+
+/** Test cases for automatic marking of code answers, with a button to check the reference solution. */
+function CodeTests({ q, setAnswer }: { q: EditorQuestion; setAnswer: (a: Record<string, any>) => void }) {
+  const tests: CodeTest[] = q.answer.tests ?? [];
+  const [check, setCheck] = useState<{ text: string; ok: boolean } | null>(null);
+  const set = (i: number, k: keyof CodeTest, v: string | boolean) => setAnswer({ tests: tests.map((t, j) => j === i ? { ...t, [k]: v } : t) });
+  async function run() {
+    setCheck(null);
+    const res = await fetch("/api/exams/code-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ language: q.data.language, code: q.answer.reference ?? "", tests }) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) return setCheck({ ok: false, text: j.error ?? "Could not run the code." });
+    const bad = (j.outcomes ?? []).map((o: { passed: boolean; output: string | null; error: string | null }, i: number) => o.passed ? null : `Test ${i + 1}: ${o.error ?? `printed "${(o.output ?? "").trim()}"`}`).filter(Boolean);
+    setCheck({ ok: !bad.length, text: `Reference solution passes ${j.passed} of ${j.total} tests.${bad.length ? " " + bad.join(" · ") : ""}` });
+  }
+  return (
+    <div className="space-y-2 rounded-lg border border-slate-200 p-3">
+      <p className="label">Automatic marking (optional)</p>
+      <p className="text-xs text-slate-500">Each test gives the program some input and checks what it prints. Marks are shared equally between tests. Visible tests are shown to students as examples they can run; hidden tests are only used for marking. In JavaScript, input is the variable <code>input</code> (or call <code>readLine()</code>) and output is <code>console.log</code>. Other languages read standard input and need a Judge0 server.</p>
+      {tests.map((t, i) => (
+        <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+          <textarea className="input h-14 font-mono text-xs" placeholder="Input" value={t.input} onChange={e => set(i, "input", e.target.value)} aria-label={`Test ${i + 1} input`} />
+          <textarea className="input h-14 font-mono text-xs" placeholder="Expected output" value={t.expected} onChange={e => set(i, "expected", e.target.value)} aria-label={`Test ${i + 1} expected output`} />
+          <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={Boolean(t.hidden)} onChange={e => set(i, "hidden", e.target.checked)} /> Hidden</label>
+          <button type="button" className="btn btn-ghost px-2 text-rose-600" aria-label="Remove test" onClick={() => setAnswer({ tests: tests.filter((_, j) => j !== i) })}><Icon name="x" className="h-4 w-4" /></button>
+        </div>
+      ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="btn btn-ghost text-xs" disabled={tests.length >= 20} onClick={() => setAnswer({ tests: [...tests, { input: "", expected: "", hidden: tests.length > 0 }] })}>+ Add test</button>
+        {tests.length > 0 && <button type="button" className="btn btn-outline text-xs" disabled={!String(q.answer.reference ?? "").trim()} onClick={run}>Check reference solution</button>}
+      </div>
+      {check && <p className={"text-xs " + (check.ok ? "text-emerald-700" : "text-rose-700")}>{check.text}</p>}
     </div>
   );
 }

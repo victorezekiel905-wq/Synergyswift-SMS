@@ -111,3 +111,30 @@ describe("exam formats", () => {
     }
   });
 });
+
+import { STARTER_QUESTIONS, starterSubjectFor } from "@/lib/exams/starter-pack";
+
+describe("starter practice pack", () => {
+  it("every question is valid and auto-markable, with an explanation", () => {
+    expect(STARTER_QUESTIONS.length).toBe(99);
+    for (const s of STARTER_QUESTIONS) {
+      const q = { id: "x", type: s.type as Question["type"], prompt: s.prompt, points: s.points, data: s.data, answer: s.answer };
+      expect(validateQuestion(q), s.prompt).toEqual([]);
+      expect(s.explanation.length).toBeGreaterThan(5);
+    }
+  });
+  it("marks its own key as correct", () => {
+    for (const s of STARTER_QUESTIONS) {
+      const q = { id: "x", type: s.type as Question["type"], prompt: s.prompt, points: 1, data: s.data, answer: s.answer };
+      const key = s.type === "mcq_single" ? s.answer.correct : s.type === "numeric" ? String(s.answer.value) : String(s.answer.expression);
+      expect(markQuestion(q, key).points, s.prompt).toBe(1);
+    }
+  });
+  it("matches common subject names", () => {
+    expect(starterSubjectFor("Maths")).toBe("Mathematics");
+    expect(starterSubjectFor("English Language")).toBe("English");
+    expect(starterSubjectFor("Further Mathematics")).toBeNull();
+    expect(starterSubjectFor("Physical and Health Education")).toBeNull();
+    expect(starterSubjectFor("Civic Education")).toBeNull();
+  });
+});

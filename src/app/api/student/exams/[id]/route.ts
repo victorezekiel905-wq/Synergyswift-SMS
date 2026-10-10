@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireCtx, readJson, jsonError, type Ctx } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildAttemptLayout, toPublicQuestion, questionsForAttempt, type Question } from "@/lib/exams/engine";
+import { canRun, gradeCode, runCode } from "@/lib/exams/code-runner";
 import { verifySeb, absoluteRequestUrl, sebLaunchUrl } from "@/lib/exams/seb";
 import {
   loadQuestions, computeDeadline, windowState, finalizeAttempt, autoSubmitIfExpired, studentResultView,
@@ -71,7 +72,8 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start"), access_code: z.string().trim().max(20) }),
   z.object({ action: z.literal("save"), answers: z.record(z.any()) }),
   z.object({ action: z.literal("event"), kind: z.string().max(40), meta: z.record(z.any()).optional() }),
-  z.object({ action: z.literal("submit"), answers: z.record(z.any()).optional() })
+  z.object({ action: z.literal("submit"), answers: z.record(z.any()).optional() }),
+  z.object({ action: z.literal("run_code"), question_id: z.string().uuid(), code: z.string().max(50_000) })
 ]);
 
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -117,6 +119,25 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
   if (!existing) return jsonError("start the exam first", 400);
   let attempt = await autoSubmitIfExpired(svc, existing, questions);
+
+  if (b.action === "run_code") {
+    // Students may try their code on the visible example tests only; hidden tests are used for marking.
+    if (!["in_progress"].includes(attempt.status)) return jsonError("the exam is not in progress", 409);
+    const q = questionsForAttempt(questions, attempt).find(x => x.id === b.question_id);
+    if (!q || q.type !== "code") return jsonError("not a code question");
+    const language = String(q.data?.language ?? "");
+    if (!canRun(language)) return jsonError("running code is not available for this language", 400);
+    const { data: last } = await svc.from("exam_events").select("at").eq("attempt_id", attempt.id).eq("kind", "code_run").order("at", { ascending: false }).limit(1);
+    if (last?.[0] && Date.now() - new Date(last[0].at).getTime() < 3000) return jsonError("wait a moment before running again", 429);
+    await svc.from("exam_events").insert({ attempt_id: attempt.id, kind: "code_run", meta: { question_id: q.id } });
+    const visible = (q.answer?.tests ?? []).filter((t: { hidden?: boolean }) => !t.hidden).slice(0, 5);
+    if (!visible.length) {
+      const run = await runCode(language, b.code, "");
+      return NextResponse.json({ results: [{ passed: null, output: run.output.slice(0, 2000), expected: null, error: run.error }] });
+    }
+    const g = await gradeCode(language, b.code, visible, 1);
+    return NextResponse.json({ results: g.outcomes.map(o => ({ passed: o.passed, output: o.output, expected: o.expected, error: o.error })) });
+  }
 
   if (b.action === "event") {
     if (!["in_progress", "locked"].includes(attempt.status)) return NextResponse.json({ status: attempt.status });

@@ -13,12 +13,13 @@ type Props = {
   disabled?: boolean;
   spellcheck?: boolean;
   onUpload?: (file: File) => Promise<void>;
+  onRunCode?: (code: string) => Promise<{ passed: boolean | null; output: string | null; expected: string | null; error: string | null }[]>;
 };
 
 const wc = (s: string) => String(s ?? "").trim().split(/\s+/).filter(Boolean).length;
 
 /** Renders one question for answering (or read-only when disabled). */
-export default function QuestionView({ q, value, onChange, disabled, spellcheck, onUpload }: Props) {
+export default function QuestionView({ q, value, onChange, disabled, spellcheck, onUpload, onRunCode }: Props) {
   const d = q.data ?? {};
   return (
     <div>
@@ -111,8 +112,52 @@ export default function QuestionView({ q, value, onChange, disabled, spellcheck,
               requestAnimationFrame(() => { t.selectionStart = t.selectionEnd = s + 4; });
             }} />
         )}
+        {q.type === "code" && <CodeExtras examples={d.examples ?? []} code={value ?? d.starter ?? ""} onRun={disabled ? undefined : onRunCode} />}
         {q.type === "file_upload" && <Upload accept={d.accept} maxMb={d.max_mb} value={value} disabled={disabled} onUpload={onUpload} />}
       </div>
+    </div>
+  );
+}
+
+function CodeExtras({ examples, code, onRun }: { examples: { input: string; expected: string }[]; code: string; onRun?: Props["onRunCode"] }) {
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState<Awaited<ReturnType<NonNullable<Props["onRunCode"]>>> | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  if (!examples.length && !onRun) return null;
+  return (
+    <div className="mt-3 space-y-2 text-sm">
+      {examples.length > 0 && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {examples.map((x, i) => (
+            <div key={i} className="rounded border border-slate-200 bg-slate-50 p-2 font-mono text-xs">
+              <p className="mb-1 font-sans text-[11px] font-semibold text-slate-500">Example {i + 1}</p>
+              <p className="whitespace-pre-wrap"><span className="text-slate-400">input: </span>{x.input || "(none)"}</p>
+              <p className="whitespace-pre-wrap"><span className="text-slate-400">output: </span>{x.expected}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      {onRun && (
+        <div>
+          <button type="button" className="btn btn-outline" disabled={busy} onClick={async () => {
+            setBusy(true); setErr(null);
+            try { setRes(await onRun(code)); } catch (e) { setErr((e as Error).message); }
+            setBusy(false);
+          }}>{busy ? "Running…" : examples.length ? "Run against the examples" : "Run my code"}</button>
+          {err && <p className="mt-1 text-xs text-rose-600">{err}</p>}
+          {res && (
+            <ul className="mt-2 space-y-1 font-mono text-xs">
+              {res.map((x, i) => (
+                <li key={i} className={"rounded p-2 " + (x.passed === null ? "bg-slate-100" : x.passed ? "bg-emerald-50 text-emerald-900" : "bg-rose-50 text-rose-900")}>
+                  <span className="font-sans font-semibold">{x.passed === null ? "Output" : `Example ${i + 1}: ${x.passed ? "passed" : "not yet"}`}</span>
+                  {x.error ? <p className="whitespace-pre-wrap">{x.error}</p> : <p className="whitespace-pre-wrap">{x.output || "(no output)"}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-1 text-[11px] text-slate-500">Running does not submit your answer. Your teacher may also mark with tests you cannot see.</p>
+        </div>
+      )}
     </div>
   );
 }

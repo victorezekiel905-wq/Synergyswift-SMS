@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
+import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
+import { STARTER_QUESTIONS, starterSubjectFor } from "@/lib/exams/starter-pack";
 import { validateQuestion, parseFillBlanks, QUESTION_TYPES } from "@/lib/exams/engine";
 import { parseCsv } from "@/lib/school";
 
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
   if (ctx instanceof NextResponse) return ctx;
   const body = await readJson<Record<string, unknown>>(req);
   if (body?.action === "import") return importCsv(ctx, body);
+  if (body?.action === "starter") return addStarterPack(ctx);
   const parsed = Question.safeParse(body);
   if (!parsed.success) return jsonError(parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "));
   const q = parsed.data;
@@ -149,6 +151,35 @@ async function importCsv(ctx: any, body: unknown) {
     if (error) return jsonError(error.message);
   }
   return NextResponse.json({ imported: out.length, skipped: problems.length, problems: problems.slice(0, 20) });
+}
+
+/**
+ * Adds the starter practice questions to the subjects the school already has
+ * (matched by name). Safe to repeat: subjects that already have starter
+ * questions are skipped.
+ */
+async function addStarterPack(ctx: any) {
+  if (!hasAny(ctx, ROLES.admin)) return jsonError("only admins can add the starter questions", 403);
+  const tid = ctx.tenant.id;
+  const { data: subjects } = await ctx.sb.from("subjects").select("id,name").eq("tenant_id", tid);
+  const { data: have } = await ctx.sb.from("question_bank").select("subject_id").eq("tenant_id", tid).eq("exam_body", "Sample").limit(5000);
+  const done = new Set((have ?? []).map((h: any) => h.subject_id));
+  const rows: Record<string, unknown>[] = [];
+  const matched: string[] = [];
+  for (const s of subjects ?? []) {
+    const key = starterSubjectFor(s.name);
+    if (!key || done.has(s.id)) continue;
+    const qs = STARTER_QUESTIONS.filter(q => q.subject === key);
+    if (!qs.length) continue;
+    matched.push(s.name);
+    for (const q of qs) rows.push({
+      tenant_id: tid, created_by: ctx.userId, subject_id: s.id, topic: q.topic, difficulty: q.difficulty, bloom: q.bloom,
+      exam_body: "Sample", type: q.type, prompt: q.prompt, points: q.points, data: q.data, answer: q.answer, explanation: q.explanation, practice: true
+    });
+  }
+  if (!rows.length) return jsonError("no matching subjects without starter questions. Starter questions cover Mathematics, English, Biology, Chemistry, Physics, Economics and Government; add those subjects under School setup first.");
+  const { error } = await ctx.sb.from("question_bank").insert(rows);
+  return error ? jsonError(error.message) : NextResponse.json({ added: rows.length, subjects: matched });
 }
 
 export async function DELETE(req: NextRequest) {

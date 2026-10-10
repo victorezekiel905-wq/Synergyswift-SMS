@@ -41,7 +41,7 @@ export type Question = {
   answer: Record<string, any>;
 };
 
-export type Mark = { points: number | null; max: number; auto: boolean; feedback?: string };
+export type Mark = { points: number | null; max: number; auto: boolean; feedback?: string; runner?: boolean };
 
 const norm = (s: unknown, caseSensitive = false) => {
   const t = String(s ?? "").trim().replace(/\s+/g, " ");
@@ -156,8 +156,12 @@ export function toPublicQuestion(q: Question, optionOrder?: string[]) {
       return { ...base, data: { items: reorder(d.items ?? [], optionOrder), zones: d.zones ?? [] } };
     case "essay":
       return { ...base, data: { min_words: d.min_words ?? null, max_words: d.max_words ?? null, rich: true } };
-    case "code":
-      return { ...base, data: { language: d.language ?? "python", starter: d.starter ?? "" } };
+    case "code": {
+      // Visible test cases are examples the student may see and run; hidden ones stay private.
+      const tests: { input: string; expected: string; hidden?: boolean }[] = q.answer?.tests ?? [];
+      return { ...base, data: { language: d.language ?? "python", starter: d.starter ?? "", has_tests: tests.length > 0,
+        examples: tests.filter(t => !t.hidden).slice(0, 5).map(t => ({ input: t.input, expected: t.expected })) } };
+    }
     case "file_upload":
       return { ...base, data: { accept: d.accept ?? ".pdf,.jpg,.jpeg,.png,.docx", max_mb: d.max_mb ?? 10 } };
   }
@@ -278,7 +282,8 @@ export function markAttempt(questions: Question[], answers: Record<string, unkno
   for (const q of questions) {
     const prev = existing[q.id];
     let m = markQuestion(q, answers[q.id]);
-    if (prev && prev.auto === false && prev.points !== null && prev.points !== undefined) {
+    // Teacher marks and code-runner results are kept; everything else is re-marked.
+    if (prev && (prev.auto === false || prev.runner) && prev.points !== null && prev.points !== undefined) {
       m = { ...prev, max: Number(q.points) };
     }
     marks[q.id] = m;
@@ -337,6 +342,10 @@ export function validateQuestion(q: Pick<Question, "type" | "prompt" | "points" 
       if (!String(a.expression ?? "").trim()) p.push("Enter the correct expression.");
       else if (!isValidExpression(a.expression)) p.push("The correct expression could not be read. Use + - * / ^ and brackets.");
       for (const alt of a.alternatives ?? []) if (alt && !isValidExpression(alt)) p.push(`Alternative "${alt}" could not be read.`);
+      break;
+    case "code":
+      if ((a.tests ?? []).some((t: { expected?: string }) => !String(t.expected ?? "").trim())) p.push("Every test case needs the expected output.");
+      if ((a.tests ?? []).length > 20) p.push("Use at most 20 test cases.");
       break;
     case "drag_drop": {
       const zones: Option[] = d.zones ?? [], items: Option[] = d.items ?? [];

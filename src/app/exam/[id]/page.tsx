@@ -322,6 +322,11 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
           </div>
           <div className="card p-5 sm:p-6">
             <QuestionView key={q.id} q={q} value={answers[q.id]} onChange={v => answer(q.id, v)} spellcheck={exam.allow_spellcheck}
+              onRunCode={async (code) => {
+                const r = await api(id, { action: "run_code", question_id: q.id, code });
+                if (!r.ok) throw new Error(r.data.error ?? "Could not run the code.");
+                return r.data.results;
+              }}
               onUpload={async (file) => {
                 const fd = new FormData(); fd.set("question_id", q.id); fd.set("file", file);
                 const r = await fetch(`/api/student/exams/${id}/upload`, { method: "POST", body: fd });

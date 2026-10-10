@@ -3,6 +3,7 @@
  * service client, after the caller has been authenticated and scoped.
  */
 import { markAttempt, questionsForAttempt, type Question, type Mark } from "./engine";
+import { canRun, gradeCode } from "./code-runner";
 
 export const VIOLATION_KINDS = new Set(["blur", "visibility_hidden", "fullscreen_exit", "copy", "paste", "context_menu", "print", "devtools", "multiple_screens", "camera_off"]);
 export const GRACE_MS = 30_000; // network latency allowance after the deadline
@@ -48,6 +49,38 @@ export async function finalizeAttempt(svc: any, attempt: any, questions: Questio
     total_score: r.total_score, max_score: r.max_score
   }).eq("id", attempt.id).in("status", ["in_progress", "locked"]).select("*").maybeSingle();
   await svc.from("exam_events").insert({ attempt_id: attempt.id, kind: "submitted", meta: { reason } });
+  return markCodeQuestions(svc, data ?? attempt, questions);
+}
+
+/**
+ * Marks code answers by running the question's test cases (JavaScript in the
+ * sandbox, other languages on Judge0 when configured). Answers already marked
+ * by a teacher are left alone; anything that cannot run stays with the teacher.
+ */
+export async function markCodeQuestions(svc: any, attempt: any, questions: Question[]) {
+  const given = questionsForAttempt(questions, attempt);
+  const todo = given.filter(q => q.type === "code" && (q.answer?.tests ?? []).length && canRun(String(q.data?.language ?? "")));
+  if (!todo.length) return attempt;
+  const marks: Record<string, Mark> = { ...(attempt.marks ?? {}) };
+  let changed = false;
+  for (const q of todo) {
+    const prev = marks[q.id];
+    // A teacher mark has points; a pending placeholder (points null) is not a teacher mark.
+    if (prev && prev.points !== null && prev.points !== undefined && (prev.auto === false || prev.runner)) continue;
+    const code = String(attempt.answers?.[q.id] ?? "");
+    if (!code.trim()) continue;
+    try {
+      const g = await gradeCode(String(q.data.language), code, q.answer.tests, Number(q.points));
+      if (g.outcomes.some(o => /no runner|runner unavailable/.test(o.error ?? ""))) continue;
+      marks[q.id] = { points: g.points, max: Number(q.points), auto: true, runner: true, feedback: g.feedback };
+      changed = true;
+    } catch { /* leave for the teacher */ }
+  }
+  if (!changed) return attempt;
+  const r = markAttempt(given, attempt.answers ?? {}, marks);
+  const { data } = await svc.from("exam_attempts").update({
+    marks: r.marks, auto_score: r.auto_score, total_score: r.total_score, max_score: r.max_score, status: r.pending === 0 ? "graded" : "submitted"
+  }).eq("id", attempt.id).in("status", ["submitted", "graded"]).select("*").maybeSingle();
   return data ?? attempt;
 }
 

@@ -11,12 +11,12 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM · **3*
 | Feature | Status |
 |---|---|
 | Question bank by subject, topic, difficulty, Bloom's level, level, exam body and year | ✅ |
-| Question types: MCQ, multi-select, true/false, short answer, essay, matching, fill-in-the-gap, drag-and-drop, maths input, coding, numeric, ordering, hotspot, file upload | ✅ (coding answers are teacher-marked) |
+| Question types: MCQ, multi-select, true/false, short answer, essay, matching, fill-in-the-gap, drag-and-drop, maths input, coding, numeric, ordering, hotspot, file upload | ✅ coding answers auto-marked by test cases: JavaScript built in; Python, Java, C, C++, C#, SQL 🔑 (Judge0) |
 | CBT engine: randomised questions and options, per-student question pools, timers, auto-save, auto-marking | ✅ |
-| Proctoring: Safe Exam Browser, tab-switch and focus detection, webcam snapshots, IP restriction | ✅ |
+| Proctoring: Safe Exam Browser, tab-switch and focus detection, webcam snapshots with face checks in every modern browser, IP restriction | ✅ |
 | Continuous assessment with weighted components | ✅ |
 | Exam timetable generation, invigilation roster, seating plans, hall allocation | ✅ |
-| Mock exams in WAEC, NECO, JAMB, BECE, NCEE, IGCSE, A Level and SAT shapes; past-question practice bank | ✅ (schools import their own past questions) |
+| Mock exams in WAEC, NECO, JAMB, BECE, NCEE, IGCSE, A Level and SAT shapes; past-question practice bank | ✅ 99 original starter practice questions included; official past questions are imported by each school |
 | Moderation workflow: teacher → HOD → principal | ✅ |
 | Item analysis: difficulty, discrimination, distractors, common wrong answers, reliability | ✅ |
 
@@ -118,7 +118,7 @@ Sections 9 (attendance), 10 (timetabling), 11 (communication), 12 (finance), 13 
 
 ## Database updates to run
 
-Run these in the Supabase SQL editor, in order, on top of your live database:
+Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
 
 | Migration | Phase |
 |---|---|

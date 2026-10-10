@@ -88,6 +88,12 @@ export default function BankBrowser({ mode, subjects, onPick, initialFilters }: 
             <option value="">+ Add a question…</option>{(Object.keys(TYPE_LABELS) as QType[]).map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
           </select>
           <button className="btn btn-outline" onClick={() => setImporting(true)}>Import from spreadsheet</button>
+          <button className="btn btn-ghost" title="99 original practice questions for core subjects (not official past questions)" onClick={async () => {
+            if (!confirm("Add the starter practice questions to Mathematics, English, Biology, Chemistry, Physics, Economics and Government (where your school has those subjects)? They are original practice questions, tagged \u201cSample\u201d, not official past questions.")) return;
+            const r = await send<{ added: number; subjects: string[] }>("/api/question-bank", { action: "starter" });
+            setMsg({ ok: r.ok, text: r.ok ? `Added ${r.data.added} starter questions to ${r.data.subjects.join(", ")}. Students can practise them now.` : r.error ?? "failed" });
+            reload();
+          }}>Add starter questions</button>
         </>}
         {mode === "pick" && <button className="btn btn-primary ml-auto" disabled={!picked.size} onClick={pick}>Add {picked.size || ""} to exam</button>}
       </div>
