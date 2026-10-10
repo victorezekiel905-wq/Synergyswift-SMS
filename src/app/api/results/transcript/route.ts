@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   let q = svc.from("report_cards").select("term_id,status,total,average,position,class_size,data,terms(name,position,starts_on,session_id,academic_sessions(name,starts_on))")
     .eq("tenant_id", tid).eq("student_id", studentId).eq("kind", "term");
   if (publishedOnly) q = q.eq("status", "published");
-  const [{ data: cards }, { data: school }] = await Promise.all([q, svc.from("tenant_settings").select("*").eq("tenant_id", tid).maybeSingle()]);
+  const [{ data: cards }, { data: school }] = await Promise.all([q, svc.from("tenant_settings").select("school_name,motto,address,logo_url,brand_color,principal_name,principal_signature_url,stamp_url").eq("tenant_id", tid).maybeSingle()]);
 
   type Row = { subject: string; totals: Record<string, { total: number | null; grade: string | null }> };
   type Session = { id: string; name: string; starts_on: string | null; terms: { id: string; name: string; position: number }[]; rows: Map<string, Row>; averages: Record<string, number | null> };

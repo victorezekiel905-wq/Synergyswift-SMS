@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { refreshScore, upsertLead, setLeadStage } from "@/lib/admissions-crm";
+import { refreshScore, upsertLead, setLeadStage, bookingError } from "@/lib/admissions-crm";
 import { appUrl } from "@/lib/school";
 
 /** Tours, open days, assessment and interview sessions with their bookings. */
@@ -74,8 +74,8 @@ export async function POST(req: NextRequest) {
   if (taken + b.party_size > e.capacity) return jsonError("this session is full");
   let leadId = b.lead_id ?? null;
   if (!leadId) leadId = (await upsertLead(svc, tid, { parent_name: b.name, phone: b.phone ?? null, email: b.email || null, source: e.kind === "open_day" ? "open_day" : "phone", consent: true }, ctx.userId, appUrl(req))).id;
-  const { error } = await ctx.sb.from("admission_bookings").insert({ tenant_id: tid, event_id: e.id, lead_id: leadId, name: b.name, phone: b.phone ?? null, email: b.email || null, party_size: b.party_size });
-  if (error) return jsonError(error.message);
+  const { error } = await svc.rpc("book_admission_event", { p_event: e.id, p_lead: leadId, p_name: b.name, p_phone: b.phone ?? null, p_email: b.email || null, p_party: b.party_size, p_staff: true });
+  if (error) return jsonError(bookingError(error.message));
   const { data: lead } = await svc.from("admission_leads").select("stage").eq("id", leadId).maybeSingle();
   if (lead?.stage === "enquiry" && ["tour", "open_day"].includes(e.kind)) await setLeadStage(svc, tid, leadId!, "tour_booked", ctx.userId);
   return NextResponse.json({ ok: true, lead_id: leadId }, { status: 201 });

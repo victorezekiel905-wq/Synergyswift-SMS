@@ -78,6 +78,14 @@ export async function upsertLead(svc: any, tenantId: string, input: LeadInput, a
 }
 
 /** Moves a lead to a stage, logs it, and swaps follow-up sequences. */
+/** Turns a book_admission_event() exception into a message for the family or staff. */
+export function bookingError(message: string) {
+  if (/full/.test(message)) return "sorry, this session is now full; please choose another";
+  if (/already booked/.test(message)) return "you are already booked for this session";
+  if (/not available/.test(message)) return "that session is not available";
+  return message;
+}
+
 export async function setLeadStage(svc: any, tenantId: string, leadId: string, stage: Stage, actor: string | null, note?: string | null) {
   const { data: lead } = await svc.from("admission_leads").select("id,stage").eq("tenant_id", tenantId).eq("id", leadId).maybeSingle();
   if (!lead || lead.stage === stage) return lead;

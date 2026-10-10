@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     ctx.sb.from("admission_templates").select("kind,subject,body,updated_at").eq("tenant_id", tid),
     ctx.sb.from("admission_capacity").select("level,intake,seats").eq("tenant_id", tid).order("level"),
     ctx.sb.from("admission_costs").select("*").eq("tenant_id", tid).order("month", { ascending: false }).limit(200),
-    ctx.sb.from("tenant_settings").select("lead_webhook_key,acceptance_fee,offer_valid_days,admissions_whatsapp,application_fee,admissions_open,currency").eq("tenant_id", tid).maybeSingle(),
+    ctx.sb.from("tenant_settings").select("acceptance_fee,offer_valid_days,admissions_whatsapp,application_fee,admissions_open,currency").eq("tenant_id", tid).maybeSingle(),
     ctx.sb.from("tenants").select("public_slug").eq("id", tid).maybeSingle(),
     ctx.sb.from("class_groups").select("level").eq("tenant_id", tid)
   ]);
@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
   const tpl = (kind: keyof typeof DEFAULT_TEMPLATES) => (templates ?? []).find((x: any) => x.kind === kind) ?? { kind, ...DEFAULT_TEMPLATES[kind], updated_at: null };
   const wa = String(s?.admissions_whatsapp ?? "").replace(/[^\d]/g, "");
   const admin = hasAny(ctx, ROLES.admin);
+  // The webhook key is a secret: only the server can read admission_secrets, and only admins are shown it.
+  const { data: secret } = admin ? await createServiceClient().from("admission_secrets").select("lead_webhook_key").eq("tenant_id", tid).maybeSingle() : { data: null };
   return NextResponse.json({
     templates: { offer: tpl("offer"), waitlist: tpl("waitlist"), regret: tpl("regret") },
     capacity: capacity ?? [], costs: costs ?? [], levels: [...new Set((levels ?? []).map((l: any) => l.level).filter(Boolean))].sort(),
@@ -37,7 +39,7 @@ export async function GET(req: NextRequest) {
       campaign_example: `${base}/enquire/${slug}?utm_source=facebook&utm_medium=paid&utm_campaign=september-intake`
     } : null,
     // Only admins see the webhook key (it lets outside tools create leads).
-    webhook: admin ? { url: s?.lead_webhook_key ? `${base}/api/crm/webhook/${s.lead_webhook_key}` : null } : null,
+    webhook: admin ? { url: secret?.lead_webhook_key ? `${base}/api/crm/webhook/${secret.lead_webhook_key}` : null } : null,
     is_admin: admin
   });
 }
@@ -76,9 +78,10 @@ export async function POST(req: NextRequest) {
       if (!hasAny(ctx, ROLES.admin)) return jsonError("only school admins can change admission settings", 403);
       // tenant_settings writes are admin-only under RLS; use the service client after the role check above.
       const svc = createServiceClient();
-      const row = b.action === "settings"
-        ? { acceptance_fee: b.acceptance_fee, offer_valid_days: b.offer_valid_days, admissions_whatsapp: b.admissions_whatsapp || null }
-        : { lead_webhook_key: b.enabled ? randomToken(18) : null };
+      if (b.action === "webhook_key") {
+        return done((await svc.from("admission_secrets").upsert({ tenant_id: tid, lead_webhook_key: b.enabled ? randomToken(18) : null, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" })).error);
+      }
+      const row = { acceptance_fee: b.acceptance_fee, offer_valid_days: b.offer_valid_days, admissions_whatsapp: b.admissions_whatsapp || null };
       return done((await svc.from("tenant_settings").upsert({ tenant_id: tid, ...row }, { onConflict: "tenant_id" })).error);
     }
   }

@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ key: str
   const { key } = await props.params;
   if (!/^[0-9a-f]{24,64}$/i.test(key)) return NextResponse.json({ error: "not found" }, { status: 404 });
   const svc = createServiceClient();
-  const { data: s } = await svc.from("tenant_settings").select("tenant_id,tenants(status)").eq("lead_webhook_key", key).maybeSingle();
+  const { data: s } = await svc.from("admission_secrets").select("tenant_id,tenants(status)").eq("lead_webhook_key", key).maybeSingle();
   if (!s || (s as any).tenants?.status !== "active") return NextResponse.json({ error: "not found" }, { status: 404 });
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "send JSON" }, { status: 400 }); }

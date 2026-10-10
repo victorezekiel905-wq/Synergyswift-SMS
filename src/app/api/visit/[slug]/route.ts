@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/service";
 import { jsonError, readJson } from "@/lib/auth";
 import { tenantForEnquiry } from "@/lib/admissions";
-import { upsertLead, setLeadStage } from "@/lib/admissions-crm";
+import { upsertLead, setLeadStage, bookingError } from "@/lib/admissions-crm";
 import { detectSource } from "@/lib/crm";
 import { notifyContact } from "@/lib/notify";
 import { admissionNote } from "@/lib/messaging/notices";
@@ -54,8 +54,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ slug: st
   const utm = Object.fromEntries(Object.entries(b.utm).filter(([k]) => /^utm_/.test(k)));
   const lead = await upsertLead(svc, t.tenant.id, { parent_name: b.name, phone: b.phone, email: b.email || null, child_name: b.child_name ?? null, applying_for: b.applying_for ?? null,
     source: e.kind === "open_day" ? "open_day" : detectSource(utm, null, b.ref), utm, referral_code: b.ref ?? null, consent: true }, null, base);
-  const { data: booking, error } = await svc.from("admission_bookings").insert({ tenant_id: t.tenant.id, event_id: e.id, lead_id: lead.id, name: b.name, phone: b.phone, email: b.email || null, party_size: b.party_size }).select("token").single();
-  if (error) return jsonError(error.message);
+  // The checks above give a quick answer; book_admission_event() re-checks under a row lock so two families cannot take the last seats.
+  const { data: token, error } = await svc.rpc("book_admission_event", { p_event: e.id, p_lead: lead.id, p_name: b.name, p_phone: b.phone, p_email: b.email || null, p_party: b.party_size });
+  if (error) return jsonError(bookingError(error.message));
+  const booking = { token: token as string };
   const { data: l } = await svc.from("admission_leads").select("stage").eq("id", lead.id).maybeSingle();
   if (l?.stage === "enquiry") await setLeadStage(svc, t.tenant.id, lead.id, "tour_booked", null);
   const brand = await loadBrand(svc, t.tenant.id);
