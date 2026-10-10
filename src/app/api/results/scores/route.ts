@@ -28,8 +28,15 @@ export async function GET(req: NextRequest) {
   const grid: Record<string, Record<string, number | null>> = {};
   for (const s of scores ?? []) (grid[s.student_id] ??= {})[s.component_id] = s.score === null ? null : Number(s.score);
 
-  const canEdit = hasAny(ctx, ROLES.admin) || offering?.teacher_id === ctx.userId || group?.form_teacher_id === ctx.userId;
-  return NextResponse.json({ scheme, students: students ?? [], scores: grid, can_edit: canEdit });
+  const isAdmin = hasAny(ctx, ROLES.admin);
+  const teaches = isAdmin || offering?.teacher_id === ctx.userId || group?.form_teacher_id === ctx.userId;
+  const [{ data: settings }, { data: sheet }] = await Promise.all([
+    ctx.sb.from("tenant_settings").select("require_moderation").eq("tenant_id", tid).maybeSingle(),
+    ctx.sb.from("score_sheets").select("id,status,note,submitted_at,hod_at,approved_at").eq("term_id", termId).eq("class_group_id", cg).eq("subject_id", subj).maybeSingle()
+  ]);
+  const moderation = Boolean(settings?.require_moderation);
+  const locked = moderation && ["submitted", "hod_approved", "approved"].includes(sheet?.status ?? "");
+  return NextResponse.json({ scheme, students: students ?? [], scores: grid, can_edit: teaches && (!locked || isAdmin), teaches, moderation, sheet: sheet ?? { status: "draft" }, locked });
 }
 
 const Put = z.object({
@@ -83,7 +90,7 @@ export async function PUT(req: NextRequest) {
   for (const [componentId, studentIds] of byComponent) {
     const { data, error } = await ctx.sb.from("score_entries").delete().eq("tenant_id", tid).eq("term_id", b.term_id).eq("subject_id", b.subject_id)
       .eq("component_id", componentId).in("student_id", studentIds).select("id");
-    if (error) return jsonError(error.message);
+    if (error) return jsonError(error.message, error.message.includes("locked") ? 403 : 400);
     cleared += data?.length ?? 0;
   }
   return NextResponse.json({ saved: upserts.length, cleared });

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Field, Badge, Empty, Icon } from "@/components/ui";
 import { LANGUAGES } from "@/lib/languages";
 
-type Tab = "profile" | "academic" | "grading" | "classes";
+type Tab = "profile" | "academic" | "grading" | "classes" | "departments";
 
 export default function SetupPage() {
   const [tab, setTab] = useState<Tab>("profile");
@@ -12,11 +12,12 @@ export default function SetupPage() {
       <PageHeader eyebrow="Administration" title="School setup" subtitle="Branding, calendar, your own grading rules, classes and subjects. Only school admins can change these." />
       <Tabs value={tab} onChange={setTab} tabs={[
         { id: "profile", label: "Profile & notifications" }, { id: "academic", label: "Sessions & terms" },
-        { id: "grading", label: "Grading" }, { id: "classes", label: "Classes & subjects" }]} />
+        { id: "grading", label: "Grading" }, { id: "classes", label: "Classes & subjects" }, { id: "departments", label: "Departments & approval" }]} />
       {tab === "profile" && <Profile />}
       {tab === "academic" && <Academic />}
       {tab === "grading" && <Grading />}
       {tab === "classes" && <Classes />}
+      {tab === "departments" && <Departments />}
     </Page>
   );
 }
@@ -25,6 +26,73 @@ function useFlash() {
   const [m, setM] = useState<{ ok: boolean; text: string } | null>(null);
   const node = m ? <div className="mb-4"><Alert tone={m.ok ? "green" : "red"}>{m.text}</Alert></div> : null;
   return { flash: (ok: boolean, text: string) => setM({ ok, text }), node };
+}
+
+/* ---------------- Departments & score approval ---------------- */
+type DeptStructure = { subjects: { id: string; name: string; department_id: string | null }[]; staff: { id: string; full_name: string }[]; departments: { id: string; name: string; head_user_id: string | null }[] };
+
+function Departments() {
+  const { data, reload } = useApi<DeptStructure>("/api/school/structure");
+  const settings = useApi<{ settings: Record<string, any> }>("/api/school/settings");
+  const [name, setName] = useState("");
+  const { flash, node } = useFlash();
+  async function act(body: Record<string, unknown>, ok?: string) {
+    const r = await send("/api/school/structure", body);
+    if (!r.ok || ok) flash(r.ok, r.ok ? ok! : r.error ?? "failed");
+    if (r.ok) reload();
+  }
+  async function setModeration(on: boolean) {
+    const r = await send("/api/school/settings", { require_moderation: on }, "PUT");
+    flash(r.ok, r.ok ? (on ? "Score approval is on. Teachers submit scores; heads of department and the principal approve them before report cards." : "Score approval is off.") : r.error ?? "failed");
+    settings.reload();
+  }
+  const on = Boolean(settings.data?.settings?.require_moderation);
+  return (
+    <div className="space-y-5">
+      {node}
+      <section className="card space-y-2 p-5">
+        <h2 className="font-semibold">Score approval</h2>
+        <p className="text-sm text-slate-600">When on, each subject teacher submits their scores; the head of the subject&apos;s department checks them, then the principal gives final approval. Submitted scores are locked until approved or returned, and report cards compile only from approved scores. Subjects whose department has no head go straight to the principal.</p>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={on} onChange={e => setModeration(e.target.checked)} disabled={!settings.data} /> Require approval before scores reach report cards</label>
+      </section>
+      <section className="card p-5">
+        <h2 className="mb-3 font-semibold">Departments and heads</h2>
+        <form className="mb-3 flex gap-2" onSubmit={e => { e.preventDefault(); act({ kind: "department", name }, "Department added"); setName(""); }}>
+          <input className="input" placeholder="Department, e.g. Sciences" value={name} onChange={e => setName(e.target.value)} required aria-label="Department name" />
+          <button className="btn btn-primary">Add</button>
+        </form>
+        {!data?.departments.length ? <Empty>No departments yet.</Empty> : (
+          <div className="space-y-4">
+            {data.departments.map(d => (
+              <div key={d.id} className="rounded-lg border border-slate-200 p-3">
+                <div className="flex flex-wrap items-end gap-3">
+                  <p className="mr-auto font-medium">{d.name}</p>
+                  <Field label="Head of department">
+                    <select className="input" value={d.head_user_id ?? ""} onChange={e => act({ kind: "department", id: d.id, name: d.name, head_user_id: e.target.value || null }, "Head of department set")}>
+                      <option value="">— none —</option>{data.staff.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                    </select>
+                  </Field>
+                  <button className="btn btn-ghost text-rose-600" onClick={() => confirm(`Delete ${d.name}? Its subjects keep their scores.`) && act({ kind: "delete", table: "departments", id: d.id }, "Department deleted")}>Delete</button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {data.subjects.map(s => {
+                    const mine = s.department_id === d.id;
+                    const other = s.department_id && !mine ? data.departments.find(x => x.id === s.department_id)?.name : null;
+                    return (
+                      <button key={s.id} type="button" onClick={() => act({ kind: "subject_department", subject_id: s.id, department_id: mine ? null : d.id })}
+                        className={"rounded-full border px-3 py-1 text-xs " + (mine ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 text-slate-600 hover:border-brand-400")}
+                        title={other ? `Currently in ${other}` : undefined} aria-pressed={mine}>{s.name}{other ? " ·" : ""}</button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1 text-xs text-slate-500">Tap subjects to put them in {d.name}. A dot means the subject is in another department.</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
 }
 
 /* ---------------- Profile ---------------- */

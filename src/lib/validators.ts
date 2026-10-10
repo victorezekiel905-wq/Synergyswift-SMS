@@ -69,5 +69,6 @@ export const TenantSettingsInput = z.object({
   withhold_results_for_debtors: z.boolean().optional(),
   admissions_open: z.boolean().optional(),
   application_fee: z.number().min(0).max(1e9).optional(),
-  admissions_intro: z.string().trim().max(3000).nullish()
+  admissions_intro: z.string().trim().max(3000).nullish(),
+  require_moderation: z.boolean().optional()
 });

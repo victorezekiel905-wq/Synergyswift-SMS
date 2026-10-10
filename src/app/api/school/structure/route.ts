@@ -7,13 +7,14 @@ export async function GET() {
   const ctx = await requireCtx(ROLES.staff);
   if (ctx instanceof NextResponse) return ctx;
   const tid = ctx.tenant.id;
-  const [groups, subjects, offerings, teachers, students] = await Promise.all([
+  const [groups, subjects, offerings, teachers, students, departments] = await Promise.all([
     ctx.sb.from("class_groups").select("id,name,level,form_teacher_id,scheme_id").eq("tenant_id", tid).order("level").order("name"),
-    ctx.sb.from("subjects").select("id,name,code").eq("tenant_id", tid).order("name"),
+    ctx.sb.from("subjects").select("id,name,code,department_id").eq("tenant_id", tid).order("name"),
     ctx.sb.from("subject_offerings").select("id,class_group_id,subject_id,teacher_id").eq("tenant_id", tid),
     ctx.sb.from("users").select("id,full_name,email,role,extra_roles").eq("tenant_id", tid)
       .not("role", "in", "(student,parent)").eq("active", true).order("full_name"),
-    ctx.sb.from("students").select("class_group_id").eq("tenant_id", tid).eq("status", "active")
+    ctx.sb.from("students").select("class_group_id").eq("tenant_id", tid).eq("status", "active"),
+    ctx.sb.from("departments").select("id,name,head_user_id").eq("tenant_id", tid).order("name")
   ]);
   const counts: Record<string, number> = {};
   for (const s of students.data ?? []) if (s.class_group_id) counts[s.class_group_id] = (counts[s.class_group_id] ?? 0) + 1;
@@ -21,7 +22,8 @@ export async function GET() {
     class_groups: (groups.data ?? []).map((g: any) => ({ ...g, students: counts[g.id] ?? 0 })),
     subjects: subjects.data ?? [],
     offerings: offerings.data ?? [],
-    staff: teachers.data ?? []
+    staff: teachers.data ?? [],
+    departments: departments.data ?? []
   });
 }
 
@@ -31,7 +33,9 @@ const Body = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("subject"), id: z.string().uuid().optional(), name: z.string().trim().min(1).max(80), code: z.string().trim().max(20).nullish() }),
   z.object({ kind: z.literal("offering"), class_group_id: z.string().uuid(), subject_id: z.string().uuid(), teacher_id: z.string().uuid().nullish() }),
   z.object({ kind: z.literal("offer_all"), class_group_id: z.string().uuid() }),
-  z.object({ kind: z.literal("delete"), table: z.enum(["class_groups", "subjects", "subject_offerings"]), id: z.string().uuid() })
+  z.object({ kind: z.literal("department"), id: z.string().uuid().optional(), name: z.string().trim().min(1).max(80), head_user_id: z.string().uuid().nullish() }),
+  z.object({ kind: z.literal("subject_department"), subject_id: z.string().uuid(), department_id: z.string().uuid().nullish() }),
+  z.object({ kind: z.literal("delete"), table: z.enum(["class_groups", "subjects", "subject_offerings", "departments"]), id: z.string().uuid() })
 ]);
 
 export async function POST(req: NextRequest) {
@@ -50,6 +54,17 @@ export async function POST(req: NextRequest) {
       ? await sb.from("class_groups").update(row).eq("tenant_id", tid).eq("id", b.id).select("id").single()
       : await sb.from("class_groups").insert(row).select("id").single();
     return error ? jsonError(dup(error.message)) : NextResponse.json(data);
+  }
+  if (b.kind === "department") {
+    const row = { tenant_id: tid, name: b.name, head_user_id: b.head_user_id ?? null };
+    const { data, error } = b.id
+      ? await sb.from("departments").update(row).eq("tenant_id", tid).eq("id", b.id).select("id").single()
+      : await sb.from("departments").insert(row).select("id").single();
+    return error ? jsonError(dup(error.message)) : NextResponse.json(data);
+  }
+  if (b.kind === "subject_department") {
+    const { error } = await sb.from("subjects").update({ department_id: b.department_id ?? null }).eq("tenant_id", tid).eq("id", b.subject_id);
+    return error ? jsonError(error.message) : NextResponse.json({ ok: true });
   }
   if (b.kind === "subject") {
     const row = { tenant_id: tid, name: b.name, code: b.code ?? null };

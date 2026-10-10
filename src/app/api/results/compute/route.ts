@@ -17,6 +17,17 @@ export async function POST(req: NextRequest) {
     if (g?.form_teacher_id !== ctx.userId) return jsonError("only admins or the form teacher can compile results", 403);
     if (b.force) return jsonError("only admins can recompute published results", 403);
   }
+  // With moderation on, only approved score sheets may go onto report cards.
+  const { data: settings } = await ctx.sb.from("tenant_settings").select("require_moderation").eq("tenant_id", ctx.tenant.id).maybeSingle();
+  if (settings?.require_moderation) {
+    const [{ data: offered }, { data: sheets }] = await Promise.all([
+      ctx.sb.from("subject_offerings").select("subject_id,subjects(name)").eq("tenant_id", ctx.tenant.id).eq("class_group_id", b.class_group_id),
+      ctx.sb.from("score_sheets").select("subject_id,status").eq("tenant_id", ctx.tenant.id).eq("term_id", b.term_id).eq("class_group_id", b.class_group_id)
+    ]);
+    const approved = new Set((sheets ?? []).filter((s: any) => s.status === "approved").map((s: any) => s.subject_id));
+    const pending = (offered ?? []).filter((o: any) => !approved.has(o.subject_id)).map((o: any) => o.subjects?.name ?? "a subject");
+    if (pending.length) return jsonError(`Scores still awaiting approval: ${pending.join(", ")}. Approve them under Results → Approvals first.`, 409);
+  }
   try {
     const r = await compileClassResults(ctx.sb, ctx.tenant.id, b.term_id, b.class_group_id, { force: b.force });
     return NextResponse.json(r);

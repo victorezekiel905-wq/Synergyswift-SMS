@@ -1,20 +1,26 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Badge, statusTone, Empty, Field, Modal, Loading } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Badge, statusTone, Empty, Field, Modal, Loading, fmtDate } from "@/components/ui";
 import { subjectTotal, gradeFor as bandFor, round } from "@/lib/grading";
 
 type Session = { id: string; name: string; terms: { id: string; name: string; is_current: boolean }[] };
 type Structure = {
   class_groups: { id: string; name: string; form_teacher_id: string | null }[];
-  subjects: { id: string; name: string }[];
+  subjects: { id: string; name: string; department_id?: string | null }[];
   offerings: { class_group_id: string; subject_id: string; teacher_id: string | null }[];
+  departments?: { id: string; name: string; head_user_id: string | null }[];
 };
 type Sheet = {
   scheme: { name: string; components: { id: string; name: string; max_score: number; weight: number }[]; bands: { grade: string; min_score: number; max_score: number }[]; pass_mark: number; decimals: number };
   students: { id: string; admission_no: string; first_name: string; last_name: string; other_names: string | null }[];
   scores: Record<string, Record<string, number | null>>;
   can_edit: boolean;
+  teaches: boolean; moderation: boolean; locked: boolean;
+  sheet: { status: string; note?: string | null };
 };
+type SheetStatus = { subject_id: string; subject: string; status: string; note: string | null; i_teach: boolean; i_am_hod: boolean; history: { action: string; note: string | null; at: string; by: string | null }[] };
+const SHEET_LABEL: Record<string, string> = { draft: "Not submitted", submitted: "Waiting for head of department", hod_approved: "Waiting for principal", approved: "Approved", returned: "Returned for correction" };
+const SHEET_TONE: Record<string, "slate" | "amber" | "blue" | "green" | "red"> = { draft: "slate", submitted: "amber", hod_approved: "blue", approved: "green", returned: "red" };
 type Card = {
   id: string; student_id: string; total: number | null; average: number | null; position: number | null; class_size: number | null;
   status: string; teacher_comment: string | null; principal_comment: string | null; access_token: string;
@@ -27,7 +33,7 @@ export default function ResultsPage() {
   const { data: me } = useApi<{ profile: { id: string; role: string; extra_roles: string[] } | null }>("/api/me");
   const [termId, setTermId] = useState("");
   const [cg, setCg] = useState("");
-  const [tab, setTab] = useState<"scores" | "traits" | "cards">("scores");
+  const [tab, setTab] = useState<"scores" | "traits" | "cards" | "approvals">("scores");
 
   useEffect(() => {
     if (termId || !sessions) return;
@@ -58,7 +64,8 @@ export default function ResultsPage() {
       {!sessions?.length && sessions && <Alert tone="amber">Create an academic session under School setup first.</Alert>}
       {termId && cg && (
         <>
-          <Tabs value={tab} onChange={setTab} tabs={[{ id: "scores", label: "Score entry" }, { id: "traits", label: "Character & skills" }, { id: "cards", label: "Report cards & publishing" }]} />
+          <Tabs value={tab} onChange={setTab} tabs={[{ id: "scores", label: "Score entry" }, { id: "traits", label: "Character & skills" }, { id: "approvals", label: "Approvals" }, { id: "cards", label: "Report cards & publishing" }]} />
+          {tab === "approvals" && <Approvals termId={termId} cg={cg} />}
           {tab === "traits" && <Traits termId={termId} cg={cg} isAdmin={isAdmin} />}
           {tab === "scores" && <ScoreEntry termId={termId} cg={cg} structure={structure} myId={me?.profile?.id} isAdmin={isAdmin} />}
           {tab === "cards" && <ReportCards termId={termId} cg={cg} isAdmin={isAdmin} isFormTeacher={structure?.class_groups.find(g => g.id === cg)?.form_teacher_id === me?.profile?.id} />}
@@ -71,7 +78,10 @@ export default function ResultsPage() {
 function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; cg: string; structure: Structure | null; myId?: string; isAdmin: boolean }) {
   const offered = (structure?.offerings ?? []).filter(o => o.class_group_id === cg);
   const subjects = (structure?.subjects ?? []).filter(s => !offered.length || offered.some(o => o.subject_id === s.id));
-  const mine = subjects.filter(s => isAdmin || offered.some(o => o.subject_id === s.id && o.teacher_id === myId) || structure?.class_groups.find(g => g.id === cg)?.form_teacher_id === myId);
+  // Heads of department may open their department's sheets read-only to review them.
+  const hodOf = new Set((structure?.departments ?? []).filter(d => d.head_user_id === myId).map(d => d.id));
+  const mine = subjects.filter(s => isAdmin || offered.some(o => o.subject_id === s.id && o.teacher_id === myId) || structure?.class_groups.find(g => g.id === cg)?.form_teacher_id === myId
+    || (s.department_id && hodOf.has(s.department_id)));
   const [subject, setSubject] = useState("");
   const mineKey = mine.map(s => s.id).join(",");
   useEffect(() => {
@@ -104,6 +114,13 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
   const gradeFor = (t: number | null) => bandFor(t, data?.scheme.bands ?? [])?.grade ?? "";
   const invalid = (c: { max_score: number }, v: string) => v !== "" && (isNaN(Number(v)) || Number(v) < 0 || Number(v) > c.max_score);
   const hasInvalid = data ? data.students.some(s => comps.some(c => invalid(c, grid[s.id]?.[c.id] ?? ""))) : false;
+
+  async function moderate(action: "submit") {
+    if (dirty && !confirm("You have unsaved scores. Submit without them?")) return;
+    const r = await send("/api/results/moderation", { term_id: termId, class_group_id: cg, subject_id: subject, action });
+    setMsg({ ok: r.ok, text: r.ok ? "Submitted for approval. The scores are locked until they are approved or returned." : r.error ?? "failed" });
+    if (r.ok) reload();
+  }
 
   async function save() {
     if (!data) return;
@@ -147,7 +164,15 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
       </div>
       {error && <Alert>{error}</Alert>}
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
-      {data && !data.can_edit && <div className="mb-3"><Alert tone="amber">View only: you are not the subject teacher for this class.</Alert></div>}
+      {data?.moderation && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm">
+          <span>Approval:</span><Badge tone={SHEET_TONE[data.sheet.status] ?? "slate"}>{SHEET_LABEL[data.sheet.status] ?? data.sheet.status}</Badge>
+          {data.sheet.status === "returned" && data.sheet.note && <span className="text-rose-700">“{data.sheet.note}”</span>}
+          {data.teaches && ["draft", "returned"].includes(data.sheet.status) && <button className="btn btn-outline ml-auto" disabled={!data.students.length} onClick={() => moderate("submit")}>Submit for approval</button>}
+        </div>
+      )}
+      {data && data.locked && !data.can_edit && <div className="mb-3"><Alert tone="blue">These scores have been submitted and are locked. The head of department or principal can return them for correction.</Alert></div>}
+      {data && !data.can_edit && !data.locked && <div className="mb-3"><Alert tone="amber">View only: you are not the subject teacher for this class.</Alert></div>}
       {data && (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
@@ -182,6 +207,66 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
           {!data.students.length && <p className="p-4 text-sm text-slate-500">No active students in this class.</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+function Approvals({ termId, cg }: { termId: string; cg: string }) {
+  const queue = useApi<{ moderation: boolean; is_admin: boolean; is_hod: boolean; queue: { id: string; class_group_id: string; subject_id: string; status: string; class_name: string; subject: string; submitted_by: string | null; submitted_at: string; my_step: "hod" | "final" }[] }>(`/api/results/moderation?term_id=${termId}&queue=1`, [termId]);
+  const cls = useApi<{ moderation: boolean; is_admin: boolean; sheets: SheetStatus[] }>(`/api/results/moderation?term_id=${termId}&class_group_id=${cg}`, [termId, cg]);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  async function act(classId: string, subjectId: string, action: string, needNote = false, hint = "") {
+    let note: string | null = null;
+    if (needNote) { note = prompt(hint || "What needs correcting?"); if (!note) return; }
+    const r = await send("/api/results/moderation", { term_id: termId, class_group_id: classId, subject_id: subjectId, action, note });
+    setMsg({ ok: r.ok, text: r.ok ? "Done." : r.error ?? "failed" });
+    queue.reload(); cls.reload();
+  }
+  if (queue.data && !queue.data.moderation) return <Empty>Score approval is off. An admin can turn it on under School setup → Departments &amp; approval.</Empty>;
+  return (
+    <div className="space-y-5">
+      {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
+      <section>
+        <h3 className="mb-2 font-semibold">Waiting for you</h3>
+        {!queue.data ? <Loading /> : !queue.data.queue.length ? <Empty>{queue.data.is_admin || queue.data.is_hod ? "Nothing waiting for your approval this term." : "Only heads of department and the principal approve scores."}</Empty> : (
+          <ul className="card divide-y divide-slate-100 text-sm">
+            {queue.data.queue.map(q => (
+              <li key={q.id} className="flex flex-wrap items-center gap-2 p-3">
+                <span className="font-medium">{q.class_name} · {q.subject}</span>
+                <Badge tone={SHEET_TONE[q.status]}>{SHEET_LABEL[q.status]}</Badge>
+                <span className="text-xs text-slate-500">{q.submitted_by ? `by ${q.submitted_by}` : ""}</span>
+                <span className="ml-auto flex gap-1">
+                  {q.my_step === "hod"
+                    ? <button className="btn btn-success px-2 py-1 text-xs" onClick={() => act(q.class_group_id, q.subject_id, "hod_approve")}>Approve</button>
+                    : <button className="btn btn-success px-2 py-1 text-xs" onClick={() => q.status === "submitted" ? act(q.class_group_id, q.subject_id, "approve", true, "The head of department has not approved these yet. Why approve now?") : act(q.class_group_id, q.subject_id, "approve")}>Final approval</button>}
+                  <button className="btn btn-ghost px-2 py-1 text-xs text-rose-600" onClick={() => act(q.class_group_id, q.subject_id, "return", true)}>Return</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-1 text-xs text-slate-500">Open Score entry for the class and subject to read the scores before approving.</p>
+      </section>
+      <section>
+        <h3 className="mb-2 font-semibold">This class</h3>
+        {!cls.data ? <Loading /> : !cls.data.sheets.length ? <Empty>No subjects are set up for this class.</Empty> : (
+          <ul className="card divide-y divide-slate-100 text-sm">
+            {cls.data.sheets.map(s => (
+              <li key={s.subject_id} className="p-3">
+                <button className="flex w-full flex-wrap items-center gap-2 text-left" onClick={() => setOpen(open === s.subject_id ? null : s.subject_id)}>
+                  <span className="font-medium">{s.subject}</span><Badge tone={SHEET_TONE[s.status]}>{SHEET_LABEL[s.status]}</Badge>
+                  {s.note && s.status === "returned" && <span className="text-xs text-rose-700">“{s.note}”</span>}
+                  {cls.data!.is_admin && s.status === "approved" && <span className="ml-auto"><button className="btn btn-ghost px-2 py-1 text-xs" onClick={e => { e.stopPropagation(); act(cg, s.subject_id, "return", true, "Why reopen these approved scores?"); }}>Reopen</button></span>}
+                </button>
+                {open === s.subject_id && (s.history.length ? (
+                  <ul className="mt-2 space-y-0.5 text-xs text-slate-600">{s.history.map((h, i) => <li key={i}>{fmtDate(h.at, true)} · {h.by ?? "someone"} · {h.action.replace("_", " ")}{h.note ? `: ${h.note}` : ""}</li>)}</ul>
+                ) : <p className="mt-2 text-xs text-slate-500">No activity yet.</p>)}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
