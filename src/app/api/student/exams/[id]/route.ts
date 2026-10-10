@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, readJson, jsonError, type Ctx } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { buildAttemptLayout, toPublicQuestion, type Question } from "@/lib/exams/engine";
+import { buildAttemptLayout, toPublicQuestion, questionsForAttempt, type Question } from "@/lib/exams/engine";
 import { verifySeb, absoluteRequestUrl, sebLaunchUrl } from "@/lib/exams/seb";
 import {
   loadQuestions, computeDeadline, windowState, finalizeAttempt, autoSubmitIfExpired, studentResultView,
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     }
     if (windowState(exam) !== "open") return jsonError("this exam is not open right now", 403);
     if (b.access_code.toUpperCase() !== String(exam.access_code).toUpperCase()) return jsonError("wrong exam code", 403);
-    const layout = buildAttemptLayout(questions, { shuffleQuestions: Boolean(settings.shuffle_questions), shuffleOptions: settings.shuffle_options !== false });
+    const layout = buildAttemptLayout(questions, { shuffleQuestions: Boolean(settings.shuffle_questions), shuffleOptions: settings.shuffle_options !== false, draw: settings.draw });
     const now = new Date();
     const { data: attempt, error } = await svc.from("exam_attempts").insert({
       tenant_id: ctx.tenant.id, exam_id: exam.id, student_user_id: ctx.userId, started_at: now.toISOString(),
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (Date.now() > new Date(attempt.deadline_at).getTime() + GRACE_MS) return jsonError("time is up", 409);
 
   const incoming = (b.action === "save" ? b.answers : b.answers) ?? {};
-  const valid = new Set(questions.map(q => q.id));
+  const valid = new Set(questionsForAttempt(questions, attempt).map(q => q.id));
   const merged: Record<string, unknown> = { ...(attempt.answers ?? {}) };
   for (const [k, v] of Object.entries(incoming)) if (valid.has(k)) merged[k] = v;
   if (JSON.stringify(merged).length > 500_000) return jsonError("answers are too large", 413);

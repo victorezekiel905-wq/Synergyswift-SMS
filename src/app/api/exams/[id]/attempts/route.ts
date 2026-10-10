@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadQuestions, autoSubmitIfExpired, finalizeAttempt, computeDeadline, type ExamRow } from "@/lib/exams/server";
-import { markAttempt, type Mark } from "@/lib/exams/engine";
+import { markAttempt, questionsForAttempt, type Mark } from "@/lib/exams/engine";
 import { studentName, toCsv } from "@/lib/school";
 
 async function loadExam(ctx: any, id: string): Promise<ExamRow | null> {
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
       status: a.status, started_at: a.started_at, deadline_at: a.deadline_at, submitted_at: a.submitted_at,
       last_seen_at: a.last_seen_at, violations: a.violations, seb_verified: a.seb_verified, extra_minutes: a.extra_minutes,
       answered: Object.values(a.answers ?? {}).filter(v => v !== null && v !== "" && !(Array.isArray(v) && !v.length)).length,
-      total_questions: questions.length, auto_score: a.auto_score, total_score: a.total_score, max_score: a.max_score,
+      total_questions: questionsForAttempt(questions, a).length, question_order: a.question_order ?? [], auto_score: a.auto_score, total_score: a.total_score, max_score: a.max_score,
       pending_manual: Object.values((a.marks ?? {}) as Record<string, Mark>).filter(m => m.points === null).length,
       answers: a.answers, marks: a.marks,
       events: (events ?? []).filter((e: any) => e.attempt_id === a.id).slice(0, 30)
@@ -122,7 +122,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     if (m.points > max) return jsonError(`points cannot exceed ${max}`);
     existing[qid] = { points: m.points, max, auto: false, feedback: m.feedback };
   }
-  const r = markAttempt(questions, a.answers ?? {}, existing);
+  const r = markAttempt(questionsForAttempt(questions, a), a.answers ?? {}, existing);
   await svc.from("exam_attempts").update({ marks: r.marks, auto_score: r.auto_score, total_score: r.total_score, max_score: r.max_score,
     status: r.pending === 0 ? "graded" : "submitted" }).eq("id", a.id);
   return NextResponse.json({ ok: true, total_score: r.total_score, pending: r.pending });

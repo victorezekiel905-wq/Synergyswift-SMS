@@ -31,7 +31,8 @@ const Patch = z.object({
     block_copy_paste: z.boolean(), violation_limit: z.number().int().min(1).max(50),
     show_score_after_submit: z.boolean(), allow_review: z.boolean(), require_seb: z.boolean(),
     seb_browser_keys: z.array(z.string().trim().max(128)).max(10), seb_config_keys: z.array(z.string().trim().max(128)).max(10),
-    quit_password: z.string().max(64).optional(), allow_spellcheck: z.boolean(), allow_calculator: z.boolean().optional()
+    quit_password: z.string().max(64).optional(), allow_spellcheck: z.boolean(), allow_calculator: z.boolean().optional(),
+    draw: z.record(z.string().max(80), z.number().int().min(0).max(500))
   }).partial().optional()
 });
 
@@ -71,7 +72,7 @@ export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: s
 
 const QuestionBody = z.object({
   id: z.string().uuid().optional(),
-  type: z.enum(["mcq_single", "mcq_multi", "true_false", "short_answer", "numeric", "fill_blanks", "matching", "ordering", "hotspot", "essay", "code", "file_upload"]),
+  type: z.enum(["mcq_single", "mcq_multi", "true_false", "short_answer", "numeric", "fill_blanks", "matching", "ordering", "hotspot", "essay", "code", "file_upload", "math", "drag_drop"]),
   prompt: z.string().trim().min(1).max(20000),
   media_url: z.string().trim().url().nullish().or(z.literal("")),
   section: z.string().trim().max(80).nullish(),

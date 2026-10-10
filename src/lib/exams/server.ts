@@ -2,7 +2,7 @@
  * Server-side exam state machine. All attempt writes go through here with the
  * service client, after the caller has been authenticated and scoped.
  */
-import { markAttempt, type Question, type Mark } from "./engine";
+import { markAttempt, questionsForAttempt, type Question, type Mark } from "./engine";
 
 export const VIOLATION_KINDS = new Set(["blur", "visibility_hidden", "fullscreen_exit", "copy", "paste", "context_menu", "print", "devtools", "multiple_screens"]);
 export const GRACE_MS = 30_000; // network latency allowance after the deadline
@@ -41,7 +41,7 @@ export function windowState(exam: ExamRow, now = new Date()): "not_open" | "open
 /** Marks and submits an attempt. Safe to call repeatedly. */
 export async function finalizeAttempt(svc: any, attempt: any, questions: Question[], reason: "student" | "timeout" | "teacher") {
   if (attempt.status === "submitted" || attempt.status === "graded") return attempt;
-  const r = markAttempt(questions, attempt.answers ?? {}, (attempt.marks ?? {}) as Record<string, Mark>);
+  const r = markAttempt(questionsForAttempt(questions, attempt), attempt.answers ?? {}, (attempt.marks ?? {}) as Record<string, Mark>);
   const status = r.pending === 0 ? "graded" : "submitted";
   const { data } = await svc.from("exam_attempts").update({
     status, submitted_at: new Date().toISOString(), marks: r.marks, auto_score: r.auto_score,
@@ -69,6 +69,6 @@ export function studentResultView(exam: ExamRow, attempt: any, questions: Questi
   return {
     released: true,
     total_score: attempt.total_score, max_score: attempt.max_score,
-    per_question: review ? questions.map(q => ({ id: q.id, prompt: q.prompt, points: attempt.marks?.[q.id]?.points ?? 0, max: Number(q.points), feedback: attempt.marks?.[q.id]?.feedback ?? null })) : null
+    per_question: review ? questionsForAttempt(questions, attempt).map(q => ({ id: q.id, prompt: q.prompt, points: attempt.marks?.[q.id]?.points ?? 0, max: Number(q.points), feedback: attempt.marks?.[q.id]?.feedback ?? null })) : null
   };
 }

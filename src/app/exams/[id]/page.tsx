@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, statusTone, fmtTime, Loading } from "@/components/ui";
 import QuestionEditor, { blankQuestion, TYPE_LABELS, type EditorQuestion, type QType } from "@/components/exams/QuestionEditor";
 import QuestionView from "@/components/exams/QuestionView";
+import BankBrowser, { DIFFICULTIES, BLOOMS, EXAM_BODIES } from "@/components/exams/BankBrowser";
 
 type Exam = {
   id: string; title: string; instructions: string | null; status: string; duration_minutes: number; opens_at: string | null; closes_at: string | null;
   access_code: string; class_group_id: string | null; subject_id: string | null; term_id: string | null; component_id: string | null; results_released: boolean;
   settings: Record<string, any>;
 };
-type Question = EditorQuestion & { id: string; position: number };
+type Question = EditorQuestion & { id: string; position: number; topic?: string | null; difficulty?: string | null; bloom?: string | null; bank_question_id?: string | null };
 type Tab = "questions" | "settings" | "monitor" | "marking";
 
 export default function ExamWorkspace(props: { params: Promise<{ id: string }> }) {
@@ -28,7 +29,7 @@ export default function ExamWorkspace(props: { params: Promise<{ id: string }> }
         actions={<><Badge tone={statusTone(exam.status)}>{exam.status}</Badge>{exam.results_released && <Badge tone="violet">results released</Badge>}</>} />
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "questions", label: "Questions" }, { id: "settings", label: "Settings & publish" }, { id: "monitor", label: "Live monitor" }, { id: "marking", label: "Marking & results" }]} />
       {tab === "questions" && <Questions exam={exam} questions={questions} reload={reload} />}
-      {tab === "settings" && <Settings exam={exam} reload={reload} />}
+      {tab === "settings" && <Settings exam={exam} questions={questions} reload={reload} />}
       {tab === "monitor" && <Monitor examId={exam.id} />}
       {tab === "marking" && <Marking exam={exam} reload={reload} />}
     </Page>
@@ -40,7 +41,12 @@ function Questions({ exam, questions, reload }: { exam: Exam; questions: Questio
   const [editing, setEditing] = useState<EditorQuestion | null>(null);
   const [preview, setPreview] = useState<Question | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [bank, setBank] = useState(false);
   const locked = exam.status !== "draft";
+  async function toBank(ids: string[]) {
+    const r = await send<{ saved: number }>(`/api/exams/${exam.id}/bank`, { action: "to_bank", question_ids: ids });
+    setMsg(r.ok ? `Saved ${r.data.saved} question${r.data.saved === 1 ? "" : "s"} to the question bank.` : r.error);
+  }
   async function save(q: EditorQuestion) {
     const r = await send(`/api/exams/${exam.id}`, q);
     if (!r.ok) return r.error;
@@ -65,20 +71,23 @@ function Questions({ exam, questions, reload }: { exam: Exam; questions: Questio
     <div className="grid gap-5 xl:grid-cols-[1fr_280px]">
       <div className="space-y-3">
         {locked && <Alert tone="amber">This exam is {exam.status}. You can still fix typos, but adding or removing questions after students start is blocked.</Alert>}
-        {msg && <Alert>{msg}</Alert>}
-        {!questions.length && <Empty>No questions yet. Pick a question type on the right.</Empty>}
+        {msg && <Alert tone={msg.startsWith("Saved") || msg.startsWith("Added") ? "green" : "red"}>{msg}</Alert>}
+        {!questions.length && <Empty>No questions yet. Pick a question type on the right, or add questions from the bank.</Empty>}
         {questions.map((q, i) => (
           <div key={q.id} className="card p-4">
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <span className="grid h-7 w-7 place-items-center rounded-full bg-brand-600 text-xs font-bold text-white">{i + 1}</span>
               <Badge>{TYPE_LABELS[q.type]}</Badge>
               {q.section && <Badge tone="violet">{q.section}</Badge>}
+              {q.topic && <Badge tone="blue">{q.topic}</Badge>}
+              {q.difficulty && <Badge>{q.difficulty}</Badge>}
               <span className="text-sm text-slate-500">{q.points} marks</span>
               <div className="ml-auto flex gap-1">
                 <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => move(i, -1)} aria-label="Move up">↑</button>
                 <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => move(i, 1)} aria-label="Move down">↓</button>
                 <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setPreview(q)}>Preview</button>
                 <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setEditing(q)}>Edit</button>
+                {!q.bank_question_id && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => toBank([q.id])}>To bank</button>}
                 <button className="btn btn-ghost px-2 py-1 text-xs text-rose-600" onClick={() => remove(q)}>Delete</button>
               </div>
             </div>
@@ -87,7 +96,9 @@ function Questions({ exam, questions, reload }: { exam: Exam; questions: Questio
         ))}
       </div>
       <aside className="card h-fit p-4">
-        <p className="mb-2 text-sm font-semibold">Add a question</p>
+        <button className="btn btn-primary mb-2 w-full" disabled={locked} onClick={() => setBank(true)}>Add from question bank</button>
+        {questions.some(q => !q.bank_question_id) && <button className="btn btn-ghost mb-3 w-full text-xs" onClick={() => toBank(questions.filter(q => !q.bank_question_id).map(q => q.id))}>Save all new questions to the bank</button>}
+        <p className="mb-2 text-sm font-semibold">Or write a new question</p>
         <div className="grid gap-1">
           {(Object.keys(TYPE_LABELS) as QType[]).map(t => (
             <button key={t} className="btn btn-ghost justify-start border border-slate-200 text-left text-xs" onClick={() => setEditing(blankQuestion(t))}>{TYPE_LABELS[t]}</button>
@@ -97,9 +108,63 @@ function Questions({ exam, questions, reload }: { exam: Exam; questions: Questio
       <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title={editing?.id ? "Edit question" : "New question"} wide>
         {editing && <QuestionEditor key={editing.id ?? editing.type} initial={editing} onSave={save} onCancel={() => setEditing(null)} />}
       </Modal>
+      <Modal open={bank} onClose={() => setBank(false)} title="Add from the question bank" wide>
+        {bank && <AddFromBank exam={exam} onDone={(text) => { setBank(false); setMsg(text); reload(); }} />}
+      </Modal>
       <Modal open={Boolean(preview)} onClose={() => setPreview(null)} title="Student preview" wide>
         {preview && <PreviewQuestion q={preview} />}
       </Modal>
+    </div>
+  );
+}
+
+function AddFromBank({ exam, onDone }: { exam: Exam; onDone: (msg: string) => void }) {
+  const { data: structure } = useApi<{ subjects: { id: string; name: string }[] }>("/api/school/structure");
+  const [mode, setMode] = useState<"pick" | "random">("pick");
+  const [section, setSection] = useState("");
+  const [r, setR] = useState({ topic: "", difficulty: "", bloom: "", exam_body: "", exam_year: "", count: "10", per_student: "" });
+  const [err, setErr] = useState<string | null>(null);
+  const subjects = structure?.subjects ?? [];
+  async function random() {
+    setErr(null);
+    const res = await send<{ added: number; requested: number }>(`/api/exams/${exam.id}/bank`, {
+      action: "random", count: Number(r.count), section: section || null, per_student: r.per_student ? Number(r.per_student) : null,
+      filters: { subject_id: exam.subject_id || null, topic: r.topic || null, difficulty: r.difficulty || null, bloom: r.bloom || null, exam_body: r.exam_body || null, exam_year: r.exam_year ? Number(r.exam_year) : null }
+    });
+    if (!res.ok) return setErr(res.error);
+    onDone(`Added ${res.data.added} of ${res.data.requested} questions from the bank.${r.per_student && section ? ` Each student gets ${r.per_student} of them.` : ""}`);
+  }
+  return (
+    <div className="space-y-3">
+      <Tabs value={mode} onChange={setMode} tabs={[{ id: "pick", label: "Choose questions" }, { id: "random", label: "Random selection" }]} />
+      <Field label="Put them in section (optional)" hint="Sections group questions on the paper. A section can also be a pool that gives each student a different random set.">
+        <input className="input max-w-xs" value={section} onChange={e => setSection(e.target.value)} placeholder="Section A" />
+      </Field>
+      {mode === "pick" ? (
+        <BankBrowser mode="pick" subjects={subjects} initialFilters={{ subject_id: exam.subject_id ?? "" }}
+          onPick={async ids => {
+            const res = await send<{ added: number }>(`/api/exams/${exam.id}/bank`, { action: "add", question_ids: ids, section: section || null });
+            if (!res.ok) return res.error;
+            onDone(`Added ${res.data.added} questions from the bank.`); return null;
+          }} />
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm text-slate-600">Picks questions at random from the bank{exam.subject_id ? " for this exam\u2019s subject" : ""}. Questions already in the exam are skipped.</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Topic"><input className="input" value={r.topic} onChange={e => setR({ ...r, topic: e.target.value })} /></Field>
+            <Field label="Difficulty"><select className="input" value={r.difficulty} onChange={e => setR({ ...r, difficulty: e.target.value })}><option value="">Any</option>{DIFFICULTIES.map(d => <option key={d}>{d}</option>)}</select></Field>
+            <Field label="Bloom's level"><select className="input" value={r.bloom} onChange={e => setR({ ...r, bloom: e.target.value })}><option value="">Any</option>{BLOOMS.map(d => <option key={d}>{d}</option>)}</select></Field>
+            <Field label="Past questions from"><select className="input" value={r.exam_body} onChange={e => setR({ ...r, exam_body: e.target.value })}><option value="">Any source</option>{EXAM_BODIES.map(d => <option key={d}>{d}</option>)}</select></Field>
+            <Field label="Year"><input className="input" type="number" value={r.exam_year} onChange={e => setR({ ...r, exam_year: e.target.value })} /></Field>
+            <Field label="How many to add"><input className="input" type="number" min={1} max={500} value={r.count} onChange={e => setR({ ...r, count: e.target.value })} /></Field>
+          </div>
+          <Field label="Each student answers (optional)" hint="Fill this in to make the section a pool: add 40, let each student answer 20, and neighbours get different papers. Needs a section name.">
+            <input className="input max-w-[140px]" type="number" min={1} value={r.per_student} onChange={e => setR({ ...r, per_student: e.target.value })} />
+          </Field>
+          {err && <Alert>{err}</Alert>}
+          <div className="flex justify-end"><button className="btn btn-primary" disabled={Boolean(r.per_student) && !section} onClick={random}>Add random questions</button></div>
+        </div>
+      )}
     </div>
   );
 }
@@ -119,7 +184,7 @@ function toLocal(v: string | null) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function Settings({ exam, reload }: { exam: Exam; reload: () => void }) {
+function Settings({ exam, questions, reload }: { exam: Exam; questions: Question[]; reload: () => void }) {
   const { data: structure } = useApi<{ class_groups: { id: string; name: string }[]; subjects: { id: string; name: string }[] }>("/api/school/structure");
   const { data: sessions } = useApi<{ id: string; name: string; terms: { id: string; name: string }[] }[]>("/api/school/academic");
   const { data: schemes } = useApi<{ id: string; name: string; grading_components: { id: string; name: string }[] }[]>("/api/school/grading");
@@ -138,13 +203,16 @@ function Settings({ exam, reload }: { exam: Exam; reload: () => void }) {
         shuffle_questions: Boolean(s.shuffle_questions), shuffle_options: s.shuffle_options !== false, require_fullscreen: s.require_fullscreen !== false,
         block_copy_paste: s.block_copy_paste !== false, violation_limit: Number(s.violation_limit ?? 3), show_score_after_submit: Boolean(s.show_score_after_submit),
         allow_review: Boolean(s.allow_review), require_seb: Boolean(s.require_seb), allow_spellcheck: Boolean(s.allow_spellcheck), allow_calculator: Boolean(s.allow_calculator),
-        seb_browser_keys: (s.seb_browser_keys ?? []).filter(Boolean), seb_config_keys: (s.seb_config_keys ?? []).filter(Boolean), quit_password: s.quit_password ?? ""
+        seb_browser_keys: (s.seb_browser_keys ?? []).filter(Boolean), seb_config_keys: (s.seb_config_keys ?? []).filter(Boolean), quit_password: s.quit_password ?? "",
+        draw: Object.fromEntries(Object.entries((s.draw ?? {}) as Record<string, number | null>).filter(([k, v]) => v !== null && v !== undefined && sections.has(k)))
       },
       ...extra
     }, "PATCH");
     setMsg({ ok: r.ok, text: r.ok ? ok : r.error ?? "failed" });
     if (r.ok) reload();
   }
+  const sections = new Map<string, number>();
+  for (const q of questions) if (q.section) sections.set(q.section, (sections.get(q.section) ?? 0) + 1);
   const cfgUrl = typeof window !== "undefined" ? `${window.location.origin}/api/exams/${exam.id}/seb` : "";
   const studentUrl = typeof window !== "undefined" ? `${window.location.origin}/exam/${exam.id}` : "";
   const comps = (schemes ?? []).flatMap(sc => sc.grading_components.map(c => ({ id: c.id, name: `${sc.name}: ${c.name}` })));
@@ -176,6 +244,23 @@ function Settings({ exam, reload }: { exam: Exam; reload: () => void }) {
           <input className="input max-w-[120px]" type="number" min={1} max={50} value={s.violation_limit ?? 3} onChange={ev => setS("violation_limit", Number(ev.target.value))} />
         </Field>
       </section>
+
+      {sections.size > 0 && (
+        <section className="card space-y-3 p-5">
+          <h2 className="font-semibold">Question pools</h2>
+          <p className="text-sm text-slate-600">Give each student a random selection from a section so neighbours get different papers. Leave blank to give everyone every question in the section.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[...sections].map(([name, total]) => (
+              <label key={name} className="flex items-center gap-2 text-sm">
+                <span className="min-w-[120px] font-medium">{name}</span> each student gets
+                <input className="input w-20" type="number" min={1} max={total} value={s.draw?.[name] ?? ""} aria-label={`Questions per student from ${name}`}
+                  onChange={ev => setS("draw", { ...(s.draw ?? {}), [name]: ev.target.value ? Math.min(total, Number(ev.target.value)) : null })} />
+                of {total}
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="card space-y-3 p-5">
         <h2 className="font-semibold">Safe Exam Browser</h2>

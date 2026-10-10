@@ -2,13 +2,13 @@
 import { useRef, useState } from "react";
 import { Field, Alert, Icon } from "@/components/ui";
 
-export type QType = "mcq_single" | "mcq_multi" | "true_false" | "short_answer" | "numeric" | "fill_blanks" | "matching" | "ordering" | "hotspot" | "essay" | "code" | "file_upload";
+export type QType = "mcq_single" | "mcq_multi" | "true_false" | "short_answer" | "numeric" | "fill_blanks" | "matching" | "ordering" | "hotspot" | "math" | "drag_drop" | "essay" | "code" | "file_upload";
 export type EditorQuestion = { id?: string; type: QType; prompt: string; points: number; media_url?: string | null; section?: string | null; data: Record<string, any>; answer: Record<string, any> };
 
 export const TYPE_LABELS: Record<QType, string> = {
   mcq_single: "Multiple choice (one answer)", mcq_multi: "Multiple choice (several answers)", true_false: "True / False",
   short_answer: "Short answer (auto-marked)", numeric: "Numeric with tolerance", fill_blanks: "Fill in the blanks",
-  matching: "Matching pairs", ordering: "Put in order", hotspot: "Hotspot on image", essay: "Essay / long answer",
+  matching: "Matching pairs", ordering: "Put in order", hotspot: "Hotspot on image", math: "Maths input", drag_drop: "Drag and drop into groups", essay: "Essay / long answer",
   code: "Code answer", file_upload: "File upload"
 };
 
@@ -26,6 +26,11 @@ export function blankQuestion(type: QType): EditorQuestion {
     case "matching": return { ...base, points: 3, data: { left: [{ id: uid(), text: "" }, { id: uid(), text: "" }, { id: uid(), text: "" }], right: [] }, answer: { pairs: {} } };
     case "ordering": return { ...base, points: 3, data: { items: [{ id: uid(), text: "" }, { id: uid(), text: "" }, { id: uid(), text: "" }] }, answer: { order: [], partial: true } };
     case "hotspot": return { ...base, data: { image_url: "" }, answer: { regions: [] } };
+    case "math": return { ...base, points: 2, data: { hint: "" }, answer: { expression: "", alternatives: [] } };
+    case "drag_drop": {
+      const z1 = uid(), z2 = uid();
+      return { ...base, points: 4, data: { zones: [{ id: z1, text: "" }, { id: z2, text: "" }], items: [{ id: uid(), text: "" }, { id: uid(), text: "" }] }, answer: { placement: {}, partial: true } };
+    }
     case "essay": return { ...base, points: 10, data: { min_words: null, max_words: null }, answer: { rubric: "" } };
     case "code": return { ...base, points: 10, data: { language: "python", starter: "" }, answer: { reference: "" } };
     case "file_upload": return { ...base, points: 10, data: { accept: ".pdf,.jpg,.jpeg,.png,.docx", max_mb: 10 }, answer: {} };
@@ -42,7 +47,7 @@ function pairsFrom(q: EditorQuestion): { l: { id: string; text: string }; r: { i
   });
 }
 
-export default function QuestionEditor({ initial, onSave, onCancel }: { initial: EditorQuestion; onSave: (q: EditorQuestion) => Promise<string | null>; onCancel: () => void }) {
+export default function QuestionEditor({ initial, onSave, onCancel, extra }: { initial: EditorQuestion; onSave: (q: EditorQuestion) => Promise<string | null>; onCancel: () => void; extra?: React.ReactNode }) {
   const [q, setQ] = useState<EditorQuestion>(initial);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -65,6 +70,14 @@ export default function QuestionEditor({ initial, onSave, onCancel }: { initial:
     }
     if (q.type === "mcq_single" || q.type === "mcq_multi") {
       out = { ...q, data: { options: (q.data.options ?? []).filter((o: { text: string }) => o.text.trim()) } };
+    }
+    if (q.type === "math") {
+      out = { ...q, answer: { ...q.answer, expression: String(q.answer.expression ?? "").trim(), alternatives: (q.answer.alternatives ?? []).map((s: string) => s.trim()).filter(Boolean) } };
+    }
+    if (q.type === "drag_drop") {
+      const zones = (q.data.zones ?? []).filter((z: { text: string }) => z.text.trim());
+      const items = (q.data.items ?? []).filter((i: { text: string }) => i.text.trim());
+      out = { ...q, data: { zones, items }, answer: { ...q.answer, placement: Object.fromEntries(items.map((i: { id: string }) => [i.id, q.answer.placement?.[i.id]]).filter(([, z]: [string, string]) => zones.some((x: { id: string }) => x.id === z))) } };
     }
     const e = await onSave({ ...out, points: Number(out.points) });
     setBusy(false);
@@ -171,6 +184,20 @@ export default function QuestionEditor({ initial, onSave, onCancel }: { initial:
 
       {q.type === "hotspot" && <HotspotEditor q={q} setData={setData} setAnswer={setAnswer} />}
 
+      {q.type === "math" && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Correct answer" hint="Any equivalent form is accepted: 2(x+1) also matches 2x+2. Use ^ for powers, sqrt( ), pi.">
+            <input className="input font-mono" value={q.answer.expression ?? ""} onChange={e => setAnswer({ expression: e.target.value })} placeholder="x^2 - 4" />
+          </Field>
+          <Field label="Other accepted answers (one per line)" hint="For answers that are not algebraically equal, such as x = 2 or x = -2.">
+            <textarea className="input h-16 font-mono" value={(q.answer.alternatives ?? []).join("\n")} onChange={e => setAnswer({ alternatives: e.target.value.split("\n") })} />
+          </Field>
+          <div className="sm:col-span-2"><Field label="Hint shown to students (optional)"><input className="input" value={q.data.hint ?? ""} onChange={e => setData({ hint: e.target.value })} placeholder="Simplify fully." /></Field></div>
+        </div>
+      )}
+
+      {q.type === "drag_drop" && <DragDropEditor q={q} setData={setData} setAnswer={setAnswer} />}
+
       {q.type === "essay" && (
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Minimum words"><input className="input" type="number" min={0} value={q.data.min_words ?? ""} onChange={e => setData({ min_words: e.target.value ? Number(e.target.value) : null })} /></Field>
@@ -194,10 +221,45 @@ export default function QuestionEditor({ initial, onSave, onCancel }: { initial:
         </div>
       )}
 
+      {extra}
       {err && <Alert>{err}</Alert>}
       <div className="flex justify-end gap-2">
         <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
         <button className="btn btn-primary" disabled={busy} onClick={save}>{busy ? "Saving…" : "Save question"}</button>
+      </div>
+    </div>
+  );
+}
+
+function DragDropEditor({ q, setData, setAnswer }: { q: EditorQuestion; setData: (d: Record<string, any>) => void; setAnswer: (a: Record<string, any>) => void }) {
+  const zones: { id: string; text: string }[] = q.data.zones ?? [];
+  const items: { id: string; text: string }[] = q.data.items ?? [];
+  const placement: Record<string, string> = q.answer.placement ?? {};
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-2">
+        <p className="label">Groups (drop zones)</p>
+        {zones.map((z, i) => (
+          <div key={z.id} className="flex items-center gap-2">
+            <input className="input" value={z.text} placeholder={`Group ${i + 1}`} aria-label={`Group ${i + 1}`} onChange={e => setData({ zones: zones.map(x => x.id === z.id ? { ...x, text: e.target.value } : x) })} />
+            <button type="button" className="btn btn-ghost px-2 text-rose-600" aria-label="Remove group" onClick={() => setData({ zones: zones.filter(x => x.id !== z.id) })}><Icon name="x" className="h-4 w-4" /></button>
+          </div>
+        ))}
+        <button className="btn btn-ghost text-xs" onClick={() => setData({ zones: [...zones, { id: uid(), text: "" }] })}>+ Add group</button>
+      </div>
+      <div className="space-y-2">
+        <p className="label">Items and the group each belongs in</p>
+        {items.map((it, i) => (
+          <div key={it.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+            <input className="input" value={it.text} placeholder={`Item ${i + 1}`} aria-label={`Item ${i + 1}`} onChange={e => setData({ items: items.map(x => x.id === it.id ? { ...x, text: e.target.value } : x) })} />
+            <select className="input w-36" value={placement[it.id] ?? ""} aria-label={`Group for item ${i + 1}`} onChange={e => setAnswer({ placement: { ...placement, [it.id]: e.target.value } })}>
+              <option value="">Group…</option>{zones.map((z, j) => <option key={z.id} value={z.id}>{z.text || `Group ${j + 1}`}</option>)}
+            </select>
+            <button type="button" className="btn btn-ghost px-2 text-rose-600" aria-label="Remove item" onClick={() => setData({ items: items.filter(x => x.id !== it.id) })}><Icon name="x" className="h-4 w-4" /></button>
+          </div>
+        ))}
+        <button className="btn btn-ghost text-xs" onClick={() => setData({ items: [...items, { id: uid(), text: "" }] })}>+ Add item</button>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={q.answer.partial !== false} onChange={e => setAnswer({ partial: e.target.checked })} /> Partial credit for each item placed correctly</label>
       </div>
     </div>
   );

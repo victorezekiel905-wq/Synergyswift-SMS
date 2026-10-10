@@ -21,6 +21,7 @@ const GROUPS: NavGroup[] = [
     { href: "/school", label: "School overview", roles: STAFF.filter(r => r !== "cashier") },
     { href: "/school/inbox", label: "Parent messages", roles: STAFF.filter(r => r !== "cashier"), module: "inbox" },
     { href: "/student", label: "My school", roles: ["student"] },
+    { href: "/student/practice", label: "Past-question practice", roles: ["student"], module: "exams" },
     { href: "/parent", label: "My children", roles: ["parent"] }
   ] },
   { title: "Teaching", links: [
@@ -31,6 +32,7 @@ const GROUPS: NavGroup[] = [
     { href: "/school/timetable", label: "Timetable", roles: STAFF, module: "timetable" },
     { href: "/school/cover", label: "Cover", roles: TEACH, module: "cover" },
     { href: "/exams", label: "Secure exams", roles: TEACH, module: "exams" },
+    { href: "/exams/bank", label: "Question bank", roles: TEACH, module: "exams" },
     { href: "/teacher/studio", label: "Lesson studio", roles: TEACH, module: "lms" },
     { href: "/teacher/assess", label: "Assess", roles: TEACH, module: "lms" },
     { href: "/teacher/live", label: "Live class", roles: TEACH, module: "lms" },

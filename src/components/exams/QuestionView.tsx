@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type PublicQuestion = {
   id: string; type: string; prompt: string; points: number; media_url: string | null; section: string | null;
@@ -88,6 +88,8 @@ export default function QuestionView({ q, value, onChange, disabled, spellcheck,
         )}
         {q.type === "ordering" && <Ordering items={d.items ?? []} value={Array.isArray(value) && value.length ? value : (d.items ?? []).map((i: { id: string }) => i.id)} onChange={onChange} disabled={disabled} />}
         {q.type === "hotspot" && <Hotspot image={d.image_url ?? q.media_url} value={value} onChange={onChange} disabled={disabled} />}
+        {q.type === "math" && <MathInput value={value ?? ""} onChange={onChange} disabled={disabled} hint={d.hint} />}
+        {q.type === "drag_drop" && <DragDrop items={d.items ?? []} zones={d.zones ?? []} value={value ?? {}} onChange={onChange} disabled={disabled} />}
         {q.type === "essay" && (
           <div>
             <textarea className="input min-h-[280px] text-base leading-relaxed" value={value ?? ""} disabled={disabled} spellCheck={spellcheck}
@@ -136,10 +138,17 @@ function Ordering({ items, value, onChange, disabled }: { items: { id: string; t
   useEffect(() => { if (!disabled && value.length) onChange(value); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const byId = new Map(items.map(i => [i.id, i]));
   const move = (i: number, d: number) => { const n = [...value]; const j = i + d; if (j < 0 || j >= n.length) return; [n[i], n[j]] = [n[j], n[i]]; onChange(n); };
+  const [dragging, setDragging] = useState<number | null>(null);
+  const dropAt = (to: number) => {
+    if (dragging === null || dragging === to) return;
+    const n = [...value]; const [x] = n.splice(dragging, 1); n.splice(to, 0, x); onChange(n); setDragging(null);
+  };
   return (
     <ol className="space-y-2">
+      {!disabled && <p className="text-xs text-slate-500">Drag the items, or use the arrows, to put them in order.</p>}
       {value.map((id, i) => (
-        <li key={id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2">
+        <li key={id} draggable={!disabled} onDragStart={() => setDragging(i)} onDragOver={e => e.preventDefault()} onDrop={() => dropAt(i)} onDragEnd={() => setDragging(null)}
+          className={"flex items-center gap-2 rounded-lg border bg-white p-2 " + (dragging === i ? "border-brand-400 opacity-60" : "border-slate-200") + (disabled ? "" : " cursor-grab")}>
           <span className="w-6 text-center font-bold text-slate-400">{i + 1}</span>
           <span className="flex-1">{byId.get(id)?.text}</span>
           <button type="button" className="btn btn-ghost px-2 py-1" disabled={disabled || i === 0} onClick={() => move(i, -1)} aria-label="Move up">↑</button>
@@ -147,6 +156,69 @@ function Ordering({ items, value, onChange, disabled }: { items: { id: string; t
         </li>
       ))}
     </ol>
+  );
+}
+
+const MATH_KEYS = [["x²", "^2"], ["xⁿ", "^"], ["√", "sqrt("], ["π", "pi"], ["(", "("], [")", ")"], ["×", "*"], ["÷", "/"]];
+
+function MathInput({ value, onChange, disabled, hint }: { value: string; onChange: (v: string) => void; disabled?: boolean; hint?: string | null }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const insert = (s: string) => {
+    const el = ref.current;
+    if (!el) return onChange(value + s);
+    const a = el.selectionStart ?? value.length, b = el.selectionEnd ?? value.length;
+    onChange(value.slice(0, a) + s + value.slice(b));
+    requestAnimationFrame(() => { el.focus(); el.selectionStart = el.selectionEnd = a + s.length; });
+  };
+  return (
+    <div className="space-y-2">
+      {hint && <p className="text-sm text-slate-600">{hint}</p>}
+      <input ref={ref} className="input max-w-xl font-mono text-lg" value={value} disabled={disabled} autoComplete="off" spellCheck={false}
+        onChange={e => onChange(e.target.value)} aria-label="Your answer" placeholder="Type your answer, for example 3x^2 + 2" />
+      {!disabled && (
+        <div className="flex flex-wrap gap-1" aria-label="Maths symbols">
+          {MATH_KEYS.map(([label, text]) => <button key={label} type="button" className="btn btn-ghost border border-slate-200 px-3 py-1 font-mono" onClick={() => insert(text)}>{label}</button>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Drag items into groups. On touch screens: tap an item, then tap a group. */
+function DragDrop({ items, zones, value, onChange, disabled }: { items: { id: string; text: string }[]; zones: { id: string; text: string }[]; value: Record<string, string>; onChange: (v: Record<string, string>) => void; disabled?: boolean }) {
+  const [held, setHeld] = useState<string | null>(null);
+  const place = (itemId: string, zoneId: string | null) => {
+    const n = { ...value };
+    if (zoneId) n[itemId] = zoneId; else delete n[itemId];
+    onChange(n); setHeld(null);
+  };
+  const chip = (it: { id: string; text: string }) => (
+    <button key={it.id} type="button" draggable={!disabled} disabled={disabled}
+      onDragStart={e => { e.dataTransfer.setData("text/plain", it.id); setHeld(it.id); }}
+      onClick={() => setHeld(held === it.id ? null : it.id)} aria-pressed={held === it.id}
+      className={"rounded-full border px-3 py-1.5 text-sm " + (held === it.id ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white hover:border-brand-400")}>{it.text}</button>
+  );
+  const drop = (zoneId: string | null) => ({
+    onDragOver: (e: React.DragEvent) => e.preventDefault(),
+    onDrop: (e: React.DragEvent) => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain") || held; if (id && !disabled) place(id, zoneId); },
+    onClick: (e: React.MouseEvent) => { if (held && e.target === e.currentTarget && !disabled) place(held, zoneId); }
+  });
+  const unplaced = items.filter(i => !value[i.id]);
+  return (
+    <div className="space-y-3">
+      {!disabled && <p className="text-xs text-slate-500">Drag each item into its group. On a phone, tap an item and then tap the group.</p>}
+      <div {...drop(null)} className="flex min-h-[52px] flex-wrap gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-2">
+        {unplaced.length ? unplaced.map(chip) : <span className="self-center text-xs text-slate-400">All items placed.</span>}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {zones.map(z => (
+          <div key={z.id} {...drop(z.id)} className={"min-h-[96px] rounded-lg border-2 p-2 " + (held ? "border-brand-300 bg-brand-50/50" : "border-slate-200")}>
+            <p className="pointer-events-none mb-2 text-sm font-semibold">{z.text}</p>
+            <div className="flex flex-wrap gap-2">{items.filter(i => value[i.id] === z.id).map(chip)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
