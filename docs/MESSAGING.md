@@ -115,6 +115,13 @@ Message from {{1}}: {{2}}
 {{1}}: {{2}} {{3}}
 ```
 
+**`WHATSAPP_TPL_COMMUNITY_NOTE`** (complaint updates, surveys and re-enrolment requests)
+```
+{{1}}: {{2}} {{3}}
+```
+
+Campaigns and newsletters are sent as free-form WhatsApp text, so they only reach families who messaged the school in the last 24 hours. Use email or SMS for school-wide campaigns.
+
 **`WHATSAPP_TPL_STAFF`**
 ```
 {{1}}: {{2}}

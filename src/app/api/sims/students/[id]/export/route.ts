@@ -28,7 +28,11 @@ const TABLES: { key: string; table: string; select: string; by?: string }[] = [
   { key: "boarding", table: "hostel_allocations", select: "bed_label,allocated_at,ended_at,hostel_rooms(name,hostels(name))" },
   { key: "exeats", table: "exeat_requests", select: "reason,leave_at,return_by,status,created_at" },
   { key: "pickups", table: "pickup_codes", select: "delegate_name,status,expires_at,created_at,used_at" },
-  { key: "conversations", table: "conversations", select: "subject,status,created_at,conversation_messages(sender_kind,sender_name,body,created_at)" }
+  { key: "conversations", table: "conversations", select: "subject,status,created_at,conversation_messages(sender_kind,sender_name,body,created_at)" },
+  { key: "complaints_and_requests", table: "tickets", select: "ticket_no,kind,category,subject,body,status,created_at,resolved_at,satisfaction,ticket_messages(author,body,internal,created_at)" },
+  { key: "reenrolment", table: "reenrolment_responses", select: "intent,reason,note,responded_at,reenrolment_rounds(title)" },
+  { key: "contact_log", table: "crm_interactions", select: "kind,body,occurred_at" },
+  { key: "alumni_record", table: "alumni", select: "full_name,graduation_year,email,phone,occupation,employer,further_study,city,country,consent_contact,created_at" }
 ];
 
 export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {

@@ -85,7 +85,7 @@ export default function MessagesPage() {
         <section className="xl:col-span-2">
           <div className="mb-3 flex flex-wrap gap-2">
             <select className="input w-auto" value={status} onChange={e => setStatus(e.target.value)} aria-label="Status"><option value="">All statuses</option>{["queued", "sending", "sent", "failed", "skipped"].map(s => <option key={s}>{s}</option>)}</select>
-            <select className="input w-auto" value={kind} onChange={e => setKind(e.target.value)} aria-label="Kind"><option value="">All kinds</option>{["result", "gate_in", "gate_out", "pickup_code", "pickup_done", "broadcast", "message", "portal_link", "library_overdue", "invite", "fee_receipt", "fee_reminder", "absence", "bus", "bus_near", "wallet_topup", "wallet_low", "cover"].map(s => <option key={s}>{s}</option>)}</select>
+            <select className="input w-auto" value={kind} onChange={e => setKind(e.target.value)} aria-label="Kind"><option value="">All kinds</option>{["result", "gate_in", "gate_out", "pickup_code", "pickup_done", "broadcast", "message", "portal_link", "library_overdue", "invite", "fee_receipt", "fee_reminder", "absence", "bus", "bus_near", "wallet_topup", "wallet_low", "cover", "ticket", "survey", "reenrolment", "campaign", "newsletter"].map(s => <option key={s}>{s}</option>)}</select>
             <button className="btn btn-ghost" onClick={reload}>Refresh</button>
             {failed.length > 0 && <button className="btn btn-ghost ml-auto border border-slate-200" onClick={() => retry(failed.map(m => m.id))}>Retry {failed.length} failed / skipped</button>}
           </div>

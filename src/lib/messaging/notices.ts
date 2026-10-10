@@ -183,3 +183,12 @@ export function admissionNote(b: Brand, p: { name: string; subject: string; line
     tplEnv: "WHATSAPP_TPL_ADMISSION_NOTE", params: [b.schoolName, p.lines[0]?.slice(0, 900) ?? p.subject, p.link ?? ""]
   });
 }
+
+/** Complaints, surveys and re-enrolment: one short notice with a link. */
+export function communityNote(b: Brand, p: { name: string; subject: string; lines: string[]; link?: string | null; linkLabel?: string }) {
+  return simple(b, {
+    subject: p.subject, title: p.subject, greeting: `Dear ${p.name},`, lines: p.lines,
+    cta: p.link ? { href: p.link, label: p.linkLabel ?? "Open" } : undefined,
+    tplEnv: "WHATSAPP_TPL_COMMUNITY_NOTE", params: [b.schoolName, p.lines[0]?.slice(0, 900) ?? p.subject, p.link ?? ""]
+  });
+}

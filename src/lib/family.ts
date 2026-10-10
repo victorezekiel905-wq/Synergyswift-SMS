@@ -4,6 +4,7 @@
  * booking and exeat requests. Every function checks that the guardian is
  * linked to the student.
  */
+import { familyReenrolment } from "./community-server";
 import { createInvoice } from "./fees";
 import { notifyGuardians, notifyContact, money } from "./notify";
 import { meetingBooked } from "./messaging/notices";
@@ -81,7 +82,7 @@ export async function requestExeat(svc: any, p: { tenantId: string; guardianId: 
 
 /** Everything a guardian sees beyond the basics: fees, events, meetings, homework, behaviour, attendance, boarding. */
 export async function familyExtras(svc: any, tenantId: string, guardianId: string, studentIds: string[], classGroupIds: string[]) {
-  if (!studentIds.length) return { invoices: [], events: [], slots: [], homework: [], behaviour: [], attendance: [], exeats: [], currency: "NGN", bookings: [], transport: [], hostel: [] };
+  if (!studentIds.length) return { invoices: [], events: [], slots: [], homework: [], behaviour: [], attendance: [], exeats: [], currency: "NGN", bookings: [], transport: [], hostel: [], support: await familySupport(svc, tenantId, guardianId) };
   const now = new Date().toISOString();
   const since30 = new Date(Date.now() - 30 * 86400_000).toISOString();
   const [settings, invoices, events, responses, homework, behaviour, attendance, exeats, bookings, transport, hostel, teachers] = await Promise.all([
@@ -113,7 +114,23 @@ export async function familyExtras(svc: any, tenantId: string, guardianId: strin
     bookings: bookings.data ?? [],
     slots: slots ?? [],
     transport: transport.data ?? [],
-    hostel: hostel.data ?? []
+    hostel: hostel.data ?? [],
+    support: await familySupport(svc, tenantId, guardianId)
+  };
+}
+
+/** The family's complaints and requests, the open re-enrolment question and unanswered surveys. */
+export async function familySupport(svc: any, tenantId: string, guardianId: string) {
+  const [{ data: tickets }, { data: invites }, reenrolment] = await Promise.all([
+    svc.from("tickets").select("ticket_no,kind,subject,status,created_at,updated_at,token").eq("tenant_id", tenantId).eq("guardian_id", guardianId).order("created_at", { ascending: false }).limit(30),
+    svc.from("survey_invites").select("token,surveys(title,status,closes_at)").eq("tenant_id", tenantId).eq("guardian_id", guardianId).is("responded_at", null).limit(10),
+    familyReenrolment(svc, tenantId, guardianId).catch(() => null)
+  ]);
+  const now = new Date().toISOString();
+  return {
+    tickets: tickets ?? [],
+    surveys: (invites ?? []).filter((i: any) => i.surveys?.status === "open" && (!i.surveys.closes_at || i.surveys.closes_at > now)).map((i: any) => ({ title: i.surveys.title, token: i.token })),
+    reenrolment
   };
 }
 

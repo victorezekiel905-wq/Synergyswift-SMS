@@ -119,9 +119,19 @@ v46 adds the modules that the leading systems sell separately, so one login runs
 - **Session rollover** (`/school/rollover`): promote every class to the next level, keep repeating students back, and graduate the final year. Each class shows its suggested next class to check, and nothing moves until you confirm.
 - **School groups** (`/group`): an owner of several branches sees headcount, attendance, fee collection and average results per branch. Branches still cannot see each other.
 
+- **Families & community** (`/school/community`, admins; the bursar sees Referrals and Partners):
+  - *Families*: every current family with its retention risk, last NPS score, balance, open complaints and re-enrolment answer. Filter and save the filter as a segment. Click a family for the 360° view: children, other guardians, fees and one timeline of everything that has happened. Log calls and meetings there.
+  - *Complaints & requests*: families raise them from the parent portal; staff log calls and walk-ins. Each gets a number and promised reply and resolve times (set them under "Response times"). Overdue tickets escalate to the principal and admins. Families follow and reply from their link and rate the outcome. Every member of staff works their own tickets at `/school/support`.
+  - *Surveys & NPS*: build a survey (start from the NPS template), choose the families, send. Families answer from a private link. Anyone scoring 0–6 on a named survey gets a follow-up ticket.
+  - *Campaigns*: newsletters and campaigns by email, SMS or WhatsApp to all families, a segment, classes, alumni or partners. Preview, send yourself a test, send now or schedule. Families can unsubscribe and still get essential messages.
+  - *Re-enrolment & retention*: open a round to ask every family whether each child will return, with reasons for leaving. The list of families at risk combines those answers with survey scores, overdue fees, unresolved complaints, attendance and siblings who left.
+  - *Referrals*: set the reward for a referral that enrols; rewards appear automatically for approval.
+  - *Alumni*: add graduated students, share the sign-up link, confirm sign-ups, find mentors.
+  - *Partners & vendors*: contacts, contracts with renewal alerts, ratings, a contact log and spend from expenses.
+
 ### Parents and students
 
-- The parent portal adds tabs for **Fees**, **Events**, **Meetings**, **Learning** (homework, timetable, behaviour, attendance) and **Boarding**. It works both after sign-in and through the private WhatsApp link.
+- The parent portal adds tabs for **Fees**, **Events**, **Meetings**, **Learning** (homework, timetable, behaviour, attendance), **Boarding** and **Help & feedback** (raise and follow complaints and requests). It also asks about re-enrolment and shows waiting surveys. It works both after sign-in and through the private WhatsApp link.
 - Students see their homework and timetable on `/student`.
 - The app can be installed on a phone's home screen. It shows an offline page when there is no connection, and it never caches school data.
 

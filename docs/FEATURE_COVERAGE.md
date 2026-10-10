@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM · **3** parent and community CRM · **4** core platform and security · **5** SIS · **6** learning management · **7** attendance, timetable, calendar · **8** communication · **9** finance · **10** HR and payroll · **11** welfare, boarding, transport, library, inventory, co-curricular · **12** portals and apps · **13** analytics, integrations, compliance.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security · **5** SIS · **6** learning management · **7** attendance, timetable, calendar · **8** communication · **9** finance · **10** HR and payroll · **11** welfare, boarding, transport, library, inventory, co-curricular · **12** portals and apps · **13** analytics, integrations, compliance.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -75,9 +75,20 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM · **3*
 | One-click conversion to student with parent records and siblings | ✅ |
 | Admissions analytics: funnel, source and campaign conversion, cost per enquiry and per enrolment, staff response time and conversion, monthly trends, lost reasons | ✅ |
 
-## 4. CRM: parent and community (phase 3)
+## 4. CRM: parent and community (phase 3, done)
 
-All ⬜: 360° family profile, interaction history, complaints/ticketing with SLAs, NPS surveys, segmentation, re-enrolment and retention flags, referral rewards, alumni module, email/SMS campaigns and newsletters, partner and vendor CRM. (Two-way parent messaging already exists.)
+| Feature | Status |
+|---|---|
+| 360° family profile: children, other guardians, fees, attendance, results, retention risk, and one timeline of messages, complaints, survey answers, payments, meetings, events, re-enrolment, referrals and everything sent | ✅ |
+| Interaction history: calls, meetings, visits and notes logged by staff, with follow-up dates (families, alumni and partners) | ✅ |
+| Complaints and requests with SLAs: raised from the parent portal or logged by staff, numbered, assigned, promised reply and resolve times per priority, automatic escalation to the principal, internal notes, a tracking link for the family, satisfaction rating when resolved, performance stats | ✅ |
+| NPS and satisfaction surveys: question builder (NPS, ratings, multiple choice, written), sent by private link, reminders, anonymous option, results and monthly NPS trend; low scores create a follow-up ticket | ✅ |
+| Segmentation: saved family segments by class, level, balance, overdue fees, NPS, retention risk, re-enrolment answer, open complaints, number of children, referrers, language and channel | ✅ |
+| Re-enrolment rounds ("will your child return?") with reasons, reminders and per-class progress; retention risk score with reasons for every family | ✅ |
+| Referral rewards: the school's standard reward earned automatically when a referred family enrols; approve and mark given; parents see their rewards | ✅ (fee discounts are applied to the next invoice by the bursar) |
+| Alumni: import graduated students, public sign-up page, private self-update link, mentors, contact log | ✅ |
+| Email/SMS campaigns and newsletters to families, segments, alumni or partners: sections with images and links, personalisation, preview, test send, scheduling, delivery numbers, one-click unsubscribe | ✅ (WhatsApp campaigns reach only people who messaged in the last 24 hours, as Meta requires) |
+| Partner and vendor CRM: suppliers, sponsors and partners with contracts, renewal alerts, ratings, tags, contact log and spend from expenses | ✅ |
 
 ## 5. Student information system (phase 5)
 
@@ -127,3 +138,5 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101002700_moderation.sql` | 1 |
 | `20260101002800_report_cards_plus.sql` | 1 |
 | `20260101002900_admissions_crm.sql` | 2 |
+| `20260101003000_review_fixes.sql` | 2 fixes |
+| `20260101003100_community_crm.sql` | 3 |

@@ -5,6 +5,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { guardianByToken } from "@/lib/guardian";
 import { respondToEvent, bookMeeting, cancelMeeting, requestExeat } from "@/lib/family";
 import { LANGUAGES } from "@/lib/languages";
+import { appUrl } from "@/lib/school";
+import { createTicket, respondReenrolment } from "@/lib/community-server";
+import { TICKET_CATEGORIES, REENROL_REASONS } from "@/lib/community";
 
 /**
  * Parent actions for both portals. Identify the guardian by session (logged-in
@@ -18,6 +21,10 @@ const Body = z.discriminatedUnion("action", [
     leave_at: z.string().datetime({ offset: true }), return_by: z.string().datetime({ offset: true }), collector: z.string().trim().max(120).nullish() }),
   z.object({ action: z.literal("medical"), token: z.string().optional(), student_id: z.string().uuid(), allergies: z.string().trim().max(500).nullish(),
     conditions: z.string().trim().max(500).nullish(), medications: z.string().trim().max(500).nullish(), emergency_contact: z.string().trim().max(200).nullish() }),
+  z.object({ action: z.literal("ticket"), token: z.string().optional(), student_id: z.string().uuid().nullish(), kind: z.enum(["complaint", "request", "enquiry", "feedback"]).default("complaint"),
+    category: z.enum(TICKET_CATEGORIES).default("other"), subject: z.string().trim().min(3).max(160), body: z.string().trim().min(5).max(3000) }),
+  z.object({ action: z.literal("reenrol"), token: z.string().optional(), round_id: z.string().uuid(), student_id: z.string().uuid(), intent: z.enum(["returning", "not_returning", "undecided"]),
+    reason: z.enum(REENROL_REASONS).nullish(), note: z.string().trim().max(500).nullish() }),
   z.object({ action: z.literal("language"), token: z.string().optional(), language: z.string().refine(l => l in LANGUAGES, "unsupported language").nullable() })
 ]);
 
@@ -44,6 +51,15 @@ export async function POST(req: NextRequest) {
       case "book": return NextResponse.json(await bookMeeting(svc, { tenantId, guardianId, studentId: b.student_id, slotId: b.slot_id, note: b.note, timezone }));
       case "cancel_booking": return NextResponse.json(await cancelMeeting(svc, { tenantId, guardianId, slotId: b.slot_id }));
       case "exeat": return NextResponse.json(await requestExeat(svc, { tenantId, guardianId, studentId: b.student_id, reason: b.reason, leaveAt: b.leave_at, returnBy: b.return_by, collector: b.collector }), { status: 201 });
+      case "ticket": {
+        const { count } = await svc.from("tickets").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("guardian_id", guardianId).gte("created_at", new Date(Date.now() - 86400_000).toISOString());
+        if ((count ?? 0) >= 5) return jsonError("you have raised several requests today; please wait for a reply or call the school", 429);
+        const t = await createTicket(svc, { tenantId, guardianId, studentId: b.student_id ?? null, kind: b.kind, category: b.category,
+          priority: ["safety", "bullying", "health"].includes(b.category) ? "high" : "normal", channel: "portal", subject: b.subject, body: b.body, baseUrl: appUrl(req) });
+        return NextResponse.json({ ok: true, ticket_no: t.ticket_no, token: t.token }, { status: 201 });
+      }
+      case "reenrol":
+        return NextResponse.json(await respondReenrolment(svc, { tenantId, guardianId, roundId: b.round_id, studentId: b.student_id, intent: b.intent, reason: b.reason, note: b.note }));
       case "language": {
         const { error } = await svc.from("guardians").update({ language: b.language }).eq("tenant_id", tenantId).eq("id", guardianId);
         return error ? jsonError(error.message) : NextResponse.json({ ok: true });

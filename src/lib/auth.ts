@@ -51,7 +51,7 @@ export const STAFF_ROLE_OPTIONS = ["teacher", "school_admin", "principal", "it_a
 export type ModuleKey = "lms" | "sims" | "results" | "exams" | "gate" | "pickup" | "library"
   | "requisitions" | "hr" | "qa" | "messaging" | "fees" | "payroll" | "inventory" | "admissions"
   | "attendance" | "behaviour" | "homework" | "health" | "events" | "meetings" | "timetable"
-  | "transport" | "hostel" | "visitors" | "lesson_notes" | "analytics" | "wallet" | "inbox" | "cover";
+  | "transport" | "hostel" | "visitors" | "lesson_notes" | "analytics" | "wallet" | "inbox" | "cover" | "community";
 
 export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });

@@ -12,7 +12,7 @@ const MODULES: [string, string][] = [
   ["inbox", "Parent-staff messaging"], ["fees", "Fees & online payments"], ["wallet", "Cashless wallet & tuck shop"],
   ["payroll", "Payroll"], ["inventory", "Accounts, stock & assets"], ["admissions", "Admissions"],
   ["attendance", "Class register"], ["behaviour", "Behaviour & houses"], ["homework", "Homework"], ["health", "Health & sick bay"],
-  ["events", "Events & consent"], ["meetings", "Parent meetings"], ["timetable", "Timetable"], ["cover", "Staff cover"],
+  ["events", "Events & consent"], ["meetings", "Parent meetings"], ["timetable", "Timetable"], ["cover", "Staff cover"], ["community", "Families & community"],
   ["transport", "School buses & live tracking"], ["hostel", "Boarding & exeat"], ["visitors", "Visitors"],
   ["lesson_notes", "Lesson notes"], ["analytics", "Early warning"]
 ];

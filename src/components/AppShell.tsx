@@ -54,7 +54,9 @@ const GROUPS: NavGroup[] = [
     { href: "/school/messages", label: "Messages", roles: [...ADMIN, "it_admin"], module: "messaging" },
     { href: "/school/events", label: "Events & trips", roles: STAFF, module: "events" },
     { href: "/school/meetings", label: "Parent meetings", roles: TEACH, module: "meetings" },
-    { href: "/school/admissions", label: "Admissions", roles: ["admissions_officer", ...ADMIN], module: "admissions" }
+    { href: "/school/admissions", label: "Admissions", roles: ["admissions_officer", ...ADMIN], module: "admissions" },
+    { href: "/school/community", label: "Families & community", roles: [...ADMIN, "bursar"], module: "community" },
+    { href: "/school/support", label: "Complaints & requests", roles: STAFF.filter(r => r !== "cashier"), module: "community" }
   ] },
   { title: "Finance", links: [
     { href: "/school/fees", label: "Fees & payments", roles: FINANCE, module: "fees" },
@@ -81,7 +83,7 @@ const GROUPS: NavGroup[] = [
 ];
 
 // Pages that render without the app chrome (public links, kiosk, exam lockdown).
-const BARE = [/^\/login$/, /^\/signup$/, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/pay\//, /^\/apply\//, /^\/enquire\//, /^\/visit\//, /^\/entrance\//, /\/print$/, /\/transcript$/];
+const BARE = [/^\/login$/, /^\/signup$/, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/pay\//, /^\/apply\//, /^\/enquire\//, /^\/visit\//, /^\/entrance\//, /^\/t\//, /^\/s\//, /^\/unsubscribe\//, /^\/alumni\//, /\/print$/, /\/transcript$/];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
