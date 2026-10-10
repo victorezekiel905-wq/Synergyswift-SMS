@@ -76,9 +76,15 @@ export async function PUT(req: NextRequest) {
     const { error } = await ctx.sb.from("score_entries").upsert(upserts, { onConflict: "term_id,student_id,subject_id,component_id" });
     if (error) return jsonError(error.message.includes("row-level security") ? "you can only enter scores for subjects you teach" : error.message, 403);
   }
-  for (const d of deletes) {
-    await ctx.sb.from("score_entries").delete().eq("tenant_id", tid).eq("term_id", b.term_id).eq("subject_id", b.subject_id)
-      .eq("student_id", d.student_id).eq("component_id", d.component_id);
+  // One delete per component; count what was really removed (RLS skips rows silently).
+  let cleared = 0;
+  const byComponent = new Map<string, string[]>();
+  for (const d of deletes) byComponent.set(d.component_id, [...(byComponent.get(d.component_id) ?? []), d.student_id]);
+  for (const [componentId, studentIds] of byComponent) {
+    const { data, error } = await ctx.sb.from("score_entries").delete().eq("tenant_id", tid).eq("term_id", b.term_id).eq("subject_id", b.subject_id)
+      .eq("component_id", componentId).in("student_id", studentIds).select("id");
+    if (error) return jsonError(error.message);
+    cleared += data?.length ?? 0;
   }
-  return NextResponse.json({ saved: upserts.length, cleared: deletes.length });
+  return NextResponse.json({ saved: upserts.length, cleared });
 }

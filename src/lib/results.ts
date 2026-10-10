@@ -5,6 +5,23 @@
 import { computeClassResults } from "./grading";
 import { schemeFor, termLabel, studentName } from "./school";
 
+const PAGE = 1000;
+
+/**
+ * Reads every row of a query. Supabase returns at most 1000 rows per request
+ * (the API's "max rows" setting, which .limit() cannot raise), so a big class
+ * would otherwise lose scores silently. `build` must order by a unique key.
+ */
+export async function fetchAll<T>(build: () => any): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await build().range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    out.push(...(data ?? []));
+    if (!data || data.length < PAGE) return out;
+  }
+}
+
 export async function compileClassResults(sb: any, tenantId: string, termId: string, classGroupId: string, opts: { force?: boolean } = {}) {
   const scheme = await schemeFor(sb, tenantId, classGroupId);
   if (!scheme) throw new Error("no grading scheme configured");
@@ -21,13 +38,14 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
   const studentIds: string[] = (students ?? []).map((s: { id: string }) => s.id);
   if (!studentIds.length) return { computed: 0, skipped_published: 0 };
 
-  const { data: scores } = await sb.from("score_entries").select("student_id,subject_id,component_id,score")
-    .eq("tenant_id", tenantId).eq("term_id", termId).in("student_id", studentIds);
+  const scores = await fetchAll<{ student_id: string; subject_id: string; component_id: string; score: number | null }>(() =>
+    sb.from("score_entries").select("id,student_id,subject_id,component_id,score")
+      .eq("tenant_id", tenantId).eq("term_id", termId).in("student_id", studentIds).order("id"));
 
   let subjects = (offerings ?? []).filter((o: any) => o.subjects).map((o: any) => ({ id: o.subjects.id, name: o.subjects.name }));
   if (!subjects.length) {
     // No offerings configured: fall back to subjects that actually have scores.
-    const ids = [...new Set((scores ?? []).map((s: any) => s.subject_id))];
+    const ids = [...new Set(scores.map(s => s.subject_id))];
     if (ids.length) {
       const { data } = await sb.from("subjects").select("id,name").eq("tenant_id", tenantId).in("id", ids);
       subjects = data ?? [];
@@ -35,17 +53,17 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
   }
   subjects.sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-  const results = computeClassResults({ studentIds, subjects, scores: scores ?? [], scheme });
+  const results = computeClassResults({ studentIds, subjects, scores, scheme });
 
   // Attendance for the term: distinct days with a sign-in.
   const present = new Map<string, number>();
   if (term.starts_on) {
     const end = term.ends_on ? `${term.ends_on}T23:59:59Z` : new Date().toISOString();
-    const { data: ev } = await sb.from("gate_events").select("student_id,at")
+    const ev = await fetchAll<{ student_id: string; at: string }>(() => sb.from("gate_events").select("id,student_id,at")
       .eq("tenant_id", tenantId).eq("direction", "in").in("student_id", studentIds)
-      .gte("at", `${term.starts_on}T00:00:00Z`).lte("at", end).limit(100000);
+      .gte("at", `${term.starts_on}T00:00:00Z`).lte("at", end).order("id"));
     const days = new Map<string, Set<string>>();
-    for (const e of ev ?? []) {
+    for (const e of ev) {
       if (!days.has(e.student_id)) days.set(e.student_id, new Set());
       days.get(e.student_id)!.add(String(e.at).slice(0, 10));
     }
@@ -54,9 +72,10 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
   // The class register is the official record when it has been taken: it wins over gate sign-ins.
   const register = new Map<string, { present: number; absent: number; opened: number }>();
   if (term.starts_on) {
-    const { data: att } = await sb.from("class_attendance").select("student_id,status").eq("tenant_id", tenantId).in("student_id", studentIds)
-      .gte("date", term.starts_on).lte("date", term.ends_on ?? new Date().toISOString().slice(0, 10)).limit(200000);
-    for (const a of att ?? []) {
+    const att = await fetchAll<{ student_id: string; status: string }>(() => sb.from("class_attendance").select("id,student_id,status")
+      .eq("tenant_id", tenantId).in("student_id", studentIds)
+      .gte("date", term.starts_on).lte("date", term.ends_on ?? new Date().toISOString().slice(0, 10)).order("id"));
+    for (const a of att) {
       const m = register.get(a.student_id) ?? { present: 0, absent: 0, opened: 0 };
       m.opened++;
       if (a.status === "present" || a.status === "late") m.present++; else if (a.status === "absent") m.absent++;
@@ -65,9 +84,10 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
   }
   // Character and skills ratings for the report card.
   const { data: traitDefs } = await sb.from("trait_definitions").select("id,domain,name,position").eq("tenant_id", tenantId).order("position");
-  const { data: traitRows } = (traitDefs ?? []).length
-    ? await sb.from("trait_ratings").select("student_id,trait_id,rating").eq("term_id", termId).in("student_id", studentIds)
-    : { data: [] };
+  const traitRows = (traitDefs ?? []).length
+    ? await fetchAll<{ student_id: string; trait_id: string; rating: number }>(() => sb.from("trait_ratings").select("student_id,trait_id,rating")
+        .eq("term_id", termId).in("student_id", studentIds).order("student_id").order("trait_id"))
+    : [];
 
   const { data: existing } = await sb.from("report_cards").select("student_id,status").eq("tenant_id", tenantId).eq("term_id", termId).in("student_id", studentIds);
   const published = new Set((existing ?? []).filter((r: any) => r.status === "published").map((r: any) => r.student_id));
@@ -93,7 +113,7 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
         days_absent: register.get(r.student_id)?.absent ?? null,
         days_opened: register.get(r.student_id)?.opened ?? null,
         traits: (traitDefs ?? []).map((t: any) => ({ domain: t.domain, name: t.name,
-          rating: (traitRows ?? []).find((x: any) => x.student_id === r.student_id && x.trait_id === t.id)?.rating ?? null }))
+          rating: traitRows.find(x => x.student_id === r.student_id && x.trait_id === t.id)?.rating ?? null }))
       }
     }));
   for (let i = 0; i < rows.length; i += 200) {

@@ -8,8 +8,8 @@ This release turns EduClass Fusion from a classroom-engagement tool into a full 
 |---|---|---|
 | Platform (super) admin | `/platform` | Create schools, suspend and reactivate them, switch modules on or off, set student limits, invite school admins, see usage. Has no account inside any school. |
 | School admin / principal | `/school`, `/school/setup` | Everything inside their own school: grading rules, calendar, classes, staff roles, publishing results. |
-| Teacher | `/dashboard`, `/school/results`, `/exams` | Enter scores for subjects they teach, write comments, build and proctor exams, use the LMS. |
-| Form teacher | `/school/results` | Compile report cards for their class. |
+| Teacher | `/dashboard`, `/school/results`, `/exams` | Enter scores for subjects they teach, build and proctor exams, use the LMS. |
+| Form teacher | `/school/results` | Compile report cards for their class and write the form teacher's comment until the cards are published. |
 | Gate officer | `/school/gate`, `/school/pickup` | Run the sign-in kiosk and the pickup desk. |
 | Librarian, bursar, HR manager, QA officer | their module pages | Library; requisition approval; staff records and leave; lesson observations. |
 | Parent | `/parent`, or the private `/g/<token>` link | See children on site now, sign-in history, published results, library books; generate pickup codes. |

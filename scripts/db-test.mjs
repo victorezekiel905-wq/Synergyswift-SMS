@@ -131,7 +131,7 @@ console.log("\nResults");
 await expectOk("subject teacher can enter scores", U.teacherA, `insert into score_entries (tenant_id, term_id, student_id, subject_id, component_id, score) values ('${T.A}', 'a5000000-0000-0000-0000-000000000000', 'a8000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000000', 'a7000000-0000-0000-0000-000000000000', 70)`);
 await expectError("other teacher cannot enter scores for that subject", U.teacherA2, `insert into score_entries (tenant_id, term_id, student_id, subject_id, component_id, score) values ('${T.A}', 'a5000000-0000-0000-0000-000000000000', 'a8000000-0000-0000-0000-000000000002', 'a3000000-0000-0000-0000-000000000000', 'a7000000-0000-0000-0000-000000000000', 70)`, /row-level security/);
 await expectError("teacher cannot publish report cards", U.teacherA, `update report_cards set status = 'published' where status = 'draft'`, /only school admins/);
-await expectOk("teacher can write a comment", U.teacherA, `update report_cards set teacher_comment = 'Good' where status = 'draft'`);
+await expectError("a teacher who is not the form teacher cannot write a comment", U.teacherA, `update report_cards set teacher_comment = 'Good' where status = 'draft'`, /form teacher or a school admin/);
 await expectRows("parent sees only their child's published card", U.parentA, "select count(*) n from report_cards", 1);
 await expectRows("student sees only own published card", U.studentA, "select count(*) n from report_cards", 1);
 await expectRows("student cannot read score entries", U.studentA, "select count(*) n from score_entries", 0);

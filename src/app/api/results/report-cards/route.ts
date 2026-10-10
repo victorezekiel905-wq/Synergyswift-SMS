@@ -51,6 +51,8 @@ export async function PATCH(req: NextRequest) {
   if ((fields.status || fields.principal_comment !== undefined) && !hasAny(ctx, ROLES.admin)) {
     return jsonError("only admins can approve, withhold or write the principal's comment", 403);
   }
+  // The database (report_cards_guard) limits everyone else to the form teacher of a card that is not published.
   const { error } = await ctx.sb.from("report_cards").update(fields).eq("tenant_id", ctx.tenant.id).eq("id", id);
-  return error ? jsonError(error.message) : NextResponse.json({ ok: true });
+  if (error) return jsonError(error.message, /^only /.test(error.message) ? 403 : 400);
+  return NextResponse.json({ ok: true });
 }

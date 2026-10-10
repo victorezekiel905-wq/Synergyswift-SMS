@@ -72,7 +72,7 @@ A staff member has one **main role** and can hold **extra duties**. For example,
 | Student and parent records | ✅ | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | 👁 | ✅ |
 | Class register | ✅ | ✅ own classes | — | — | — | — | — | — | — | — | — | — |
 | Enter scores | ✅ | ✅ subjects taught and own form class | — | — | — | — | — | — | — | — | — | — |
-| Compile report cards | ✅ | ✅ form teacher | — | — | — | — | — | — | — | — | — | — |
+| Compile report cards, form teacher's comment (not once published) | ✅ | ✅ form teacher | — | — | — | — | — | — | — | — | — | — |
 | Approve, publish, withhold results | ✅ | — | — | — | — | — | — | — | — | — | — | — |
 | Lesson notes | ✅ approve | ✅ own | — | — | ✅ approve | — | — | — | — | — | — | — |
 | Homework, behaviour points | ✅ | ✅ | — | — | — | — | — | — | behaviour | — | — | — |

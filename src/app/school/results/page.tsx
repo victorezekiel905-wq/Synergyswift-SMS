@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Badge, statusTone, Empty, Field, Modal, Loading } from "@/components/ui";
+import { subjectTotal, gradeFor as bandFor, round } from "@/lib/grading";
 
 type Session = { id: string; name: string; terms: { id: string; name: string; is_current: boolean }[] };
 type Structure = {
@@ -9,7 +10,7 @@ type Structure = {
   offerings: { class_group_id: string; subject_id: string; teacher_id: string | null }[];
 };
 type Sheet = {
-  scheme: { name: string; components: { id: string; name: string; max_score: number; weight: number }[]; bands: { grade: string; min_score: number }[]; pass_mark: number };
+  scheme: { name: string; components: { id: string; name: string; max_score: number; weight: number }[]; bands: { grade: string; min_score: number; max_score: number }[]; pass_mark: number; decimals: number };
   students: { id: string; admission_no: string; first_name: string; last_name: string; other_names: string | null }[];
   scores: Record<string, Record<string, number | null>>;
   can_edit: boolean;
@@ -94,12 +95,13 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
   }, [data]);
 
   const comps = data?.scheme.components ?? [];
+  // Same arithmetic and rounding as the compiled report card.
   const totalFor = (sid: string) => {
-    let t = 0, any = false;
-    for (const c of comps) { const v = grid[sid]?.[c.id]; if (v !== "" && v !== undefined && !isNaN(Number(v))) { t += Math.min(Math.max(Number(v), 0), c.max_score) / c.max_score * c.weight; any = true; } }
-    return any ? Math.round(t * 10) / 10 : null;
+    const scores = Object.fromEntries(comps.map(c => { const v = grid[sid]?.[c.id] ?? ""; return [c.id, v === "" ? null : Number(v)]; }));
+    const { total } = subjectTotal(scores, comps, 4);
+    return total === null ? null : round(total, data?.scheme.decimals ?? 1);
   };
-  const gradeFor = (t: number | null) => t === null ? "" : [...(data?.scheme.bands ?? [])].sort((a, b) => b.min_score - a.min_score).find(b => t >= b.min_score)?.grade ?? "";
+  const gradeFor = (t: number | null) => bandFor(t, data?.scheme.bands ?? [])?.grade ?? "";
   const invalid = (c: { max_score: number }, v: string) => v !== "" && (isNaN(Number(v)) || Number(v) < 0 || Number(v) > c.max_score);
   const hasInvalid = data ? data.students.some(s => comps.some(c => invalid(c, grid[s.id]?.[c.id] ?? ""))) : false;
 
@@ -260,7 +262,7 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
                     <td className="p-2 text-center font-semibold tabular-nums">{c.average ?? "—"}</td>
                     <td className="p-2"><Badge tone={statusTone(c.status)}>{c.status}</Badge></td>
                     <td className="whitespace-nowrap p-2 text-right">
-                      <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setEditing(c)}>Comments</button>
+                      {(isAdmin || (isFormTeacher && c.status !== "published")) && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setEditing(c)}>Comments</button>}
                       <a className="btn btn-ghost px-2 py-1 text-xs" href={`/r/${c.access_token}`} target="_blank" rel="noreferrer">Preview</a>
                       {isAdmin && c.status !== "published" && (c.status === "withheld"
                         ? <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => patch(c.id, { status: "draft" })}>Release hold</button>
