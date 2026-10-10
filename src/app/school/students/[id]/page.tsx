@@ -59,6 +59,7 @@ export default function StudentDetail(props: { params: Promise<{ id: string }> }
           <HousePicker studentId={s.id} houseId={s.house_id ?? null} onChange={reload} />
           <button className="btn btn-outline" onClick={() => setCard(true)}>ID card / QR</button>
           {!s.user_id && <button className="btn btn-outline" onClick={createLogin}>Create student login</button>}
+          <a className="btn btn-outline" href={`/school/students/${s.id}/transcript`} target="_blank" rel="noreferrer">Transcript</a>
           <a className="btn btn-outline" href={`/api/sims/students/${s.id}/export`} title="Everything held about this student, for a data access request">Export data</a>
         </>} />
       {msg && <div className="mb-4"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}

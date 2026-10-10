@@ -93,6 +93,7 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notes, setNotes] = useState(false);
 
   useEffect(() => {
     if (!data) return;
@@ -158,8 +159,9 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
         </Field>
         {data && <p className="pb-2 text-xs text-slate-500">Scheme: {data.scheme.name}. {comps.map(c => `${c.name} /${c.max_score} (${c.weight}%)`).join(" · ")}</p>}
         <div className="ml-auto flex gap-2 pb-0.5">
+          <button className="btn btn-ghost" onClick={() => { if (!dirty || confirm("Discard unsaved scores?")) setNotes(n => !n); }}>{notes ? "Back to scores" : "Comments & targets"}</button>
           {dirty && <span className="self-center text-xs text-amber-600">Unsaved changes</span>}
-          <button className="btn btn-primary" onClick={save} disabled={!dirty || busy || hasInvalid || !data?.can_edit}>{busy ? "Saving…" : "Save scores"}</button>
+          {!notes && <button className="btn btn-primary" onClick={save} disabled={!dirty || busy || hasInvalid || !data?.can_edit}>{busy ? "Saving…" : "Save scores"}</button>}
         </div>
       </div>
       {error && <Alert>{error}</Alert>}
@@ -173,7 +175,8 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
       )}
       {data && data.locked && !data.can_edit && <div className="mb-3"><Alert tone="blue">These scores have been submitted and are locked. The head of department or principal can return them for correction.</Alert></div>}
       {data && !data.can_edit && !data.locked && <div className="mb-3"><Alert tone="amber">View only: you are not the subject teacher for this class.</Alert></div>}
-      {data && (
+      {data && notes && <SubjectNotes termId={termId} cg={cg} subject={subject} students={data.students} canEdit={data.teaches} bands={data.scheme.bands} />}
+      {data && !notes && (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
@@ -271,8 +274,51 @@ function Approvals({ termId, cg }: { termId: string; cg: string }) {
   );
 }
 
+type Note = { comment: string; effort: string; target_grade: string; predicted_grade: string };
+
+/** Per-subject report comments, effort, target and predicted grades (printed on British-style cards). */
+function SubjectNotes({ termId, cg, subject, students, canEdit, bands }: { termId: string; cg: string; subject: string; students: Sheet["students"]; canEdit: boolean; bands: { grade: string }[] }) {
+  const { data, reload } = useApi<{ notes: Record<string, Partial<Note>> }>(`/api/results/subject-comments?term_id=${termId}&class_group_id=${cg}&subject_id=${subject}`, [termId, cg, subject]);
+  const [rows, setRows] = useState<Record<string, Note>>({});
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => {
+    if (!data) return;
+    setRows(Object.fromEntries(students.map(s => { const n = data.notes[s.id] ?? {}; return [s.id, { comment: n.comment ?? "", effort: n.effort ?? "", target_grade: n.target_grade ?? "", predicted_grade: n.predicted_grade ?? "" }]; })));
+  }, [data, students]);
+  const set = (id: string, k: keyof Note, v: string) => setRows(r => ({ ...r, [id]: { ...r[id], [k]: v } }));
+  async function save() {
+    const r = await send("/api/results/subject-comments", { term_id: termId, subject_id: subject, notes: students.map(s => ({ student_id: s.id, ...rows[s.id] })) }, "PUT");
+    setMsg({ ok: r.ok, text: r.ok ? "Saved. Recompile report cards to include them." : r.error ?? "failed" });
+    if (r.ok) reload();
+  }
+  if (!data) return <Loading />;
+  const grades = bands.map(b => b.grade);
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-slate-600">Effort uses 1 (excellent) to 4 (cause for concern). Leave <i>Predicted</i> blank to let the system forecast it from the student&apos;s results so far.</p>
+      {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
+      <div className="card overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Comment</th><th className="p-2">Effort</th><th className="p-2">Target</th><th className="p-2">Predicted</th></tr></thead>
+          <tbody>{students.map(s => (
+            <tr key={s.id} className="border-t border-slate-100">
+              <td className="whitespace-nowrap p-2 font-medium">{s.last_name}, {s.first_name}</td>
+              <td className="p-1"><input className="input py-1" disabled={!canEdit} maxLength={600} value={rows[s.id]?.comment ?? ""} onChange={e => set(s.id, "comment", e.target.value)} aria-label={`Comment for ${s.first_name}`} /></td>
+              <td className="p-1"><select className="input w-20 py-1" disabled={!canEdit} value={rows[s.id]?.effort ?? ""} onChange={e => set(s.id, "effort", e.target.value)} aria-label={`Effort for ${s.first_name}`}><option value="">—</option>{["1", "2", "3", "4"].map(x => <option key={x}>{x}</option>)}</select></td>
+              <td className="p-1"><select className="input w-24 py-1" disabled={!canEdit} value={rows[s.id]?.target_grade ?? ""} onChange={e => set(s.id, "target_grade", e.target.value)} aria-label={`Target for ${s.first_name}`}><option value="">—</option>{grades.map(g => <option key={g}>{g}</option>)}</select></td>
+              <td className="p-1"><select className="input w-24 py-1" disabled={!canEdit} value={rows[s.id]?.predicted_grade ?? ""} onChange={e => set(s.id, "predicted_grade", e.target.value)} aria-label={`Predicted grade for ${s.first_name}`}><option value="">Auto</option>{grades.map(g => <option key={g}>{g}</option>)}</select></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      {canEdit && <div className="flex justify-end"><button className="btn btn-primary" onClick={save}>Save comments &amp; targets</button></div>}
+    </div>
+  );
+}
+
 function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; cg: string; isAdmin: boolean; isFormTeacher: boolean }) {
-  const { data, error, reload } = useApi<Card[]>(`/api/results/report-cards?term_id=${termId}&class_group_id=${cg}`, [termId, cg]);
+  const [kind, setKind] = useState<"term" | "midterm">("term");
+  const { data, error, reload } = useApi<Card[]>(`/api/results/report-cards?term_id=${termId}&class_group_id=${cg}&kind=${kind}`, [termId, cg, kind]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [editing, setEditing] = useState<Card | null>(null);
@@ -284,7 +330,7 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
 
   async function compile(force = false) {
     setBusy("compile");
-    const r = await send("/api/results/compute", { term_id: termId, class_group_id: cg, force });
+    const r = await send("/api/results/compute", { term_id: termId, class_group_id: cg, force, kind });
     setBusy(null);
     setMsg({ ok: r.ok, text: r.ok ? `Compiled ${r.data.computed} report cards${r.data.skipped_published ? ` (${r.data.skipped_published} already published were kept)` : ""}.` : r.error ?? "failed" });
     if (r.ok) reload();
@@ -293,7 +339,7 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
     const draft = (data ?? []).filter(c => c.status === "draft" || c.status === "approved").length;
     if (!confirm(resend ? "Send the published results to parents again?" : `Publish ${draft} report cards and send them to parents by WhatsApp and email now?`)) return;
     setBusy("publish");
-    const r = await send("/api/results/publish", { term_id: termId, class_group_id: cg, resend });
+    const r = await send("/api/results/publish", { term_id: termId, class_group_id: cg, resend, kind });
     setBusy(null);
     if (!r.ok) { setMsg({ ok: false, text: r.error ?? "failed" }); return; }
     const d = r.data;
@@ -304,7 +350,7 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
   }
   async function draftComments(role: "form_teacher" | "principal") {
     setBusy("draft_" + role);
-    const r = await send("/api/results/draft-comments", { term_id: termId, class_group_id: cg, role });
+    const r = await send("/api/results/draft-comments", { term_id: termId, class_group_id: cg, role, kind });
     setBusy(null);
     setMsg({ ok: r.ok, text: r.ok ? `Drafted ${r.data.drafted} comments${r.data.note ? ` (${r.data.note})` : ""}. Read and edit them before publishing.` : r.error ?? "failed" });
     if (r.ok) reload();
@@ -316,8 +362,20 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
   }
 
   const incomplete = (data ?? []).filter(c => c.data?.subjects?.some(s => s.total !== null && !s.complete)).length;
+  const printUrl = (view: string) => `/school/results/print?term=${termId}&class=${cg}&kind=${kind}&view=${view}`;
   return (
     <div>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-lg border border-slate-200 p-0.5" role="group" aria-label="Report type">
+          {(["term", "midterm"] as const).map(k => <button key={k} className={"rounded-md px-3 py-1 text-sm " + (kind === k ? "bg-brand-600 text-white" : "text-slate-600")} onClick={() => setKind(k)} aria-pressed={kind === k}>{k === "term" ? "End of term" : "Mid-term"}</button>)}
+        </div>
+        {data && data.length > 0 && <>
+          <a className="btn btn-ghost text-xs" href={printUrl("cards")} target="_blank" rel="noreferrer">Print all cards (PDF)</a>
+          <a className="btn btn-ghost text-xs" href={printUrl("broadsheet")} target="_blank" rel="noreferrer">Broadsheet</a>
+          <a className="btn btn-ghost text-xs" href={printUrl("master")} target="_blank" rel="noreferrer">Master score sheet</a>
+        </>}
+      </div>
+      {kind === "midterm" && <p className="mb-3 text-xs text-slate-500">Mid-term reports use only the assessments ticked as mid-term under School setup → Grading.</p>}
       <div className="mb-4 flex flex-wrap gap-2">
         {(isAdmin || isFormTeacher) && <button className="btn btn-outline" disabled={busy !== null} onClick={() => compile(false)}>{busy === "compile" ? "Compiling…" : "Compile report cards"}</button>}
         {isAdmin && <button className="btn btn-outline" disabled={busy !== null} onClick={() => confirm("Recompute published report cards too? Parents will see the new figures on their link.") && compile(true)}>Recompute all</button>}
@@ -325,7 +383,7 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
         {isAdmin && <button className="btn btn-ghost" disabled={busy !== null} onClick={() => publish(true)}>Resend</button>}
         {(isAdmin || isFormTeacher) && <button className="btn btn-outline" disabled={busy !== null || !data?.length} onClick={() => draftComments("form_teacher")}>{busy === "draft_form_teacher" ? "Drafting comments…" : "Draft teacher comments"}</button>}
         {isAdmin && <button className="btn btn-outline" disabled={busy !== null || !data?.length} onClick={() => draftComments("principal")}>{busy === "draft_principal" ? "Drafting comments…" : "Draft principal comments"}</button>}
-        <a className="btn btn-ghost ml-auto" href={`/api/results/report-cards?term_id=${termId}&class_group_id=${cg}&format=csv`}>Download broadsheet (CSV)</a>
+        <a className="btn btn-ghost ml-auto" href={`/api/results/report-cards?term_id=${termId}&class_group_id=${cg}&kind=${kind}&format=csv`}>Download broadsheet (CSV)</a>
       </div>
       {error && <Alert>{error}</Alert>}
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
@@ -373,9 +431,48 @@ function CommentForm({ card, isAdmin, onSave }: { card: Card; isAdmin: boolean; 
   return (
     <form className="space-y-3" onSubmit={e => { e.preventDefault(); onSave(isAdmin ? { teacher_comment: t, principal_comment: p } : { teacher_comment: t }); }}>
       <Field label="Form teacher's comment"><textarea className="input h-24" value={t} onChange={e => setT(e.target.value)} maxLength={600} /></Field>
+      <CommentBankPicker role="form_teacher" average={card.average} name={card.data.student_name} onPick={setT} isAdmin={isAdmin} />
       {isAdmin && <Field label="Principal's comment"><textarea className="input h-24" value={p} onChange={e => setP(e.target.value)} maxLength={600} /></Field>}
+      {isAdmin && <CommentBankPicker role="principal" average={card.average} name={card.data.student_name} onPick={setP} isAdmin={isAdmin} />}
       <div className="flex justify-end"><button className="btn btn-primary">Save</button></div>
     </form>
+  );
+}
+
+type BankComment = { id: string; role: string; min_average: number | null; max_average: number | null; text: string; fits: boolean; mine: boolean };
+
+/** Comment bank suggestions for a report card; matching ones (by average) first. Staff can add their own. */
+function CommentBankPicker({ role, average, name, onPick, isAdmin }: { role: "form_teacher" | "principal"; average: number | null; name: string; onPick: (t: string) => void; isAdmin: boolean }) {
+  const { data, reload } = useApi<BankComment[]>(`/api/results/comment-bank?role=${role}${average !== null ? `&average=${average}` : ""}`, [role, average]);
+  const [adding, setAdding] = useState(false);
+  const [f, setF] = useState({ text: "", min: "", max: "" });
+  const first = String(name ?? "").split(" ")[0] || "The student";
+  const fill = (text: string) => text.replace(/\{name\}/g, first);
+  async function add() {
+    const r = await send("/api/results/comment-bank", { action: "save", role, text: f.text, min_average: f.min === "" ? null : Number(f.min), max_average: f.max === "" ? null : Number(f.max) });
+    if (r.ok) { setAdding(false); setF({ text: "", min: "", max: "" }); reload(); }
+  }
+  const list = (data ?? []).slice(0, 8);
+  return (
+    <div className="rounded-lg bg-slate-50 p-2 text-xs">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="font-semibold text-slate-600">Comment bank</span>
+        <button type="button" className="text-brand-700 hover:underline" onClick={() => setAdding(a => !a)}>{adding ? "Cancel" : "+ Add"}</button>
+        {isAdmin && data && !data.length && <button type="button" className="text-brand-700 hover:underline" onClick={async () => { await send("/api/results/comment-bank", { action: "seed" }); reload(); }}>Add starter comments</button>}
+      </div>
+      {adding && (
+        <div className="mb-2 space-y-1">
+          <input className="input py-1 text-xs" placeholder="Comment. Write {name} for the student's first name." value={f.text} onChange={e => setF({ ...f, text: e.target.value })} aria-label="New bank comment" />
+          <div className="flex items-center gap-1">For averages from <input className="input w-16 py-1 text-xs" type="number" value={f.min} onChange={e => setF({ ...f, min: e.target.value })} aria-label="From average" /> to <input className="input w-16 py-1 text-xs" type="number" value={f.max} onChange={e => setF({ ...f, max: e.target.value })} aria-label="To average" />
+            <button type="button" className="btn btn-primary ml-auto px-2 py-1 text-xs" disabled={f.text.trim().length < 2} onClick={add}>Save</button></div>
+        </div>
+      )}
+      {!list.length ? <p className="text-slate-500">No saved comments yet.</p> : (
+        <ul className="space-y-1">{list.map(c => (
+          <li key={c.id}><button type="button" className={"w-full rounded px-2 py-1 text-left hover:bg-white " + (c.fits ? "text-slate-800" : "text-slate-400")} onClick={() => onPick(fill(c.text))} title={c.min_average !== null || c.max_average !== null ? `Averages ${c.min_average ?? 0}–${c.max_average ?? 100}` : "Any average"}>{fill(c.text)}</button></li>
+        ))}</ul>
+      )}
+    </div>
   );
 }
 

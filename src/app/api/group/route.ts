@@ -32,7 +32,7 @@ export async function GET() {
     const [invoices, att, cards, pays] = await Promise.all([
       term ? svc.from("fee_invoices").select("total,amount_paid").eq("tenant_id", t.id).eq("term_id", term.id).neq("status", "void").limit(20000) : { data: [] },
       svc.from("class_attendance").select("status").eq("tenant_id", t.id).gte("date", since30.slice(0, 10)).limit(50000),
-      term ? svc.from("report_cards").select("average").eq("tenant_id", t.id).eq("term_id", term.id).limit(20000) : { data: [] },
+      term ? svc.from("report_cards").select("average").eq("tenant_id", t.id).eq("term_id", term.id).eq("kind", "term").limit(20000) : { data: [] },
       svc.from("fee_payments").select("amount").eq("tenant_id", t.id).eq("status", "success").gte("paid_at", since30).limit(50000)
     ]);
     const billed = (invoices.data ?? []).reduce((a: number, i: any) => a + Number(i.total), 0);

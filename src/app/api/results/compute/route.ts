@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
 import { compileClassResults } from "@/lib/results";
 
-const Body = z.object({ term_id: z.string().uuid(), class_group_id: z.string().uuid(), force: z.boolean().default(false) });
+const Body = z.object({ term_id: z.string().uuid(), class_group_id: z.string().uuid(), force: z.boolean().default(false), kind: z.enum(["term", "midterm"]).default("term") });
 
 /** Compile report cards for a class (admins or the form teacher). Published cards are kept unless force=true. */
 export async function POST(req: NextRequest) {
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   }
   // With moderation on, only approved score sheets may go onto report cards.
   const { data: settings } = await ctx.sb.from("tenant_settings").select("require_moderation").eq("tenant_id", ctx.tenant.id).maybeSingle();
-  if (settings?.require_moderation) {
+  if (settings?.require_moderation && b.kind === "term") {
     const [{ data: offered }, { data: sheets }] = await Promise.all([
       ctx.sb.from("subject_offerings").select("subject_id,subjects(name)").eq("tenant_id", ctx.tenant.id).eq("class_group_id", b.class_group_id),
       ctx.sb.from("score_sheets").select("subject_id,status").eq("tenant_id", ctx.tenant.id).eq("term_id", b.term_id).eq("class_group_id", b.class_group_id)
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     if (pending.length) return jsonError(`Scores still awaiting approval: ${pending.join(", ")}. Approve them under Results → Approvals first.`, 409);
   }
   try {
-    const r = await compileClassResults(ctx.sb, ctx.tenant.id, b.term_id, b.class_group_id, { force: b.force });
+    const r = await compileClassResults(ctx.sb, ctx.tenant.id, b.term_id, b.class_group_id, { force: b.force, kind: b.kind });
     return NextResponse.json(r);
   } catch (e) {
     return jsonError((e as Error).message);

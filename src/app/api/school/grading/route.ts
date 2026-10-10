@@ -3,8 +3,8 @@ import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { validateScheme, DEFAULT_SCHEME } from "@/lib/grading";
 
-const SELECT = "id,name,is_default,pass_mark,show_position,show_class_average,cumulative_mode,decimals,created_at," +
-  "grade_bands(id,grade,min_score,max_score,remark,grade_point),grading_components(id,name,max_score,weight,position)";
+const SELECT = "id,name,is_default,pass_mark,show_position,show_class_average,cumulative_mode,decimals,template,created_at," +
+  "grade_bands(id,grade,min_score,max_score,remark,grade_point),grading_components(id,name,max_score,weight,position,midterm)";
 
 /** The school's grading schemes (each tenant defines its own). */
 export async function GET() {
@@ -28,12 +28,14 @@ const SchemeBody = z.object({
   show_position: z.boolean(),
   show_class_average: z.boolean(),
   cumulative_mode: z.enum(["average", "weighted", "none"]).default("average"),
+  report_layout: z.enum(["nigerian", "british", "american"]).default("nigerian"),
   decimals: z.number().int().min(0).max(3),
   components: z.array(z.object({
     id: z.string().uuid().optional(),
     name: z.string().trim().min(1).max(40),
     max_score: z.number().positive(),
-    weight: z.number().min(0).max(100)
+    weight: z.number().min(0).max(100),
+    midterm: z.boolean().default(false)
   })).min(1).max(12),
   bands: z.array(z.object({
     grade: z.string().trim().min(1).max(12),
@@ -62,7 +64,7 @@ export async function PUT(req: NextRequest) {
   const sb = ctx.sb;
 
   const fields = { name: s.name, is_default: s.is_default, pass_mark: s.pass_mark, show_position: s.show_position,
-    show_class_average: s.show_class_average, cumulative_mode: s.cumulative_mode, decimals: s.decimals };
+    show_class_average: s.show_class_average, cumulative_mode: s.cumulative_mode, decimals: s.decimals, template: s.report_layout };
   let schemeId = s.id;
   if (schemeId) {
     const { error } = await sb.from("grading_schemes").update(fields).eq("tenant_id", tid).eq("id", schemeId);
@@ -87,7 +89,7 @@ export async function PUT(req: NextRequest) {
   }
   for (let i = 0; i < s.components.length; i++) {
     const c = s.components[i];
-    const row = { scheme_id: schemeId, name: c.name, max_score: c.max_score, weight: c.weight, position: i + 1 };
+    const row = { scheme_id: schemeId, name: c.name, max_score: c.max_score, weight: c.weight, midterm: c.midterm, position: i + 1 };
     const { error } = c.id
       ? await sb.from("grading_components").update(row).eq("id", c.id).eq("scheme_id", schemeId)
       : await sb.from("grading_components").insert(row);

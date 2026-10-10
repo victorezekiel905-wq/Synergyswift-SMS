@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     const [a, b, c] = await Promise.all([
       ctx.sb.from("class_attendance").select("student_id,status").eq("tenant_id", tid).in("student_id", part).gte("date", since.toISOString().slice(0, 10)).limit(50000),
       ctx.sb.from("behaviour_records").select("student_id,points").eq("tenant_id", tid).eq("kind", "negative").in("student_id", part).gte("occurred_at", since.toISOString()).limit(50000),
-      ctx.sb.from("report_cards").select("student_id,term_id,average,computed_at,data").eq("tenant_id", tid).in("student_id", part).order("computed_at", { ascending: false }).limit(20000)
+      ctx.sb.from("report_cards").select("student_id,term_id,average,computed_at,data").eq("tenant_id", tid).eq("kind", "term").in("student_id", part).order("computed_at", { ascending: false }).limit(20000)
     ]);
     att.push(...(a.data ?? [])); beh.push(...(b.data ?? [])); cards.push(...(c.data ?? []));
   }

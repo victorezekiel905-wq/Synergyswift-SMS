@@ -7,7 +7,7 @@
  */
 
 export type Band = { grade: string; min_score: number; max_score: number; remark?: string | null; grade_point?: number | null };
-export type Component = { id: string; name: string; max_score: number; weight: number; position?: number };
+export type Component = { id: string; name: string; max_score: number; weight: number; position?: number; midterm?: boolean };
 export type Scheme = {
   pass_mark: number;
   decimals: number;
@@ -210,6 +210,69 @@ export function computeClassResults(input: {
     for (const r of results) r.position = pos.get(r.student_id) ?? null;
   }
   return results;
+}
+
+/**
+ * Scheme for a mid-term progress report: only the components marked as
+ * mid-term, with their weights scaled up to 100 so the total reads as a
+ * percentage of the work assessed so far. Null when none are marked.
+ */
+export function midtermScheme<S extends Scheme>(scheme: S): S | null {
+  const comps = scheme.components.filter(c => c.midterm);
+  const w = comps.reduce((a, c) => a + Number(c.weight), 0);
+  if (!comps.length || w <= 0) return null;
+  return { ...scheme, components: comps.map(c => ({ ...c, weight: (Number(c.weight) / w) * 100 })) };
+}
+
+/**
+ * Projected next score from a run of earlier scores (oldest first) by a
+ * least-squares line, clamped to 0–100. One score projects itself.
+ */
+export function projectScore(history: number[], decimals = 1): number | null {
+  const ys = history.filter(v => Number.isFinite(v));
+  if (!ys.length) return null;
+  if (ys.length === 1) return round(ys[0], decimals);
+  const n = ys.length, xs = ys.map((_, i) => i);
+  const mx = (n - 1) / 2, my = ys.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0, sxx = 0;
+  for (let i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; }
+  const slope = sxx ? sxy / sxx : 0;
+  // Damp the trend so one strong or weak term does not swing the forecast too far.
+  const next = my + slope * (n - mx) * 0.75;
+  return round(Math.max(0, Math.min(100, next)), decimals);
+}
+
+/**
+ * Cumulative (session) results: each student's subject totals across the
+ * session's terms so far and their average, plus the overall cumulative
+ * average and a cumulative class position.
+ */
+export function cumulativeResults(input: {
+  terms: { id: string; label: string }[];                    // session terms in order, current last
+  totals: Map<string, Map<string, Map<string, number | null>>>; // student → term → subject → total
+  studentIds: string[];
+  decimals: number;
+}) {
+  const { terms, totals, studentIds, decimals } = input;
+  const out = new Map<string, { subjects: Record<string, { totals: (number | null)[]; average: number | null }>; average: number | null; position: number | null }>();
+  for (const sid of studentIds) {
+    const byTerm = totals.get(sid) ?? new Map();
+    const subjectIds = new Set<string>();
+    byTerm.forEach(m => m.forEach((_v: unknown, k: string) => subjectIds.add(k)));
+    const subjects: Record<string, { totals: (number | null)[]; average: number | null }> = {};
+    const avgs: number[] = [];
+    subjectIds.forEach(subj => {
+      const ts = terms.map(t => byTerm.get(t.id)?.get(subj) ?? null);
+      const vals = ts.filter((v): v is number => v !== null);
+      const average = vals.length ? round(vals.reduce((a, b) => a + b, 0) / vals.length, decimals) : null;
+      subjects[subj] = { totals: ts, average };
+      if (average !== null) avgs.push(average);
+    });
+    out.set(sid, { subjects, average: avgs.length ? round(avgs.reduce((a, b) => a + b, 0) / avgs.length, decimals) : null, position: null });
+  }
+  const pos = rank(studentIds.map(id => ({ id, value: out.get(id)!.average })), decimals);
+  out.forEach((v, k) => { v.position = pos.get(k) ?? null; });
+  return out;
 }
 
 /** Cumulative (session) average from term averages. */

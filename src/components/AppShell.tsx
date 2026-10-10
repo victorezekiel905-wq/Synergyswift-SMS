@@ -81,7 +81,7 @@ const GROUPS: NavGroup[] = [
 ];
 
 // Pages that render without the app chrome (public links, kiosk, exam lockdown).
-const BARE = [/^\/login$/, /^\/signup$/, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/pay\//, /^\/apply\//, /\/print$/];
+const BARE = [/^\/login$/, /^\/signup$/, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/pay\//, /^\/apply\//, /\/print$/, /\/transcript$/];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

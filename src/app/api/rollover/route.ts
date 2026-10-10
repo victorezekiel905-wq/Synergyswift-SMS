@@ -20,7 +20,7 @@ export async function GET() {
   const ids = (students ?? []).map((s: any) => s.id);
   const latest = new Map<string, number | null>();
   for (let i = 0; i < ids.length; i += 400) {
-    const { data } = await ctx.sb.from("report_cards").select("student_id,average,computed_at").eq("tenant_id", tid).in("student_id", ids.slice(i, i + 400)).order("computed_at", { ascending: false });
+    const { data } = await ctx.sb.from("report_cards").select("student_id,average,computed_at").eq("tenant_id", tid).eq("kind", "term").in("student_id", ids.slice(i, i + 400)).order("computed_at", { ascending: false });
     for (const r of data ?? []) if (!latest.has(r.student_id)) latest.set(r.student_id, r.average === null ? null : Number(r.average));
   }
   const gs = groups ?? [];

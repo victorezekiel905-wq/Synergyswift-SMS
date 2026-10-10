@@ -36,14 +36,14 @@ export async function termLabel(sb: any, tenantId: string, termId: string) {
 }
 
 /** Scheme for a class group: its own scheme, else the tenant default, else the first one. */
-export async function schemeFor(sb: any, tenantId: string, classGroupId: string | null): Promise<(Scheme & { id: string; name: string; show_class_average: boolean }) | null> {
+export async function schemeFor(sb: any, tenantId: string, classGroupId: string | null): Promise<(Scheme & { id: string; name: string; show_class_average: boolean; template: "nigerian" | "british" | "american"; show_cumulative: boolean }) | null> {
   let schemeId: string | null = null;
   if (classGroupId) {
     const { data: g } = await sb.from("class_groups").select("scheme_id").eq("tenant_id", tenantId).eq("id", classGroupId).maybeSingle();
     schemeId = g?.scheme_id ?? null;
   }
   let q = sb.from("grading_schemes")
-    .select("id,name,pass_mark,decimals,show_position,show_class_average,is_default,grade_bands(grade,min_score,max_score,remark,grade_point),grading_components(id,name,max_score,weight,position)")
+    .select("id,name,pass_mark,decimals,show_position,show_class_average,is_default,template,cumulative_mode,grade_bands(grade,min_score,max_score,remark,grade_point),grading_components(id,name,max_score,weight,position,midterm)")
     .eq("tenant_id", tenantId);
   q = schemeId ? q.eq("id", schemeId) : q.order("is_default", { ascending: false }).order("created_at");
   const { data } = await q.limit(1);
@@ -52,6 +52,7 @@ export async function schemeFor(sb: any, tenantId: string, classGroupId: string 
   return {
     id: s.id, name: s.name, pass_mark: Number(s.pass_mark), decimals: Number(s.decimals),
     show_position: s.show_position, show_class_average: s.show_class_average,
+    template: s.template ?? "nigerian", show_cumulative: s.cumulative_mode !== "none",
     bands: (s.grade_bands ?? []).map((b: any) => ({ ...b, min_score: Number(b.min_score), max_score: Number(b.max_score), grade_point: b.grade_point === null ? null : Number(b.grade_point) })),
     components: (s.grading_components ?? []).map((c: any) => ({ ...c, max_score: Number(c.max_score), weight: Number(c.weight) }))
       .sort((a: any, b: any) => a.position - b.position)

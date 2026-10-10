@@ -10,9 +10,10 @@ export async function GET(req: NextRequest) {
   const u = new URL(req.url);
   const termId = u.searchParams.get("term_id"), cg = u.searchParams.get("class_group_id");
   if (!termId || !cg) return jsonError("term_id and class_group_id are required");
+  const kind = u.searchParams.get("kind") === "midterm" ? "midterm" : "term";
   const { data, error } = await ctx.sb.from("report_cards")
-    .select("id,student_id,total,average,position,class_size,status,teacher_comment,principal_comment,published_at,access_token,computed_at,data")
-    .eq("tenant_id", ctx.tenant.id).eq("term_id", termId).eq("class_group_id", cg)
+    .select("id,student_id,total,average,position,class_size,status,teacher_comment,principal_comment,published_at,access_token,computed_at,data,kind")
+    .eq("tenant_id", ctx.tenant.id).eq("term_id", termId).eq("class_group_id", cg).eq("kind", kind)
     .order("position", { ascending: true, nullsFirst: false });
   if (error) return jsonError(error.message);
   const cards = data ?? [];

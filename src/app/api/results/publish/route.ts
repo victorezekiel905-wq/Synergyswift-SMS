@@ -6,10 +6,12 @@ import { guardiansByStudent, rowsForGuardian, enqueue, tryDispatch, loadBrand, t
 import { resultPublished } from "@/lib/messaging/templates";
 import { appUrl } from "@/lib/school";
 import { financeSettings, debtorsForTerm } from "@/lib/fees";
+import { signPublishedCards } from "@/lib/report-sign";
 
 const Body = z.object({
   term_id: z.string().uuid(),
   class_group_id: z.string().uuid(),
+  kind: z.enum(["term", "midterm"]).default("term"),
   student_ids: z.array(z.string().uuid()).optional(),  // publish a subset
   notify: z.boolean().default(true),
   resend: z.boolean().default(false)                   // re-notify already-published cards
@@ -29,7 +31,7 @@ export async function POST(req: NextRequest) {
   const tid = ctx.tenant.id;
 
   let q = ctx.sb.from("report_cards").select("id,student_id,status,average,position,class_size,access_token,data")
-    .eq("tenant_id", tid).eq("term_id", b.term_id).eq("class_group_id", b.class_group_id);
+    .eq("tenant_id", tid).eq("term_id", b.term_id).eq("class_group_id", b.class_group_id).eq("kind", b.kind);
   if (b.student_ids?.length) q = q.in("student_id", b.student_ids);
   const { data: cards, error } = await q;
   if (error) return jsonError(error.message);
@@ -56,6 +58,7 @@ export async function POST(req: NextRequest) {
       .update({ status: "published", published_at: new Date().toISOString(), published_by: ctx.userId })
       .in("id", toPublish.map((c: any) => c.id));
     if (pErr) return jsonError(pErr.message);
+    await signPublishedCards(ctx.sb, tid, toPublish.map((c: any) => c.id));
   }
   await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "results.published",
     target: b.class_group_id, meta: { term_id: b.term_id, count: toPublish.length } });

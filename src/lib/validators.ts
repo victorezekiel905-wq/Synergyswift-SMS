@@ -70,5 +70,8 @@ export const TenantSettingsInput = z.object({
   admissions_open: z.boolean().optional(),
   application_fee: z.number().min(0).max(1e9).optional(),
   admissions_intro: z.string().trim().max(3000).nullish(),
-  require_moderation: z.boolean().optional()
+  require_moderation: z.boolean().optional(),
+  principal_signature_url: z.string().trim().url().or(z.literal("")).nullish(),
+  stamp_url: z.string().trim().url().or(z.literal("")).nullish(),
+  report_footer: z.string().trim().max(500).nullish()
 });
