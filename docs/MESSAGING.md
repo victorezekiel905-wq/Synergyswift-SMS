@@ -110,6 +110,11 @@ Message from {{1}}: {{2}}
 {{1}}: the application for {{2}} ({{3}}) {{4}}. Track it here: {{5}}
 ```
 
+**`WHATSAPP_TPL_ADMISSION_NOTE`** (follow-ups, tour bookings, offers and fee requests to families who have not enrolled yet)
+```
+{{1}}: {{2}} {{3}}
+```
+
 **`WHATSAPP_TPL_STAFF`**
 ```
 {{1}}: {{2}}

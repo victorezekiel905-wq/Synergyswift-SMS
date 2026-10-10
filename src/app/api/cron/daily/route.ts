@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { guardiansByStudent, rowsForGuardian, enqueue, loadBrand, dispatchDue, formatInZone, type OutboxRow } from "@/lib/messaging/outbox";
 import { libraryOverdue } from "@/lib/messaging/templates";
 import { studentName } from "@/lib/school";
+import { expireOffers } from "@/lib/admissions-crm";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
   const { data: expired } = await svc.from("pickup_codes").update({ status: "expired" }).eq("status", "active").lt("expires_at", now).select("id");
   const { data: closed } = await svc.from("exams").update({ status: "closed" }).eq("status", "published").lt("closes_at", now).select("id");
 
+  const offersExpired = await expireOffers(svc).catch(() => 0);
   // Webcam photos are kept for 30 days for appeals, then removed.
   const monthAgo = new Date(Date.now() - 30 * 86400_000).toISOString();
   const { data: oldSnaps } = await svc.from("exam_events").select("id,meta").eq("kind", "snapshot").lt("at", monthAgo).is("meta->deleted", null).limit(1000);
@@ -60,5 +62,5 @@ export async function GET(req: NextRequest) {
   }
   if (rows.length) await enqueue(svc, rows);
   const delivery = rows.length ? await dispatchDue(svc, { budgetMs: 40_000 }) : null;
-  return NextResponse.json({ expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, webcam_photos_deleted: snapPaths.length, delivery });
+  return NextResponse.json({ expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, webcam_photos_deleted: snapPaths.length, admission_offers_expired: offersExpired, delivery });
 }

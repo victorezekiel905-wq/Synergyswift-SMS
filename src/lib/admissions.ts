@@ -49,3 +49,12 @@ export async function enrollApplication(svc: any, p: { tenantId: string; applica
   await svc.from("applications").update({ status: "enrolled", student_id: st.id, updated_at: new Date().toISOString() }).eq("tenant_id", p.tenantId).eq("id", app.id);
   return { student_id: st.id, guardian_id: gid, already: false };
 }
+
+/** School behind a public admissions link, for enquiries and visit booking (works even when applications are closed). */
+export async function tenantForEnquiry(svc: any, slug: string) {
+  if (!/^[a-z0-9][a-z0-9-]{1,48}$/i.test(slug)) return null;
+  const { data: t } = await svc.from("tenants").select("id,name,status,public_slug").ilike("public_slug", slug).maybeSingle();
+  if (!t || t.status !== "active") return null;
+  const { data: s } = await svc.from("tenant_settings").select("school_name,logo_url,brand_color,address,phone,email,admissions_open,admissions_whatsapp").eq("tenant_id", t.id).maybeSingle();
+  return { tenant: t, settings: s ?? {} };
+}

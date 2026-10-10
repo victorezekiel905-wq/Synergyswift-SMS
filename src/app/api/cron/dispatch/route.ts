@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { dispatchDue, requeueStale } from "@/lib/messaging/outbox";
+import { processSequences, sendBookingReminders } from "@/lib/admissions-crm";
+import { appUrl } from "@/lib/school";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,8 +19,12 @@ async function run(req: NextRequest) {
   }
   const svc = createServiceClient();
   await requeueStale(svc);
-  const stats = await dispatchDue(svc, { budgetMs: 45_000, limit: 100, concurrency: 10 });
-  return NextResponse.json({ ok: true, ...stats });
+  // Admissions follow-ups and visit reminders queue messages, which this run then sends.
+  const base = appUrl(req);
+  const followUps = await processSequences(svc, { limit: 50, baseUrl: base }).catch(() => null);
+  const reminders = await sendBookingReminders(svc, base).catch(() => 0);
+  const stats = await dispatchDue(svc, { budgetMs: 40_000, limit: 100, concurrency: 10 });
+  return NextResponse.json({ ok: true, ...stats, admissions_follow_ups: followUps, visit_reminders: reminders });
 }
 
 export const GET = run;

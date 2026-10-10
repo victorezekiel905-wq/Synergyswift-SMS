@@ -110,7 +110,12 @@ v46 adds the modules that the leading systems sell separately, so one login runs
 
 ### Growth
 
-- **Admissions** (`/school/admissions`): a public application form at `/apply/<school>`, open only while admissions are open. Applicants get a tracking link. Staff move each application through review, assessment, interview, offer and enrolment, and enrolling creates the student record.
+- **Admissions** (`/school/admissions`): a CRM for every family from first enquiry to enrolment.
+  - *Capture*: `/enquire/<school>` (embed it on your website with the code under Setup), `/visit/<school>` to book tours and open days, `/apply/<school>` for applications, a WhatsApp click-to-chat link, ad links with `utm_campaign` tags, a lead webhook for Facebook / Instagram lead ads (via Zapier or Make), quick add for walk-ins and calls, and each parent's referral link in the parent portal. Repeat enquiries from the same phone or email merge into one family.
+  - *Pipeline*: drag families across Enquiry → Tour booked → Applied → Assessed → Offer → Accepted → Enrolled or Lost. Once a family applies, the board follows the application. Each family has an owner (new enquiries go to the least-busy admissions officer), a score, a timeline of calls, messages and visits, and tasks.
+  - *Follow-ups*: sequences of emails, SMS, WhatsApp messages and staff tasks start when a family enters a stage and stop when they move on. "Add starter sequences" gives a sensible set to edit.
+  - *Applications*: families upload documents and pay the application fee online from their private link. Send an online entrance test (any exam from Secure exams) to one or many applicants; scores land on the application. Record interviews, waitlist with positions, and make offers: the offer letter comes from your template, the family signs it online with a drawn signature, then pays the acceptance fee. Offers expire automatically. Enrolling creates the student and parent records.
+  - *Analytics*: funnel, sources and campaigns with cost per enquiry and per enrolment (add your marketing spend under Setup), staff response times and conversion, monthly trends and why families did not go ahead.
 - **Session rollover** (`/school/rollover`): promote every class to the next level, keep repeating students back, and graduate the final year. Each class shows its suggested next class to check, and nothing moves until you confirm.
 - **School groups** (`/group`): an owner of several branches sees headcount, attendance, fee collection and average results per branch. Branches still cannot see each other.
 

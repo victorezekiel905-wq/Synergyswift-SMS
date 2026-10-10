@@ -26,7 +26,8 @@ export default function ApplyPage(props: { params: Promise<{ slug: string }> }) 
     <main className="mx-auto max-w-xl p-6 text-center">
       <h1 className="text-2xl font-bold" style={{ color }}>Application received</h1>
       <p className="mt-2">Your application number is <b className="font-mono">{done.application_no}</b>. We have sent a confirmation to your WhatsApp and email.</p>
-      <a className="btn mt-4 text-white" style={{ background: color }} href={`/apply/track/${done.tracking_token}`}>Track your application</a>
+      <p className="mt-2 text-sm text-slate-600">Next, upload the child&apos;s documents (birth certificate, last school report, passport photo){data.application_fee > 0 ? " and pay the application fee" : ""} on your application page.</p>
+      <a className="btn mt-4 text-white" style={{ background: color }} href={`/apply/track/${done.tracking_token}`}>Continue: documents and tracking</a>
     </main>
   );
 
@@ -38,12 +39,15 @@ export default function ApplyPage(props: { params: Promise<{ slug: string }> }) 
         <div><h1 className="text-xl font-bold" style={{ color }}>{data.school.name}: admissions</h1><p className="text-xs text-slate-600">{data.school.address}{data.school.phone ? ` · ${data.school.phone}` : ""}</p></div>
       </header>
       {data.intro && <p className="mb-4 whitespace-pre-wrap text-sm">{data.intro}</p>}
-      {data.application_fee > 0 && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm">Application fee: <b>{money(data.application_fee, data.currency)}</b>. The school will tell you how to pay.</p>}
+      {data.application_fee > 0 && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm">Application fee: <b>{money(data.application_fee, data.currency)}</b>. You can pay it online after submitting, or as the school directs.</p>}
       <form className="grid gap-3 sm:grid-cols-2" onSubmit={async e => {
         e.preventDefault();
         setBusy(true); setErr(null);
+        const qs = new URLSearchParams(window.location.search);
+        const utm = Object.fromEntries([...qs].filter(([k]) => k.startsWith("utm_")));
         const r = await send<{ application_no: string; tracking_token: string }>(`/api/apply/${slug}`, { ...f, gender: f.gender || null, date_of_birth: f.date_of_birth || null,
-          guardian_email: f.guardian_email || null, other_names: f.other_names || null, previous_school: f.previous_school || null, address: f.address || null, notes: f.notes || null, consent });
+          guardian_email: f.guardian_email || null, other_names: f.other_names || null, previous_school: f.previous_school || null, address: f.address || null, notes: f.notes || null, consent,
+          utm, ref: qs.get("ref") || null, referrer: document.referrer || null });
         setBusy(false);
         if (!r.ok) return setErr(r.error);
         setDone(r.data);

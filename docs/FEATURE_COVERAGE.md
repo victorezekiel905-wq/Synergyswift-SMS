@@ -59,22 +59,21 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM · **3*
 | Encrypted storage, automated backups, uptime monitoring | 🟡 Supabase encryption and backups; status endpoint exists |
 | IP/device restrictions for exams and staff portals | 🟡 exams done; staff portals missing |
 
-## 3. CRM: admissions and enquiries (phase 2)
+## 3. CRM: admissions and enquiries (phase 2, done)
 
 | Feature | Status |
 |---|---|
-| Online application forms with document upload and tracking | ✅ |
-| Application fee payment | ✅ |
-| Lead capture (website, WhatsApp, social ads, walk-ins, calls, open days, referral links) | ⬜ |
-| Kanban pipeline Enquiry → Enrolled/Lost | ⬜ |
-| Lead scoring and source tracking | ⬜ |
-| Follow-up automation (email, SMS, WhatsApp sequences, reminders) | ⬜ |
-| Tour and open-day booking | ⬜ |
-| Entrance exams (online CBT), interviews, scoring | 🟡 CBT engine exists, not linked to applicants |
-| Offer letters, e-signature acceptance, acceptance fee | ⬜ |
-| Waitlist | ⬜ |
-| One-click conversion to student | 🟡 check during phase 2 |
-| Admissions analytics | ⬜ |
+| Lead capture: website enquiry form (embeddable), WhatsApp click-to-chat, Facebook/Instagram ads (tracked links and lead webhook), walk-ins and calls (quick add), open-day registration, parent referral links | ✅ (Meta lead ads arrive through the webhook via Zapier, Make or Meta's integrations 🔑) |
+| Kanban pipeline Enquiry → Tour booked → Applied → Assessed → Offer → Accepted → Enrolled / Lost, kept in step with applications | ✅ |
+| Lead scoring and source / campaign tracking (UTM tags, referrers, referral codes), duplicate merging | ✅ |
+| Follow-up automation: email, SMS and WhatsApp sequences by stage, staff tasks and reminders | ✅ (WhatsApp outside the 24-hour window needs the approved template 🔑) |
+| Tour and open-day booking: slots with capacity, public booking, confirmations, calendar files, day-before reminders, attendance | ✅ |
+| Online application forms: document upload (birth certificate, reports, passport photo), application fee paid online | ✅ (online payment needs Paystack or Flutterwave keys 🔑) |
+| Entrance exams (online test from a private link) and interviews with notes and scores | ✅ |
+| Offer letters from templates, e-signature acceptance (name, drawn signature, letter fingerprint, time, IP), acceptance fee online, expiry | ✅ |
+| Waitlist with positions and places per level | ✅ |
+| One-click conversion to student with parent records and siblings | ✅ |
+| Admissions analytics: funnel, source and campaign conversion, cost per enquiry and per enrolment, staff response time and conversion, monthly trends, lost reasons | ✅ |
 
 ## 4. CRM: parent and community (phase 3)
 
@@ -127,3 +126,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101002600_exam_logistics.sql` | 1 |
 | `20260101002700_moderation.sql` | 1 |
 | `20260101002800_report_cards_plus.sql` | 1 |
+| `20260101002900_admissions_crm.sql` | 2 |

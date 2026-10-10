@@ -3,6 +3,8 @@ import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/service";
 import { jsonError, readJson } from "@/lib/auth";
 import { tenantBySlug, notifyApplicant } from "@/lib/admissions";
+import { syncLeadFromApplication } from "@/lib/admissions-crm";
+import { detectSource } from "@/lib/crm";
 import { appUrl } from "@/lib/school";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +29,7 @@ const Body = z.object({
   guardian_name: z.string().trim().min(2).max(120), guardian_phone: z.string().trim().min(7).max(30), guardian_email: z.string().trim().email().nullish().or(z.literal("")),
   guardian_relation: z.string().trim().max(30).default("parent"), address: z.string().trim().max(300).nullish(), notes: z.string().trim().max(1000).nullish(),
   consent: z.literal(true, { errorMap: () => ({ message: "please confirm the information is correct and agree to the privacy notice" }) }),
+  utm: z.record(z.string().max(120)).default({}), ref: z.string().trim().max(20).nullish(), referrer: z.string().max(500).nullish(),
   website: z.string().max(0).optional() // honeypot: real people leave this empty
 });
 
@@ -43,10 +46,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ slug: st
     .eq("guardian_phone", b.guardian_phone).gte("created_at", new Date(Date.now() - 86400_000).toISOString());
   if ((count ?? 0) >= 5) return jsonError("too many applications from this phone number today", 429);
   const { data: no } = await svc.rpc("next_doc_no", { p_tenant: t.tenant.id, p_kind: "app" });
-  const { consent: _c, website: _w, ...row } = b;
+  const { consent: _c, website: _w, utm: rawUtm, ref, referrer, ...row } = b;
+  const utm = Object.fromEntries(Object.entries(rawUtm).filter(([k]) => /^utm_(source|medium|campaign|content|term)$/.test(k)));
+  const source = detectSource(utm, referrer, ref);
   const { data: app, error } = await svc.from("applications").insert({ ...row, date_of_birth: row.date_of_birth || null, guardian_email: row.guardian_email || null,
-    tenant_id: t.tenant.id, application_no: no, source: "online" }).select("*").single();
+    tenant_id: t.tenant.id, application_no: no, source, utm, referral_code: ref?.toUpperCase() ?? null }).select("*").single();
   if (error) return jsonError(error.message);
+  await syncLeadFromApplication(svc, app).catch(() => null);
   await notifyApplicant(svc, app, appUrl(req));
   return NextResponse.json({ application_no: app.application_no, tracking_token: app.tracking_token }, { status: 201 });
 }
