@@ -4,7 +4,7 @@
  */
 import { markAttempt, questionsForAttempt, type Question, type Mark } from "./engine";
 
-export const VIOLATION_KINDS = new Set(["blur", "visibility_hidden", "fullscreen_exit", "copy", "paste", "context_menu", "print", "devtools", "multiple_screens"]);
+export const VIOLATION_KINDS = new Set(["blur", "visibility_hidden", "fullscreen_exit", "copy", "paste", "context_menu", "print", "devtools", "multiple_screens", "camera_off"]);
 export const GRACE_MS = 30_000; // network latency allowance after the deadline
 
 export type ExamRow = {

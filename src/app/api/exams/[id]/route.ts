@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { validateQuestion, countBlanks } from "@/lib/exams/engine";
 import { randomToken } from "@/lib/crypto";
+import { isValidIpRule } from "@/lib/net";
 
 export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -32,7 +33,9 @@ const Patch = z.object({
     show_score_after_submit: z.boolean(), allow_review: z.boolean(), require_seb: z.boolean(),
     seb_browser_keys: z.array(z.string().trim().max(128)).max(10), seb_config_keys: z.array(z.string().trim().max(128)).max(10),
     quit_password: z.string().max(64).optional(), allow_spellcheck: z.boolean(), allow_calculator: z.boolean().optional(),
-    draw: z.record(z.string().max(80), z.number().int().min(0).max(500))
+    draw: z.record(z.string().max(80), z.number().int().min(0).max(500)),
+    allowed_ips: z.array(z.string().trim().max(64)).max(50).refine(l => l.every(x => !x || isValidIpRule(x)), "each allowed network must be an IP address or range such as 41.58.0.0/16"),
+    webcam_snapshots: z.boolean(), snapshot_interval_sec: z.number().int().min(15).max(600)
   }).partial().optional()
 });
 

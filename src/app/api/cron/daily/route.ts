@@ -12,6 +12,7 @@ export const maxDuration = 60;
  *  - expire old pickup codes
  *  - remind guardians about overdue library books (at most once every 7 days per loan)
  *  - close exams whose window has ended
+ *  - delete exam webcam photos older than 30 days
  */
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -23,6 +24,13 @@ export async function GET(req: NextRequest) {
 
   const { data: expired } = await svc.from("pickup_codes").update({ status: "expired" }).eq("status", "active").lt("expires_at", now).select("id");
   const { data: closed } = await svc.from("exams").update({ status: "closed" }).eq("status", "published").lt("closes_at", now).select("id");
+
+  // Webcam photos are kept for 30 days for appeals, then removed.
+  const monthAgo = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const { data: oldSnaps } = await svc.from("exam_events").select("id,meta").eq("kind", "snapshot").lt("at", monthAgo).is("meta->deleted", null).limit(1000);
+  const snapPaths = (oldSnaps ?? []).map((e: any) => e.meta?.path).filter(Boolean);
+  for (let i = 0; i < snapPaths.length; i += 100) await svc.storage.from("exam-uploads").remove(snapPaths.slice(i, i + 100));
+  for (const e of oldSnaps ?? []) await svc.from("exam_events").update({ meta: { ...e.meta, deleted: true } }).eq("id", e.id);
 
   const { data: loans } = await svc.from("library_loans")
     .select("id,tenant_id,student_id,due_at,library_books(title),students(first_name,last_name,other_names),tenants(status,timezone)")
@@ -52,5 +60,5 @@ export async function GET(req: NextRequest) {
   }
   if (rows.length) await enqueue(svc, rows);
   const delivery = rows.length ? await dispatchDue(svc, { budgetMs: 40_000 }) : null;
-  return NextResponse.json({ expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, delivery });
+  return NextResponse.json({ expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, webcam_photos_deleted: snapPaths.length, delivery });
 }

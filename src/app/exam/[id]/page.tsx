@@ -3,11 +3,13 @@ import { useCallback, useEffect, useRef, useState, use } from "react";
 import Link from "next/link";
 import QuestionView, { type PublicQuestion } from "@/components/exams/QuestionView";
 import Calculator from "@/components/exams/Calculator";
+import WebcamProctor, { requestCamera } from "@/components/exams/WebcamProctor";
 
 type ExamInfo = {
   id: string; title: string; instructions: string | null; duration_minutes: number; opens_at: string | null; closes_at: string | null;
   window: "not_open" | "open" | "closed"; require_seb: boolean; seb_config_url: string; seb_launch_url: string;
   require_fullscreen: boolean; block_copy_paste: boolean; violation_limit: number; allow_spellcheck: boolean; allow_calculator: boolean;
+  webcam_snapshots: boolean; snapshot_interval_sec: number; network_restricted: boolean;
 };
 type AttemptState = { id: string; status: string; started_at: string; deadline_at: string; violations: number; server_now: string; answers: Record<string, any>; questions: PublicQuestion[] };
 type Result = { released: boolean; pending_manual?: boolean; total_score?: number; max_score?: number; per_question?: { id: string; prompt: string; points: number; max: number; feedback: string | null }[] | null };
@@ -42,6 +44,8 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
   const [calc, setCalc] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [isFs, setIsFs] = useState(true);
+  const [camera, setCamera] = useState<MediaStream | null>(null);
+  const [consent, setConsent] = useState(false);
   const dirty = useRef<Record<string, any>>({});
   const offset = useRef(0);
   const statusRef = useRef<string | null>(null);
@@ -177,9 +181,14 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
 
   async function start() {
     setError(null);
+    let cam: MediaStream | null = null;
+    if (exam?.webcam_snapshots) {
+      try { cam = await requestCamera(); setCamera(cam); }
+      catch { setError("This exam needs your camera. Allow camera access in your browser and press Start again."); return; }
+    }
     if (exam?.require_fullscreen && !exam.require_seb) { try { await document.documentElement.requestFullscreen(); } catch { /* user can re-enter */ } }
     const r = await api(id, { action: "start", access_code: code });
-    if (!r.ok) { setError(r.data.error ?? "Could not start."); return; }
+    if (!r.ok) { cam?.getTracks().forEach(t => t.stop()); setCamera(null); setError(r.data.error ?? "Could not start."); return; }
     const a = r.data.attempt as AttemptState;
     offset.current = new Date(a.server_now).getTime() - Date.now();
     setAttempt(a); setAnswers(a.answers ?? {}); setStatus(a.status); setViolations(a.violations);
@@ -245,14 +254,22 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
           {exam.require_fullscreen && <li>The exam runs in full screen. Leaving full screen is recorded.</li>}
           <li>Switching to another tab or app is recorded. After {exam.violation_limit} violations your exam locks until the teacher unlocks it.</li>
           {exam.block_copy_paste && <li>Copy, paste and right-click are disabled.</li>}
+          {exam.network_restricted && <li>This exam only works on the school network (the exam room Wi-Fi or school computers).</li>}
           <li>Your answers save automatically. If your connection drops, keep working; they are kept on this device and sent when you reconnect.</li>
         </ul>
+        {exam.webcam_snapshots && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="font-semibold">This exam uses your camera.</p>
+            <p className="mt-1">A photo is taken every {exam.snapshot_interval_sec} seconds while you write. Only your teachers and school exam officers can see the photos, and they are deleted after 30 days. Sit facing the camera in a well-lit place.</p>
+            <label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /> I understand and agree</label>
+          </div>
+        )}
         {exam.window !== "open" ? (
           <p className="mt-6 rounded-lg bg-amber-50 p-4 text-amber-900">{exam.window === "not_open" ? "This exam has not opened yet." : "This exam is closed."}</p>
         ) : (
           <form className="mt-6 flex max-w-md gap-2" onSubmit={e => { e.preventDefault(); start(); }}>
             <input className="input text-center font-mono text-xl uppercase tracking-widest" placeholder="EXAM CODE" value={code} onChange={e => setCode(e.target.value.toUpperCase())} aria-label="Exam code" required />
-            <button className="btn btn-primary px-6">Start</button>
+            <button className="btn btn-primary px-6" disabled={exam.webcam_snapshots && !consent}>Start</button>
           </form>
         )}
         {error && <p role="alert" className="mt-3 text-sm text-rose-600">{error}</p>}
@@ -326,6 +343,7 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
       </div>
 
       {calc && <Calculator onClose={() => setCalc(false)} />}
+      {exam.webcam_snapshots && (status === "in_progress" || status === "locked") && <WebcamProctor examId={id} intervalSec={exam.snapshot_interval_sec} initialStream={camera} onEvent={report} />}
 
       {confirmSubmit && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4">

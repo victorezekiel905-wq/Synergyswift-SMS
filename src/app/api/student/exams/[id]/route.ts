@@ -9,6 +9,7 @@ import {
   VIOLATION_KINDS, GRACE_MS, type ExamRow
 } from "@/lib/exams/server";
 import { appUrl } from "@/lib/school";
+import { clientIp, ipAllowed } from "@/lib/net";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,9 @@ function publicExam(exam: ExamRow, req: NextRequest) {
     opens_at: exam.opens_at, closes_at: exam.closes_at, window: windowState(exam),
     require_seb: Boolean(s.require_seb), seb_config_url: cfg, seb_launch_url: sebLaunchUrl(cfg),
     require_fullscreen: s.require_fullscreen !== false, block_copy_paste: s.block_copy_paste !== false,
-    violation_limit: s.violation_limit ?? 3, allow_spellcheck: Boolean(s.allow_spellcheck), allow_calculator: Boolean(s.allow_calculator)
+    violation_limit: s.violation_limit ?? 3, allow_spellcheck: Boolean(s.allow_spellcheck), allow_calculator: Boolean(s.allow_calculator),
+    webcam_snapshots: Boolean(s.webcam_snapshots), snapshot_interval_sec: Math.min(600, Math.max(15, Number(s.snapshot_interval_sec ?? 60))),
+    network_restricted: Boolean((s.allowed_ips ?? []).length)
   };
 }
 
@@ -82,6 +85,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const settings = exam.settings ?? {};
   const seb = verifySeb(absoluteRequestUrl(req), req.headers, settings);
   if (!seb.ok && b.action !== "event") return jsonError(seb.reason ?? "Safe Exam Browser required", 403);
+  const ip = clientIp(req.headers);
+  if (b.action !== "event" && !ipAllowed(ip, settings.allowed_ips)) {
+    return jsonError("This exam can only be taken on the school network. Connect to the exam room Wi-Fi or use a school computer.", 403);
+  }
 
   const questions = await loadQuestions(svc, exam.id);
   const { data: existing } = await svc.from("exam_attempts").select("*").eq("exam_id", exam.id).eq("student_user_id", ctx.userId).maybeSingle();
@@ -100,7 +107,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     const { data: attempt, error } = await svc.from("exam_attempts").insert({
       tenant_id: ctx.tenant.id, exam_id: exam.id, student_user_id: ctx.userId, started_at: now.toISOString(),
       deadline_at: computeDeadline(exam, now).toISOString(), question_order: layout.question_order, option_orders: layout.option_orders,
-      seb_verified: seb.ok && seb.level !== "none", client_ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+      seb_verified: seb.ok && seb.level !== "none", client_ip: ip,
       user_agent: req.headers.get("user-agent")?.slice(0, 300) ?? null
     }).select("*").single();
     if (error) return jsonError(error.message.includes("duplicate") ? "exam already started on another device" : error.message, 409);

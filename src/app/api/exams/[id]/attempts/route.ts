@@ -35,6 +35,10 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
     ? await svc.from("exam_events").select("attempt_id,kind,meta,at").in("attempt_id", fresh.map(a => a.id)).order("at", { ascending: false }).limit(2000)
     : { data: [] };
 
+  // Latest webcam photos per attempt (separate query so they never crowd out the activity log).
+  const { data: snaps } = fresh.length && exam.settings?.webcam_snapshots
+    ? await svc.from("exam_events").select("attempt_id,meta,at").in("attempt_id", fresh.map(a => a.id)).eq("kind", "snapshot").order("at", { ascending: false }).limit(fresh.length * 6)
+    : { data: [] };
   const rows = fresh.map(a => {
     const s: any = sBy.get(a.student_user_id);
     return {
@@ -46,7 +50,9 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
       total_questions: questionsForAttempt(questions, a).length, question_order: a.question_order ?? [], auto_score: a.auto_score, total_score: a.total_score, max_score: a.max_score,
       pending_manual: Object.values((a.marks ?? {}) as Record<string, Mark>).filter(m => m.points === null).length,
       answers: a.answers, marks: a.marks,
-      events: (events ?? []).filter((e: any) => e.attempt_id === a.id).slice(0, 30)
+      events: (events ?? []).filter((e: any) => e.attempt_id === a.id && e.kind !== "snapshot").slice(0, 30),
+      snapshots: (snaps ?? []).filter((e: any) => e.attempt_id === a.id && e.meta?.path && !e.meta?.deleted).slice(0, 6)
+        .map((e: any) => ({ at: e.at, url: `/api/exams/${exam.id}/file?path=${encodeURIComponent(e.meta.path)}` }))
     };
   });
 

@@ -12,7 +12,7 @@ type Exam = {
   settings: Record<string, any>;
 };
 type Question = EditorQuestion & { id: string; position: number; topic?: string | null; difficulty?: string | null; bloom?: string | null; bank_question_id?: string | null };
-type Tab = "questions" | "settings" | "monitor" | "marking";
+type Tab = "questions" | "settings" | "monitor" | "marking" | "analysis";
 
 export default function ExamWorkspace(props: { params: Promise<{ id: string }> }) {
   const params = use(props.params);
@@ -27,11 +27,12 @@ export default function ExamWorkspace(props: { params: Promise<{ id: string }> }
       <Link href="/exams" className="text-sm text-brand-700 hover:underline">← Exams</Link>
       <PageHeader title={exam.title} subtitle={`${questions.length} questions · ${total} marks · ${exam.duration_minutes} minutes · code ${exam.access_code}`}
         actions={<><Badge tone={statusTone(exam.status)}>{exam.status}</Badge>{exam.results_released && <Badge tone="violet">results released</Badge>}</>} />
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "questions", label: "Questions" }, { id: "settings", label: "Settings & publish" }, { id: "monitor", label: "Live monitor" }, { id: "marking", label: "Marking & results" }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "questions", label: "Questions" }, { id: "settings", label: "Settings & publish" }, { id: "monitor", label: "Live monitor" }, { id: "marking", label: "Marking & results" }, { id: "analysis", label: "Item analysis" }]} />
       {tab === "questions" && <Questions exam={exam} questions={questions} reload={reload} />}
       {tab === "settings" && <Settings exam={exam} questions={questions} reload={reload} />}
       {tab === "monitor" && <Monitor examId={exam.id} />}
       {tab === "marking" && <Marking exam={exam} reload={reload} />}
+      {tab === "analysis" && <Analysis examId={exam.id} />}
     </Page>
   );
 }
@@ -204,6 +205,8 @@ function Settings({ exam, questions, reload }: { exam: Exam; questions: Question
         block_copy_paste: s.block_copy_paste !== false, violation_limit: Number(s.violation_limit ?? 3), show_score_after_submit: Boolean(s.show_score_after_submit),
         allow_review: Boolean(s.allow_review), require_seb: Boolean(s.require_seb), allow_spellcheck: Boolean(s.allow_spellcheck), allow_calculator: Boolean(s.allow_calculator),
         seb_browser_keys: (s.seb_browser_keys ?? []).filter(Boolean), seb_config_keys: (s.seb_config_keys ?? []).filter(Boolean), quit_password: s.quit_password ?? "",
+        allowed_ips: (s.allowed_ips ?? []).map((x: string) => x.trim()).filter(Boolean),
+        webcam_snapshots: Boolean(s.webcam_snapshots), snapshot_interval_sec: Number(s.snapshot_interval_sec ?? 60),
         draw: Object.fromEntries(Object.entries((s.draw ?? {}) as Record<string, number | null>).filter(([k, v]) => v !== null && v !== undefined && sections.has(k)))
       },
       ...extra
@@ -263,6 +266,23 @@ function Settings({ exam, questions, reload }: { exam: Exam; questions: Question
       )}
 
       <section className="card space-y-3 p-5">
+        <h2 className="font-semibold">Network and camera</h2>
+        <Field label="Only allow these networks (one per line)" hint="Leave empty to allow any network. Enter the school's public IP address or a range such as 41.58.0.0/16. Students elsewhere cannot start, save or submit.">
+          <textarea className="input h-20 font-mono text-xs" value={(s.allowed_ips ?? []).join("\n")} onChange={ev => setS("allowed_ips", ev.target.value.split("\n"))} />
+        </Field>
+        <button type="button" className="btn btn-ghost text-xs" onClick={async () => {
+          const r = await fetch("/api/net/ip").then(x => x.json()).catch(() => null);
+          if (r?.ip) setS("allowed_ips", [...new Set([...(s.allowed_ips ?? []).filter((x: string) => x.trim()), r.ip])]);
+        }}>+ Allow the network I am on now</button>
+        {check("webcam_snapshots", "Take webcam photos during the exam (students are told and must agree before starting)")}
+        {s.webcam_snapshots && (
+          <Field label="Photo every (seconds)" hint="Photos appear in the live monitor and are deleted after 30 days.">
+            <input className="input max-w-[120px]" type="number" min={15} max={600} value={s.snapshot_interval_sec ?? 60} onChange={ev => setS("snapshot_interval_sec", Number(ev.target.value))} />
+          </Field>
+        )}
+      </section>
+
+      <section className="card space-y-3 p-5">
         <h2 className="font-semibold">Safe Exam Browser</h2>
         {check("require_seb", "Require Safe Exam Browser (students cannot start in a normal browser)")}
         {s.require_seb && (
@@ -307,6 +327,7 @@ type Attempt = {
   violations: number; seb_verified: boolean; extra_minutes: number; answered: number; total_questions: number; total_score: number | null; max_score: number | null;
   pending_manual: number; answers: Record<string, any>; marks: Record<string, { points: number | null; max: number; auto: boolean; feedback?: string }>;
   events: { kind: string; at: string; meta: Record<string, unknown> }[];
+  snapshots?: { at: string; url: string }[]; question_order?: string[];
 };
 
 function Monitor({ examId }: { examId: string }) {
@@ -355,9 +376,23 @@ function Monitor({ examId }: { examId: string }) {
                     </tr>
                     {open === a.id && (
                       <tr><td colSpan={7} className="bg-slate-50 p-3">
+                        {(a.snapshots ?? []).length > 0 && (
+                          <div className="mb-3">
+                            <p className="mb-1 text-xs font-semibold uppercase text-slate-500">Camera</p>
+                            <div className="flex flex-wrap gap-2">
+                              {a.snapshots!.map(s => (
+                                <a key={s.url} href={s.url} target="_blank" rel="noreferrer" className="block text-center text-[10px] text-slate-500">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={s.url} alt={`Camera photo at ${fmtTime(s.at)}`} className="h-20 w-28 rounded border border-slate-200 object-cover" loading="lazy" />
+                                  {fmtTime(s.at)}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <p className="mb-1 text-xs font-semibold uppercase text-slate-500">Activity</p>
                         <ul className="grid gap-x-6 text-xs sm:grid-cols-2">
-                          {a.events.map((ev, i) => <li key={i} className={["blur", "visibility_hidden", "fullscreen_exit", "copy", "paste", "devtools", "context_menu", "print", "locked", "multiple_screens"].includes(ev.kind) ? "text-rose-600" : "text-slate-600"}>{fmtTime(ev.at)} · {ev.kind.replace(/_/g, " ")}</li>)}
+                          {a.events.map((ev, i) => <li key={i} className={["blur", "visibility_hidden", "fullscreen_exit", "copy", "paste", "devtools", "context_menu", "print", "locked", "multiple_screens", "camera_off", "no_face", "multiple_faces"].includes(ev.kind) ? "text-rose-600" : "text-slate-600"}>{fmtTime(ev.at)} · {ev.kind.replace(/_/g, " ")}</li>)}
                         </ul>
                       </td></tr>
                     )}
@@ -424,7 +459,7 @@ function Marking({ exam, reload: reloadExam }: { exam: Exam; reload: () => void 
         {attempt && data ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">{attempt.name}</h3><span className="text-lg font-bold tabular-nums">{attempt.total_score ?? "—"} / {attempt.max_score}</span></div>
-            {data.questions.map((q, i) => {
+            {data.questions.filter(q => !attempt.question_order?.length || attempt.question_order.includes(q.id)).map((q, i) => {
               const m = attempt.marks?.[q.id];
               let pubData = q.data;
               if (q.type === "fill_blanks") { let k = 0; pubData = { text: String(q.data.text ?? "").replace(/\[\[[^\]]*\]\]/g, () => `[[${++k}]]`) }; }
@@ -448,6 +483,108 @@ function Marking({ exam, reload: reloadExam }: { exam: Exam; reload: () => void 
           </div>
         ) : <Empty>Select a submission to mark.</Empty>}
       </div>
+    </div>
+  );
+}
+
+/* ---------- Item analysis ---------- */
+type ItemStats = {
+  question_id: string; position: number; type: string; topic: string | null; bloom: string | null; n: number; p: number | null; discrimination: number | null; point_biserial: number | null;
+  distractors: { option_id: string; text: string; correct: boolean; count: number; upper: number; lower: number }[] | null;
+  common_wrong: { answer: string; count: number }[] | null; flags: string[];
+};
+type AnalysisData = {
+  students: number; mean: number | null; median: number | null; sd: number | null; highest: number | null; lowest: number | null;
+  reliability: number | null; reliability_note: string | null; items: ItemStats[];
+  by_topic: { topic: string; items: number; p: number }[]; by_bloom: { bloom: string; items: number; p: number }[];
+  distribution: { band: string; count: number }[]; questions: { id: string; prompt: string; type: string; points: number }[];
+};
+
+function Analysis({ examId }: { examId: string }) {
+  const { data, error } = useApi<AnalysisData>(`/api/exams/${examId}/analysis`);
+  const [open, setOpen] = useState<string | null>(null);
+  if (error) return <Alert>{error}</Alert>;
+  if (!data) return <Loading />;
+  if (!data.students) return <Empty>Item analysis appears once students have submitted.</Empty>;
+  const prompt = new Map(data.questions.map(q => [q.id, q.prompt]));
+  const maxBand = Math.max(1, ...data.distribution.map(d => d.count));
+  const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)}%`);
+  const tone = (it: ItemStats) => it.flags.some(f => f.startsWith("negative")) ? "red" : it.flags.length ? "amber" : "green";
+  return (
+    <div className="space-y-5">
+      <section className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {[["Students", data.students], ["Average", data.mean === null ? "—" : `${data.mean}%`], ["Median", data.median === null ? "—" : `${data.median}%`],
+          ["Spread (SD)", data.sd ?? "—"], ["Highest / lowest", `${data.highest ?? "—"} / ${data.lowest ?? "—"}`],
+          ["Reliability (α)", data.reliability ?? "—"]].map(([k, v]) => (
+          <div key={String(k)} className="card p-3"><p className="text-xs text-slate-500">{k}</p><p className="text-xl font-bold tabular-nums">{v}</p></div>
+        ))}
+      </section>
+      {data.reliability_note && <p className="text-xs text-slate-500">Reliability: {data.reliability_note}</p>}
+      {data.reliability !== null && <p className="text-xs text-slate-500">Reliability above 0.7 is good for a class test and above 0.8 for a final exam.</p>}
+
+      <section className="grid gap-5 lg:grid-cols-3">
+        <div className="card p-4">
+          <h3 className="mb-2 text-sm font-semibold">Score distribution (%)</h3>
+          <ul className="space-y-1 text-xs">
+            {data.distribution.map(d => (
+              <li key={d.band} className="flex items-center gap-2"><span className="w-14 tabular-nums">{d.band}</span>
+                <span className="h-3 rounded bg-brand-500" style={{ width: `${(d.count / maxBand) * 100}%`, minWidth: d.count ? 4 : 0 }} /><span className="tabular-nums">{d.count}</span></li>
+            ))}
+          </ul>
+        </div>
+        <div className="card p-4">
+          <h3 className="mb-2 text-sm font-semibold">By topic (average score)</h3>
+          {!data.by_topic.length ? <p className="text-xs text-slate-500">Tag questions with topics in the question bank to see this.</p> : (
+            <ul className="space-y-1 text-xs">{data.by_topic.map(t => <li key={t.topic} className="flex justify-between gap-2"><span>{t.topic} <span className="text-slate-400">({t.items})</span></span><b className={"tabular-nums " + (t.p < 0.5 ? "text-rose-600" : "")}>{pct(t.p)}</b></li>)}</ul>
+          )}
+        </div>
+        <div className="card p-4">
+          <h3 className="mb-2 text-sm font-semibold">By Bloom&apos;s level</h3>
+          {!data.by_bloom.length ? <p className="text-xs text-slate-500">Tag questions with Bloom&apos;s levels to see this.</p> : (
+            <ul className="space-y-1 text-xs">{data.by_bloom.map(t => <li key={t.bloom} className="flex justify-between gap-2"><span className="capitalize">{t.bloom} <span className="text-slate-400">({t.items})</span></span><b className="tabular-nums">{pct(t.p)}</b></li>)}</ul>
+          )}
+        </div>
+      </section>
+
+      <div className="card overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr>
+            <th className="p-2">Q</th><th className="p-2">Question</th><th className="p-2 text-center" title="Share of marks earned">Difficulty</th>
+            <th className="p-2 text-center" title="Top 27% minus bottom 27%">Discrimination</th><th className="p-2 text-center">Point-biserial</th><th className="p-2 text-center">Answered</th><th className="p-2">Notes</th>
+          </tr></thead>
+          <tbody>
+            {data.items.map(it => (
+              <Fragment key={it.question_id}>
+                <tr className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => setOpen(open === it.question_id ? null : it.question_id)}>
+                  <td className="p-2 font-semibold">{it.position}</td>
+                  <td className="max-w-md p-2"><span className="line-clamp-2">{prompt.get(it.question_id)}</span>{it.topic && <span className="text-xs text-slate-400">{it.topic}</span>}</td>
+                  <td className="p-2 text-center tabular-nums">{pct(it.p)}</td>
+                  <td className={"p-2 text-center tabular-nums " + ((it.discrimination ?? 1) < 0 ? "font-semibold text-rose-600" : (it.discrimination ?? 1) < 0.2 ? "text-amber-600" : "")}>{it.discrimination ?? "—"}</td>
+                  <td className="p-2 text-center tabular-nums">{it.point_biserial ?? "—"}</td>
+                  <td className="p-2 text-center tabular-nums">{it.n}</td>
+                  <td className="p-2">{it.flags.length ? <Badge tone={tone(it)}>{it.flags[0]}{it.flags.length > 1 ? ` +${it.flags.length - 1}` : ""}</Badge> : <Badge tone="green">fine</Badge>}</td>
+                </tr>
+                {open === it.question_id && (
+                  <tr><td colSpan={7} className="bg-slate-50 p-3 text-xs">
+                    {it.flags.length > 0 && <ul className="mb-2 list-disc pl-5 text-amber-800">{it.flags.map(f => <li key={f}>{f}</li>)}</ul>}
+                    {it.distractors && (
+                      <table className="w-full max-w-xl">
+                        <thead className="text-left text-slate-500"><tr><th className="p-1">Option</th><th className="p-1 text-center">Chosen</th><th className="p-1 text-center">Top group</th><th className="p-1 text-center">Bottom group</th></tr></thead>
+                        <tbody>{it.distractors.map(d => (
+                          <tr key={d.option_id || "none"} className={d.correct ? "font-semibold text-emerald-700" : ""}><td className="p-1">{d.text}{d.correct ? " ✓" : ""}</td><td className="p-1 text-center">{d.count}</td><td className="p-1 text-center">{d.upper}</td><td className="p-1 text-center">{d.lower}</td></tr>
+                        ))}</tbody>
+                      </table>
+                    )}
+                    {it.common_wrong && (it.common_wrong.length ? <p><b>Common wrong answers:</b> {it.common_wrong.map(w => `"${w.answer}" (${w.count})`).join(", ")}</p> : <p className="text-slate-500">No wrong answers.</p>)}
+                    {!it.distractors && !it.common_wrong && !it.flags.length && <p className="text-slate-500">Nothing unusual.</p>}
+                  </td></tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-slate-500">Difficulty is the share of marks students earned on the question (30–90% is a healthy range). Discrimination compares the top and bottom 27% of the class: above 0.3 is good, below 0.2 is weak, and a negative value usually means the answer key is wrong or the question is ambiguous.</p>
     </div>
   );
 }

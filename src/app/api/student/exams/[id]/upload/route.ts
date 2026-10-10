@@ -3,6 +3,7 @@ import { requireCtx, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { verifySeb, absoluteRequestUrl } from "@/lib/exams/seb";
 import { GRACE_MS } from "@/lib/exams/server";
+import { clientIp, ipAllowed } from "@/lib/net";
 
 /** File-upload answers. Stored privately under <tenant>/<exam>/<attempt>/. */
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -14,6 +15,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (!exam) return jsonError("exam not found", 404);
   const seb = verifySeb(absoluteRequestUrl(req), req.headers, exam.settings ?? {});
   if (!seb.ok) return jsonError(seb.reason ?? "Safe Exam Browser required", 403);
+  if (!ipAllowed(clientIp(req.headers), exam.settings?.allowed_ips)) return jsonError("This exam can only be taken on the school network.", 403);
   const { data: attempt } = await svc.from("exam_attempts").select("id,status,deadline_at,answers").eq("exam_id", exam.id).eq("student_user_id", ctx.userId).maybeSingle();
   if (!attempt || attempt.status !== "in_progress") return jsonError("exam is not in progress", 409);
   if (Date.now() > new Date(attempt.deadline_at).getTime() + GRACE_MS) return jsonError("time is up", 409);
