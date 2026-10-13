@@ -57,7 +57,7 @@ export const TenantSettingsInput = z.object({
   geofence_radius_m: z.number().int().min(20).max(20000).nullish(),
   library_loan_days: z.number().int().min(1).max(365).optional(),
   library_fine_per_day: z.number().min(0).optional(),
-  currency: z.string().trim().max(8).optional(),
+  currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "choose a currency").optional(),
   pickup_code_ttl_min: z.number().int().min(10).max(1440).optional(),
   exam_violation_limit: z.number().int().min(1).max(50).optional(),
   sms_mode: z.enum(["off", "fallback", "always"]).optional(),

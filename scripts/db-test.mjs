@@ -15,6 +15,7 @@ const bootstrap = `
 create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
 create schema auth; create schema storage;
 create table auth.users (id uuid primary key, email text);
+create table auth.sessions (id uuid primary key, user_id uuid, created_at timestamptz not null default now(), updated_at timestamptz, user_agent text, ip inet, not_after timestamptz);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
 create table storage.buckets (id text primary key, name text, public boolean);
@@ -79,8 +80,11 @@ let pass = 0, fail = 0;
 // Session assurance level: "aal2" once a second factor was verified.
 let AAL = "aal1";
 function setAal(v) { AAL = v; }
+// Extra access-token claims (session_id, amr) for session-rule tests.
+let EXTRA = {};
+function setClaims(v) { EXTRA = v ?? {}; }
 async function as(uid, fn) {
-  const claims = JSON.stringify({ sub: uid, aal: AAL });
+  const claims = JSON.stringify({ sub: uid, aal: AAL, ...EXTRA });
   await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub', '${uid}', false); select set_config('request.jwt.claims', '${claims}', false);`);
   try { return await fn(); } finally { await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false); select set_config('request.jwt.claims', '', false);`); }
 }
@@ -176,7 +180,7 @@ await expectError("device rows cannot be injected into another school", U.parent
 function check(name, ok, detail) {
   if (ok) { pass++; console.log("  ✓", name); } else { fail++; console.log("  ✗", name, JSON.stringify(detail ?? null)); }
 }
-await moduleTests({ db, as, q, expectRows, expectError, expectOk, check, setAal, U, T });
+await moduleTests({ db, as, q, expectRows, expectError, expectOk, check, setAal, setClaims, U, T });
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -55,14 +55,14 @@ export function RulesEditor({ rules, onChange, classes }: { rules: SegmentRules;
 }
 
 /** Every current family with NPS, balance, complaints, re-enrolment and a retention flag; click for the 360° profile. */
-export default function Families({ segments }: { segments: { id: string; name: string }[] }) {
+export default function Families({ segments, openId }: { segments: { id: string; name: string }[]; openId?: string | null }) {
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
   useEffect(() => { const t = setTimeout(() => setQuery(q.trim()), 350); return () => clearTimeout(t); }, [q]);
   const [rules, setRules] = useState<SegmentRules>({});
   const [segment, setSegment] = useState("");
   const [filters, setFilters] = useState(false);
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(openId ?? null);
   const url = `/api/community/families?q=${encodeURIComponent(query)}${segment ? `&segment=${segment}` : ""}${Object.keys(rules).length ? `&rules=${encodeURIComponent(JSON.stringify(rules))}` : ""}`;
   const { data, error } = useApi<ListData>(url);
   const [saveName, setSaveName] = useState("");

@@ -46,12 +46,13 @@ export default function WelcomePage() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (pw.length < 8) return setErr("Use at least 8 characters.");
     if (pw !== pw2) return setErr("The passwords do not match.");
     setBusy(true); setErr(null);
-    const { error } = await createClient().auth.updateUser({ password: pw });
+    // The server applies the school's password rules.
+    const r = await fetch("/api/account/password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pw }) });
+    const j = await r.json().catch(() => ({}));
     setBusy(false);
-    if (error) return setErr(error.message);
+    if (!r.ok) return setErr(j.error ?? "could not save the password");
     await fetch("/api/auth/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => null);
     router.replace(next);
   }

@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useApi, send, Alert, Badge, Empty, Field, Loading, Modal, Stat, fmtDate } from "@/components/ui";
 
 type Alumnus = { id: string; full_name: string; graduation_year: number | null; last_class: string | null; email: string | null; phone: string | null; occupation: string | null; employer: string | null;
-  further_study: string | null; city: string | null; country: string | null; mentor: boolean; consent_contact: boolean; status: string; source: string; created_at: string; linkedin?: string | null; notes?: string | null };
+  further_study: string | null; city: string | null; country: string | null; mentor: boolean; consent_contact: boolean; status: string; source: string; created_at: string; linkedin?: string | null; notes?: string | null; user_id?: string | null };
 type Data = { items: Alumnus[]; join_link: string | null; stats: { total: number; pending: number; mentors: number; reachable: number; graduates: number } };
 
 /** Former students: directory, sign-ups to confirm, mentors, and the contact log. */
@@ -95,6 +95,9 @@ function AlumnusView({ id, onEdit, onDeleted }: { id: string; onEdit: (a: Alumnu
           <button className="btn btn-outline text-rose-700" onClick={async () => { if (!confirm(`Remove ${a.full_name}?`)) return; const r = await send("/api/community/alumni", { action: "delete", id }); if (r.ok) onDeleted(); else alert(r.error); }}>Remove</button></div>
       </div>
       <p className="rounded bg-slate-50 p-2 text-xs">Private link for {a.full_name.split(" ")[0]} to update their details: <code className="select-all">{a.update_link}</code></p>
+      {a.user_id ? <p className="text-xs text-emerald-700">Has an alumni sign-in.</p> : a.email && a.status === "active" && (
+        <button className="btn btn-outline px-2 py-1 text-xs" onClick={async () => { const r = await send("/api/community/alumni", { action: "invite", id }); alert(r.ok ? "Invitation sent." : r.error); reload(); }}>Invite to the alumni page</button>
+      )}
       <form className="flex flex-wrap gap-2" onSubmit={async e => { e.preventDefault(); const r = await send("/api/community/alumni", { action: "log", id, ...log }); if (r.ok) { setLog({ ...log, body: "" }); reload(); } }}>
         <select className="input w-auto" value={log.kind} onChange={e => setLog({ ...log, kind: e.target.value })} aria-label="Kind">{["call", "meeting", "email", "visit", "note", "other"].map(k => <option key={k}>{k}</option>)}</select>
         <input className="input flex-1" value={log.body} onChange={e => setLog({ ...log, body: e.target.value })} placeholder="e.g. Agreed to speak at careers day" required maxLength={4000} />

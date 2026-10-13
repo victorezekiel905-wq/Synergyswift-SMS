@@ -1,7 +1,7 @@
 "use client";
 import { useApi, Page, PageHeader, Alert, Empty, Stat, money, Loading } from "@/components/ui";
 
-type School = { id: string; name: string; status: string; term: string | null; students: number; staff: number;
+type School = { id: string; name: string; status: string; term: string | null; students: number; staff: number; currency: string;
   fees: { billed: number; paid: number; outstanding: number; collection_rate: number | null }; collected_30d: number; attendance_30d: number | null; average_score: number | null };
 
 /** Proprietor console: every branch side by side. */
@@ -11,12 +11,15 @@ export default function GroupPage() {
   if (!data) return <Page><Loading /></Page>;
   const t = data.schools.reduce((a, s) => ({ students: a.students + s.students, staff: a.staff + s.staff, billed: a.billed + s.fees.billed, paid: a.paid + s.fees.paid, c30: a.c30 + s.collected_30d }),
     { students: 0, staff: 0, billed: 0, paid: 0, c30: 0 });
+  // Money only adds up across branches that use the same currency.
+  const currencies = [...new Set(data.schools.map(s => s.currency))];
+  const cur = currencies.length === 1 ? currencies[0] : null;
   return (
     <Page wide>
       <PageHeader eyebrow={data.groups.map(g => g.name).join(", ")} title="All branches" subtitle="Live numbers across your schools: enrolment, fees, attendance and results." />
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
         <Stat label="Schools" value={data.schools.length} /><Stat label="Students" value={t.students} /><Stat label="Staff" value={t.staff} />
-        <Stat label="Fees collected this term" value={money(t.paid)} hint={`of ${money(t.billed)}`} /><Stat label="Collected (30 days)" value={money(t.c30)} tone="good" />
+        <Stat label="Fees collected this term" value={cur ? money(t.paid, cur) : "per branch"} hint={cur ? `of ${money(t.billed, cur)}` : `branches use ${currencies.join(", ")}`} /><Stat label="Collected (30 days)" value={cur ? money(t.c30, cur) : "per branch"} tone="good" />
       </div>
       {!data.schools.length ? <Empty>No schools in this group yet.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
@@ -25,7 +28,7 @@ export default function GroupPage() {
             <tr key={s.id} className="border-t border-slate-100"><td className="p-2 font-medium">{s.name}<div className="text-xs text-slate-400">{s.term ?? "no current term"}{s.status !== "active" ? " · suspended" : ""}</div></td>
               <td className="p-2 text-right tabular-nums">{s.students}</td><td className="p-2 text-right tabular-nums">{s.staff}</td>
               <td className={"p-2 text-right tabular-nums " + (s.fees.collection_rate !== null && s.fees.collection_rate < 60 ? "text-rose-600" : "")}>{s.fees.collection_rate === null ? "—" : `${s.fees.collection_rate}%`}</td>
-              <td className="p-2 text-right tabular-nums">{money(s.fees.outstanding)}</td>
+              <td className="p-2 text-right tabular-nums">{money(s.fees.outstanding, s.currency)}</td>
               <td className={"p-2 text-right tabular-nums " + (s.attendance_30d !== null && s.attendance_30d < 90 ? "text-amber-600" : "")}>{s.attendance_30d === null ? "—" : `${s.attendance_30d}%`}</td>
               <td className="p-2 text-right tabular-nums">{s.average_score ?? "—"}</td></tr>))}</tbody></table></div>
       )}

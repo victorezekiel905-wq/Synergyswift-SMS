@@ -8,6 +8,8 @@ import { LANGUAGES } from "@/lib/languages";
 import { appUrl } from "@/lib/school";
 import { createTicket, respondReenrolment } from "@/lib/community-server";
 import { TICKET_CATEGORIES, REENROL_REASONS } from "@/lib/community";
+import { recordConsent } from "@/lib/consent-server";
+import { clientIp } from "@/lib/net";
 
 /**
  * Parent actions for both portals. Identify the guardian by session (logged-in
@@ -25,6 +27,7 @@ const Body = z.discriminatedUnion("action", [
     category: z.enum(TICKET_CATEGORIES).default("other"), subject: z.string().trim().min(3).max(160), body: z.string().trim().min(5).max(3000) }),
   z.object({ action: z.literal("reenrol"), token: z.string().optional(), round_id: z.string().uuid(), student_id: z.string().uuid(), intent: z.enum(["returning", "not_returning", "undecided"]),
     reason: z.enum(REENROL_REASONS).nullish(), note: z.string().trim().max(500).nullish() }),
+  z.object({ action: z.literal("consent"), token: z.string().optional(), purpose_id: z.string().uuid(), student_id: z.string().uuid().nullish(), granted: z.boolean() }),
   z.object({ action: z.literal("language"), token: z.string().optional(), language: z.string().refine(l => l in LANGUAGES, "unsupported language").nullable() })
 ]);
 
@@ -60,6 +63,9 @@ export async function POST(req: NextRequest) {
       }
       case "reenrol":
         return NextResponse.json(await respondReenrolment(svc, { tenantId, guardianId, roundId: b.round_id, studentId: b.student_id, intent: b.intent, reason: b.reason, note: b.note }));
+      case "consent":
+        return NextResponse.json(await recordConsent(svc, { tenantId, guardianId, purposeId: b.purpose_id, studentId: b.student_id ?? null, granted: b.granted,
+          method: b.token ? "link" : "portal", ip: clientIp(req.headers), userAgent: req.headers.get("user-agent") }));
       case "language": {
         const { error } = await svc.from("guardians").update({ language: b.language }).eq("tenant_id", tenantId).eq("id", guardianId);
         return error ? jsonError(error.message) : NextResponse.json({ ok: true });

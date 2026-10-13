@@ -7,6 +7,11 @@ export type SupportData = {
   tickets: { ticket_no: string; kind: string; subject: string; status: TicketStatus; created_at: string; updated_at: string; token: string }[];
   surveys: { title: string; token: string }[];
   reenrolment: null | { round: { id: string; title: string; message: string | null; deadline: string | null }; children: { id: string; name: string; intent: string | null; reason: string | null; note: string | null }[] };
+  consent?: null | {
+    purposes: { id: string; title: string; description: string; per_child: boolean; required: boolean }[];
+    items: { purpose_id: string; student_id: string | null; child: string | null; state: "granted" | "declined" | "outdated" | "missing"; answered_at: string | null }[];
+    privacy_notice: string | null; school: string | null; pending: number;
+  };
 };
 type Kid = { id: string; name: string };
 type Post = (body: Record<string, unknown>) => Promise<{ ok: boolean; data: any; error: string | null }>;
@@ -110,5 +115,54 @@ export function SupportTab({ data, kids, token, onChange }: { data: SupportData;
         ))}</ul>
       )}
     </div>
+  );
+}
+
+/** "Permissions and privacy": each permission the school asks for, per child or for the family. Opens by itself while answers are missing. */
+export function ConsentCard({ data, token, onChange }: { data: NonNullable<SupportData["consent"]>; token?: string; onChange: () => void }) {
+  const [open, setOpen] = useState(data.pending > 0);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [notice, setNotice] = useState(false);
+  if (!data.purposes.length) return null;
+  const answer = async (purposeId: string, studentId: string | null, granted: boolean) => {
+    setBusy(`${purposeId}:${studentId}`); setErr(null);
+    const r = await post(token)({ action: "consent", purpose_id: purposeId, student_id: studentId, granted });
+    setBusy(null);
+    if (!r.ok) setErr(r.error ?? "failed"); else onChange();
+  };
+  return (
+    <section id="consent" className={"card mb-4 p-4 text-sm " + (data.pending ? "border-amber-300" : "")}>
+      <button className="flex w-full items-center justify-between text-left" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span><b>Permissions and privacy</b>{data.pending > 0 && <span className="ml-2 text-amber-800">{data.pending} to answer</span>}</span>
+        <span className="text-xs text-brand-700">{open ? "Hide" : "Review"}</span>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3">
+          <p className="text-slate-600">You can change these at any time. {data.privacy_notice && <button className="text-brand-700 underline" onClick={() => setNotice(!notice)}>{notice ? "Hide" : "Read"} the privacy notice</button>}</p>
+          {notice && data.privacy_notice && <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded bg-slate-50 p-3 text-xs">{data.privacy_notice}</div>}
+          {err && <Alert>{err}</Alert>}
+          {data.purposes.map(p => (
+            <div key={p.id} className="rounded-lg border border-slate-200 p-3">
+              <p className="font-medium">{p.title}{p.required && <span className="ml-1 text-xs font-normal text-slate-500">(needed to run your child&apos;s place)</span>}</p>
+              <p className="text-xs text-slate-600">{p.description}</p>
+              <ul className="mt-2 space-y-1">{data.items.filter(i => i.purpose_id === p.id).map(i => (
+                <li key={`${i.purpose_id}:${i.student_id}`} className="flex flex-wrap items-center gap-2">
+                  <span className="min-w-32 flex-1">{i.child ?? "Our family"}{i.state === "outdated" && <span className="text-xs text-amber-800"> · wording changed, please answer again</span>}</span>
+                  {p.required ? (
+                    i.state === "granted" ? <Badge tone="green">acknowledged</Badge> : <button className="btn btn-primary px-2 py-1 text-xs" disabled={busy !== null} onClick={() => answer(p.id, i.student_id, true)}>I understand</button>
+                  ) : (
+                    <span className="flex gap-1" role="group" aria-label={`${p.title} for ${i.child ?? "our family"}`}>
+                      <button className={"rounded-md border px-2 py-1 text-xs " + (i.state === "granted" ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-300")} aria-pressed={i.state === "granted"} disabled={busy !== null} onClick={() => answer(p.id, i.student_id, true)}>Yes</button>
+                      <button className={"rounded-md border px-2 py-1 text-xs " + (i.state === "declined" ? "border-rose-600 bg-rose-50 text-rose-800" : "border-slate-300")} aria-pressed={i.state === "declined"} disabled={busy !== null} onClick={() => answer(p.id, i.student_id, false)}>No</button>
+                    </span>
+                  )}
+                </li>
+              ))}</ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

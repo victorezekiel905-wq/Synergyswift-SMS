@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Page, PageHeader, Alert, Field, Badge, fmtDate } from "@/components/ui";
 import { NotificationsToggle } from "@/components/parent/FamilyConnect";
+import { PasswordCard, SessionsCard } from "@/components/auth/AccountPassword";
 
 type Factor = { id: string; friendly_name?: string; factor_type: string; status: string; created_at: string };
 
@@ -87,7 +88,8 @@ export default function AccountSecurityPage() {
     <Page>
       <PageHeader eyebrow="Account" title="Account security"
         subtitle="Two-factor sign-in stops anyone who learns your password from getting in. You enter a code from an app on your phone as well as your password." />
-      {required && !sessionVerified && (
+      {required === "password" && <div className="mb-4"><PasswordCard required onChanged={continueOn} /></div>}
+      {required && required !== "password" && !sessionVerified && (
         <div className="mb-4"><Alert tone="amber">
           {required === "platform"
             ? "Platform administrators must use two-factor sign-in. Set it up below to open the platform console."
@@ -143,13 +145,16 @@ export default function AccountSecurityPage() {
         )}
       </section>
 
+      {required !== "password" && <div className="mt-4"><PasswordCard /></div>}
+      <div className="mt-4"><SessionsCard /></div>
+
       <section className="card mt-4 space-y-2 p-5">
         <h2 className="font-semibold">Notifications</h2>
         <p className="text-sm text-slate-600">Get parent messages and cover duties on this phone or computer. Without it, they come by email.</p>
         <NotificationsToggle />
       </section>
 
-      {sessionVerified && required && (
+      {sessionVerified && required && required !== "password" && (
         <div className="mt-4"><button className="btn btn-primary" onClick={continueOn}>Continue</button></div>
       )}
     </Page>

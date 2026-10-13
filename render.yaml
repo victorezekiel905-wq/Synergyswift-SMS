@@ -50,6 +50,9 @@ services:
         sync: false
       - key: DEFAULT_COUNTRY_CODE
         value: "234"
+      # Google / Microsoft sign-in buttons: providers enabled in Supabase Auth, e.g. google,azure
+      - key: NEXT_PUBLIC_SSO_PROVIDERS
+        sync: false
       # ---- Online payments ----
       - key: PAYSTACK_SECRET_KEY
         sync: false

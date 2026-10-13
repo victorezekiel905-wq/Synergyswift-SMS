@@ -11,7 +11,8 @@ export async function GET(request: Request) {
   const sb = await createClient();
   const { error } = await sb.auth.exchangeCodeForSession(code);
   if (error) return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, url));
-  return NextResponse.redirect(new URL(next, url));
+  // The login page finishes setting up the account (school link, approval, second factor) before going on.
+  return NextResponse.redirect(new URL(`/login?finish=1&next=${encodeURIComponent(next)}`, url));
 }
 
 function safeNext(value: string | null): string {

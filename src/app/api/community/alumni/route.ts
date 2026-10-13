@@ -4,6 +4,7 @@ import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { appUrl } from "@/lib/school";
 import { importGraduates, CrmError } from "@/lib/community-server";
+import { provisionUser } from "@/lib/provision";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
   }
   const svc = createServiceClient();
   const [{ data, error }, { data: t }, { count: graduates }] = await Promise.all([
-    ctx.sb.from("alumni").select("id,full_name,graduation_year,last_class,email,phone,occupation,employer,further_study,city,country,mentor,consent_contact,status,source,created_at")
+    ctx.sb.from("alumni").select("id,full_name,graduation_year,last_class,email,phone,occupation,employer,further_study,city,country,mentor,consent_contact,status,source,created_at,user_id")
       .eq("tenant_id", tid).order("graduation_year", { ascending: false, nullsFirst: false }).order("full_name").limit(5000),
     svc.from("tenants").select("public_slug").eq("id", tid).maybeSingle(),
     svc.from("students").select("id", { count: "exact", head: true }).eq("tenant_id", tid).eq("status", "graduated")
@@ -48,6 +49,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("status"), id: z.string().uuid(), status: z.enum(["pending", "active", "archived"]) }),
   z.object({ action: z.literal("delete"), id: z.string().uuid() }),
   z.object({ action: z.literal("import_graduates") }),
+  z.object({ action: z.literal("invite"), id: z.string().uuid() }),
   z.object({ action: z.literal("log"), id: z.string().uuid(), kind: z.enum(["note", "call", "meeting", "email", "visit", "other"]), body: z.string().trim().min(1).max(4000) })
 ]);
 
@@ -75,6 +77,18 @@ export async function POST(req: NextRequest) {
       case "delete": {
         const { error } = await ctx.sb.from("alumni").delete().eq("tenant_id", tid).eq("id", b.id);
         return error ? jsonError(error.message) : NextResponse.json({ ok: true });
+      }
+      case "invite": {
+        // A sign-in for the alumni page only: alumni accounts see none of the school's data.
+        const { data: a } = await ctx.sb.from("alumni").select("id,full_name,email,user_id,status").eq("tenant_id", tid).eq("id", b.id).maybeSingle();
+        if (!a) return jsonError("not found", 404);
+        if (a.user_id) return jsonError("already invited");
+        if (!a.email) return jsonError("add an email address first");
+        if (a.status !== "active") return jsonError("confirm this alumnus first");
+        const svc = createServiceClient();
+        const { userId } = await provisionUser(svc, { tenantId: tid, email: a.email, fullName: a.full_name, role: "alumni", redirectTo: `${appUrl(req)}/auth/welcome?next=/alumni/me`, createdBy: ctx.userId });
+        await svc.from("alumni").update({ user_id: userId, updated_at: new Date().toISOString() }).eq("id", a.id);
+        return NextResponse.json({ ok: true });
       }
       case "import_graduates":
         return NextResponse.json({ ok: true, added: await importGraduates(createServiceClient(), tid) });

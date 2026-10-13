@@ -32,6 +32,7 @@ const TABLES: { key: string; table: string; select: string; by?: string }[] = [
   { key: "complaints_and_requests", table: "tickets", select: "ticket_no,kind,category,subject,body,status,created_at,resolved_at,satisfaction,ticket_messages(author,body,internal,created_at)" },
   { key: "reenrolment", table: "reenrolment_responses", select: "intent,reason,note,responded_at,reenrolment_rounds(title)" },
   { key: "contact_log", table: "crm_interactions", select: "kind,body,occurred_at" },
+  { key: "consents", table: "consent_records", select: "granted,version,method,created_at,consent_purposes(title)" },
   { key: "alumni_record", table: "alumni", select: "full_name,graduation_year,email,phone,occupation,employer,further_study,city,country,consent_contact,created_at" }
 ];
 

@@ -4,12 +4,15 @@
  */
 import { startOfTodayIso, studentName } from "./school";
 import { familyExtras } from "./family";
+import { beginRequest } from "./request-actor";
 
 export async function guardianByToken(svc: any, token: string) {
+  const store = beginRequest();
   if (!/^[0-9a-f]{32,128}$/i.test(token)) return null;
   const { data } = await svc.from("guardians").select("id,tenant_id,full_name,email,phone,whatsapp_phone,notify_email,notify_whatsapp,tenants(status,timezone)")
     .eq("portal_token", token).maybeSingle();
   if (!data || data.tenants?.status !== "active") return null;
+  store.actor = `guardian:${data.id}`;
   return data as { id: string; tenant_id: string; full_name: string; notify_email: boolean; notify_whatsapp: boolean; tenants: { timezone: string } };
 }
 

@@ -27,6 +27,16 @@ export async function GET(req: NextRequest) {
   const { data: closed } = await svc.from("exams").update({ status: "closed" }).eq("status", "published").lt("closes_at", now).select("id");
 
   const offersExpired = await expireOffers(svc).catch(() => 0);
+  // Change history is kept for each school's chosen period; spent sign-in codes and access grants go at once.
+  let historyPurged = 0;
+  const { data: keep } = await svc.from("tenant_settings").select("tenant_id,audit_retention_days");
+  for (const k of keep ?? []) {
+    const cutoff = new Date(Date.now() - (k.audit_retention_days ?? 730) * 86400_000).toISOString();
+    const { count } = await svc.from("data_changes").delete({ count: "exact" }).eq("tenant_id", k.tenant_id).lt("at", cutoff);
+    historyPurged += count ?? 0;
+  }
+  await svc.from("access_grants").delete().lt("expires_at", now);
+  await svc.from("phone_login_codes").delete().lt("created_at", new Date(Date.now() - 86400_000).toISOString());
   // Webcam photos are kept for 30 days for appeals, then removed.
   const monthAgo = new Date(Date.now() - 30 * 86400_000).toISOString();
   const { data: oldSnaps } = await svc.from("exam_events").select("id,meta").eq("kind", "snapshot").lt("at", monthAgo).is("meta->deleted", null).limit(1000);
@@ -62,5 +72,5 @@ export async function GET(req: NextRequest) {
   }
   if (rows.length) await enqueue(svc, rows);
   const delivery = rows.length ? await dispatchDue(svc, { budgetMs: 40_000 }) : null;
-  return NextResponse.json({ expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, webcam_photos_deleted: snapPaths.length, admission_offers_expired: offersExpired, delivery });
+  return NextResponse.json({ expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, webcam_photos_deleted: snapPaths.length, admission_offers_expired: offersExpired, change_history_purged: historyPurged, delivery });
 }

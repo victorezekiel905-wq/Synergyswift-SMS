@@ -1,9 +1,18 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import SsoButtons from "@/components/auth/SsoButtons";
+import SsoButtons, { ssoEnabled } from "@/components/auth/SsoButtons";
+import PhoneLogin from "@/components/auth/PhoneLogin";
+
+// Why someone was sent back to sign in (?error=…).
+const REASONS: Record<string, string> = {
+  idle: "You were signed out after a period of inactivity.",
+  session_expired: "Your session reached the time limit your school set. Please sign in again.",
+  sso_required: "Your school requires you to sign in with your school Google or Microsoft account.",
+  missing_oauth_code: "Single sign-on did not finish. Please try again."
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,6 +23,30 @@ export default function LoginPage() {
   // Second step for accounts with an authenticator app.
   const [factorId, setFactorId] = useState<string | null>(null);
   const [code, setCode] = useState("");
+  const [mode, setMode] = useState<"email" | "phone">("email");
+  const [phoneOk, setPhoneOk] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    const e = new URLSearchParams(window.location.search).get("error");
+    if (e) setNotice(REASONS[e] ?? e);
+    // Back from Google or Microsoft: check the second factor, then finish setting up.
+    if (new URLSearchParams(window.location.search).get("finish") === "1") { setBusy(true); afterPhone(); }
+    fetch("/api/auth/phone").then(r => r.json()).then(j => setPhoneOk(Boolean(j.available))).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // After a phone-code sign-in: ask for the second factor if the account has one.
+  async function afterPhone() {
+    const sb = createClient();
+    const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+      const { data: f } = await sb.auth.mfa.listFactors();
+      const totp = f?.totp?.[0];
+      if (totp) { setFactorId(totp.id); setBusy(false); return; }
+    }
+    setBusy(true);
+    await finish();
+  }
 
   async function finish() {
     const sb = createClient();
@@ -29,7 +62,8 @@ export default function LoginPage() {
       setErr(j.error ?? "profile setup failed");
       return;
     }
-    router.push(j.next ?? "/dashboard");
+    const after = new URLSearchParams(window.location.search).get("next");
+    router.push(j.next && j.next !== "/dashboard" ? j.next : after && after.startsWith("/") && !after.startsWith("//") ? after : "/dashboard");
     router.refresh();
   }
 
@@ -61,6 +95,7 @@ export default function LoginPage() {
     <main className="mx-auto max-w-md px-6 py-16">
       <h1 className="text-2xl font-semibold">Welcome back</h1>
       <p className="mt-1 text-sm text-slate-600">Sign in to your school workspace.</p>
+      {notice && <p role="status" className="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-900">{notice}</p>}
       <div className="card mt-8 space-y-4 p-6">
         {factorId ? (
           <form onSubmit={onCode} className="space-y-4">
@@ -74,7 +109,14 @@ export default function LoginPage() {
         ) : (
           <>
             <SsoButtons />
-            <div className="flex items-center gap-3 text-[11px] text-slate-400"><span className="h-px flex-1 bg-slate-200" />or use email<span className="h-px flex-1 bg-slate-200" /></div>
+            {ssoEnabled && <div className="flex items-center gap-3 text-[11px] text-slate-400"><span className="h-px flex-1 bg-slate-200" />or<span className="h-px flex-1 bg-slate-200" /></div>}
+            {phoneOk && (
+              <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-sm" role="tablist" aria-label="Sign in with">
+                {(["email", "phone"] as const).map(m => <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)}
+                  className={"rounded-md py-1.5 " + (mode === m ? "bg-white font-semibold shadow-sm" : "text-slate-600")}>{m === "email" ? "Email" : "Phone"}</button>)}
+              </div>
+            )}
+            {mode === "phone" && phoneOk ? <PhoneLogin onSignedIn={afterPhone} /> : (
             <form onSubmit={onSubmit} className="space-y-4">
               <div>
                 <label className="label">Email</label>
@@ -91,6 +133,7 @@ export default function LoginPage() {
                 <Link href="/student/join" className="font-medium text-brand-600">Join as student</Link>
               </p>
             </form>
+            )}
           </>
         )}
       </div>

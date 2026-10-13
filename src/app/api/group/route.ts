@@ -24,10 +24,11 @@ export async function GET() {
     return (await q).count ?? 0;
   };
   const schools = await Promise.all((tenants ?? []).map(async (t: any) => {
-    const [{ data: term }, students, staff] = await Promise.all([
+    const [{ data: term }, students, staff, { data: settings }] = await Promise.all([
       svc.from("terms").select("id,name").eq("tenant_id", t.id).eq("is_current", true).maybeSingle(),
       count("students", t.id, q => q.eq("status", "active")),
-      count("staff", t.id, q => q.neq("status", "exited"))
+      count("staff", t.id, q => q.neq("status", "exited")),
+      svc.from("tenant_settings").select("currency").eq("tenant_id", t.id).maybeSingle()
     ]);
     const [invoices, att, cards, pays] = await Promise.all([
       term ? svc.from("fee_invoices").select("total,amount_paid").eq("tenant_id", t.id).eq("term_id", term.id).neq("status", "void").limit(20000) : { data: [] },
@@ -40,7 +41,7 @@ export async function GET() {
     const a = att.data ?? [];
     const avgs = (cards.data ?? []).map((c: any) => c.average).filter((x: any) => x !== null).map(Number);
     return {
-      id: t.id, name: t.name, status: t.status, group_id: t.group_id, term: term?.name ?? null, students, staff,
+      id: t.id, name: t.name, status: t.status, group_id: t.group_id, term: term?.name ?? null, students, staff, currency: settings?.currency ?? "NGN",
       fees: { billed, paid, outstanding: billed - paid, collection_rate: billed ? Math.round((paid / billed) * 1000) / 10 : null },
       collected_30d: (pays.data ?? []).reduce((s: number, p: any) => s + Number(p.amount), 0),
       attendance_30d: a.length ? Math.round((a.filter((x: any) => x.status === "present" || x.status === "late").length / a.length) * 1000) / 10 : null,

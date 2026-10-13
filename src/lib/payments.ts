@@ -10,6 +10,7 @@
  * and currency match what was requested.
  */
 import { createHmac, timingSafeEqual } from "crypto";
+import { PAYSTACK_CURRENCIES } from "./currency";
 
 export type Provider = "paystack" | "flutterwave";
 
@@ -37,6 +38,7 @@ export type InitInput = {
 
 export async function initializePayment(i: InitInput): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   if (!providerConfigured(i.provider)) return { ok: false, error: `${i.provider} is not configured on this server` };
+  if (i.provider === "paystack" && !PAYSTACK_CURRENCIES.includes(i.currency.toUpperCase())) return { ok: false, error: `Paystack does not take ${i.currency}; the school can switch to Flutterwave under Fees → Online payments` };
   try {
     if (i.provider === "paystack") {
       const r = await fetch("https://api.paystack.co/transaction/initialize", {

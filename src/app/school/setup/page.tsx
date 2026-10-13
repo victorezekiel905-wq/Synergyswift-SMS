@@ -2,8 +2,10 @@
 import { useEffect, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Field, Badge, Empty, Icon } from "@/components/ui";
 import { LANGUAGES } from "@/lib/languages";
+import { CURRENCIES } from "@/lib/currency";
+import Sections from "@/components/admin/Sections";
 
-type Tab = "profile" | "academic" | "grading" | "classes" | "departments";
+type Tab = "profile" | "academic" | "sections" | "grading" | "classes" | "departments";
 
 export default function SetupPage() {
   const [tab, setTab] = useState<Tab>("profile");
@@ -11,10 +13,11 @@ export default function SetupPage() {
     <Page wide>
       <PageHeader eyebrow="Administration" title="School setup" subtitle="Branding, calendar, your own grading rules, classes and subjects. Only school admins can change these." />
       <Tabs value={tab} onChange={setTab} tabs={[
-        { id: "profile", label: "Profile & notifications" }, { id: "academic", label: "Sessions & terms" },
+        { id: "profile", label: "Profile & notifications" }, { id: "academic", label: "Sessions & terms" }, { id: "sections", label: "Sections & curriculum" },
         { id: "grading", label: "Grading" }, { id: "classes", label: "Classes & subjects" }, { id: "departments", label: "Departments & approval" }]} />
       {tab === "profile" && <Profile />}
       {tab === "academic" && <Academic />}
+      {tab === "sections" && <Sections />}
       {tab === "grading" && <Grading />}
       {tab === "classes" && <Classes />}
       {tab === "departments" && <Departments />}
@@ -167,7 +170,11 @@ function Profile() {
         <h2 className="font-semibold md:col-span-4">Library & exams</h2>
         <Field label="Loan period (days)"><input className="input" min={1} {...num("library_loan_days")} /></Field>
         <Field label="Fine per overdue day"><input className="input" min={0} step="any" {...num("library_fine_per_day")} /></Field>
-        <Field label="Currency"><input className="input" {...text("currency")} /></Field>
+        <Field label="Currency" hint="Used for fees, the tuck shop, payroll and every amount shown.">
+          <select className="input" value={(s.currency as string) ?? "NGN"} onChange={e => setS({ ...s, currency: e.target.value })}>
+            {CURRENCIES.map(([c, n]) => <option key={c} value={c}>{c} · {n}</option>)}
+          </select>
+        </Field>
         <Field label="Default exam violation limit" hint="Exam locks after this many integrity violations."><input className="input" min={1} {...num("exam_violation_limit")} /></Field>
       </section>
       <button className="btn btn-primary">Save settings</button>

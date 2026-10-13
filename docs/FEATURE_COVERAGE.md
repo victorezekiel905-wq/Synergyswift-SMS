@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security · **5** SIS · **6** learning management · **7** attendance, timetable, calendar · **8** communication · **9** finance · **10** HR and payroll · **11** welfare, boarding, transport, library, inventory, co-curricular · **12** portals and apps · **13** analytics, integrations, compliance.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS · **6** learning management · **7** attendance, timetable, calendar · **8** communication · **9** finance · **10** HR and payroll · **11** welfare, boarding, transport, library, inventory, co-curricular · **12** portals and apps · **13** analytics, integrations, compliance.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -31,33 +31,33 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Transcripts, broadsheets, master score sheets | ✅ |
 | Mid-term progress reports, predicted grades, target grades | ✅ |
 
-## 1. Core platform and administration (phase 4)
+## 1. Core platform and administration (phase 4, done)
 
 | Feature | Status |
 |---|---|
-| Multi-school, separate branding, group dashboard for chains | ✅ |
+| Multi-school, separate branding, group dashboard for chains | ✅ (branches in different currencies are shown side by side, not added up) |
 | Sessions, terms, classes, arms, houses | ✅ |
-| Sections (Nursery, Primary, Secondary) as their own layer | 🟡 classes have a free-text level; no section entity |
-| Curriculum frameworks (EYFS, KS1–KS4, IGCSE, A Level, UBE, WAEC/NECO/BECE, American) and mixed setups | ⬜ (report layouts and exam formats exist) |
-| Granular RBAC including HOD, form tutor, counsellor, alumni | 🟡 HOD via department head, form teacher exists; counsellor and alumni roles missing |
-| Settings: grading, report templates, timezone, currency, languages | 🟡 currency stored but not multi-currency (₦/£/$) everywhere |
-| Audit logs for every create, edit and delete | 🟡 key actions logged; not every table |
-| CSV/Excel import and export; migration tools | 🟡 students and questions import; no general importer |
-| Global search | ⬜ |
+| Sections (Nursery, Primary, Secondary, Sixth form) as their own layer, with a head and a curriculum each | ✅ |
+| Curriculum frameworks (Nigerian UBE/BECE/WAEC/NECO, British EYFS and KS1–KS5, Cambridge Primary to IGCSE and A Level, American Pre-K–12) and mixed setups: one step creates sections, classes and arms, usual subjects and matching grading schemes; a class may follow a different curriculum from its section | ✅ |
+| Granular RBAC including HOD, form tutor, counsellor, alumni | ✅ counsellor (pastoral staff: behaviour, early warning, read-only health) and alumni (own alumni page only, no school data) |
+| Settings: grading, report templates, timezone, currency, languages | ✅ currency chosen from a list (₦, GH₵, KSh, R, CFA, $, £, €) and used for every amount; Paystack schools are warned about currencies Paystack does not take. One currency per school; invoices in a second currency are phase 9 |
+| Audit logs for every create, edit and delete | ✅ change history on every table holding school data (except high-volume machine logs), with who, when, before and after; secrets never stored; server-side writes record the person they acted for; filters, record history, CSV download, retention setting |
+| CSV/Excel import and export; migration tools | ✅ students, parents, staff (optionally with sign-in invitations), classes, subjects, who teaches what, opening fee balances, alumni and vendors; checked before importing, row-by-row problems, column names from other systems recognised; every one exportable to CSV or Excel in the same columns |
+| Global search | ✅ Ctrl/⌘ K across students, staff, families, classes, invoices, complaints, enquiries, applications, alumni, partners and pages, limited to what each person may see |
 
 ## 2. Authentication and security (phase 4)
 
 | Feature | Status |
 |---|---|
 | Email/password | ✅ |
-| SSO with Google Workspace and Microsoft 365 | ⬜ 🔑 |
-| Phone OTP sign-in | ⬜ 🔑 (SMS provider) |
+| SSO with Google Workspace and Microsoft 365 | ✅ 🔑 sign-in buttons, "staff must use single sign-on" rule, and join-by-school-email with admin approval (providers are switched on in Supabase and listed in `NEXT_PUBLIC_SSO_PROVIDERS`) |
+| Phone OTP sign-in | ✅ 🔑 6-digit code by SMS through the school platform's SMS provider, rate-limited, one account per number, then the usual second factor |
 | Two-factor authentication | ✅ |
-| Password policies, session management | ⬜ |
+| Password policies, session management | ✅ length, character mix, common-password and name checks, expiry (staff or everyone); idle sign-out, maximum session length, signed-in devices with sign-out, admin "sign out everywhere" |
 | Parent–child linking, sibling grouping | ✅ |
-| NDPA/GDPR compliance, child-data consent records | 🟡 data export exists; consent records missing |
-| Encrypted storage, automated backups, uptime monitoring | 🟡 Supabase encryption and backups; status endpoint exists |
-| IP/device restrictions for exams and staff portals | 🟡 exams done; staff portals missing |
+| NDPA/GDPR compliance, child-data consent records | ✅ permissions per child or family with versioned wording, answered in the parent portal or recorded from paper, coverage report and printable lists, privacy notice, consents in the data export |
+| Encrypted storage, automated backups, uptime monitoring | ✅ 🔑 Supabase encrypts at rest and in transit and takes daily backups (point-in-time recovery on paid plans); `/api/status` for an uptime monitor |
+| IP/device restrictions for exams and staff portals | ✅ staff limited to the school network, approved devices, or either; enforced in the database, so it also covers direct data access; admins can be exempt and cannot lock themselves out |
 
 ## 3. CRM: admissions and enquiries (phase 2, done)
 
@@ -140,3 +140,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101002900_admissions_crm.sql` | 2 |
 | `20260101003000_review_fixes.sql` | 2 fixes |
 | `20260101003100_community_crm.sql` | 3 |
+| `20260101003200_core_security.sql` | 4 |

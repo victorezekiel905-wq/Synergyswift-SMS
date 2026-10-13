@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DEFAULT_SCHEME } from "@/lib/grading";
+import { emailDomain } from "@/lib/security";
+import { staffRows, enqueue, tryDispatch } from "@/lib/messaging/outbox";
+import { appUrl } from "@/lib/school";
 
 /**
  * Called after every sign-in / sign-up. Idempotent.
@@ -31,6 +34,10 @@ export async function POST(req: NextRequest) {
   if (state?.state === "deactivated") return NextResponse.json({ error: "Your account has been deactivated. Please contact your school.", code: "deactivated" }, { status: 403 });
   // The school (or the platform) requires a second factor this session does not have yet.
   if (state?.state === "mfa_required") return NextResponse.json({ ok: true, already: true, mfa: true, next: "/account/security?required=school" });
+  if (state?.state === "password_expired") return NextResponse.json({ ok: true, already: true, next: "/account/security?required=password" });
+  if (state?.state === "access_restricted") return NextResponse.json({ ok: true, already: true, next: "/dashboard" });
+  if (state?.state === "alumni") return NextResponse.json({ ok: true, already: true, next: "/alumni/me" });
+  if (state?.state === "sso_required") return NextResponse.json({ error: "Your school requires you to sign in with your school Google or Microsoft account.", code: "sso_required" }, { status: 403 });
   const { data: platformState } = await sb.rpc("platform_admin_state");
   if (platformState === "mfa_required") return NextResponse.json({ ok: true, already: true, mfa: true, next: "/account/security?required=platform" });
   if (platformState === "ok") return NextResponse.json({ ok: true, platform: true, already: true, next: "/platform" });
@@ -56,6 +63,28 @@ export async function POST(req: NextRequest) {
     if (uErr && !uErr.message.includes("duplicate")) return NextResponse.json({ error: uErr.message }, { status: 400 });
     await svc.from("class_members").upsert({ class_id: c.id, user_id: user.id, role: "student" }, { onConflict: "class_id,user_id" });
     return NextResponse.json({ ok: true, role: "student", next: "/dashboard" });
+  }
+
+  // Single sign-on from a school's own email domain: the account is created and waits for an admin to approve it.
+  const provider = String(user.app_metadata?.provider ?? "");
+  const domain = emailDomain(user.email);
+  if (["google", "azure"].includes(provider) && domain && user.email_confirmed_at) {
+    const { data: schools } = await svc.from("tenant_settings").select("tenant_id,sso_domains,sso_auto_join,tenants(status,name)").eq("sso_auto_join", true).contains("sso_domains", [domain]);
+    const school = (schools ?? []).find((s: any) => s.tenants?.status === "active");
+    if (school) {
+      const { error: uErr } = await svc.from("users").insert({ id: user.id, tenant_id: school.tenant_id, email: user.email ?? "", full_name: fullName, role: "teacher", active: false });
+      if (uErr && !uErr.message.includes("duplicate")) return NextResponse.json({ error: uErr.message }, { status: 400 });
+      await svc.from("staff").insert({ tenant_id: school.tenant_id, user_id: user.id, staff_no: `SSO-${user.id.slice(0, 8).toUpperCase()}`, full_name: fullName, email: user.email, status: "active" });
+      await svc.from("audit_logs").insert({ tenant_id: school.tenant_id, actor_id: user.id, action: "staff.sso_join_requested", meta: { email: user.email, provider } });
+      try {
+        const { data: admins } = await svc.from("users").select("id").eq("tenant_id", school.tenant_id).eq("active", true).in("role", ["school_admin", "principal"]).limit(10);
+        const rows = await staffRows(svc, { tenantId: school.tenant_id, userIds: (admins ?? []).map((a: any) => a.id), kind: "staff_join", subject: `${fullName} asked to join`,
+          text: `${fullName} (${user.email}) signed in with ${provider === "azure" ? "Microsoft" : "Google"}. Approve them in HR & leave and set their role.`, url: `${appUrl(req)}/school/hr` });
+        if (rows.length) { await enqueue(svc, rows); await tryDispatch(svc, { budgetMs: 3000 }); }
+      } catch { /* the request is recorded even if the notice fails */ }
+      await sb.auth.signOut();
+      return NextResponse.json({ error: `Thanks, ${fullName.split(" ")[0]}. Your account at ${school.tenants?.name ?? "your school"} is waiting for approval by a school admin. You can sign in once they approve it.`, code: "pending_approval" }, { status: 403 });
+    }
   }
 
   if (process.env.ALLOW_SELF_SERVE_TENANTS !== "true") {

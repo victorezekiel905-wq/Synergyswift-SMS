@@ -5,6 +5,7 @@
  * linked to the student.
  */
 import { familyReenrolment } from "./community-server";
+import { familyConsent } from "./consent-server";
 import { createInvoice } from "./fees";
 import { notifyGuardians, notifyContact, money } from "./notify";
 import { meetingBooked } from "./messaging/notices";
@@ -121,16 +122,18 @@ export async function familyExtras(svc: any, tenantId: string, guardianId: strin
 
 /** The family's complaints and requests, the open re-enrolment question and unanswered surveys. */
 export async function familySupport(svc: any, tenantId: string, guardianId: string) {
-  const [{ data: tickets }, { data: invites }, reenrolment] = await Promise.all([
+  const [{ data: tickets }, { data: invites }, reenrolment, consent] = await Promise.all([
     svc.from("tickets").select("ticket_no,kind,subject,status,created_at,updated_at,token").eq("tenant_id", tenantId).eq("guardian_id", guardianId).order("created_at", { ascending: false }).limit(30),
     svc.from("survey_invites").select("token,surveys(title,status,closes_at)").eq("tenant_id", tenantId).eq("guardian_id", guardianId).is("responded_at", null).limit(10),
-    familyReenrolment(svc, tenantId, guardianId).catch(() => null)
+    familyReenrolment(svc, tenantId, guardianId).catch(() => null),
+    familyConsent(svc, tenantId, guardianId).catch(() => null)
   ]);
   const now = new Date().toISOString();
   return {
     tickets: tickets ?? [],
     surveys: (invites ?? []).filter((i: any) => i.surveys?.status === "open" && (!i.surveys.closes_at || i.surveys.closes_at > now)).map((i: any) => ({ title: i.surveys.title, token: i.token })),
-    reenrolment
+    reenrolment,
+    consent
   };
 }
 

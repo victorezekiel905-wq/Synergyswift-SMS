@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { send, Alert, Badge, Empty, Tabs, Field, fmtDate, fmtTime, money } from "@/components/ui";
 import { ParentMessages, ParentWallet, ParentBus } from "./FamilyConnect";
-import { ReenrolCard, SurveyPrompt, SupportTab, type SupportData } from "./Support";
+import { ReenrolCard, SurveyPrompt, SupportTab, ConsentCard, type SupportData } from "./Support";
 
 export type Extras = {
   currency: string;
@@ -53,6 +53,7 @@ export default function FamilyTabs({ extras, kids, token, onChange }: { extras: 
     <>
     {extras.support?.reenrolment && <div className="mt-5"><ReenrolCard data={extras.support.reenrolment} token={token} onChange={onChange} /></div>}
     {extras.support && <SurveyPrompt surveys={extras.support.surveys} />}
+    {extras.support?.consent && <ConsentCard data={extras.support.consent} token={token} onChange={onChange} />}
     <section id="events" className="card mt-5 p-4">
       <Tabs value={tab} onChange={setTab} tabs={tabs} />
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}

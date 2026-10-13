@@ -20,6 +20,11 @@ export async function middleware(request: NextRequest) {
     }
   );
   await supabase.auth.getUser();
+  // A long-lived random id for this browser, used when a school only lets staff in from approved devices.
+  if (!request.cookies.get("ecf_dev")) {
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(20)), b => b.toString(16).padStart(2, "0")).join("");
+    response.cookies.set("ecf_dev", id, { httpOnly: true, secure: request.nextUrl.protocol === "https:", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 400 });
+  }
   return response;
 }
 

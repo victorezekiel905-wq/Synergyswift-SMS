@@ -129,9 +129,19 @@ v46 adds the modules that the leading systems sell separately, so one login runs
   - *Alumni*: add graduated students, share the sign-up link, confirm sign-ups, find mentors.
   - *Partners & vendors*: contacts, contracts with renewal alerts, ratings, a contact log and spend from expenses.
 
+### Running the school safely (phase 4)
+
+- **Sections & curriculum** (School setup): set the school up from a curriculum in one step: pick stages (for example Nigerian Primary and JSS, or British KS3 with IGCSE), add arms, and the sections, classes, subjects and grading schemes are created. Nothing existing is deleted.
+- **Security & sign-in** (`/school/security`): password rules and expiry, two-factor rules, idle sign-out and session length, Google/Microsoft sign-in (and letting staff join with the school email, approved in HR), phone sign-in, and where staff pages may be opened (school network, approved devices, or either). New devices wait for approval in the same page. An admin can sign anyone out everywhere.
+- **Consent & privacy** (`/school/consent`): the permissions families are asked for (records, emergency care, photos inside and outside school, trips, newsletters), who has answered, printable lists such as "children who may not be photographed", paper forms, and the privacy notice. Changing a permission's wording asks families again.
+- **Import & export** (`/school/data`): bring in students, parents, staff, classes, subjects, who teaches what, opening balances, alumni and vendors from CSV or Excel. "Check the file" lists every problem by row before anything is saved. Every list exports to Excel or CSV in the same columns.
+- **Change history** (`/school/audit`): every record added, changed or deleted, who did it and the values before and after. Kept for two years unless you change it under Security & sign-in.
+- **Search**: press Ctrl K (⌘ K on a Mac) anywhere.
+- **Counsellors** see behaviour, early warning and health records (read only). **Alumni** invited from the alumni directory sign in to their own alumni page and never see school data.
+
 ### Parents and students
 
-- The parent portal adds tabs for **Fees**, **Events**, **Meetings**, **Learning** (homework, timetable, behaviour, attendance), **Boarding** and **Help & feedback** (raise and follow complaints and requests). It also asks about re-enrolment and shows waiting surveys. It works both after sign-in and through the private WhatsApp link.
+- The parent portal adds tabs for **Fees**, **Events**, **Meetings**, **Learning** (homework, timetable, behaviour, attendance), **Boarding** and **Help & feedback** (raise and follow complaints and requests). It also asks about re-enrolment, shows waiting surveys, and lists the permissions the school asks for (**Permissions and privacy**). It works both after sign-in and through the private WhatsApp link.
 - Students see their homework and timetable on `/student`.
 - The app can be installed on a phone's home screen. It shows an offline page when there is no connection, and it never caches school data.
 
@@ -179,6 +189,8 @@ v47 adds what the market leaders sell as separate products (ParentSquare, Parent
    - For drafted lesson notes, report comments and notices, and for translation, set the service key `ANTHROPIC_API_KEY`. Everything else works without it, and the drafting buttons stay hidden.
    - For app notifications, run `npx web-push generate-vapid-keys` and set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT`.
    - Point an uptime monitor at `/api/status`.
+   - For Google Workspace or Microsoft 365 sign-in, enable the Google and/or Azure providers in Supabase Auth (redirect URL `<app>/auth/callback`) and set `NEXT_PUBLIC_SSO_PROVIDERS=google,azure`.
+   - Phone sign-in turns on by itself once an SMS provider is set.
 4. Schedule `/api/cron/dispatch` every minute and `/api/cron/daily` once a day.
 5. Create yourself as platform admin: `node --env-file=.env.local scripts/make-platform-admin.mjs you@company.com`. At first sign-in you set up two-factor sign-in, which super admins must use.
 6. Sign in, open `/platform`, and create the first school. Its admin receives an invitation branded with the school's name.

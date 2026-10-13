@@ -38,7 +38,7 @@ function Community() {
       <PageHeader eyebrow="Relationships" title="Families & community"
         subtitle="Know every family: a 360° view of their children, fees, messages, complaints and survey answers. Spot families likely to leave, ask about next session, reward referrals, and stay in touch with alumni and partners." />
       <Tabs value={tab} onChange={t => { setTab(t); router.replace(`/school/community?tab=${t}`); }} tabs={tabs} />
-      {tab === "families" && <Families segments={segs?.items ?? []} />}
+      {tab === "families" && <Families segments={segs?.items ?? []} openId={params.get("family")} />}
       {tab === "tickets" && <Tickets openId={params.get("ticket")} />}
       {tab === "surveys" && <Surveys />}
       {tab === "campaigns" && <Campaigns />}

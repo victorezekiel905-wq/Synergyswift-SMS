@@ -1,19 +1,21 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Icon, rolesOf, type Me } from "@/components/ui";
+import SearchPalette from "@/components/SearchPalette";
 
 type NavLink = { href: string; label: string; roles: string[]; module?: string };
 type NavGroup = { title: string; links: NavLink[] };
 
 const STAFF = ["teacher", "school_admin", "it_admin", "platform_admin", "principal", "bursar", "librarian", "hr_manager", "qa_officer", "gate_officer",
-  "transport_officer", "hostel_warden", "nurse", "admissions_officer", "cashier"];
+  "transport_officer", "hostel_warden", "nurse", "admissions_officer", "cashier", "counsellor"];
 const ADMIN = ["school_admin", "principal", "platform_admin"];
 const TEACH = ["teacher", "school_admin", "principal"];
 const FINANCE = ["bursar", ...ADMIN];
-const ACADEMIC = STAFF.filter(r => !["gate_officer", "librarian", "bursar", "transport_officer", "nurse", "admissions_officer", "hostel_warden", "cashier"].includes(r));
+const ACADEMIC = STAFF.filter(r => !["gate_officer", "librarian", "bursar", "transport_officer", "nurse", "admissions_officer", "hostel_warden", "cashier", "counsellor"].includes(r));
+const PASTORAL = [...TEACH, "counsellor"];
 
 const GROUPS: NavGroup[] = [
   { title: "Home", links: [
@@ -42,9 +44,9 @@ const GROUPS: NavGroup[] = [
   ] },
   { title: "Students", links: [
     { href: "/school/students", label: "Students & parents", roles: STAFF, module: "sims" },
-    { href: "/school/analytics", label: "Early warning", roles: [...TEACH, "qa_officer"], module: "analytics" },
-    { href: "/school/behaviour", label: "Behaviour & houses", roles: [...TEACH, "hostel_warden"], module: "behaviour" },
-    { href: "/school/health", label: "Health & sick bay", roles: ["nurse", "hostel_warden", ...TEACH], module: "health" },
+    { href: "/school/analytics", label: "Early warning", roles: [...PASTORAL, "qa_officer"], module: "analytics" },
+    { href: "/school/behaviour", label: "Behaviour & houses", roles: [...PASTORAL, "hostel_warden"], module: "behaviour" },
+    { href: "/school/health", label: "Health & sick bay", roles: ["nurse", "hostel_warden", ...PASTORAL], module: "health" },
     { href: "/school/gate", label: "Sign in / out", roles: STAFF, module: "gate" },
     { href: "/school/pickup", label: "Pickup desk", roles: ["gate_officer", ...ADMIN], module: "pickup" },
     { href: "/school/transport", label: "School buses", roles: ["transport_officer", ...TEACH], module: "transport" },
@@ -75,6 +77,10 @@ const GROUPS: NavGroup[] = [
   ] },
   { title: "Administration", links: [
     { href: "/school/setup", label: "School setup", roles: ADMIN },
+    { href: "/school/security", label: "Security & sign-in", roles: ADMIN },
+    { href: "/school/consent", label: "Consent & privacy", roles: ADMIN },
+    { href: "/school/data", label: "Import & export", roles: [...ADMIN, "it_admin"] },
+    { href: "/school/audit", label: "Change history", roles: ADMIN },
     { href: "/account/security", label: "Account security", roles: [...STAFF, "parent", "student"] },
     { href: "/school/rollover", label: "Promote students", roles: ADMIN, module: "sims" },
     { href: "/teacher/admin", label: "Policies & audit", roles: [...ADMIN, "it_admin"] },
@@ -90,15 +96,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [open, setOpen] = useState(false);
+  const [idleWarn, setIdleWarn] = useState(false);
+  const lastActive = useRef(Date.now());
   const bare = BARE.some(r => r.test(pathname));
 
   useEffect(() => {
     if (bare) return;
-    fetch("/api/me").then(r => r.json()).then((j: Me) => {
+    fetch("/api/me").then(r => r.json()).then(async (j: Me) => {
       setMe(j);
+      const state = j.account?.state;
       // A second factor is required before this account can see anything.
-      if ((j.platform_mfa || j.account?.state === "mfa_required") && !pathname.startsWith("/account/security")) {
+      if ((j.platform_mfa || state === "mfa_required") && !pathname.startsWith("/account/security")) {
         router.replace(`/account/security?required=${j.platform_mfa ? "platform" : "school"}`);
+        return;
+      }
+      if (state === "password_expired" && !pathname.startsWith("/account/security")) { router.replace("/account/security?required=password"); return; }
+      if (state === "alumni") { router.replace("/alumni/me"); return; }
+      if (state === "sso_required" || state === "session_expired") {
+        await createClient().auth.signOut();
+        router.replace(`/login?error=${state}`);
         return;
       }
       if (pathname === "/") {
@@ -110,6 +126,29 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bare]);
   useEffect(() => setOpen(false), [pathname]);
+  // Keep the session's access grant fresh while the page is open (schools that restrict staff access).
+  useEffect(() => {
+    if (bare || !me?.profile) return;
+    const t = setInterval(() => { if (document.visibilityState === "visible") fetch("/api/me").catch(() => {}); }, 5 * 60_000);
+    return () => clearInterval(t);
+  }, [bare, me?.profile]);
+  // Sign out after the school's idle time, with a one-minute warning.
+  const idle = me?.prefs?.idle_minutes ?? 0;
+  useEffect(() => {
+    if (bare || !idle) return;
+    const touch = () => { lastActive.current = Date.now(); setIdleWarn(false); };
+    const events = ["mousemove", "keydown", "pointerdown", "scroll", "touchstart"];
+    events.forEach(e => window.addEventListener(e, touch, { passive: true }));
+    const t = setInterval(async () => {
+      const left = idle * 60_000 - (Date.now() - lastActive.current);
+      if (left <= 0) {
+        clearInterval(t);
+        await createClient().auth.signOut();
+        router.replace("/login?error=idle");
+      } else setIdleWarn(left <= 60_000);
+    }, 10_000);
+    return () => { clearInterval(t); events.forEach(e => window.removeEventListener(e, touch)); };
+  }, [bare, idle, router]);
   useEffect(() => {
     if (!open) return;
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
@@ -118,6 +157,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [open]);
 
   if (bare) return <>{children}</>;
+  if (me?.account?.state === "access_restricted") return <AccessBlocked message={me.account.message ?? null} device={(me.account as { device?: string | null }).device ?? null} />;
 
   async function signOut() {
     let unsent = 0;
@@ -173,6 +213,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
           <div className="flex items-center gap-3">
+            {me?.profile && <SearchPalette pages={groups.flatMap(g => g.links)} />}
             {me?.profile && (
               <span className="hidden text-xs text-slate-500 sm:block">
                 {me.profile.full_name} <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] uppercase">{me.profile.role.replace(/_/g, " ")}</span>
@@ -188,6 +229,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {nav}
         </aside>
         <div className="min-w-0 flex-1">
+          {idleWarn && <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">You will be signed out in a minute because of inactivity. Move the mouse or press a key to stay signed in.</div>}
+          {me?.prefs?.password_days_left != null && me.prefs.password_days_left <= 7 && me.prefs.password_days_left >= 0 && (
+            <div role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">Your password expires in {me.prefs.password_days_left} day{me.prefs.password_days_left === 1 ? "" : "s"}. <Link href="/account/security#password" className="font-semibold underline">Change it now</Link></div>
+          )}
           {closedState && (
             <div role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
               {closedState === "paused" ? "This school is closed for now." : "This school account is suspended."} {me?.account?.message ?? "Contact the school office."}
@@ -197,5 +242,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Shown instead of the app when a school only lets staff in from its network or approved devices. */
+function AccessBlocked({ message, device }: { message: string | null; device: string | null }) {
+  return (
+    <main className="mx-auto max-w-md px-6 py-20 text-center">
+      <h1 className="text-xl font-semibold">Access restricted</h1>
+      <p className="mt-2 text-slate-600">{message ?? "Your school restricts where staff pages can be opened."}</p>
+      {device === "pending" && <p className="mt-2 text-sm text-slate-500">Your school admin can approve this device under Security &amp; sign-in. Then press Try again.</p>}
+      <div className="mt-6 flex justify-center gap-2">
+        <button className="btn btn-primary" onClick={() => window.location.reload()}>Try again</button>
+        <button className="btn btn-outline" onClick={async () => { await createClient().auth.signOut(); window.location.href = "/login"; }}>Sign out</button>
+      </div>
+    </main>
   );
 }
