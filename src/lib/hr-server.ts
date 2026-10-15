@@ -21,13 +21,14 @@ export async function leavePolicies(svc: any, tenantId: string): Promise<LeavePo
 
 /** One person's balances for the leave year that contains `today`. */
 export async function balancesFor(svc: any, tenantId: string, staffId: string, today: string, policies?: LeavePolicy[]) {
-  const [{ data: s }, { data: reqs }, pols] = await Promise.all([
+  const [{ data: s }, { data: reqs }, pols, { data: hs }] = await Promise.all([
     svc.from("staff").select("leave_allowance").eq("tenant_id", tenantId).eq("id", staffId).maybeSingle(),
     svc.from("leave_requests").select("leave_type,days,status,starts_on").eq("tenant_id", tenantId).eq("staff_id", staffId)
       .gte("starts_on", `${Number(today.slice(0, 4)) - 2}-01-01`),
-    policies ? Promise.resolve(policies) : leavePolicies(svc, tenantId)
+    policies ? Promise.resolve(policies) : leavePolicies(svc, tenantId),
+    svc.from("hr_settings").select("leave_year_start_month").eq("tenant_id", tenantId).maybeSingle()
   ]);
-  return leaveBalances({ policies: pols, annualAllowance: Number(s?.leave_allowance ?? 20), requests: (reqs ?? []) as Taken[], today });
+  return leaveBalances({ policies: pols, annualAllowance: Number(s?.leave_allowance ?? 20), requests: (reqs ?? []) as Taken[], today, startMonth: hs?.leave_year_start_month ?? 1 });
 }
 
 /** Approved leave appears in the cover planner as an absence; cancelled or rejected leave comes out again. */

@@ -7,6 +7,7 @@ import { Leave } from "@/components/hr/Leave";
 import { Recruitment } from "@/components/hr/Recruitment";
 import { Checklists } from "@/components/hr/Checklists";
 import { HrOverview } from "@/components/hr/HrOverview";
+import { Development } from "@/components/hr/Development";
 
 type Staff = {
   id: string; staff_no: string; full_name: string; email: string | null; phone: string | null; department: string | null; position: string | null;
@@ -14,7 +15,7 @@ type Staff = {
   line_manager_id: string | null; probation_ends_on: string | null;
   users: { id: string; role: string; extra_roles: string[]; active: boolean } | null;
 };
-type Tab = "overview" | "me" | "leave" | "staff" | "recruitment" | "checklists";
+type Tab = "overview" | "me" | "leave" | "development" | "staff" | "recruitment" | "checklists";
 
 const ROLE_OPTIONS = ["teacher", "school_admin", "principal", "it_admin", "bursar", "librarian", "hr_manager", "qa_officer", "gate_officer", "transport_officer", "hostel_warden", "nurse", "admissions_officer", "cashier", "counsellor"];
 
@@ -36,7 +37,7 @@ export default function HrPage() {
   }, []);
   const tabs: { id: Tab; label: string }[] = [
     ...(isHr ? [{ id: "overview" as Tab, label: "Overview" }] : []),
-    { id: "me", label: "My HR" }, { id: "leave", label: "Leave" }, { id: "staff", label: "Staff directory" },
+    { id: "me", label: "My HR" }, { id: "leave", label: "Leave" }, { id: "development", label: "Appraisals & CPD" }, { id: "staff", label: "Staff directory" },
     { id: "recruitment", label: isHr ? "Recruitment" : "Interviews" }, { id: "checklists", label: "Onboarding" }
   ];
   const active: Tab = tab && tabs.some(t => t.id === tab) ? tab : me ? (isHr ? "overview" : "me") : "me";
@@ -48,6 +49,7 @@ export default function HrPage() {
       {active === "overview" && <HrOverview onOpenStaff={setRecord} onTab={t => setTab(t as Tab)} />}
       {active === "me" && <StaffRecord />}
       {active === "leave" && <Leave staff={people} />}
+      {active === "development" && <Development />}
       {active === "staff" && <StaffTab isHr={isHr} isAdmin={isAdmin} myId={me?.profile?.id} data={staff.data} error={staff.error} reload={staff.reload} onOpen={setRecord} />}
       {active === "recruitment" && <Recruitment initialPosting={deep.posting} initialApplication={deep.application} />}
       {active === "checklists" && <Checklists staff={people} />}

@@ -54,7 +54,7 @@ export type LedgerInput = {
   payments: { reference: string; receipt_no: string | null; amount: number; method: string; paid_at: string; invoice_no?: string | null }[];
   expenses: { id: string; category: string; description: string; amount: number; spent_on: string; method: string | null }[];
   pettyCash: { kind: string; amount: number; on_date: string; note: string | null; float_name: string }[];
-  payroll: { period: string; status: string; gross: number; deductions: number; net: number; approved_at: string | null; paid_at: string | null }[];
+  payroll: { period: string; status: string; gross: number; deductions: number; net: number; employer_total?: number | null; approved_at: string | null; paid_at: string | null }[];
   wallet: { kind: string; amount: number; method: string | null; created_at: string; reference: string }[];
   journals: { entry_no: string | null; entry_date: string; memo: string; lines: { account_id: string; debit: number; credit: number; description?: string | null }[] }[];
 };
@@ -139,10 +139,11 @@ export function buildPostings(input: LedgerInput): Posting[] {
   }
   for (const run of input.payroll) {
     if (run.status !== "approved" && run.status !== "paid") continue;
-    const gross = Number(run.gross), net = Number(run.net), ded = Math.round((gross - net) * 100) / 100;
+    const gross = Number(run.gross), net = Number(run.net), ded = Math.round((gross - net) * 100) / 100, employer = Number(run.employer_total ?? 0);
     const accrued = run.approved_at ?? run.paid_at;
+    // Employer pension, NHIS, NSITF and ITF are a cost to the school, owed with the staff deductions.
     if (accrued) push(posting(accrued, `PAY-${run.period}`, `Payroll ${run.period}`, "payroll",
-      [[r.sys("salaries"), gross], [r.sys("salaries_payable"), -net], [r.sys("deductions_payable"), -ded]]));
+      [[r.sys("salaries"), gross + employer], [r.sys("salaries_payable"), -net], [r.sys("deductions_payable"), -(ded + employer)]]));
     if (run.status === "paid" && run.paid_at) push(posting(run.paid_at, `PAY-${run.period}`, `Salaries paid ${run.period}`, "payroll",
       [[r.sys("salaries_payable"), net], [r.sys("bank"), -net]]));
   }

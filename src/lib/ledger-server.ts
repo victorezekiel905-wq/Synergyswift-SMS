@@ -35,7 +35,7 @@ export async function loadLedger(svc: any, tenantId: string, to: string) {
       .eq("tenant_id", tenantId).eq("status", "success").not("paid_at", "is", null).lte("paid_at", end).order("paid_at")),
     fetchAll<any>(() => svc.from("expenses").select("id,category,description,amount,spent_on,method").eq("tenant_id", tenantId).lte("spent_on", to).order("spent_on")),
     fetchAll<any>(() => svc.from("petty_cash_moves").select("kind,amount,on_date,note,petty_cash_floats(name)").eq("tenant_id", tenantId).neq("kind", "spend").lte("on_date", to).order("on_date")),
-    svc.from("payroll_runs").select("period,status,gross,deductions,net,approved_at,paid_at").eq("tenant_id", tenantId).in("status", ["approved", "paid"]).then((r: any) => r.data ?? []),
+    svc.from("payroll_runs").select("period,status,gross,deductions,net,employer_total,approved_at,paid_at").eq("tenant_id", tenantId).in("status", ["approved", "paid"]).then((r: any) => r.data ?? []),
     fetchAll<any>(() => svc.from("wallet_transactions").select("kind,amount,method,created_at,reference").eq("tenant_id", tenantId).eq("status", "success").lte("created_at", end).order("created_at")),
     fetchAll<any>(() => svc.from("journal_entries").select("entry_no,entry_date,memo,journal_lines(account_id,debit,credit,description)")
       .eq("tenant_id", tenantId).eq("status", "posted").lte("entry_date", to).order("entry_date"))
@@ -60,7 +60,7 @@ export async function budgetActuals(svc: any, tenantId: string, from: string, to
       .eq("tenant_id", tenantId).neq("fee_invoices.status", "void").gte("fee_invoices.created_at", `${from}T00:00:00Z`).lte("fee_invoices.created_at", `${to}T23:59:59.999Z`)),
     svc.from("fee_items").select("id,name").eq("tenant_id", tenantId).then((r: any) => r.data ?? []),
     fetchAll<any>(() => svc.from("expenses").select("category,amount").eq("tenant_id", tenantId).gte("spent_on", from).lte("spent_on", to)),
-    svc.from("payroll_runs").select("gross,approved_at,paid_at").eq("tenant_id", tenantId).in("status", ["approved", "paid"]).then((r: any) => r.data ?? [])
+    svc.from("payroll_runs").select("gross,employer_total,approved_at,paid_at").eq("tenant_id", tenantId).in("status", ["approved", "paid"]).then((r: any) => r.data ?? [])
   ]);
   const itemName = new Map((items as { id: string; name: string }[]).map(i => [i.id, i.name]));
   const income: Record<string, number> = {}, expense: Record<string, number> = {};
@@ -72,7 +72,7 @@ export async function budgetActuals(svc: any, tenantId: string, from: string, to
   for (const e of expenses) expense[e.category] = (expense[e.category] ?? 0) + Number(e.amount);
   for (const r of payroll as any[]) {
     const d = String(r.approved_at ?? r.paid_at ?? "").slice(0, 10);
-    if (d >= from && d <= to) expense.Salaries = (expense.Salaries ?? 0) + Number(r.gross);
+    if (d >= from && d <= to) expense.Salaries = (expense.Salaries ?? 0) + Number(r.gross) + Number(r.employer_total ?? 0);
   }
   return { income, expense };
 }

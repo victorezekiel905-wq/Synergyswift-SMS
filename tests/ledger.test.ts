@@ -26,7 +26,7 @@ const input: LedgerInput = {
   pettyCash: [{ kind: "topup", amount: 5000, on_date: "2026-01-02", note: null, float_name: "Front office" },
     { kind: "spend", amount: 1500, on_date: "2026-01-12", note: "Biscuits", float_name: "Front office" },
     { kind: "adjust", amount: -200, on_date: "2026-01-31", note: "count", float_name: "Front office" }],
-  payroll: [{ period: "2026-01", status: "paid", gross: 300000, deductions: 30000, net: 270000, approved_at: "2026-01-28T10:00:00Z", paid_at: "2026-01-30T10:00:00Z" },
+  payroll: [{ period: "2026-01", status: "paid", gross: 300000, deductions: 30000, net: 270000, employer_total: 33000, approved_at: "2026-01-28T10:00:00Z", paid_at: "2026-01-30T10:00:00Z" },
     { period: "2026-02", status: "draft", gross: 1, deductions: 0, net: 1, approved_at: null, paid_at: null }],
   wallet: [{ kind: "topup", amount: 3000, method: "online", created_at: "2026-01-03T08:00:00Z", reference: "W1" },
     { kind: "purchase", amount: -700, method: null, created_at: "2026-01-04T08:00:00Z", reference: "W2" }],
@@ -71,9 +71,9 @@ describe("deriving the ledger", () => {
     expect(r.method(null)).toBe(id("bank"));
   });
   it("accrues payroll when approved and clears it when paid; drafts are ignored", () => {
-    expect(net(id("salaries"))).toBe(300000);
+    expect(net(id("salaries"))).toBe(300000 + 33000);          // gross pay and the employer's pension and levies
     expect(net(id("salaries_payable"))).toBe(0);
-    expect(net(id("deductions_payable"))).toBe(-30000);
+    expect(net(id("deductions_payable"))).toBe(-30000 - 33000);
   });
   it("holds wallet money as a liability until it is spent", () => {
     expect(net(id("wallet"))).toBe(-3000 + 700);
@@ -95,7 +95,7 @@ describe("statements", () => {
     const pl = incomeStatement(postings, chart, "2026-01-01", "2026-01-31");
     expect(pl.totalIncome).toBe(100000 + 20000 - 10000 + 5000 + 50000 - 50000 + 700);
     expect(pl.income.find(r => r.account.system_key === "discounts")!.amount).toBe(-10000);
-    expect(pl.totalExpenses).toBe(8000 + 1500 + 200 + 300000);
+    expect(pl.totalExpenses).toBe(8000 + 1500 + 200 + 300000 + 33000);
     expect(pl.surplus).toBe(pl.totalIncome - pl.totalExpenses);
   });
   it("balance sheet balances, with the surplus in equity", () => {

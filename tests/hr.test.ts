@@ -101,3 +101,20 @@ describe("checklists, alerts and gaps", () => {
     expect(validRsaPin("PEN12345")).toBe(false);
   });
 });
+
+import { weightedScore, ratingLabel, cpdSummary, DEFAULT_CRITERIA } from "@/lib/hr";
+describe("appraisals and CPD", () => {
+  it("weights the scores that were given", () => {
+    const c = [{ id: "a", label: "A", weight: 30 }, { id: "b", label: "B", weight: 10 }, { id: "c", label: "C", weight: 60 }];
+    expect(weightedScore(c, { a: 4, b: 2, c: 5 })).toBe(4.4);
+    expect(weightedScore(c, { a: 4, b: null })).toBe(4);
+    expect(weightedScore(c, { a: 9 })).toBeNull();
+    expect(DEFAULT_CRITERIA.reduce((s, x) => s + x.weight, 0)).toBe(100);
+    expect([ratingLabel(4.6), ratingLabel(3.5), ratingLabel(2.9), ratingLabel(1), ratingLabel(null)]).toEqual(["outstanding", "good", "requires improvement", "inadequate", "not scored"]);
+  });
+  it("counts completed CPD in the year against the target", () => {
+    const items = [{ hours: 6, status: "completed", starts_on: "2026-02-01", verified_at: "x" }, { hours: 3.5, status: "completed", starts_on: "2026-05-01", verified_at: null },
+      { hours: 10, status: "planned", starts_on: "2026-06-01", verified_at: null }, { hours: 8, status: "completed", starts_on: "2025-12-01", verified_at: "x" }];
+    expect(cpdSummary(items, 20, "2026-01-01", "2026-12-31")).toEqual({ hours: 9.5, verified: 6, target: 20, remaining: 10.5, met: false, activities: 2 });
+  });
+});

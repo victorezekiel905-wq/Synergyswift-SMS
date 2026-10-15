@@ -195,5 +195,41 @@ export function profileGaps(p: { email: string | null; phone: string | null; per
   return gaps;
 }
 
+// ---------- Appraisals and CPD ----------
+export type Criterion = { id: string; label: string; weight: number };
+export const DEFAULT_CRITERIA: Criterion[] = [
+  { id: "planning", label: "Planning and preparation", weight: 20 },
+  { id: "teaching", label: "Teaching and learning in the classroom", weight: 25 },
+  { id: "assessment", label: "Assessment, marking and feedback", weight: 20 },
+  { id: "behaviour", label: "Classroom management and safeguarding", weight: 15 },
+  { id: "professional", label: "Professional conduct, punctuality and teamwork", weight: 10 },
+  { id: "growth", label: "Professional development", weight: 10 }
+];
+
+/** Weighted average of 1–5 scores over the criteria that were scored (null if none were). */
+export function weightedScore(criteria: Criterion[], scores: Record<string, number | null | undefined>) {
+  let w = 0, t = 0;
+  for (const c of criteria) {
+    const v = scores[c.id];
+    if (typeof v !== "number" || !(v >= 1 && v <= 5)) continue;
+    const weight = Math.max(0, Number(c.weight) || 0);
+    w += weight; t += weight * v;
+  }
+  return w ? Math.round((t / w) * 10) / 10 : null;
+}
+
+export function ratingLabel(score: number | null) {
+  if (score === null) return "not scored";
+  return score >= 4.5 ? "outstanding" : score >= 3.5 ? "good" : score >= 2.5 ? "requires improvement" : "inadequate";
+}
+
+/** CPD hours in a period against the yearly target (only completed activities count; verified ones are shown apart). */
+export function cpdSummary(items: { hours: number; status: string; starts_on: string; verified_at: string | null }[], target: number, from: string, to: string) {
+  const inYear = items.filter(i => i.status === "completed" && i.starts_on >= from && i.starts_on <= to);
+  const hours = Math.round(inYear.reduce((s, i) => s + Number(i.hours), 0) * 10) / 10;
+  const verified = Math.round(inYear.filter(i => i.verified_at).reduce((s, i) => s + Number(i.hours), 0) * 10) / 10;
+  return { hours, verified, target, remaining: Math.max(0, Math.round((target - hours) * 10) / 10), met: hours >= target, activities: inYear.length };
+}
+
 export const validNin = (s: string) => /^\d{11}$/.test(s.trim());
 export const validRsaPin = (s: string) => /^PEN\d{12}$/i.test(s.trim());
