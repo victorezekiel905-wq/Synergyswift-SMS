@@ -15,7 +15,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
 import { languageName } from "./languages";
 
-export const AI_MODEL = "claude-opus-5";
+export const AI_MODEL = "claude-opus-5-5";
 
 export function assistConfigured(): boolean {
   const k = process.env.ANTHROPIC_API_KEY;
@@ -59,7 +59,7 @@ export async function generateLessonNote(p: {
       model: AI_MODEL,
       max_tokens: 16000,
       thinking: { type: "adaptive" },
-      output_config: { effort: "high", format: zodOutputFormat(LessonNoteSchema) },
+      output_config: { effort: "medium", format: zodOutputFormat(LessonNoteSchema) },
       system:
         "You write lesson notes for school teachers. Notes must be accurate, age-appropriate, practical for a real classroom with limited resources, " +
         "and aligned with the stated curriculum. Use clear, simple English. Include concrete examples relevant to the students' country and daily life." +
@@ -185,7 +185,7 @@ export async function draftNotice(p: { instruction: string; schoolName: string; 
   const response = await anthropic().messages.parse(
     {
       model: AI_MODEL,
-      max_tokens: 4000,
+      max_tokens: 8000,
       thinking: { type: "adaptive" },
       output_config: { effort: "low", format: zodOutputFormat(NoticeSchema) },
       system:
@@ -214,8 +214,8 @@ export function assistErrorMessage(e: unknown): { message: string; status: numbe
 
 // ---------------- learning (phase 6) ----------------
 
-/** Newer features (feedback drafts, quizzes, tutor) run on the current Opus model. */
-export const LEARNING_MODEL = "claude-opus-5-5";
+/** Feedback drafts, quizzes and the study helper use the same model as the rest. */
+export const LEARNING_MODEL = AI_MODEL;
 
 const FeedbackSchema = z.object({
   feedback: z.string(),
