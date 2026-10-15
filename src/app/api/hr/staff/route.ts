@@ -34,7 +34,9 @@ const StaffInput = z.object({
   employment_type: z.enum(["full_time", "part_time", "contract", "volunteer"]).default("full_time"),
   hire_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish().or(z.literal("")),
   status: z.enum(["active", "on_leave", "exited"]).default("active"),
-  leave_allowance: z.number().int().min(0).max(365).default(20)
+  leave_allowance: z.number().int().min(0).max(365).default(20),
+  line_manager_id: z.string().uuid().nullish().or(z.literal("")),
+  probation_ends_on: z.string().regex(/^d{4}-d{2}-d{2}$/).nullish().or(z.literal(""))
 });
 
 const Body = z.discriminatedUnion("action", [
@@ -54,7 +56,8 @@ export async function POST(req: NextRequest) {
 
   if (b.action === "save") {
     const { id, ...s } = b.staff;
-    const row = { ...s, email: s.email || null, hire_date: s.hire_date || null, tenant_id: tid };
+    if (id && s.line_manager_id === id) return jsonError("someone cannot be their own line manager");
+    const row = { ...s, email: s.email || null, hire_date: s.hire_date || null, line_manager_id: s.line_manager_id || null, probation_ends_on: s.probation_ends_on || null, tenant_id: tid };
     const { data, error } = id
       ? await ctx.sb.from("staff").update(row).eq("tenant_id", tid).eq("id", id).select("id").single()
       : await ctx.sb.from("staff").insert(row).select("id").single();

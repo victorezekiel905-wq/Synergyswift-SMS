@@ -169,9 +169,20 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Accounting integration (QuickBooks, Sage, Zoho Books) and a general ledger | ✅ general ledger derived from invoices, payments, expenses, petty cash, approved payroll and the wallet, plus manual journals (balanced before posting, reversed rather than edited) and opening balances; editable chart of accounts with mappings for fee items, expense categories and payment methods; closing the books up to a date; journal files for QuickBooks Online, Sage 50 and Zoho Books imports (daily summary or every transaction) and the chart as CSV. A live connection to their APIs is not built: the files are imported by hand |
 | Financial reports: collections, outstanding balances, revenue by class | ✅ income and expenditure, balance sheet, trial balance, account ledger; collections by day, method and class; billed, paid and outstanding by class and by fee item; debt ageing; budget against actual; all as CSV |
 
-## 13–23
+## 13. HR and payroll (phase 10)
 
-Sections 13 (HR and payroll), 12 (finance), 13 (HR and payroll), 14 (welfare), 15 (boarding), 16 (transport), 17 (library), 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
+| Feature | Status |
+|---|---|
+| Staff profiles, contracts, qualifications, documents | ✅ personal and statutory details (NIN, TIN, pension PFA and RSA PIN, NHF number, next of kin, emergency contact) seen only by the person and HR; line manager; documents (CV, ID, certificates, references kept from the person); contracts with probation and notice, accepted by the staff member; qualifications and licences (e.g. TRCN) added by staff and verified by HR, with expiry; alerts for contracts, probation and licences ending; a list of incomplete records |
+| Recruitment: job postings, applicant tracking, interview scheduling | ✅ jobs on a public careers page (or staff-only), applications with a CV, stages from applied to hired with emails to the candidate, walk-ins and referrals added by HR, interviews (in person, video, phone) with a panel who each score alone, candidate tracking page and withdrawal, hiring creates the staff record, copies the CV and starts onboarding |
+| Leave management and approvals | ✅ policies per type (days a year, paid or unpaid, carry-over, notice, supporting document), balances with carried-over days, half days, weekends and school holidays not counted, line manager recommends then HR decides, cover note, who is away by month, approved leave feeds the cover planner, notifications at each step |
+| Payroll: salaries, allowances, deductions, PAYE, pension (RSA), NHF, payslips | 🟡 salary profiles, allowances, deductions, flat tax and pension, unpaid leave, two-person approval, payslips, bank schedule; Nigerian PAYE bands, pension on basic+housing+transport with employer share, NHF and remittance schedules in 10b |
+| Staff appraisals, lesson observations, CPD tracking | 🟡 lesson observations (Quality assurance); appraisals and CPD in 10b |
+| Staff onboarding and offboarding checklists | ✅ templates (starter ones included) with tasks owned by HR, admin, IT, bursary, the line manager or the person, due dates from the start date, ticked only by the owner, progress and overdue items on the HR overview; recording someone as left ends their contract and can disable their login |
+
+## 14–23
+
+Sections 14 (welfare), 15 (boarding), 16 (transport), 17 (library), 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
 
 ## Database updates to run
 
@@ -196,3 +207,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101003800_communication.sql` | 8 |
 | `20260101003900_fees_plus.sql` | 9a |
 | `20260101004000_accounts.sql` | 9b |
+| `20260101004100_hr_people.sql` | 10a |

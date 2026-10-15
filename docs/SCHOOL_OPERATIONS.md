@@ -208,6 +208,17 @@ Under **Finance**:
 - **Export to accounting**: download journals for QuickBooks Online, Sage 50 or Zoho Books (one journal per day and source, or every transaction), and the chart of accounts so the package can be set up with the same accounts. Once a period is exported, the principal or an admin closes the books up to its last day. Expenses, petty cash and journals dated on or before that day are then locked.
 - **Reports**: collections by day, method and class; billed, paid and outstanding by class and fee item for a term. Every report has a CSV.
 
+### People (phase 10)
+
+Under **HR**:
+
+- **Overview** (HR and admins): contracts, probation and licences ending in the next 45 days, records with missing details, onboarding and offboarding progress, who is away today, leave waiting and candidates in progress.
+- **My HR** (everyone): your own details (NIN, tax ID, pension PFA and RSA PIN, NHF number, next of kin), documents, contracts to accept, qualifications to add (HR verifies them) and leave balances. Only you and HR see your personal details.
+- **Staff directory**: set each person's **line manager** and **probation end** on their record, then open **Record** to add contracts, documents (tick "keep from the staff member" for references), and to confirm or extend probation, start onboarding or offboarding, or record that they have left (their contract ends and an admin can disable their login).
+- **Leave**: set the rules per type under **Leave policies** (days a year, paid or not, carry-over, notice, whether a document is needed). Staff see their balances and ask for leave, including half days; weekends and school holidays on the calendar are not counted. The line manager recommends it, then HR decides; everyone is told. Approved leave appears in **Cover** for teachers.
+- **Recruitment**: add a job and **Publish** it. It appears on the school's careers page at `/careers/<school web address>` (share the link or put it on the school website); tick "current staff only" for internal posts. Candidates apply with a CV and get a link to follow their application. Move them through shortlisted, interview and offer, with an email each time if you like. **Schedule interview** books a time, emails the candidate and tells the panel; each panel member scores on their own. **Hire** makes the staff record, copies the CV and starts onboarding.
+- **Onboarding**: checklists start from templates (starter ones are included; edit them under **Templates**). Each task belongs to HR, an admin, IT, the bursary, the line manager or the new person, and only they can tick it.
+
 ### Parents and students
 
 - The parent portal adds tabs for **Fees**, **Events**, **Meetings**, **Learning** (homework, timetable, behaviour, attendance), **Boarding** and **Help & feedback** (raise and follow complaints and requests). It also asks about re-enrolment, shows waiting surveys, and lists the permissions the school asks for (**Permissions and privacy**). **Records** shows each child's achievements, certificates, approved work, shared documents and support plan, which parents can agree to.
