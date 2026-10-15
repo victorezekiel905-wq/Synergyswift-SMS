@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar · **8** communication · **9** finance · **10** HR and payroll · **11** welfare, boarding, transport, library, inventory, co-curricular · **12** portals and apps · **13** analytics, integrations, compliance.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication · **9** finance · **10** HR and payroll · **11** welfare, boarding, transport, library, inventory, co-curricular · **12** portals and apps · **13** analytics, integrations, compliance.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -122,7 +122,7 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | AI assistant: lesson plans, quiz generation, feedback, tutor bot | ✅ 🔑 (ANTHROPIC_API_KEY) lesson notes, report comments, homework feedback; quiz questions on a topic, matched to curriculum objectives or lesson notes, checked by the teacher before they reach the bank; a study helper for students (hints, not answers) that the school switches on, with a daily limit, chats readable by teachers and parents, and safety or wellbeing concerns sent to counsellors at once |
 | Offline and low-bandwidth mode | ✅ interactive content kept on the device opens without a connection, and its progress is sent when the connection returns; lite mode (audio-only live classes, no animations); offline register; installable app |
 
-## 9. Attendance (phase 7)
+## 9. Attendance (phase 7, done)
 
 | Feature | Status |
 |---|---|
@@ -133,15 +133,15 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Staff attendance and clock-in/out | ✅ daily staff sheet from the kiosk, cards, clocking machines or self check-in: first in, last out, hours, late, on leave, absent; CSV |
 | Attendance analytics: chronic absence flags, trends | ✅ school and class rate, daily trend and direction, day-of-week pattern, persistent absence below the school's threshold (default 90%), frequent lateness, lessons missed while in school, registers not yet taken today |
 
-## 10. Timetabling and calendar (phase 7)
+## 10. Timetabling and calendar (phase 7, done)
 
 | Feature | Status |
 |---|---|
-| Automatic timetable generator with constraints | 🟡 periods, weekly loads, teacher clashes, locked cells; teacher availability, rooms and double periods coming in 7b |
+| Automatic timetable generator with constraints | ✅ periods and breaks, weekly loads, double periods (never across a break), teacher availability, rooms (labs, ICT suites for the subjects that need them; class home rooms), no teacher, class or room clashes, locked cells kept, and a reason for anything that cannot fit |
 | Substitution/cover management | ✅ |
-| School calendar: terms, holidays, events, exams, PTA meetings | 🟡 events list; one calendar coming in 7b |
-| Room and facility booking | ⬜ |
-| Personal calendars synced with Google and Outlook | ⬜ |
+| School calendar: terms, holidays, events, exams, PTA meetings | ✅ one calendar for staff, students and parents: term dates, holidays, events, trips, PTA and parent meetings, published exam papers, online lessons, cover duties, room bookings, homework deadlines and (for teachers and students) weekly lessons |
+| Room and facility booking | ✅ labs, halls, ICT suites and other rooms; day view with timetabled lessons; weekly repeats; no double booking (checked in the database); rooms that need an admin's approval |
+| Personal calendars synced with Google and Outlook | ✅ a private calendar link per person for Google Calendar, Outlook.com, Microsoft 365 and phones; it updates itself; a new link stops the old one |
 
 ## 11–23
 
@@ -166,3 +166,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101003400_lms_teaching.sql` | 6a |
 | `20260101003500_lms_content.sql` | 6b |
 | `20260101003600_attendance.sql` | 7a |
+| `20260101003700_timetable_calendar.sql` | 7b |

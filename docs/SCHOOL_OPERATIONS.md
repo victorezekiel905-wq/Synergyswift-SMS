@@ -174,6 +174,12 @@ v46 adds the modules that the leading systems sell separately, so one login runs
 - **Staff**: the day's sheet of who clocked in, when, for how long, who was late, on leave or absent, with a CSV download.
 - **Analytics**: the attendance rate and trend, classes, days of the week, students below the threshold, frequent lateness, lessons missed while in school, and registers not yet taken today.
 
+### Timetable, rooms and calendar (phase 7)
+
+- **Timetable** (`/school/timetable`): under **Rooms**, add classrooms, laboratories, ICT suites and halls, and give each class a home room. Under **Weekly load & generate**, set each subject's periods a week, how many are double periods, and whether it needs a lab or the ICT suite. Teachers mark periods they cannot teach under **My availability** (admins can do it for anyone under **Teacher availability**). **Generate** places every lesson without teacher, class or room clashes and lists anything that does not fit, with the reason.
+- **Rooms & booking** (`/school/rooms`): see every room's day, including timetabled lessons, and book a room for a time (optionally every week for up to 12 weeks). A room cannot be double-booked or booked over a timetabled lesson. Rooms marked **Bookings need approval** wait for an admin, who approves or declines at the top of the page.
+- **Calendar** (`/calendar`, for staff, students and parents): term dates, holidays (add them as "Holiday or closure" events), events, PTA meetings, exams, meetings, online lessons, cover, room bookings, homework deadlines and weekly lessons. **Get my calendar link** adds it to Google Calendar, Outlook or a phone; it updates itself. Making a new link stops the old one.
+
 ### Parents and students
 
 - The parent portal adds tabs for **Fees**, **Events**, **Meetings**, **Learning** (homework, timetable, behaviour, attendance), **Boarding** and **Help & feedback** (raise and follow complaints and requests). It also asks about re-enrolment, shows waiting surveys, and lists the permissions the school asks for (**Permissions and privacy**). **Records** shows each child's achievements, certificates, approved work, shared documents and support plan, which parents can agree to.

@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("create"), title: z.string().trim().min(2).max(160), description: z.string().trim().max(4000).nullish(),
-    kind: z.enum(["event", "trip", "club", "holiday", "exam", "meeting"]), starts_at: z.string().datetime({ offset: true }), ends_at: z.string().datetime({ offset: true }).nullish(),
+    kind: z.enum(["event", "trip", "club", "holiday", "exam", "meeting", "pta"]), starts_at: z.string().datetime({ offset: true }), ends_at: z.string().datetime({ offset: true }).nullish(),
     location: z.string().trim().max(200).nullish(), class_group_ids: z.array(z.string().uuid()).default([]), requires_consent: z.boolean().default(false),
     fee: z.number().min(0).max(1e9).default(0), capacity: z.number().int().positive().nullish(), respond_by: z.string().datetime({ offset: true }).nullish(), notify: z.boolean().default(true) }),
   z.object({ action: z.literal("delete"), id: z.string().uuid() })

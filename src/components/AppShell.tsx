@@ -26,6 +26,7 @@ const GROUPS: NavGroup[] = [
     { href: "/student/learn", label: "My learning", roles: ["student"], module: "lms" },
     { href: "/student/practice", label: "Past-question practice", roles: ["student"], module: "exams" },
     { href: "/forums", label: "Discussions", roles: [...STAFF, "student"], module: "lms" },
+    { href: "/calendar", label: "Calendar", roles: [...STAFF, "student", "parent"] },
     { href: "/parent", label: "My children", roles: ["parent"] }
   ] },
   { title: "Teaching", links: [
@@ -37,6 +38,7 @@ const GROUPS: NavGroup[] = [
     { href: "/school/learning", label: "Learning library", roles: [...TEACH, "counsellor"], module: "lms" },
     { href: "/school/timetable", label: "Timetable", roles: STAFF, module: "timetable" },
     { href: "/school/cover", label: "Cover", roles: TEACH, module: "cover" },
+    { href: "/school/rooms", label: "Rooms & booking", roles: STAFF.filter(r => r !== "cashier") },
     { href: "/exams", label: "Secure exams", roles: TEACH, module: "exams" },
     { href: "/exams/bank", label: "Question bank", roles: TEACH, module: "exams" },
     { href: "/school/exam-planner", label: "Exam planner", roles: TEACH, module: "exams" },

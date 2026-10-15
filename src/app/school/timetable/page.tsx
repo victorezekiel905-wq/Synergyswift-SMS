@@ -1,26 +1,31 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Field, rolesOf, type Me, Loading, Icon } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, rolesOf, type Me, Loading, Icon } from "@/components/ui";
+import { Rooms, Availability, ROOM_KIND } from "@/components/timetable/TimetableSetup";
 
 type Period = { id: string; name: string; starts_at: string; ends_at: string; is_break: boolean; position: number };
 type Entry = { id: string; class_group_id: string; day: number; period_id: string; subject_id: string | null; teacher_id: string | null; room: string | null; locked: boolean;
   subjects: { name: string } | null; class_groups: { name: string } | null; users: { full_name: string } | null };
-type Offering = { id: string; class_group_id: string; subject_id: string; teacher_id: string | null; periods_per_week: number; subjects: { name: string } | null; class_groups: { name: string } | null; users: { full_name: string } | null };
+type Offering = { id: string; class_group_id: string; subject_id: string; teacher_id: string | null; periods_per_week: number; doubles: number; room_kind: string | null; subjects: { name: string } | null; class_groups: { name: string } | null; users: { full_name: string } | null };
 const DAYS = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function TimetablePage() {
   const { data: me } = useApi<Me>("/api/me");
   const admin = ["school_admin", "principal", "platform_admin"].some(r => rolesOf(me).has(r));
-  const [tab, setTab] = useState<"class" | "mine" | "load" | "periods">("class");
-  const tabs = [{ id: "class" as const, label: "Class timetables" }, { id: "mine" as const, label: "My timetable" }, ...(admin ? [{ id: "load" as const, label: "Weekly load & generate" }, { id: "periods" as const, label: "School day" }] : [])];
+  const [tab, setTab] = useState<"class" | "mine" | "load" | "periods" | "rooms" | "availability">("class");
+  const tabs = [{ id: "class" as const, label: "Class timetables" }, { id: "mine" as const, label: "My timetable" },
+    ...(admin ? [{ id: "load" as const, label: "Weekly load & generate" }, { id: "rooms" as const, label: "Rooms" }, { id: "periods" as const, label: "School day" }] : []),
+    { id: "availability" as const, label: admin ? "Teacher availability" : "My availability" }];
   return (
     <Page wide>
-      <PageHeader eyebrow="Academics" title="Timetable" subtitle="Build the school timetable automatically from each subject's weekly periods, then adjust by hand. Teacher and room clashes are blocked." />
+      <PageHeader eyebrow="Academics" title="Timetable" subtitle="Build the school timetable automatically from each subject's weekly periods, double periods, rooms and teachers' availability, then adjust by hand. Teacher and room clashes are blocked." />
       <Tabs value={tab} onChange={setTab} tabs={tabs} />
       {tab === "class" && <ClassView admin={admin} />}
       {tab === "mine" && <Grid url="/api/timetable?teacher_id=me" showClass />}
       {tab === "load" && <Load />}
       {tab === "periods" && <Periods />}
+      {tab === "rooms" && <Rooms />}
+      {tab === "availability" && <Availability admin={admin} me={me?.user?.id ?? null} />}
     </Page>
   );
 }
@@ -94,7 +99,7 @@ function Load() {
     setBusy(true);
     const r = await send("/api/timetable", { action: "generate", days, keep_locked: true });
     setBusy(false);
-    setMsg({ ok: r.ok, text: r.ok ? `Placed ${r.data.placed} lessons.${r.data.unplaced.length ? ` Could not fit: ${r.data.unplaced.map((u: any) => `${u.subject} ×${u.perWeek}`).join(", ")}. Add periods or free up the teacher.` : " Everything fits with no clashes."}` : r.error ?? "failed" });
+    setMsg({ ok: r.ok, text: r.ok ? `Placed ${r.data.placed} lessons.${r.data.unplaced.length ? ` Could not fit: ${r.data.unplaced.map((u: any) => `${u.subject} ×${u.perWeek}${u.reason ? ` (${u.reason})` : ""}`).join("; ")}.` : " Everything fits with no clashes."}` : r.error ?? "failed" });
     reload();
   }
   if (!data?.offerings.length) return <Empty>Offer subjects to classes under School setup → Classes & subjects first.</Empty>;
@@ -112,8 +117,18 @@ function Load() {
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{data.offerings.filter(o => (o.class_groups?.name ?? "") === gname).map(o => (
             <div key={o.id} className="flex items-center justify-between gap-2 rounded border border-slate-200 px-2 py-1.5 text-sm">
               <span>{o.subjects?.name}<span className="block text-xs text-slate-400">{o.users?.full_name ?? "no teacher"} · {placed(o)} placed</span></span>
-              <input className="input w-16 py-1 text-center" type="number" min={0} max={20} defaultValue={o.periods_per_week} aria-label={`${o.subjects?.name} periods per week`}
-                onBlur={async e => { if (Number(e.target.value) !== o.periods_per_week) { await send("/api/timetable", { action: "set_load", offering_id: o.id, periods_per_week: Number(e.target.value) }); reload(); } }} />
+              <span className="flex flex-col items-end gap-1">
+                <input className="input w-16 py-1 text-center" type="number" min={0} max={20} defaultValue={o.periods_per_week} aria-label={`${o.subjects?.name} periods per week`} title="Periods a week"
+                  onBlur={async e => { if (Number(e.target.value) !== o.periods_per_week) { await send("/api/timetable", { action: "set_load", offering_id: o.id, periods_per_week: Number(e.target.value) }); reload(); } }} />
+                <span className="flex gap-1">
+                  <select className="input w-auto py-0 text-xs" value={o.doubles ?? 0} aria-label={`${o.subjects?.name} double periods`} title="Double periods a week"
+                    onChange={async e => { await send("/api/timetable", { action: "set_load", offering_id: o.id, periods_per_week: o.periods_per_week, doubles: Number(e.target.value) }); reload(); }}>
+                    {Array.from({ length: Math.floor(o.periods_per_week / 2) + 1 }, (_, i) => <option key={i} value={i}>{i ? `${i} double${i > 1 ? "s" : ""}` : "singles"}</option>)}</select>
+                  <select className="input w-auto py-0 text-xs" value={o.room_kind ?? ""} aria-label={`${o.subjects?.name} room`} title="Room needed"
+                    onChange={async e => { await send("/api/timetable", { action: "set_load", offering_id: o.id, periods_per_week: o.periods_per_week, room_kind: e.target.value || null }); reload(); }}>
+                    <option value="">home room</option>{Object.entries(ROOM_KIND).filter(([k]) => k !== "classroom").map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+                </span>
+              </span>
             </div>))}</div>
         </section>
       ))}

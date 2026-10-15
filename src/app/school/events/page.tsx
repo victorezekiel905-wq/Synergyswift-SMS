@@ -54,7 +54,7 @@ function NewEvent({ groups, onDone }: { groups: { id: string; name: string }[]; 
       onDone();
     }}>
       <div className="sm:col-span-2"><Field label="Title"><input className="input" required value={f.title} onChange={e => setF({ ...f, title: e.target.value })} /></Field></div>
-      <Field label="Type"><select className="input" value={f.kind} onChange={e => setF({ ...f, kind: e.target.value })}>{["event", "trip", "club", "meeting", "exam", "holiday"].map(k => <option key={k}>{k}</option>)}</select></Field>
+      <Field label="Type"><select className="input" value={f.kind} onChange={e => setF({ ...f, kind: e.target.value })}>{[["event", "Event"], ["trip", "Trip"], ["club", "Club"], ["meeting", "Meeting"], ["pta", "PTA meeting"], ["exam", "Exam"], ["holiday", "Holiday or closure"]].map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
       <Field label="Location"><input className="input" value={f.location} onChange={e => setF({ ...f, location: e.target.value })} /></Field>
       <Field label="Starts"><input className="input" type="datetime-local" required value={f.starts} onChange={e => setF({ ...f, starts: e.target.value })} /></Field>
       <Field label="Ends"><input className="input" type="datetime-local" value={f.ends} onChange={e => setF({ ...f, ends: e.target.value })} /></Field>

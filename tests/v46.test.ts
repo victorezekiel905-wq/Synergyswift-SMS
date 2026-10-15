@@ -52,7 +52,7 @@ describe("timetable generator", () => {
   });
   it("reports what cannot fit", () => {
     const r = generateTimetable({ days: [1], periodIds: ["p1", "p2"], requirements: [{ classId: "A", subjectId: "x", teacherId: "t", perWeek: 3 }], fixed: [], seed: 1, attempts: 3 });
-    expect(r.unplaced).toEqual([{ classId: "A", subjectId: "x", teacherId: "t", perWeek: 1 }]);
+    expect(r.unplaced).toEqual([{ classId: "A", subjectId: "x", teacherId: "t", perWeek: 1, reason: "no free period for the class and teacher" }]);
   });
 });
 
