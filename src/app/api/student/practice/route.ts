@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireCtx, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { secureShuffle } from "@/lib/crypto";
+import { POINTS } from "@/lib/lms";
 import { buildAttemptLayout, toPublicQuestion, markQuestion, describeAnswer, type Question } from "@/lib/exams/engine";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,9 @@ export async function POST(req: NextRequest) {
 
   if (b.action === "finish") {
     await svc.from("practice_sessions").update({ finished_at: new Date().toISOString() }).eq("id", session.id);
+    // Finished practice counts towards points, streaks and badges.
+    const { data: st } = await svc.from("students").select("id").eq("tenant_id", tid).eq("user_id", ctx.userId).maybeSingle();
+    if (st && Object.keys(session.marks ?? {}).length > 0) await svc.from("learning_activity").upsert({ tenant_id: tid, student_id: st.id, kind: "practice", points: POINTS.practice, ref_id: session.id }, { onConflict: "student_id,kind,ref_id", ignoreDuplicates: true });
     return NextResponse.json({ score: Number(session.score), max_score: Number(session.max_score) });
   }
 

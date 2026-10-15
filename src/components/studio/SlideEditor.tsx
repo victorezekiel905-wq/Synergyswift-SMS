@@ -16,7 +16,7 @@ export default function SlideEditor({ lessonId, initialSlides = [] }: { lessonId
   const [slides, setSlides] = useState<Slide[]>(normalizedInitialSlides);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [kind, setKind] = useState<"html" | "image" | "video">("html");
+  const [kind, setKind] = useState<"text" | "html" | "image" | "video">("text");
   const [mediaUrl, setMediaUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -76,12 +76,13 @@ export default function SlideEditor({ lessonId, initialSlides = [] }: { lessonId
       <div className="card grid grid-cols-1 gap-2 p-4 md:grid-cols-4">
         <input className="input md:col-span-2" placeholder="Slide title" value={title} onChange={(e) => setTitle(e.target.value)} />
         <select className="input" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
-          <option value="html">HTML / text</option>
+          <option value="text">Text, maths and code</option>
+          <option value="html">Embed (HTML)</option>
           <option value="image">Image</option>
           <option value="video">Video</option>
         </select>
         <button className="btn btn-primary text-xs" onClick={add} disabled={busy}>{busy ? "Saving…" : "+ Slide"}</button>
-        <textarea className="input md:col-span-4 min-h-[80px]" placeholder="Slide body (HTML or text)" value={body} onChange={(e) => setBody(e.target.value)} />
+        <textarea className="input md:col-span-4 min-h-[80px]" placeholder={kind === "text" ? String.raw`Text. Maths: $$x^2 + 2x + 1$$ or \(\frac{a}{b}\). Code: three backticks and the language, e.g. ` + "```python" : "Slide body (HTML, shown in a sandboxed frame)"} value={body} onChange={(e) => setBody(e.target.value)} />
         <input className="input md:col-span-4" placeholder="Optional media URL" value={mediaUrl} onChange={(e) => setMediaUrl(e.target.value)} />
         {err && <p className="md:col-span-4 text-xs text-rose-600">{err}</p>}
       </div>

@@ -59,6 +59,11 @@ function normalizeIncomingSlide(body: Record<string, unknown>) {
     };
   }
 
+  // Text with formatting, LaTeX maths and code blocks (rendered safely, see lib/richtext).
+  if (incomingKind === "text") {
+    return { idx, kind: "text", payload: { title: String(body.title ?? "Text slide"), markdown: String(body.body ?? "").slice(0, 50000) } };
+  }
+
   if (incomingKind === "video") {
     return {
       idx,

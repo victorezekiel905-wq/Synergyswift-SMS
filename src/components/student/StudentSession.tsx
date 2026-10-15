@@ -1,4 +1,5 @@
 "use client";
+import RichText from "@/components/content/RichText";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -162,11 +163,12 @@ export default function StudentSession(props: {
                 {cur.payload.subheading && <p className="mt-2 text-slate-600">{cur.payload.subheading}</p>}
               </div>
             )}
-            {cur.kind === "text" && <pre className="whitespace-pre-wrap text-sm">{cur.payload.markdown}</pre>}
+            {cur.kind === "text" && <RichText text={cur.payload.markdown} className="text-sm" />}
             {/* eslint-disable-next-line @next/next/no-img-element -- data URL / uploaded file, nothing for next/image to optimise */}
             {cur.kind === "image" && cur.payload.url && <img src={cur.payload.url} alt={cur.payload.alt ?? ""} className="rounded" />}
             {cur.kind === "video" && cur.payload.url && <video src={cur.payload.url} controls className="w-full rounded" />}
-            {cur.kind === "embed" && <div dangerouslySetInnerHTML={{ __html: cur.payload.html ?? "" }} />}
+            {/* Teacher-made embeds run in a sandboxed frame, never inside the student's page. */}
+            {cur.kind === "embed" && <iframe title="Embedded content" sandbox="allow-scripts allow-popups allow-forms" srcDoc={cur.payload.html ?? ""} className="h-[28rem] w-full rounded border border-slate-200" />}
           </div>
         </section>
       )}

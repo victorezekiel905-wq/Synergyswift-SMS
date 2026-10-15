@@ -24,11 +24,13 @@ const GROUPS: NavGroup[] = [
     { href: "/school/inbox", label: "Parent messages", roles: STAFF.filter(r => r !== "cashier"), module: "inbox" },
     { href: "/student", label: "My school", roles: ["student"] },
     { href: "/student/practice", label: "Past-question practice", roles: ["student"], module: "exams" },
+    { href: "/forums", label: "Discussions", roles: [...STAFF, "student"], module: "lms" },
     { href: "/parent", label: "My children", roles: ["parent"] }
   ] },
   { title: "Teaching", links: [
     { href: "/school/attendance", label: "Class register", roles: TEACH, module: "attendance" },
     { href: "/school/results", label: "Results & report cards", roles: ACADEMIC, module: "results" },
+    { href: "/school/schemes", label: "Schemes of work", roles: [...TEACH, "qa_officer"], module: "lesson_notes" },
     { href: "/school/lesson-notes", label: "Lesson notes", roles: [...TEACH, "qa_officer"], module: "lesson_notes" },
     { href: "/school/homework", label: "Homework", roles: TEACH, module: "homework" },
     { href: "/school/timetable", label: "Timetable", roles: STAFF, module: "timetable" },

@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("save"), id: z.string().uuid().optional(), subject_id: z.string().uuid().nullish(), class_group_id: z.string().uuid().nullish(),
     term_id: z.string().uuid().nullish(), week: z.number().int().min(1).max(20).nullish(), topic: z.string().trim().min(2).max(200), content: z.string().max(60000),
-    drafted: z.boolean().optional(), submit: z.boolean().default(false) }),
+    drafted: z.boolean().optional(), submit: z.boolean().default(false), scheme_week_id: z.string().uuid().nullish() }),
   z.object({ action: z.literal("review"), id: z.string().uuid(), decision: z.enum(["approved", "returned"]), comment: z.string().trim().max(2000).nullish() }),
   z.object({ action: z.literal("delete"), id: z.string().uuid() }),
   z.object({ action: z.literal("generate"), subject: z.string().trim().min(1).max(80), level: z.string().trim().min(1).max(60), topic: z.string().trim().min(2).max(200),

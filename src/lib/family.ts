@@ -92,7 +92,7 @@ export async function familyExtras(svc: any, tenantId: string, guardianId: strin
     svc.from("fee_invoices").select("id,student_id,invoice_no,title,status,total,amount_paid,due_date,pay_token").eq("tenant_id", tenantId).in("student_id", studentIds).neq("status", "void").order("created_at", { ascending: false }).limit(50),
     svc.from("school_events").select("id,title,description,kind,starts_at,ends_at,location,class_group_ids,requires_consent,fee,respond_by").eq("tenant_id", tenantId).gte("starts_at", new Date(Date.now() - 86400_000).toISOString()).order("starts_at").limit(40),
     svc.from("event_responses").select("event_id,student_id,consent,invoice_id").eq("tenant_id", tenantId).in("student_id", studentIds),
-    classGroupIds.length ? svc.from("homework").select("id,class_group_id,title,due_at,subjects(name)").eq("tenant_id", tenantId).in("class_group_id", classGroupIds).gte("due_at", since30).order("due_at", { ascending: false }).limit(60) : { data: [] },
+    classGroupIds.length ? svc.from("homework").select("id,class_group_id,title,due_at,group_ids,subjects(name)").eq("tenant_id", tenantId).in("class_group_id", classGroupIds).gte("due_at", since30).order("due_at", { ascending: false }).limit(60) : { data: [] },
     svc.from("behaviour_records").select("student_id,kind,points,note,occurred_at,behaviour_categories(name)").eq("tenant_id", tenantId).in("student_id", studentIds).gte("occurred_at", since30).order("occurred_at", { ascending: false }).limit(60),
     svc.from("class_attendance").select("student_id,status").eq("tenant_id", tenantId).in("student_id", studentIds).gte("date", since30.slice(0, 10)).limit(5000),
     svc.from("exeat_requests").select("id,student_id,reason,leave_at,return_by,status,decision_note").eq("tenant_id", tenantId).in("student_id", studentIds).order("created_at", { ascending: false }).limit(20),
@@ -104,12 +104,16 @@ export async function familyExtras(svc: any, tenantId: string, guardianId: strin
   const teacherIds = [...new Set((teachers.data ?? []).map((t: any) => t.teacher_id))];
   const { data: slots } = teacherIds.length ? await svc.from("consultation_slots").select("id,starts_at,ends_at,location,staff_user_id,users!consultation_slots_staff_user_id_fkey(full_name)")
     .eq("tenant_id", tenantId).in("staff_user_id", teacherIds).is("guardian_id", null).gte("starts_at", now).order("starts_at").limit(200) : { data: [] };
+  const { data: memberships } = await svc.from("learning_group_members").select("group_id").in("student_id", studentIds);
+  const myGroups = new Set((memberships ?? []).map((m: any) => m.group_id));
   const { data: subs } = (homework.data ?? []).length ? await svc.from("homework_submissions").select("homework_id,student_id,submitted_at,score,late").in("student_id", studentIds).in("homework_id", (homework.data ?? []).map((h: any) => h.id)) : { data: [] };
   return {
     currency: settings.data?.currency ?? "NGN",
     invoices: invoices.data ?? [],
     events: (events.data ?? []).map((e: any) => ({ ...e, responses: (responses.data ?? []).filter((r: any) => r.event_id === e.id) })),
-    homework: (homework.data ?? []).map((h: any) => ({ ...h, submissions: (subs ?? []).filter((s: any) => s.homework_id === h.id) })),
+    // Homework set for groups shows only to families with a child in one of them.
+    homework: (homework.data ?? []).filter((h: any) => !h.group_ids?.length || h.group_ids.some((g: string) => myGroups.has(g)))
+      .map((h: any) => ({ ...h, group_ids: undefined, submissions: (subs ?? []).filter((s: any) => s.homework_id === h.id) })),
     behaviour: behaviour.data ?? [],
     attendance: attendance.data ?? [],
     exeats: exeats.data ?? [],

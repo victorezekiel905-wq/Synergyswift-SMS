@@ -108,18 +108,18 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 |---|---|
 | Lesson studio, slides, live class, games, homework, rubrics | ✅ |
 | Lesson notes with approval | ✅ |
-| Schemes of work with curriculum objective mapping | ⬜ |
+| Schemes of work with curriculum objective mapping | ✅ curriculum objectives per subject and level (added one by one or pasted from the curriculum), week-by-week schemes mapped to them, coverage showing what is planned, taught and missing, approval by the head of department, QA or the principal (never the author), copying to another term, lesson notes linked to a week |
 | Content library incl. SCORM/xAPI, H5P | 🟡 media in lessons; no SCORM/xAPI/H5P |
-| Authoring with LaTeX and code blocks | ⬜ |
+| Authoring with LaTeX and code blocks | ✅ text slides, homework instructions and discussions take headings, lists, links, LaTeX maths (KaTeX) and highlighted code in 12 languages, always escaped; HTML embed slides now run in a sandbox |
 | Learning paths with prerequisites | ⬜ |
-| Assignments: late penalties, resubmission | 🟡 |
-| Inline annotation, voice/video feedback | ⬜ |
-| Plagiarism and AI-content checks | ⬜ |
-| Discussion forums | ⬜ |
+| Assignments: late penalties, resubmission | ✅ penalty per day late with a cap, resubmission with an attempt limit and every earlier attempt kept, "send back to improve", file uploads (PDF, Word, PowerPoint, images, audio, video), homework for chosen learning groups only |
+| Inline annotation, voice/video feedback | ✅ comments on highlighted words in the answer and pins on uploaded images, recorded voice or video feedback, all shown to the student and family once the work is returned or marked |
+| Plagiarism and AI-content checks | ✅ similarity against classmates' answers and the student's own earlier work, with the matching passages; a writing-style change check against the student's earlier work as the sign of outside or AI help. Both are labelled as prompts for a conversation, never proof |
+| Discussion forums | ✅ class, school-wide and staff-room forums, threads and replies with maths and code, pinning, locking, hiding, reports from students, a language filter and a posting limit for students |
 | Zoom, Google Meet, Teams | ⬜ 🔑 (built-in video exists) |
 | Whiteboard, polls, breakout rooms, hand raise | 🟡 whiteboard, polls, hand raise exist; breakout rooms missing |
-| Differentiation, gamification (badges, streaks) | 🟡 leaderboards exist |
-| AI assistant: lesson plans, quiz generation, feedback, tutor bot | 🟡 drafting exists 🔑 (ANTHROPIC_API_KEY) |
+| Differentiation, gamification (badges, streaks) | ✅ learning groups inside a class (support, core, extension) that homework can target; points for homework, practice and discussion, school-day streaks, automatic and teacher-given badges, a class overview, shown to students and parents |
+| AI assistant: lesson plans, quiz generation, feedback, tutor bot | 🟡 lesson notes, comments and now draft homework feedback with a suggested mark 🔑 (ANTHROPIC_API_KEY); quiz generation and tutor in 6b |
 | Offline and low-bandwidth mode | 🟡 offline register; installable app |
 
 ## 9–23
@@ -142,3 +142,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101003100_community_crm.sql` | 3 |
 | `20260101003200_core_security.sql` | 4 |
 | `20260101003300_sis.sql` | 5 |
+| `20260101003400_lms_teaching.sql` | 6a |

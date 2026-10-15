@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, statusTone, fmtDate, Loading } from "@/components/ui";
 
 type Note = { id: string; topic: string; week: number | null; status: string; drafted: boolean; review_comment: string | null; updated_at: string; author_id: string;
@@ -11,7 +11,16 @@ export default function LessonNotesPage() {
   const queue = useApi<{ items: Note[] }>(mine.data?.reviewer ? "/api/lesson-notes?queue=1" : null, [mine.data?.reviewer]);
   const [edit, setEdit] = useState<string | "new" | null>(null);
   const [review, setReview] = useState<string | null>(null);
+  const [prefill, setPrefill] = useState<Record<string, string> | null>(null);
   const reload = () => { mine.reload(); queue.reload(); };
+  // Opened from a scheme of work week: start a note for that week.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (!q.get("scheme_week")) return;
+    setPrefill({ scheme_week_id: q.get("scheme_week")!, topic: q.get("topic") ?? "", subject_id: q.get("subject_id") ?? "", term_id: q.get("term_id") ?? "", week: q.get("week") ?? "" });
+    setEdit("new");
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
   return (
     <Page wide>
       <PageHeader eyebrow="Teaching" title="Lesson notes"
@@ -20,8 +29,8 @@ export default function LessonNotesPage() {
       {mine.data?.reviewer && <Tabs value={tab} onChange={setTab} tabs={[{ id: "mine", label: "My notes" }, { id: "queue", label: `Awaiting approval${queue.data?.items.length ? ` (${queue.data.items.length})` : ""}` }]} />}
       {mine.error && <Alert>{mine.error}</Alert>}
       <List items={(tab === "queue" ? queue.data?.items : mine.data?.items) ?? []} showAuthor={tab === "queue"} onOpen={id => tab === "queue" ? setReview(id) : setEdit(id)} />
-      <Modal open={Boolean(edit)} onClose={() => setEdit(null)} title={edit === "new" ? "New lesson note" : "Lesson note"} wide>
-        {edit && <Editor id={edit === "new" ? null : edit} drafting={Boolean(mine.data?.drafting)} onDone={() => { setEdit(null); reload(); }} />}
+      <Modal open={Boolean(edit)} onClose={() => { setEdit(null); setPrefill(null); }} title={edit === "new" ? "New lesson note" : "Lesson note"} wide>
+        {edit && <Editor id={edit === "new" ? null : edit} prefill={prefill} drafting={Boolean(mine.data?.drafting)} onDone={() => { setEdit(null); setPrefill(null); reload(); }} />}
       </Modal>
       <Modal open={Boolean(review)} onClose={() => setReview(null)} title="Review lesson note" wide>
         {review && <Review id={review} onDone={() => { setReview(null); reload(); }} />}
@@ -45,20 +54,21 @@ function List({ items, showAuthor, onOpen }: { items: Note[]; showAuthor: boolea
   );
 }
 
-function Editor({ id, drafting, onDone }: { id: string | null; drafting: boolean; onDone: () => void }) {
+function Editor({ id, prefill, drafting, onDone }: { id: string | null; prefill?: Record<string, string> | null; drafting: boolean; onDone: () => void }) {
   const { data: existing } = useApi<any>(id ? `/api/lesson-notes?id=${id}` : null, [id]);
   const { data: structure } = useApi<{ class_groups: { id: string; name: string; level: string | null }[]; subjects: { id: string; name: string }[] }>("/api/school/structure");
   const { data: sessions } = useApi<{ id: string; name: string; terms: { id: string; name: string; is_current: boolean }[] }[]>("/api/school/academic");
   const [f, setF] = useState<Record<string, any> | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [gen, setGen] = useState({ busy: false, curriculum: "NERDC national curriculum", notes: "", minutes: 40 });
-  const cur = f ?? (id ? (existing ? { ...existing } : null) : { topic: "", content: "", subject_id: "", class_group_id: "", term_id: sessions?.flatMap(s => s.terms).find(t => t.is_current)?.id ?? "", week: "" });
+  const cur = f ?? (id ? (existing ? { ...existing } : null) : { topic: "", content: "", subject_id: "", class_group_id: "", term_id: sessions?.flatMap(s => s.terms).find(t => t.is_current)?.id ?? "", week: "", scheme_week_id: null,
+    ...Object.fromEntries(Object.entries(prefill ?? {}).filter(([, v]) => v)) });
   if (!cur) return <Loading />;
   const set = (k: string, v: unknown) => setF({ ...cur, [k]: v });
   const locked = cur.status === "approved" || cur.status === "submitted";
   async function save(submit: boolean) {
     const r = await send("/api/lesson-notes", { action: "save", id: id ?? undefined, topic: cur!.topic, content: cur!.content, subject_id: cur!.subject_id || null,
-      class_group_id: cur!.class_group_id || null, term_id: cur!.term_id || null, week: cur!.week ? Number(cur!.week) : null, drafted: Boolean(cur!.drafted), submit });
+      class_group_id: cur!.class_group_id || null, term_id: cur!.term_id || null, week: cur!.week ? Number(cur!.week) : null, drafted: Boolean(cur!.drafted), submit, scheme_week_id: cur!.scheme_week_id ?? null });
     if (!r.ok) return setErr(r.error);
     onDone();
   }

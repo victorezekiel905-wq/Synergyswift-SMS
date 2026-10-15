@@ -211,3 +211,56 @@ export function assistErrorMessage(e: unknown): { message: string; status: numbe
   if (e instanceof Anthropic.APIError) return { message: "Drafting did not finish. Please try again.", status: 502 };
   return { message: (e as Error).message, status: 400 };
 }
+
+// ---------------- learning (phase 6) ----------------
+
+/** Newer features (feedback drafts, quizzes, tutor) run on the current Opus model. */
+export const LEARNING_MODEL = "claude-opus-5-5";
+
+const FeedbackSchema = z.object({
+  feedback: z.string(),
+  strengths: z.array(z.string()),
+  next_steps: z.array(z.string()),
+  suggested_score: z.number().nullable(),
+  note_for_teacher: z.string()
+});
+export type FeedbackDraft = z.infer<typeof FeedbackSchema>;
+
+/**
+ * A draft of feedback on one student's homework for the teacher to edit. Only
+ * the task and the answer are sent: no name or other personal details.
+ */
+export async function draftFeedback(p: { subject: string | null; level: string | null; task: string; answer: string; maxScore: number | null; teacherNotes?: string | null }): Promise<FeedbackDraft> {
+  const response = await anthropic().messages.parse(
+    {
+      model: LEARNING_MODEL,
+      max_tokens: 16000,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "medium", format: zodOutputFormat(FeedbackSchema) },
+      system:
+        "You help teachers write feedback on school homework. Feedback speaks directly to the student in two to four short, kind, specific sentences, " +
+        "says what was done well, and gives one or two clear next steps. Judge only what is in the answer. " +
+        "Suggest a score only when a maximum is given and the task makes the standard clear; otherwise return null. " +
+        "Use note_for_teacher for anything the teacher should check (for example, an answer that does not address the task)." +
+        " Write as the teacher would. Never mention how the text was produced, and never refer to yourself, to software, to assistants or to automation.",
+      messages: [{
+        role: "user",
+        content: [
+          p.subject ? `Subject: ${p.subject}` : "",
+          p.level ? `Class: ${p.level}` : "",
+          `Task:\n${p.task.slice(0, 8000)}`,
+          p.maxScore != null ? `Maximum score: ${p.maxScore}` : "No score is given for this task.",
+          p.teacherNotes ? `Teacher's marking notes: ${p.teacherNotes.slice(0, 2000)}` : "",
+          `Student's answer:\n${p.answer.slice(0, 30000)}`
+        ].filter(Boolean).join("\n\n")
+      }],
+      fallbacks: "default"
+    },
+    { headers: { "anthropic-beta": FALLBACK_BETA } }
+  );
+  if (response.stop_reason === "refusal") throw new DraftDeclined("Feedback for this answer could not be drafted. Please write it yourself.");
+  if (!response.parsed_output) throw new Error("The draft could not be completed. Please try again.");
+  const out = response.parsed_output;
+  const cap = p.maxScore ?? null;
+  return { ...out, suggested_score: cap === null || out.suggested_score === null ? null : Math.max(0, Math.min(cap, out.suggested_score)) };
+}

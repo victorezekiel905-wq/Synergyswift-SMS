@@ -37,3 +37,23 @@
   }
   .label { @apply mb-1 block text-xs font-medium text-slate-600; }
 }
+
+/* Rich text: lesson, homework and forum content (see src/lib/richtext.ts). */
+.rich-text { line-height: 1.6; }
+.rich-text p { margin: 0 0 0.6em; }
+.rich-text ul { list-style: disc; padding-left: 1.4em; margin: 0 0 0.6em; }
+.rich-text ol { list-style: decimal; padding-left: 1.4em; margin: 0 0 0.6em; }
+.rich-text h3 { font-size: 1.25em; font-weight: 700; margin: 0.6em 0 0.3em; }
+.rich-text h4 { font-size: 1.1em; font-weight: 700; margin: 0.6em 0 0.3em; }
+.rich-text h5 { font-weight: 700; margin: 0.6em 0 0.3em; }
+.rich-text a { color: #1d5ddb; text-decoration: underline; }
+.rich-text .rt-inline { background: #f1f5f9; border-radius: 4px; padding: 0 0.3em; font-size: 0.9em; }
+.rich-text .rt-code { background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 0.8em 1em; overflow-x: auto; font-size: 0.85em; margin: 0 0 0.6em; }
+.rich-text .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.2em 0; }
+.hljs-keyword, .hljs-built_in, .hljs-selector-tag { color: #c4b5fd; }
+.hljs-string, .hljs-attr, .hljs-template-string { color: #86efac; }
+.hljs-number, .hljs-literal { color: #fdba74; }
+.hljs-comment { color: #94a3b8; font-style: italic; }
+.hljs-title, .hljs-function .hljs-title, .hljs-title.function_ { color: #93c5fd; }
+.hljs-tag, .hljs-name { color: #f9a8d4; }
+.hljs-type, .hljs-class .hljs-title { color: #fde68a; }
