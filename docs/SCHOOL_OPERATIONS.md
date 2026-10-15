@@ -165,6 +165,15 @@ v46 adds the modules that the leading systems sell separately, so one login runs
 - **Breakout rooms**: in the live audio/video room the teacher opens breakout rooms (number and minutes), moves students between rooms, visits any room, sends a message to every room, and closes them to bring everyone back. Only the session's class can join its room.
 - **Students** (`/student/learn`, "My learning"): learning paths, interactive lessons (with **Keep for offline use**), online classes with a **Join now** button, and the study helper. **Save data (lite mode)** makes live classes audio-only and turns off animations on that device. Homework has a **Stuck? Ask the study helper** link.
 
+### Attendance (phase 7)
+
+- **Attendance** (`/school/attendance`) has tabs for the **Morning register**, **Lesson registers**, the **Attendance report**, **Absence requests**, **Analytics**, **Staff** (admins, HR and QA) and **Machines & cards** (admins, IT and gate officers).
+- **Lesson registers**: each teacher sees the day's lessons from the timetable, including any they cover. The register starts from the morning register and agreed absences; tap the exceptions and save. If a child was in school that morning but is marked absent in a lesson, their parents are told straight away (switch this off in Attendance settings).
+- **Absence requests**: parents use **Tell the school about an absence** on the Learning tab of their portal (or their WhatsApp link). The form teacher (or an admin) agrees or declines with a note. Agreed school days are marked as excused and the parent is told.
+- **Machines & cards**: link RFID card numbers to students and staff (a USB card reader at the gate kiosk types the number), and register fingerprint or face-recognition machines. For ZKTeco machines, set the machine's **Cloud Server** to this site's address (HTTPS) and register its serial number; enrol each person's fingerprint or face on the machine under the user number you link here. Other systems post check-ins to `/api/attendance/device` with the key shown when you add them. **Attendance settings** sets the late times for students and staff, the school days, and the persistent-absence threshold.
+- **Staff**: the day's sheet of who clocked in, when, for how long, who was late, on leave or absent, with a CSV download.
+- **Analytics**: the attendance rate and trend, classes, days of the week, students below the threshold, frequent lateness, lessons missed while in school, and registers not yet taken today.
+
 ### Parents and students
 
 - The parent portal adds tabs for **Fees**, **Events**, **Meetings**, **Learning** (homework, timetable, behaviour, attendance), **Boarding** and **Help & feedback** (raise and follow complaints and requests). It also asks about re-enrolment, shows waiting surveys, and lists the permissions the school asks for (**Permissions and privacy**). **Records** shows each child's achievements, certificates, approved work, shared documents and support plan, which parents can agree to.

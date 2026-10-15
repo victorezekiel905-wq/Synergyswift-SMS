@@ -122,9 +122,30 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | AI assistant: lesson plans, quiz generation, feedback, tutor bot | ✅ 🔑 (ANTHROPIC_API_KEY) lesson notes, report comments, homework feedback; quiz questions on a topic, matched to curriculum objectives or lesson notes, checked by the teacher before they reach the bank; a study helper for students (hints, not answers) that the school switches on, with a daily limit, chats readable by teachers and parents, and safety or wellbeing concerns sent to counsellors at once |
 | Offline and low-bandwidth mode | ✅ interactive content kept on the device opens without a connection, and its progress is sent when the connection returns; lite mode (audio-only live classes, no animations); offline register; installable app |
 
-## 9–23
+## 9. Attendance (phase 7)
 
-Sections 9 (attendance), 10 (timetabling), 11 (communication), 12 (finance), 13 (HR and payroll), 14 (welfare), 15 (boarding), 16 (transport), 17 (library), 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
+| Feature | Status |
+|---|---|
+| Daily and per-lesson register, by teacher app | ✅ morning register (works offline) and a register for every lesson on the teacher's timetable, including lessons they cover; starts from the morning register and agreed absences |
+| QR, RFID, biometric or face-recognition check-in | ✅ QR ID cards and RFID cards at the gate kiosk (any USB card reader); fingerprint and face-recognition clocking machines through the ZKTeco push protocol (most machines sold locally) or a webhook for other systems; staff self check-in on their phone at school |
+| Automatic parent alerts by SMS, WhatsApp or push for absence and lateness | ✅ absent or late on the register, gate sign-in and out, and a child who was in school but missed a lesson; WhatsApp, SMS, email and app notifications |
+| Leave requests from parents, with approval | ✅ parents report an absence ahead or after (portal or WhatsApp link); the form teacher or an admin agrees or declines; agreed days are marked excused and the parent is told |
+| Staff attendance and clock-in/out | ✅ daily staff sheet from the kiosk, cards, clocking machines or self check-in: first in, last out, hours, late, on leave, absent; CSV |
+| Attendance analytics: chronic absence flags, trends | ✅ school and class rate, daily trend and direction, day-of-week pattern, persistent absence below the school's threshold (default 90%), frequent lateness, lessons missed while in school, registers not yet taken today |
+
+## 10. Timetabling and calendar (phase 7)
+
+| Feature | Status |
+|---|---|
+| Automatic timetable generator with constraints | 🟡 periods, weekly loads, teacher clashes, locked cells; teacher availability, rooms and double periods coming in 7b |
+| Substitution/cover management | ✅ |
+| School calendar: terms, holidays, events, exams, PTA meetings | 🟡 events list; one calendar coming in 7b |
+| Room and facility booking | ⬜ |
+| Personal calendars synced with Google and Outlook | ⬜ |
+
+## 11–23
+
+Sections 11 (communication), 12 (finance), 13 (HR and payroll), 14 (welfare), 15 (boarding), 16 (transport), 17 (library), 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
 
 ## Database updates to run
 
@@ -144,3 +165,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101003300_sis.sql` | 5 |
 | `20260101003400_lms_teaching.sql` | 6a |
 | `20260101003500_lms_content.sql` | 6b |
+| `20260101003600_attendance.sql` | 7a |

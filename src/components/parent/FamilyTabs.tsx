@@ -14,6 +14,7 @@ export type Extras = {
   behaviour: { student_id: string; kind: string; points: number; note: string | null; occurred_at: string; behaviour_categories: { name: string } | null }[];
   attendance: { student_id: string; status: string }[];
   exeats: { id: string; student_id: string; reason: string; leave_at: string; return_by: string; status: string; decision_note: string | null }[];
+  absences?: { id: string; student_id: string; kind: string; starts_on: string; ends_on: string; reason: string; status: string; decision_note: string | null }[];
   bookings: { id: string; starts_at: string; location: string | null; student_id: string; users: { full_name: string } | null }[];
   slots: { id: string; starts_at: string; ends_at: string; location: string | null; staff_user_id: string; users: { full_name: string } | null }[];
   transport: { student_id: string; stop_name: string | null; transport_routes: { name: string; vehicle: string | null; driver_name: string | null; driver_phone: string | null } | null }[];
@@ -113,6 +114,7 @@ export default function FamilyTabs({ extras, kids, token, onChange }: { extras: 
 
       {tab === "learning" && (
         <div className="space-y-5 text-sm">
+          <AbsenceRequests extras={extras} kids={kids} name={name} act={act} />
           {kids.map(k => {
             const att = extras.attendance.filter(a => a.student_id === k.id);
             const present = att.filter(a => a.status === "present" || a.status === "late").length;
@@ -141,6 +143,39 @@ export default function FamilyTabs({ extras, kids, token, onChange }: { extras: 
       {tab === "records" && extras.records && <Records data={extras.records} kids={kids} token={token} onChange={onChange} />}
     </section>
     </>
+  );
+}
+
+const ABSENCE_KIND: Record<string, string> = { sick: "Illness", medical: "Medical or dental appointment", family: "Family matter", religious: "Religious observance", bereavement: "Bereavement", travel: "Travel", other: "Other" };
+
+/** Tell the school a child will be (or was) away, and see whether it was agreed. */
+function AbsenceRequests({ extras, kids, name, act }: { extras: Extras; kids: Child[]; name: (id: string) => string; act: (b: Record<string, unknown>, ok: string) => Promise<{ ok: boolean }> }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [f, setF] = useState({ student_id: kids[0]?.id ?? "", kind: "sick", starts_on: today, ends_on: today, reason: "" });
+  const [open, setOpen] = useState(false);
+  const list = extras.absences ?? [];
+  return (
+    <div className="rounded-lg border border-slate-200 p-3">
+      <div className="flex items-center gap-2"><h3 className="mr-auto font-semibold">Absences</h3>
+        <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => setOpen(!open)}>{open ? "Close" : "Tell the school about an absence"}</button></div>
+      {open && (
+        <form className="mt-2 grid gap-2 sm:grid-cols-4" onSubmit={async e => { e.preventDefault(); const r = await act({ action: "absence", ...f }, "Sent. The class teacher will reply here."); if (r.ok) { setOpen(false); setF({ ...f, reason: "" }); } }}>
+          {kids.length > 1 && <Field label="Child"><select className="input" value={f.student_id} onChange={e => setF({ ...f, student_id: e.target.value })}>{kids.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}</select></Field>}
+          <Field label="Reason"><select className="input" value={f.kind} onChange={e => setF({ ...f, kind: e.target.value })}>{Object.entries(ABSENCE_KIND).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+          <Field label="From"><input className="input" type="date" value={f.starts_on} onChange={e => setF({ ...f, starts_on: e.target.value, ends_on: e.target.value > f.ends_on ? e.target.value : f.ends_on })} required /></Field>
+          <Field label="To"><input className="input" type="date" value={f.ends_on} min={f.starts_on} onChange={e => setF({ ...f, ends_on: e.target.value })} required /></Field>
+          <div className="sm:col-span-4"><Field label="Details for the school"><textarea className="input min-h-16" value={f.reason} onChange={e => setF({ ...f, reason: e.target.value })} required minLength={3} maxLength={1000} /></Field></div>
+          <div className="sm:col-span-4"><button className="btn btn-primary">Send</button></div>
+        </form>
+      )}
+      {list.length > 0 && <ul className="mt-2 space-y-1">{list.map(a => (
+        <li key={a.id} className="flex flex-wrap items-center gap-2">
+          <span>{name(a.student_id)}: {ABSENCE_KIND[a.kind]}, {fmtDate(a.starts_on)}{a.ends_on !== a.starts_on ? ` to ${fmtDate(a.ends_on)}` : ""}</span>
+          <Badge tone={a.status === "approved" ? "green" : a.status === "declined" ? "red" : a.status === "pending" ? "amber" : "slate"}>{a.status === "pending" ? "waiting" : a.status === "approved" ? "agreed" : a.status === "declined" ? "not agreed" : "cancelled"}</Badge>
+          {a.decision_note && <span className="text-xs text-slate-600">{a.decision_note}</span>}
+          {a.status === "pending" && <button className="text-xs text-rose-600" onClick={() => act({ action: "cancel_absence", id: a.id }, "Cancelled.")}>Cancel</button>}
+        </li>))}</ul>}
+    </div>
   );
 }
 

@@ -11,6 +11,7 @@ import { TICKET_CATEGORIES, REENROL_REASONS } from "@/lib/community";
 import { recordConsent } from "@/lib/consent-server";
 import { familyFileLink } from "@/lib/sis-server";
 import { clientIp } from "@/lib/net";
+import { requestAbsence, cancelAbsence, ABSENCE_KINDS } from "@/lib/attendance-server";
 
 /**
  * Parent actions for both portals. Identify the guardian by session (logged-in
@@ -31,6 +32,9 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("consent"), token: z.string().optional(), purpose_id: z.string().uuid(), student_id: z.string().uuid().nullish(), granted: z.boolean() }),
   z.object({ action: z.literal("iep_agree"), token: z.string().optional(), iep_id: z.string().uuid(), views: z.string().trim().max(2000).nullish() }),
   z.object({ action: z.literal("open_file"), token: z.string().optional(), kind: z.enum(["document", "portfolio"]), id: z.string().uuid() }),
+  z.object({ action: z.literal("absence"), token: z.string().optional(), student_id: z.string().uuid(), kind: z.enum(ABSENCE_KINDS),
+    starts_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), ends_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), reason: z.string().trim().min(3).max(1000) }),
+  z.object({ action: z.literal("cancel_absence"), token: z.string().optional(), id: z.string().uuid() }),
   z.object({ action: z.literal("language"), token: z.string().optional(), language: z.string().refine(l => l in LANGUAGES, "unsupported language").nullable() })
 ]);
 
@@ -83,6 +87,10 @@ export async function POST(req: NextRequest) {
         const { data: links } = await svc.from("student_guardians").select("student_id").eq("tenant_id", tenantId).eq("guardian_id", guardianId);
         return NextResponse.json({ url: await familyFileLink(svc, tenantId, (links ?? []).map((l: { student_id: string }) => l.student_id), b.kind, b.id) });
       }
+      case "absence":
+        return NextResponse.json(await requestAbsence(svc, { tenantId, guardianId, studentId: b.student_id, kind: b.kind, startsOn: b.starts_on, endsOn: b.ends_on,
+          reason: b.reason, timezone, baseUrl: appUrl(req) }), { status: 201 });
+      case "cancel_absence": return NextResponse.json(await cancelAbsence(svc, { tenantId, guardianId, id: b.id }));
       case "language": {
         const { error } = await svc.from("guardians").update({ language: b.language }).eq("tenant_id", tenantId).eq("id", guardianId);
         return error ? jsonError(error.message) : NextResponse.json({ ok: true });

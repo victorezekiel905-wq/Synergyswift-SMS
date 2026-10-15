@@ -84,7 +84,7 @@ export async function requestExeat(svc: any, p: { tenantId: string; guardianId: 
 
 /** Everything a guardian sees beyond the basics: fees, events, meetings, homework, behaviour, attendance, boarding. */
 export async function familyExtras(svc: any, tenantId: string, guardianId: string, studentIds: string[], classGroupIds: string[]) {
-  if (!studentIds.length) return { invoices: [], events: [], slots: [], homework: [], behaviour: [], attendance: [], exeats: [], currency: "NGN", bookings: [], transport: [], hostel: [], support: await familySupport(svc, tenantId, guardianId) };
+  if (!studentIds.length) return { invoices: [], events: [], slots: [], homework: [], behaviour: [], attendance: [], exeats: [], absences: [], currency: "NGN", bookings: [], transport: [], hostel: [], support: await familySupport(svc, tenantId, guardianId) };
   const now = new Date().toISOString();
   const since30 = new Date(Date.now() - 30 * 86400_000).toISOString();
   const [settings, invoices, events, responses, homework, behaviour, attendance, exeats, bookings, transport, hostel, teachers] = await Promise.all([
@@ -107,8 +107,11 @@ export async function familyExtras(svc: any, tenantId: string, guardianId: strin
   const { data: memberships } = await svc.from("learning_group_members").select("group_id").in("student_id", studentIds);
   const myGroups = new Set((memberships ?? []).map((m: any) => m.group_id));
   const { data: subs } = (homework.data ?? []).length ? await svc.from("homework_submissions").select("homework_id,student_id,submitted_at,score,late").in("student_id", studentIds).in("homework_id", (homework.data ?? []).map((h: any) => h.id)) : { data: [] };
+  const { data: absences } = await svc.from("student_absence_requests").select("id,student_id,kind,starts_on,ends_on,reason,status,decision_note,created_at")
+    .eq("tenant_id", tenantId).in("student_id", studentIds).gte("ends_on", new Date(Date.now() - 60 * 86400_000).toISOString().slice(0, 10)).order("starts_on", { ascending: false }).limit(40);
   return {
     currency: settings.data?.currency ?? "NGN",
+    absences: absences ?? [],
     invoices: invoices.data ?? [],
     events: (events.data ?? []).map((e: any) => ({ ...e, responses: (responses.data ?? []).filter((r: any) => r.event_id === e.id) })),
     // Homework set for groups shows only to families with a child in one of them.

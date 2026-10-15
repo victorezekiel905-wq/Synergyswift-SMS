@@ -22,6 +22,9 @@ export function normalizeScan(raw: string): string {
 export async function resolvePerson(svc: any, tenantId: string, raw: string): Promise<GatePerson | null> {
   const code = normalizeScan(raw);
   if (!code || code.length > 80) return null;
+  // RFID cards (a reader that types the card number) and other registered cards.
+  const card = await personByIdentifier(svc, tenantId, "card", code);
+  if (card) return card;
   const { data: st } = await svc.from("students").select("id,first_name,last_name,other_names,photo_url,status,class_groups(name)")
     .eq("tenant_id", tenantId).or(`card_code.eq.${code.replace(/[,()]/g, "")},admission_no.eq.${code.replace(/[,()]/g, "")}`).limit(1);
   if (st?.[0] && st[0].status === "active") {
@@ -34,26 +37,44 @@ export async function resolvePerson(svc: any, tenantId: string, raw: string): Pr
   return null;
 }
 
+/** A student or member of staff by a registered card number or clocking-machine user number. */
+export async function personByIdentifier(svc: any, tenantId: string, kind: "card" | "device_pin", value: string): Promise<GatePerson | null> {
+  const { data: id } = await svc.from("attendance_identifiers")
+    .select("person_type,students(id,first_name,last_name,other_names,photo_url,status,class_groups(name)),staff(id,full_name,status,position)")
+    .eq("tenant_id", tenantId).eq("kind", kind).eq("value", value.trim()).maybeSingle();
+  if (!id) return null;
+  if (id.person_type === "student" && id.students?.status === "active") {
+    const s = id.students;
+    return { type: "student", id: s.id, name: studentName(s), photo_url: s.photo_url, class_name: s.class_groups?.name ?? null };
+  }
+  if (id.person_type === "staff" && id.staff && id.staff.status !== "exited") return { type: "staff", id: id.staff.id, name: id.staff.full_name, photo_url: null, class_name: id.staff.position };
+  return null;
+}
+
+export type GateMethod = "kiosk" | "self" | "manual" | "pickup" | "card" | "fingerprint" | "face" | "device";
+
 export async function recordGateEvent(svc: any, p: {
   tenantId: string; timezone: string; person: GatePerson; direction: "in" | "out" | "auto";
-  method: "kiosk" | "self" | "manual" | "pickup"; recordedBy: string | null; note?: string | null;
+  method: GateMethod; recordedBy: string | null; note?: string | null;
   lat?: number | null; lng?: number | null; notify?: boolean; viaLabel?: string | null;
+  /** When the person actually passed (clocking machines send their log later). */
+  at?: Date;
 }) {
   const col = p.person.type === "student" ? "student_id" : "staff_id";
-  const since = startOfTodayIso(p.timezone);
+  const now = p.at ?? new Date();
+  const since = startOfTodayIso(p.timezone, now);
   const { data: last } = await svc.from("gate_events").select("direction,at").eq("tenant_id", p.tenantId)
-    .eq(col, p.person.id).gte("at", since).order("at", { ascending: false }).limit(1);
+    .eq(col, p.person.id).gte("at", since).lte("at", now.toISOString()).order("at", { ascending: false }).limit(1);
   const prev = last?.[0] as { direction: "in" | "out"; at: string } | undefined;
   const direction: "in" | "out" = p.direction === "auto" ? (prev?.direction === "in" ? "out" : "in") : p.direction;
 
   // Double scans within 60s are ignored (no duplicate parent alerts).
-  if (prev && prev.direction === direction && Date.now() - new Date(prev.at).getTime() < 60_000) {
+  if (prev && prev.direction === direction && now.getTime() - new Date(prev.at).getTime() < 60_000) {
     return { duplicate: true, direction, late: false, at: prev.at, notified: 0 };
   }
 
   const { data: settings } = await svc.from("tenant_settings").select("staff_start_time,student_start_time,notify_gate_events")
     .eq("tenant_id", p.tenantId).maybeSingle();
-  const now = new Date();
   const firstInToday = direction === "in" && !(last ?? []).length;
   const late = firstInToday && isLate(now, p.person.type === "student" ? settings?.student_start_time ?? "07:45" : settings?.staff_start_time ?? "08:00", p.timezone);
 
@@ -64,7 +85,9 @@ export async function recordGateEvent(svc: any, p: {
   if (error) throw new Error(error.message);
 
   let notified = 0;
-  if (p.person.type === "student" && p.notify !== false && settings?.notify_gate_events !== false) {
+  // Parents hear about it as it happens, not hours later when a machine sends an old log.
+  const fresh = Date.now() - now.getTime() < 30 * 60_000;
+  if (p.person.type === "student" && p.notify !== false && fresh && settings?.notify_gate_events !== false) {
     const brand = await loadBrand(svc, p.tenantId);
     const { time, date } = formatInZone(now, p.timezone);
     const gs = (await guardiansByStudent(svc, p.tenantId, [p.person.id])).get(p.person.id) ?? [];

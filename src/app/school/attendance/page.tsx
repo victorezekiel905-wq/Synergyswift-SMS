@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Field, Badge, localDate } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Field, Badge, localDate, rolesOf, type Me } from "@/components/ui";
+import LessonRegisters from "@/components/attendance/LessonRegisters";
+import { AbsenceRequests, StaffAttendance, AttendanceAnalytics, DevicesAndCards, AttendanceSettings } from "@/components/attendance/AttendanceAdmin";
 
 type Status = "present" | "absent" | "late" | "excused";
 type Register = { date: string; taken: boolean; students: { id: string; admission_no: string; first_name: string; last_name: string; photo_url: string | null;
@@ -20,22 +22,36 @@ const local = {
 };
 const isNetworkError = (e: string | null) => !navigator.onLine || /fetch|network|load failed|offline/i.test(e ?? "");
 
+type Tab = "register" | "report" | "lessons" | "requests" | "analytics" | "staff" | "devices";
+
 export default function AttendancePage() {
   const { data: live } = useApi<{ class_groups: { id: string; name: string }[] }>("/api/school/structure");
   const [cachedStructure, setCachedStructure] = useState<{ class_groups: { id: string; name: string }[] } | null>(null);
   useEffect(() => { if (live) local.set("educlass:structure", live); else setCachedStructure(local.get("educlass:structure", null)); }, [live]);
   const structure = live ?? cachedStructure;
   const [cg, setCg] = useState("");
-  const [tab, setTab] = useState<"register" | "report">("register");
+  const [tab, setTab] = useState<Tab>("register");
+  const { data: me } = useApi<Me>("/api/me");
+  const roles = rolesOf(me ?? null);
+  const admin = ["school_admin", "principal", "platform_admin"].some(r => roles.has(r));
+  const staffView = admin || ["hr_manager", "qa_officer"].some(r => roles.has(r));
+  const devices = admin || ["it_admin", "gate_officer"].some(r => roles.has(r));
+  useEffect(() => { const t = new URLSearchParams(window.location.search).get("tab"); if (t && ["lessons", "requests", "staff", "analytics", "devices"].includes(t)) setTab(t as Tab); }, []);
   useEffect(() => { if (!cg && structure?.class_groups[0]) setCg(structure.class_groups[0].id); }, [structure, cg]);
   return (
     <Page wide>
       <PageHeader eyebrow="Attendance" title="Class register"
         subtitle="Take the morning register in seconds. Everyone starts as present (or from the gate sign-in); tap the exceptions. Parents of absent and late students are told immediately."
         actions={<select className="input w-auto" value={cg} onChange={e => setCg(e.target.value)} aria-label="Class">{(structure?.class_groups ?? []).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select>} />
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "register", label: "Register" }, { id: "report", label: "Attendance report" }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "register", label: "Morning register" }, { id: "lessons", label: "Lesson registers" }, { id: "report", label: "Attendance report" },
+        { id: "requests", label: "Absence requests" }, { id: "analytics", label: "Analytics" }, ...(staffView ? [{ id: "staff" as const, label: "Staff" }] : []), ...(devices ? [{ id: "devices" as const, label: "Machines & cards" }] : [])]} />
       {cg && tab === "register" && <RegisterView cg={cg} />}
       {cg && tab === "report" && <ReportView cg={cg} />}
+      {tab === "lessons" && <LessonRegisters />}
+      {tab === "requests" && <AbsenceRequests />}
+      {tab === "analytics" && <AttendanceAnalytics classes={structure?.class_groups ?? []} />}
+      {tab === "staff" && <StaffAttendance />}
+      {tab === "devices" && <div className="space-y-4">{admin && <AttendanceSettings />}<DevicesAndCards /></div>}
     </Page>
   );
 }

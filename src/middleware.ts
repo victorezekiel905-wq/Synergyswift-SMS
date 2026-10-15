@@ -28,7 +28,7 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-// Content packages (/pkg/…) and their record store (/api/xapi/…) are reached with a signed token, not the session.
+// Content packages (/pkg/…), their record store (/api/xapi/…) and clocking machines (/iclock/…) do not use the session.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|pkg/|api/xapi/|.*\\.svg$).*)"]
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|pkg/|api/xapi/|iclock/|.*\\.svg$).*)"]
 };
