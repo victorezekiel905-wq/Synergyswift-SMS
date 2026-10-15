@@ -10,6 +10,7 @@
  *
  * All writes use the service role after the caller has been authorised here.
  */
+import { safeguardingFlags } from "./communication";
 import { assistConfigured, translateTexts } from "./assist";
 import { needsTranslation } from "./languages";
 import { enqueue, tryDispatch, loadBrand, rowsForGuardian, staffRows, type Guardian } from "./messaging/outbox";
@@ -78,7 +79,10 @@ export async function postMessage(svc: any, p: { tenantId: string; conversationI
   const translated = !translate ? null : p.sender.kind === "staff"
     ? await translateFor(p.body, lang.school, lang.guardian)
     : await translateFor(p.body, lang.guardian, lang.school);
+  // Messages that mention contact details, secrets or risk are flagged for the safeguarding leads.
+  const reasons = safeguardingFlags(p.body);
   const { data: msg, error } = await svc.from("conversation_messages").insert({
+    flagged: reasons.length > 0, flag_reason: reasons.join("; ") || null,
     tenant_id: p.tenantId, conversation_id: c.id, sender_kind: p.sender.kind,
     sender_user_id: p.sender.kind === "staff" ? p.sender.userId : null, sender_name: p.sender.name, body: p.body,
     translated_body: translated, source_lang: translated ? (p.sender.kind === "staff" ? lang.school : lang.guardian) : null,
@@ -91,6 +95,10 @@ export async function postMessage(svc: any, p: { tenantId: string; conversationI
 
   // Tell the other side. Failures here never lose the message itself.
   try {
+    if (reasons.length) {
+      const { alertLeads } = await import("./student-messaging");
+      await alertLeads(svc, { tenantId: p.tenantId, where: `a parent conversation ("${c.subject}")`, reasons, refId: msg.id, url: `${p.baseUrl}/school/messaging-safety` });
+    }
     if (p.sender.kind === "staff") {
       const { data: g } = await svc.from("guardians")
         .select("id,user_id,full_name,email,phone,whatsapp_phone,notify_email,notify_whatsapp,notify_sms,portal_token,language,push_subscriptions(id)")

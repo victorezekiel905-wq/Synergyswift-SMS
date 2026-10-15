@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Icon, rolesOf, type Me } from "@/components/ui";
 import SearchPalette from "@/components/SearchPalette";
+import { EmergencyBanner } from "@/components/comms/NoticeBoard";
 
 type NavLink = { href: string; label: string; roles: string[]; module?: string };
 type NavGroup = { title: string; links: NavLink[] };
@@ -22,8 +23,13 @@ const GROUPS: NavGroup[] = [
     { href: "/dashboard", label: "Dashboard", roles: [...STAFF, "student"] },
     { href: "/school", label: "School overview", roles: STAFF.filter(r => r !== "cashier") },
     { href: "/school/inbox", label: "Parent messages", roles: STAFF.filter(r => r !== "cashier"), module: "inbox" },
+    { href: "/school/student-messages", label: "Messages with students", roles: TEACH.concat(["counsellor"]) },
+    { href: "/school/notices", label: "Announcements", roles: ["school_admin", "principal", "platform_admin", "it_admin"], module: "messaging" },
+    { href: "/school/conferences", label: "Parent–teacher evenings", roles: STAFF.filter(r => r !== "cashier"), module: "meetings" },
+    { href: "/school/messaging-safety", label: "Messaging safety", roles: ["school_admin", "principal", "platform_admin", "counsellor"] },
     { href: "/student", label: "My school", roles: ["student"] },
     { href: "/student/learn", label: "My learning", roles: ["student"], module: "lms" },
+    { href: "/student/messages", label: "Messages with teachers", roles: ["student"] },
     { href: "/student/practice", label: "Past-question practice", roles: ["student"], module: "exams" },
     { href: "/forums", label: "Discussions", roles: [...STAFF, "student"], module: "lms" },
     { href: "/calendar", label: "Calendar", roles: [...STAFF, "student", "parent"] },
@@ -97,7 +103,7 @@ const GROUPS: NavGroup[] = [
 ];
 
 // Pages that render without the app chrome (public links, kiosk, exam lockdown).
-const BARE = [/^\/login$/, /^\/signup$/, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/pay\//, /^\/apply\//, /^\/enquire\//, /^\/visit\//, /^\/entrance\//, /^\/t\//, /^\/s\//, /^\/unsubscribe\//, /^\/alumni\//, /^\/v\//, /\/print$/, /\/transcript$/];
+const BARE = [/^\/login$/, /^\/signup$/, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/pay\//, /^\/apply\//, /^\/enquire\//, /^\/visit\//, /^\/entrance\//, /^\/t\//, /^\/s\//, /^\/unsubscribe\//, /^\/alumni\//, /^\/v\//, /^\/n\//, /\/print$/, /\/transcript$/];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -239,6 +245,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {nav}
         </aside>
         <div className="min-w-0 flex-1">
+          {me?.profile && !me.platform && <EmergencyBanner />}
           {idleWarn && <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">You will be signed out in a minute because of inactivity. Move the mouse or press a key to stay signed in.</div>}
           {me?.prefs?.password_days_left != null && me.prefs.password_days_left <= 7 && me.prefs.password_days_left >= 0 && (
             <div role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">Your password expires in {me.prefs.password_days_left} day{me.prefs.password_days_left === 1 ? "" : "s"}. <Link href="/account/security#password" className="font-semibold underline">Change it now</Link></div>

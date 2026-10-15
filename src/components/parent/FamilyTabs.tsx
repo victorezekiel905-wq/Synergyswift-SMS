@@ -15,20 +15,23 @@ export type Extras = {
   attendance: { student_id: string; status: string }[];
   exeats: { id: string; student_id: string; reason: string; leave_at: string; return_by: string; status: string; decision_note: string | null }[];
   absences?: { id: string; student_id: string; kind: string; starts_on: string; ends_on: string; reason: string; status: string; decision_note: string | null }[];
-  bookings: { id: string; starts_at: string; location: string | null; student_id: string; users: { full_name: string } | null }[];
-  slots: { id: string; starts_at: string; ends_at: string; location: string | null; staff_user_id: string; users: { full_name: string } | null }[];
+  notices?: { receipt_id: string; id: string; kind: string; title: string; body: string; requires_ack: boolean; sent_at: string; read_at: string | null; acknowledged_at: string | null }[];
+  bookings: { id: string; starts_at: string; ends_at?: string; location: string | null; student_id: string; users: { full_name: string } | null }[];
+  slots: { id: string; starts_at: string; ends_at: string; location: string | null; staff_user_id: string; conference_id?: string | null; users: { full_name: string } | null; pt_conferences?: { title: string } | null }[];
   transport: { student_id: string; stop_name: string | null; transport_routes: { name: string; vehicle: string | null; driver_name: string | null; driver_phone: string | null } | null }[];
   hostel: { student_id: string; bed_label: string | null; hostel_rooms: { name: string; hostels: { name: string } | null } | null }[];
   support?: SupportData;
   records?: RecordsData | null;
 };
 type Child = { id: string; name: string; class_group_id?: string | null };
-type Tab = "messages" | "fees" | "wallet" | "bus" | "events" | "meetings" | "learning" | "boarding" | "support" | "records";
+type Tab = "notices" | "messages" | "fees" | "wallet" | "bus" | "events" | "meetings" | "learning" | "boarding" | "support" | "records";
 
 /** Extra parent-portal tabs: fees, events and consent, meetings, learning, boarding. */
 export default function FamilyTabs({ extras, kids, token, onChange }: { extras: Extras; kids: Child[]; token?: string; onChange: () => void }) {
   const boarding = extras.hostel.length > 0;
+  const unreadNotices = (extras.notices ?? []).filter(n => !n.read_at).length;
   const tabs: { id: Tab; label: string }[] = [
+    ...((extras.notices ?? []).length ? [{ id: "notices" as const, label: `Notices${unreadNotices ? ` (${unreadNotices})` : ""}` }] : []),
     { id: "messages", label: "Messages" },
     { id: "fees", label: `Fees${extras.invoices.some(i => i.status !== "paid") ? " •" : ""}` },
     { id: "wallet", label: "Wallet" },
@@ -42,7 +45,7 @@ export default function FamilyTabs({ extras, kids, token, onChange }: { extras: 
   // Links in notifications open the right tab (#messages, #wallet, #bus).
   useEffect(() => {
     const h = window.location.hash.slice(1) as Tab;
-    if (["messages", "wallet", "bus", "events", "support", "records"].includes(h)) { setTab(h); setTimeout(() => document.getElementById("events")?.scrollIntoView({ behavior: "smooth" }), 300); }
+    if (["notices", "messages", "wallet", "bus", "events", "support", "records", "meetings"].includes(h)) { setTab(h); setTimeout(() => document.getElementById("events")?.scrollIntoView({ behavior: "smooth" }), 300); }
   }, []);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const name = (sid: string) => kids.find(k => k.id === sid)?.name.split(" ")[0] ?? "";
@@ -60,7 +63,7 @@ export default function FamilyTabs({ extras, kids, token, onChange }: { extras: 
     {extras.support?.consent && <ConsentCard data={extras.support.consent} token={token} onChange={onChange} />}
     <section id="events" className="card mt-5 p-4">
       <Tabs value={tab} onChange={setTab} tabs={tabs} />
-      {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
+      {msg?.text && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
 
       {tab === "fees" && (!extras.invoices.length ? <Empty>No invoices.</Empty> : (
         <ul className="space-y-2">{extras.invoices.map(i => {
@@ -135,6 +138,7 @@ export default function FamilyTabs({ extras, kids, token, onChange }: { extras: 
         </div>
       )}
 
+      {tab === "notices" && <FamilyNotices extras={extras} act={act} />}
       {tab === "messages" && <ParentMessages token={token} />}
       {tab === "wallet" && <ParentWallet token={token} kids={kids} />}
       {tab === "bus" && <ParentBus token={token} kids={kids} />}
@@ -181,18 +185,49 @@ function AbsenceRequests({ extras, kids, name, act }: { extras: Extras; kids: Ch
 
 function MeetingPicker({ extras, kids, onBook }: { extras: Extras; kids: Child[]; onBook: (slotId: string, studentId: string) => void }) {
   const [sid, setSid] = useState(kids[0]?.id ?? "");
-  const byTeacher = new Map<string, Extras["slots"]>();
-  for (const s of extras.slots) byTeacher.set(s.users?.full_name ?? "Teacher", [...(byTeacher.get(s.users?.full_name ?? "Teacher") ?? []), s]);
   if (!extras.slots.length) return <Empty>No meeting times are open right now. Teachers publish them before consultation days.</Empty>;
+  // Parent-teacher evenings first, then other open times; within each, by teacher.
+  const groups = new Map<string, Map<string, Extras["slots"]>>();
+  for (const s of extras.slots) {
+    const g = s.pt_conferences?.title ?? "Other times";
+    const byTeacher = groups.get(g) ?? new Map();
+    const t = s.users?.full_name ?? "Teacher";
+    byTeacher.set(t, [...(byTeacher.get(t) ?? []), s]);
+    groups.set(g, byTeacher);
+  }
+  // Times that clash with an appointment already booked are greyed out.
+  const clash = (s: Extras["slots"][number]) => extras.bookings.some(b => { const bs = Date.parse(b.starts_at); return bs < Date.parse(s.ends_at) && Date.parse(s.starts_at) < bs + (Date.parse(s.ends_at) - Date.parse(s.starts_at)); });
   return (
     <div>
       {kids.length > 1 && <Field label="About"><select className="input mb-2 w-auto" value={sid} onChange={e => setSid(e.target.value)}>{kids.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}</select></Field>}
-      {[...byTeacher.entries()].map(([t, slots]) => (
-        <div key={t} className="mb-3"><p className="font-medium">{t}</p>
-          <div className="mt-1 flex flex-wrap gap-1.5">{slots.map(s => <button key={s.id} className="rounded border border-slate-200 px-2 py-1 text-xs hover:border-brand-400" onClick={() => onBook(s.id, sid)}>{fmtDate(s.starts_at)} {fmtTime(s.starts_at)}</button>)}</div>
+      {[...groups.entries()].map(([g, byTeacher]) => (
+        <div key={g} className="mb-4"><h3 className="mb-1 font-semibold">{g}</h3>
+          {[...byTeacher.entries()].map(([t, slots]) => (
+            <div key={t} className="mb-3"><p className="font-medium">{t}</p>
+              <div className="mt-1 flex flex-wrap gap-1.5">{slots.map(s => (
+                <button key={s.id} disabled={clash(s)} title={clash(s) ? "You have another appointment then" : undefined} className="rounded border border-slate-200 px-2 py-1 text-xs hover:border-brand-400 disabled:opacity-40" onClick={() => onBook(s.id, sid)}>{fmtDate(s.starts_at)} {fmtTime(s.starts_at)}</button>))}</div>
+            </div>
+          ))}
         </div>
       ))}
     </div>
+  );
+}
+
+function FamilyNotices({ extras, act }: { extras: Extras; act: (b: Record<string, unknown>, ok: string) => Promise<{ ok: boolean }> }) {
+  const [open, setOpen] = useState<string | null>(null);
+  return (
+    <ul className="divide-y divide-slate-100 text-sm">{(extras.notices ?? []).map(n => (
+      <li key={n.receipt_id} className="py-2">
+        <button className="flex w-full items-center gap-2 text-left" onClick={() => { setOpen(open === n.receipt_id ? null : n.receipt_id); if (!n.read_at) void act({ action: "notice_read", receipt_id: n.receipt_id }, ""); }}>
+          {!n.read_at && <span className="h-2 w-2 shrink-0 rounded-full bg-brand-600" aria-label="unread" />}
+          <span className={"mr-auto " + (n.read_at ? "" : "font-semibold")}>{n.title}</span>
+          {n.kind !== "announcement" && <Badge tone={n.kind === "emergency" ? "red" : "violet"}>{n.kind}</Badge>}<span className="text-xs text-slate-500">{fmtDate(n.sent_at)}</span>
+        </button>
+        {open === n.receipt_id && <div className="mt-2 space-y-2"><p className="whitespace-pre-wrap">{n.body}</p>
+          {(n.requires_ack || n.kind === "emergency") && (n.acknowledged_at ? <p className="text-xs text-emerald-700">You confirmed this on {fmtDate(n.acknowledged_at, true)}.</p>
+            : <button className="btn btn-primary px-2 py-1 text-xs" onClick={() => act({ action: "notice_read", receipt_id: n.receipt_id, ack: true }, "Thank you. The school knows you have read this.")}>{n.kind === "emergency" ? "I received this" : "I have read this"}</button>)}</div>}
+      </li>))}</ul>
   );
 }
 

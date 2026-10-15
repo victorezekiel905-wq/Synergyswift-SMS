@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { dispatchDue, requeueStale } from "@/lib/messaging/outbox";
 import { processSequences, sendBookingReminders } from "@/lib/admissions-crm";
 import { escalateTickets, sendDueCampaigns } from "@/lib/community-server";
+import { sendScheduledNotices } from "@/lib/notices-server";
 import { appUrl } from "@/lib/school";
 
 export const dynamic = "force-dynamic";
@@ -27,8 +28,9 @@ async function run(req: NextRequest) {
   // Overdue complaints escalate to the admins; scheduled campaigns go out.
   const escalated = await escalateTickets(svc, base).catch(() => 0);
   const campaigns = await sendDueCampaigns(svc, base).catch(() => 0);
+  const notices = await sendScheduledNotices(svc, base).catch(() => 0);
   const stats = await dispatchDue(svc, { budgetMs: 40_000, limit: 100, concurrency: 10 });
-  return NextResponse.json({ ok: true, ...stats, admissions_follow_ups: followUps, visit_reminders: reminders, tickets_escalated: escalated, campaigns_sent: campaigns });
+  return NextResponse.json({ ok: true, ...stats, admissions_follow_ups: followUps, visit_reminders: reminders, tickets_escalated: escalated, campaigns_sent: campaigns, notices_sent: notices });
 }
 
 export const GET = run;

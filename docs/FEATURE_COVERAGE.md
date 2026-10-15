@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication · **9** finance · **10** HR and payroll · **11** welfare, boarding, transport, library, inventory, co-curricular · **12** portals and apps · **13** analytics, integrations, compliance.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance · **10** HR and payroll · **11** welfare, boarding, transport, library, inventory, co-curricular · **12** portals and apps · **13** analytics, integrations, compliance.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -143,9 +143,21 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Room and facility booking | ✅ labs, halls, ICT suites and other rooms; day view with timetabled lessons; weekly repeats; no double booking (checked in the database); rooms that need an admin's approval |
 | Personal calendars synced with Google and Outlook | ✅ a private calendar link per person for Google Calendar, Outlook.com, Microsoft 365 and phones; it updates itself; a new link stops the old one |
 
-## 11–23
+## 11. Communication (phase 8, done)
 
-Sections 11 (communication), 12 (finance), 13 (HR and payroll), 14 (welfare), 15 (boarding), 16 (transport), 17 (library), 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
+| Feature | Status |
+|---|---|
+| Announcements by school, section, class or individual | ✅ to the whole school, sections, classes or chosen students, families and staff; parents, students and/or staff (by role); personalised with each family's children's names; scheduled sending; a notice board on every portal |
+| In-app messaging between teacher and parent and teacher and student, with safeguarding rules and monitoring | ✅ parent conversations (since v47) and now teacher–student conversations: only a student's own teachers, school days within set hours, no attachments, nothing edited or deleted, readable by safeguarding leads and (if the school allows) parents, students notified by app only; messages mentioning phone numbers, private apps, secrets, meeting up or risk are flagged and the safeguarding leads alerted; a monitoring page |
+| SMS, email, WhatsApp Business API and push notifications | ✅ |
+| Newsletters and circulars, with read receipts | ✅ newsletters (phase 3); circulars and announcements record who has read and who has confirmed, from the app or the link in any message, with one-tap reminders to the rest |
+| Parent–teacher conference booking with time slots | ✅ teachers' own slots, and parent–teacher evenings: one form creates every teacher's appointments, invites the families, stops parents double-booking themselves, closes booking, prints each teacher's schedule |
+| Emergency broadcast alerts | ✅ ready-made wording (closure, early dismissal, lockdown, weather, all clear), every channel including SMS whatever a parent's settings, "I received this" on every screen until confirmed, live confirmation count |
+| Message templates and multi-language translation | ✅ saved templates with placeholders; translation into each family's home language |
+
+## 12–23
+
+Sections 12 (finance), 12 (finance), 13 (HR and payroll), 14 (welfare), 15 (boarding), 16 (transport), 17 (library), 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
 
 ## Database updates to run
 
@@ -167,3 +179,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101003500_lms_content.sql` | 6b |
 | `20260101003600_attendance.sql` | 7a |
 | `20260101003700_timetable_calendar.sql` | 7b |
+| `20260101003800_communication.sql` | 8 |

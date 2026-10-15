@@ -47,6 +47,13 @@ export async function respondToEvent(svc: any, p: { tenantId: string; guardianId
 
 export async function bookMeeting(svc: any, p: { tenantId: string; guardianId: string; studentId: string; slotId: string; note?: string | null; timezone: string }) {
   await assertLinked(svc, p.tenantId, p.guardianId, p.studentId);
+  const { data: want } = await svc.from("consultation_slots").select("id,starts_at,ends_at,conference_id,pt_conferences(status,booking_closes_at)").eq("tenant_id", p.tenantId).eq("id", p.slotId).maybeSingle();
+  if (!want) throw new Error("that slot is no longer available");
+  const conf = want.pt_conferences as { status: string; booking_closes_at: string | null } | null;
+  if (conf && (conf.status !== "open" || (conf.booking_closes_at && Date.parse(conf.booking_closes_at) < Date.now()))) throw new Error("booking for this evening has closed");
+  const { data: mine } = await svc.from("consultation_slots").select("starts_at,ends_at").eq("tenant_id", p.tenantId).eq("guardian_id", p.guardianId)
+    .lt("starts_at", want.ends_at).gt("ends_at", want.starts_at);
+  if (mine?.length) throw new Error("you already have an appointment at that time; please pick another slot");
   const { data: slot, error } = await svc.from("consultation_slots")
     .update({ guardian_id: p.guardianId, student_id: p.studentId, booked_at: new Date().toISOString(), note: p.note ?? null })
     .eq("tenant_id", p.tenantId).eq("id", p.slotId).is("guardian_id", null).gt("starts_at", new Date().toISOString())
@@ -96,14 +103,17 @@ export async function familyExtras(svc: any, tenantId: string, guardianId: strin
     svc.from("behaviour_records").select("student_id,kind,points,note,occurred_at,behaviour_categories(name)").eq("tenant_id", tenantId).in("student_id", studentIds).gte("occurred_at", since30).order("occurred_at", { ascending: false }).limit(60),
     svc.from("class_attendance").select("student_id,status").eq("tenant_id", tenantId).in("student_id", studentIds).gte("date", since30.slice(0, 10)).limit(5000),
     svc.from("exeat_requests").select("id,student_id,reason,leave_at,return_by,status,decision_note").eq("tenant_id", tenantId).in("student_id", studentIds).order("created_at", { ascending: false }).limit(20),
-    svc.from("consultation_slots").select("id,starts_at,ends_at,location,student_id,users!consultation_slots_staff_user_id_fkey(full_name)").eq("tenant_id", tenantId).eq("guardian_id", guardianId).gte("starts_at", now).order("starts_at"),
+    svc.from("consultation_slots").select("id,starts_at,ends_at,location,student_id,conference_id,users!consultation_slots_staff_user_id_fkey(full_name)").eq("tenant_id", tenantId).eq("guardian_id", guardianId).gte("starts_at", now).order("starts_at"),
     svc.from("transport_assignments").select("student_id,stop_name,transport_routes(name,vehicle,driver_name,driver_phone)").eq("tenant_id", tenantId).in("student_id", studentIds),
     svc.from("hostel_allocations").select("student_id,bed_label,hostel_rooms(name,hostels(name))").eq("tenant_id", tenantId).in("student_id", studentIds).is("ended_at", null),
     classGroupIds.length ? svc.from("subject_offerings").select("teacher_id,class_group_id").eq("tenant_id", tenantId).in("class_group_id", classGroupIds).not("teacher_id", "is", null) : { data: [] }
   ]);
   const teacherIds = [...new Set((teachers.data ?? []).map((t: any) => t.teacher_id))];
-  const { data: slots } = teacherIds.length ? await svc.from("consultation_slots").select("id,starts_at,ends_at,location,staff_user_id,users!consultation_slots_staff_user_id_fkey(full_name)")
-    .eq("tenant_id", tenantId).in("staff_user_id", teacherIds).is("guardian_id", null).gte("starts_at", now).order("starts_at").limit(200) : { data: [] };
+  const { data: slots } = teacherIds.length ? await svc.from("consultation_slots").select("id,starts_at,ends_at,location,staff_user_id,conference_id,users!consultation_slots_staff_user_id_fkey(full_name),pt_conferences(title,status,booking_closes_at)")
+    .eq("tenant_id", tenantId).in("staff_user_id", teacherIds).is("guardian_id", null).gte("starts_at", now).order("starts_at").limit(1500) : { data: [] };
+  // Notices for this family (the last 60 days).
+  const { data: notices } = await svc.from("notice_recipients").select("id,read_at,acknowledged_at,notices!inner(id,kind,title,body,requires_ack,sent_at,expires_at,status)")
+    .eq("tenant_id", tenantId).eq("guardian_id", guardianId).eq("notices.status", "sent").gte("created_at", new Date(Date.now() - 60 * 86400_000).toISOString()).order("created_at", { ascending: false }).limit(50);
   const { data: memberships } = await svc.from("learning_group_members").select("group_id").in("student_id", studentIds);
   const myGroups = new Set((memberships ?? []).map((m: any) => m.group_id));
   const { data: subs } = (homework.data ?? []).length ? await svc.from("homework_submissions").select("homework_id,student_id,submitted_at,score,late").in("student_id", studentIds).in("homework_id", (homework.data ?? []).map((h: any) => h.id)) : { data: [] };
@@ -121,7 +131,8 @@ export async function familyExtras(svc: any, tenantId: string, guardianId: strin
     attendance: attendance.data ?? [],
     exeats: exeats.data ?? [],
     bookings: bookings.data ?? [],
-    slots: slots ?? [],
+    slots: (slots ?? []).filter((s: any) => !s.pt_conferences || (s.pt_conferences.status === "open" && (!s.pt_conferences.booking_closes_at || Date.parse(s.pt_conferences.booking_closes_at) > Date.now()))),
+    notices: (notices ?? []).map((r: any) => ({ receipt_id: r.id, read_at: r.read_at, acknowledged_at: r.acknowledged_at, ...r.notices })),
     transport: transport.data ?? [],
     hostel: hostel.data ?? [],
     support: await familySupport(svc, tenantId, guardianId),

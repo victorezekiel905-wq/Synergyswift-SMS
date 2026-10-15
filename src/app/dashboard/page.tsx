@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import MyExamTimetable from "@/components/exams/MyExamTimetable";
+import NoticeBoard from "@/components/comms/NoticeBoard";
 
 export default async function Dashboard() {
   const sb = await createClient();
@@ -100,6 +101,7 @@ export default async function Dashboard() {
         <div className="mt-3 flex flex-wrap gap-2"><Link href="/school/results" className="btn btn-primary text-xs">Enter scores</Link><Link href="/exams" className="btn btn-outline text-xs">Secure exams</Link><Link href="/school/gate" className="btn btn-outline text-xs">Sign in / out</Link></div>
       </header>
 
+      <NoticeBoard />
       <MyExamTimetable />
 
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">

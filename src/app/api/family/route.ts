@@ -35,6 +35,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("absence"), token: z.string().optional(), student_id: z.string().uuid(), kind: z.enum(ABSENCE_KINDS),
     starts_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), ends_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), reason: z.string().trim().min(3).max(1000) }),
   z.object({ action: z.literal("cancel_absence"), token: z.string().optional(), id: z.string().uuid() }),
+  z.object({ action: z.literal("notice_read"), token: z.string().optional(), receipt_id: z.string().uuid(), ack: z.boolean().default(false) }),
   z.object({ action: z.literal("language"), token: z.string().optional(), language: z.string().refine(l => l in LANGUAGES, "unsupported language").nullable() })
 ]);
 
@@ -91,6 +92,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(await requestAbsence(svc, { tenantId, guardianId, studentId: b.student_id, kind: b.kind, startsOn: b.starts_on, endsOn: b.ends_on,
           reason: b.reason, timezone, baseUrl: appUrl(req) }), { status: 201 });
       case "cancel_absence": return NextResponse.json(await cancelAbsence(svc, { tenantId, guardianId, id: b.id }));
+      case "notice_read": {
+        const now = new Date().toISOString();
+        const { data: r } = await svc.from("notice_recipients").select("id,read_at,acknowledged_at").eq("tenant_id", tenantId).eq("guardian_id", guardianId).eq("id", b.receipt_id).maybeSingle();
+        if (!r) return jsonError("not found", 404);
+        await svc.from("notice_recipients").update({ read_at: r.read_at ?? now, ...(b.ack && !r.acknowledged_at ? { acknowledged_at: now } : {}) }).eq("id", r.id);
+        return NextResponse.json({ ok: true });
+      }
       case "language": {
         const { error } = await svc.from("guardians").update({ language: b.language }).eq("tenant_id", tenantId).eq("id", guardianId);
         return error ? jsonError(error.message) : NextResponse.json({ ok: true });
