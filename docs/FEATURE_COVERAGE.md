@@ -40,7 +40,7 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Sections (Nursery, Primary, Secondary, Sixth form) as their own layer, with a head and a curriculum each | ✅ |
 | Curriculum frameworks (Nigerian UBE/BECE/WAEC/NECO, British EYFS and KS1–KS5, Cambridge Primary to IGCSE and A Level, American Pre-K–12) and mixed setups: one step creates sections, classes and arms, usual subjects and matching grading schemes; a class may follow a different curriculum from its section | ✅ |
 | Granular RBAC including HOD, form tutor, counsellor, alumni | ✅ counsellor (pastoral staff: behaviour, early warning, read-only health) and alumni (own alumni page only, no school data) |
-| Settings: grading, report templates, timezone, currency, languages | ✅ currency chosen from a list (₦, GH₵, KSh, R, CFA, $, £, €) and used for every amount; Paystack schools are warned about currencies Paystack does not take. One currency per school; invoices in a second currency are phase 9 |
+| Settings: grading, report templates, timezone, currency, languages | ✅ currency chosen from a list (₦, GH₵, KSh, R, CFA, $, £, €) and used for every amount; Paystack schools are warned about currencies Paystack does not take. One currency per school; invoicing in a second currency is not built (Stripe charges in the school currency) |
 | Audit logs for every create, edit and delete | ✅ change history on every table holding school data (except high-volume machine logs), with who, when, before and after; secrets never stored; server-side writes record the person they acted for; filters, record history, CSV download, retention setting |
 | CSV/Excel import and export; migration tools | ✅ students, parents, staff (optionally with sign-in invitations), classes, subjects, who teaches what, opening fee balances, alumni and vendors; checked before importing, row-by-row problems, column names from other systems recognised; every one exportable to CSV or Excel in the same columns |
 | Global search | ✅ Ctrl/⌘ K across students, staff, families, classes, invoices, complaints, enquiries, applications, alumni, partners and pages, limited to what each person may see |
@@ -165,9 +165,9 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Installment plans and part-payments | ✅ plans (e.g. 50/25/25 with due dates) chosen when invoicing or per invoice; payments clear the earliest instalment first; part-payments |
 | Automated reminders, late fees, defaulter lists | ✅ automatic reminders before the due date and every N days after; late fee (percentage and/or fixed) after a grace period, once per invoice or instalment; debtors list with ageing (current, 1–30, 31–60, 61–90, 90+ days), CSV |
 | Receipts, statements of account, parent wallet | ✅ numbered receipts; statements with opening balance, running balance and totals (staff, and parents in their portal); wallet |
-| Expense tracking, budgeting, petty cash | 🟡 expenses; budgets and petty cash in 9b |
-| Accounting integration (QuickBooks, Sage, Zoho Books) and a general ledger | ⬜ 9b |
-| Financial reports: collections, outstanding balances, revenue by class | 🟡 collections by method and class, outstanding and ageing; full reports in 9b |
+| Expense tracking, budgeting, petty cash | ✅ expenses by category with receipts; budgets per period (income by fee item, spending by category, payroll as Salaries) approved by a second person, with budget against actual and variance; petty cash floats with a custodian, imprest top-ups, spends with receipt photos, returns, cash counts and over/short adjustments |
+| Accounting integration (QuickBooks, Sage, Zoho Books) and a general ledger | ✅ general ledger derived from invoices, payments, expenses, petty cash, approved payroll and the wallet, plus manual journals (balanced before posting, reversed rather than edited) and opening balances; editable chart of accounts with mappings for fee items, expense categories and payment methods; closing the books up to a date; journal files for QuickBooks Online, Sage 50 and Zoho Books imports (daily summary or every transaction) and the chart as CSV. A live connection to their APIs is not built: the files are imported by hand |
+| Financial reports: collections, outstanding balances, revenue by class | ✅ income and expenditure, balance sheet, trial balance, account ledger; collections by day, method and class; billed, paid and outstanding by class and by fee item; debt ageing; budget against actual; all as CSV |
 
 ## 13–23
 
@@ -195,3 +195,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101003700_timetable_calendar.sql` | 7b |
 | `20260101003800_communication.sql` | 8 |
 | `20260101003900_fees_plus.sql` | 9a |
+| `20260101004000_accounts.sql` | 9b |

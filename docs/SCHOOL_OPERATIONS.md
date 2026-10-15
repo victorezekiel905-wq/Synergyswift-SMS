@@ -198,6 +198,16 @@ v46 adds the modules that the leading systems sell separately, so one login runs
 - **Debtors & statements**: outstanding balances by age, the debtors list (CSV), and a printable statement of account for any student. Parents see their own statement under Fees in their portal.
 - **Online payments**: besides Paystack or Flutterwave (cards, bank, USSD, transfer), admins can add the school's **Remita** keys (parents get an RRR they can also pay at a bank) and **Stripe** keys (cards from abroad). Point Remita's notifications to `/api/pay/webhook/remita` and a Stripe webhook (event `checkout.session.completed`) to `/api/pay/webhook/stripe`.
 
+### Accounts (phase 9)
+
+Under **Finance**:
+
+- **Petty cash**: open a float, name its custodian and set its imprest (the amount it is topped back up to), then top it up. The custodian sees the float under Finance → Petty cash, records each spend with a photo of the receipt, and counts the cash now and then. Each spend is an expense paid from the float. The bursary tops it back up, returns cash to the bank, and can book any shortage or surplus found at a count.
+- **Budgets**: set what you expect to bill (by fee item) and spend (by expense category, with Salaries for payroll) over a period. The principal or another admin approves it. The budget page then shows actual against budget, how much of each line is used, and spending that was never budgeted. Reopen an approved budget to change it.
+- **Ledger**: the general ledger builds itself from fees billed and received, expenses, petty cash, approved payroll and the wallet. Before your first report, post **Opening balances** under Journals (bank, cash and anything owed on the start date). Then use Statements for income and expenditure, the balance sheet, the trial balance and any account's ledger. Under **Chart of accounts**, add accounts and choose where each fee item, expense category and payment method is posted. If salaries go through payroll, do not also enter them as expenses.
+- **Export to accounting**: download journals for QuickBooks Online, Sage 50 or Zoho Books (one journal per day and source, or every transaction), and the chart of accounts so the package can be set up with the same accounts. Once a period is exported, the principal or an admin closes the books up to its last day. Expenses, petty cash and journals dated on or before that day are then locked.
+- **Reports**: collections by day, method and class; billed, paid and outstanding by class and fee item for a term. Every report has a CSV.
+
 ### Parents and students
 
 - The parent portal adds tabs for **Fees**, **Events**, **Meetings**, **Learning** (homework, timetable, behaviour, attendance), **Boarding** and **Help & feedback** (raise and follow complaints and requests). It also asks about re-enrolment, shows waiting surveys, and lists the permissions the school asks for (**Permissions and privacy**). **Records** shows each child's achievements, certificates, approved work, shared documents and support plan, which parents can agree to.

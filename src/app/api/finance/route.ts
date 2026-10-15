@@ -26,12 +26,15 @@ export async function GET(req: NextRequest) {
       }
       return NextResponse.json(expenses ?? []);
     }
-    // Cashbook: fee receipts in, expenses out, running balance.
+    // Cashbook: fee receipts in, expenses out, running balance. Petty cash spends leave through their float's top-ups.
+    const { data: petty } = await ctx.sb.from("petty_cash_moves").select("kind,amount,on_date,note,petty_cash_floats(name)").eq("tenant_id", tid)
+      .in("kind", ["topup", "return"]).gte("on_date", from).lte("on_date", to).limit(5000);
     const { data: pays } = await ctx.sb.from("fee_payments").select("amount,method,receipt_no,paid_at,payer_name,students(first_name,last_name)")
       .eq("tenant_id", tid).eq("status", "success").gte("paid_at", `${from}T00:00:00Z`).lte("paid_at", `${to}T23:59:59Z`).limit(20000);
     const entries = [
       ...(pays ?? []).map((p: any) => ({ date: String(p.paid_at).slice(0, 10), kind: "in", description: `Fees ${p.receipt_no ?? ""} ${p.students?.first_name ?? ""} ${p.students?.last_name ?? ""}`.trim(), method: p.method, amount: Number(p.amount) })),
-      ...(expenses ?? []).map((e: any) => ({ date: e.spent_on, kind: "out", description: `${e.category}: ${e.description}`, method: e.method, amount: Number(e.amount) }))
+      ...(expenses ?? []).filter((e: any) => e.method !== "petty_cash").map((e: any) => ({ date: e.spent_on, kind: "out", description: `${e.category}: ${e.description}`, method: e.method, amount: Number(e.amount) })),
+      ...(petty ?? []).map((m: any) => ({ date: m.on_date, kind: m.kind === "topup" ? "out" : "in", description: `Petty cash ${m.kind === "topup" ? "top-up" : "returned"}: ${m.petty_cash_floats?.name ?? ""}${m.note ? ` (${m.note})` : ""}`, method: "transfer", amount: Number(m.amount) }))
     ].sort((a, b) => a.date.localeCompare(b.date));
     let bal = 0;
     const rows = entries.map(e => { bal += e.kind === "in" ? e.amount : -e.amount; return { ...e, balance: Math.round(bal * 100) / 100 }; });

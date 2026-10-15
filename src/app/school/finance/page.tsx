@@ -1,8 +1,12 @@
 "use client";
 import { useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, Stat, money, fmtDate, localDate, rolesOf, type Me } from "@/components/ui";
+import { PettyCash } from "@/components/finance/PettyCash";
+import { Budgets } from "@/components/finance/Budgets";
+import { Ledger } from "@/components/finance/Ledger";
+import { FinReports } from "@/components/finance/FinReports";
 
-type Tab = "cashbook" | "expenses" | "stock" | "assets";
+type Tab = "cashbook" | "expenses" | "petty" | "budgets" | "ledger" | "reports" | "stock" | "assets";
 
 export default function FinancePage() {
   const { data: me } = useApi<Me>("/api/me");
@@ -12,15 +16,20 @@ export default function FinancePage() {
   const { data: settings } = useApi<{ settings: { currency?: string } }>("/api/school/settings");
   const cur = settings?.settings?.currency ?? "NGN";
   const tabs: { id: Tab; label: string }[] = finance
-    ? [{ id: "cashbook", label: "Cashbook" }, { id: "expenses", label: "Expenses" }, { id: "stock", label: "Stock" }, { id: "assets", label: "Assets" }]
-    : [{ id: "stock", label: "Stock" }, { id: "assets", label: "Assets" }];
+    ? [{ id: "cashbook", label: "Cashbook" }, { id: "expenses", label: "Expenses" }, { id: "petty", label: "Petty cash" }, { id: "budgets", label: "Budgets" },
+       { id: "ledger", label: "Ledger" }, { id: "reports", label: "Reports" }, { id: "stock", label: "Stock" }, { id: "assets", label: "Assets" }]
+    : [{ id: "petty", label: "Petty cash" }, { id: "stock", label: "Stock" }, { id: "assets", label: "Assets" }];
   const active = tabs.some(t => t.id === tab) ? tab : tabs[0].id;
   return (
     <Page wide>
-      <PageHeader eyebrow="Finance" title="Accounts, stock & assets" subtitle="Money in from fees and money out as expenses in one cashbook, plus a stock store and an asset register." />
+      <PageHeader eyebrow="Finance" title="Accounts, stock & assets" subtitle="Cashbook, expenses, petty cash, budgets, the general ledger and financial reports, plus a stock store and an asset register." />
       <Tabs value={active} onChange={setTab} tabs={tabs} />
       {active === "cashbook" && <Cashbook currency={cur} />}
       {active === "expenses" && <Expenses currency={cur} />}
+      {active === "petty" && <PettyCash />}
+      {active === "budgets" && <Budgets />}
+      {active === "ledger" && <Ledger />}
+      {active === "reports" && <FinReports />}
       {active === "stock" && <Stock canEdit={finance} currency={cur} />}
       {active === "assets" && <Assets canEdit={finance} currency={cur} />}
     </Page>
@@ -84,7 +93,8 @@ function Expenses({ currency }: { currency: string }) {
         {!data?.length ? <Empty>No expenses recorded.</Empty> : (
           <div className="card overflow-x-auto"><table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Date</th><th className="p-2">Category</th><th className="p-2">Description</th><th className="p-2">Payee</th><th className="p-2 text-right">Amount</th><th className="p-2" /></tr></thead>
-            <tbody>{data.map((e: any) => <tr key={e.id} className="border-t border-slate-100"><td className="p-2">{e.spent_on}</td><td className="p-2">{e.category}</td><td className="p-2">{e.description}</td><td className="p-2">{e.payee}</td>
+            <tbody>{data.map((e: any) => <tr key={e.id} className="border-t border-slate-100"><td className="p-2">{e.spent_on}</td><td className="p-2">{e.category}{e.method === "petty_cash" && <span className="ml-1 text-xs text-slate-400">petty cash</span>}</td>
+              <td className="p-2">{e.description}{e.receipt_path && <a className="ml-1 text-xs text-brand-700 underline" href={`/api/accounts?receipt=${e.id}`} target="_blank" rel="noreferrer">receipt</a>}</td><td className="p-2">{e.payee}</td>
               <td className="p-2 text-right tabular-nums">{money(e.amount, currency)}</td><td className="p-2 text-right"><button className="text-xs text-rose-600" onClick={async () => { if (confirm("Delete this expense?")) { await send("/api/finance", { action: "delete_expense", id: e.id }); reload(); } }}>Delete</button></td></tr>)}</tbody></table></div>
         )}
       </div>
