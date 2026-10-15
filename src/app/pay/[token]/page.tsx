@@ -7,8 +7,11 @@ type Data = {
   invoice: { invoice_no: string; title: string; status: string; total: number; amount_paid: number; balance: number; due_date: string | null; created_at: string;
     student: { name: string; admission_no: string; class_name: string | null };
     lines: { kind: string; description: string; amount: number }[];
-    payments: { amount: number; method: string; receipt_no: string | null; paid_at: string | null; reference: string }[] };
+    payments: { amount: number; method: string; receipt_no: string | null; paid_at: string | null; reference: string }[];
+    installments: { seq: number; label: string; amount: number; due_date: string; paid: number; due: number; state: "paid" | "overdue" | "upcoming" }[];
+    claims: { amount: number; paid_on: string; bank_reference: string; status: string }[] };
   currency: string; bank_details: string | null; online: boolean; provider: string | null;
+  methods: { card: string | null; remita: boolean; stripe: boolean; transfer: boolean };
 };
 
 /** Public invoice + pay page (from the parent's WhatsApp / email link). Also prints as a statement with receipts. */
@@ -19,6 +22,9 @@ export default function PayPage(props: { params: Promise<{ token: string }> }) {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [method, setMethod] = useState<"card" | "remita" | "stripe">("card");
+  const [claimOpen, setClaimOpen] = useState(false);
+  const [claimMsg, setClaimMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const result = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("payment") : null;
 
   if (error) return <main className="mx-auto max-w-xl p-6"><p role="alert" className="rounded-lg bg-rose-50 p-4 text-rose-700">{error}</p></main>;
@@ -29,7 +35,8 @@ export default function PayPage(props: { params: Promise<{ token: string }> }) {
   async function pay(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(null);
-    const r = await send<{ url: string }>(`/api/pay/${token}`, { amount: amount ? Number(amount) : null, email: email || null });
+    const r = await send<{ url: string }>(`/api/pay/${token}`, { amount: amount ? Number(amount) : null, email: email || null,
+      method: method === "card" && !data!.methods.card ? (data!.methods.remita ? "remita" : "stripe") : method });
     if (!r.ok) { setBusy(false); setErr(r.error); return; }
     window.location.href = r.data.url;
   }
@@ -63,11 +70,27 @@ export default function PayPage(props: { params: Promise<{ token: string }> }) {
             <tr key={i} className="border-t border-slate-100"><td className="py-1.5 font-mono text-xs">{p.receipt_no}</td><td>{fmtDate(p.paid_at, true)}</td><td className="capitalize">{p.method}</td><td className="text-right tabular-nums">{money(p.amount, data.currency)}</td></tr>))}</tbody></table></div>
         </section>
       )}
+      {inv.installments.length > 0 && (
+        <section className="mt-4">
+          <h2 className="text-sm font-semibold">Instalments</h2>
+          <table className="w-full text-sm"><tbody>{inv.installments.map(i => (
+            <tr key={i.seq} className="border-t border-slate-100"><td className="py-1.5">{i.label}</td><td>due {fmtDate(i.due_date)}</td><td className="text-right tabular-nums">{money(i.amount, data.currency)}</td>
+              <td className="text-right"><span className={i.state === "paid" ? "text-emerald-700" : i.state === "overdue" ? "text-rose-700" : "text-slate-500"}>{i.state === "paid" ? "paid" : i.state === "overdue" ? `${money(i.due, data.currency)} overdue` : "to come"}</span></td></tr>))}</tbody></table>
+        </section>
+      )}
+      {inv.claims.filter(c => c.status === "pending").map((c, i) => <p key={i} className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">The bursary is checking your transfer of {money(c.amount, data.currency)} on {fmtDate(c.paid_on)} (reference {c.bank_reference}).</p>)}
       {inv.balance > 0 && inv.status !== "void" && (
         <section className="mt-6 space-y-4 print:hidden">
-          {data.online ? (
+          {(data.methods.remita || data.methods.stripe) && (data.methods.card || data.methods.remita || data.methods.stripe) && (
+            <div className="flex flex-wrap gap-2 text-sm" role="radiogroup" aria-label="How to pay">
+              {data.methods.card && <label className="flex items-center gap-1 rounded border px-2 py-1"><input type="radio" checked={method === "card"} onChange={() => setMethod("card")} />Card, bank transfer or USSD</label>}
+              {data.methods.remita && <label className="flex items-center gap-1 rounded border px-2 py-1"><input type="radio" checked={method === "remita"} onChange={() => setMethod("remita")} />Remita (RRR)</label>}
+              {data.methods.stripe && <label className="flex items-center gap-1 rounded border px-2 py-1"><input type="radio" checked={method === "stripe"} onChange={() => setMethod("stripe")} />Card from abroad</label>}
+            </div>
+          )}
+          {(data.online || data.methods.remita || data.methods.stripe) ? (
             <form onSubmit={pay} className="rounded-xl border-2 p-4" style={{ borderColor: color }}>
-              <p className="font-semibold">Pay online (card, bank transfer or USSD)</p>
+              <p className="font-semibold">{method === "remita" ? "Pay with Remita (online, at a bank or on your banking app)" : method === "stripe" ? "Pay by card from outside Nigeria" : "Pay online (card, bank transfer or USSD)"}</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 <label className="block text-sm"><span className="label">Amount (leave blank to pay the full balance)</span>
                   <input className="input" type="number" min={100} max={inv.balance} step="any" value={amount} onChange={e => setAmount(e.target.value)} placeholder={String(inv.balance)} /></label>
@@ -75,10 +98,26 @@ export default function PayPage(props: { params: Promise<{ token: string }> }) {
               </div>
               {err && <p role="alert" className="mt-2 text-sm text-rose-600">{err}</p>}
               <button className="btn mt-3 w-full py-3 text-white" style={{ background: color }} disabled={busy}>{busy ? "Opening secure payment…" : `Pay ${amount ? money(Number(amount), data.currency) : money(inv.balance, data.currency)}`}</button>
-              <p className="mt-2 text-center text-xs text-slate-500">Secured by {data.provider === "flutterwave" ? "Flutterwave" : "Paystack"}. The school never sees your card details.</p>
+              <p className="mt-2 text-center text-xs text-slate-500">Secured by {method === "remita" ? "Remita" : method === "stripe" ? "Stripe" : data.provider === "flutterwave" ? "Flutterwave" : "Paystack"}. The school never sees your card details.</p>
             </form>
           ) : <p className="rounded-lg bg-slate-50 p-3 text-sm">Online payment is not enabled for this school yet.</p>}
-          {data.bank_details && <div className="rounded-lg bg-slate-50 p-3 text-sm"><p className="font-semibold">Pay by bank transfer</p><p className="whitespace-pre-wrap">{data.bank_details}</p><p className="mt-1 text-xs text-slate-500">Use <b>{inv.invoice_no}</b> as the transfer narration.</p></div>}
+          {data.bank_details && <div className="rounded-lg bg-slate-50 p-3 text-sm"><p className="font-semibold">Pay by bank transfer</p><p className="whitespace-pre-wrap">{data.bank_details}</p><p className="mt-1 text-xs text-slate-500">Use <b>{inv.invoice_no}</b> as the transfer narration.</p>
+            {data.methods.transfer && (!claimOpen ? <button className="btn btn-outline mt-2" onClick={() => setClaimOpen(true)}>I have paid by transfer</button> : (
+              <form className="mt-2 grid gap-2 sm:grid-cols-2" onSubmit={async e => {
+                e.preventDefault();
+                const r = await fetch(`/api/pay/${token}/claim`, { method: "POST", body: new FormData(e.currentTarget) });
+                const j = await r.json().catch(() => ({}));
+                setClaimMsg({ ok: r.ok, text: r.ok ? "Thank you. The bursary will check the transfer and send your receipt." : j.error ?? "Could not send." });
+                if (r.ok) { setClaimOpen(false); reload(); }
+              }}>
+                <label className="block"><span className="label">Amount</span><input className="input" name="amount" type="number" min={1} max={inv.balance} step="any" required defaultValue={inv.balance} /></label>
+                <label className="block"><span className="label">Date paid</span><input className="input" name="paid_on" type="date" required /></label>
+                <label className="block"><span className="label">Bank reference or session ID</span><input className="input" name="reference" required minLength={3} maxLength={80} /></label>
+                <label className="block"><span className="label">Paid by (name on the account)</span><input className="input" name="payer_name" maxLength={120} /></label>
+                <label className="block sm:col-span-2"><span className="label">Receipt or screenshot (optional, PDF or image, up to 5 MB)</span><input className="input" name="proof" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" /></label>
+                <div className="flex gap-2 sm:col-span-2"><button className="btn btn-primary">Send to the bursary</button><button type="button" className="btn btn-ghost" onClick={() => setClaimOpen(false)}>Cancel</button></div>
+              </form>))}
+            {claimMsg && <p className={"mt-2 " + (claimMsg.ok ? "text-emerald-700" : "text-rose-700")}>{claimMsg.text}</p>}</div>}
         </section>
       )}
       <div className="mt-6 text-center print:hidden"><button className="btn btn-outline" onClick={() => window.print()}>Print or save as PDF</button></div>

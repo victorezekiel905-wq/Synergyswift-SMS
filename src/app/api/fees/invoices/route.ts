@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const id = u.searchParams.get("id");
   if (id) {
     const { data: invoice } = await ctx.sb.from("fee_invoices")
-      .select("*,students(id,first_name,last_name,other_names,admission_no,class_groups(name)),fee_invoice_lines(id,kind,description,amount),fee_payments(id,amount,method,provider,reference,status,receipt_no,paid_at,payer_name,created_at)")
+      .select("*,students(id,first_name,last_name,other_names,admission_no,class_groups(name)),fee_invoice_lines(id,kind,description,amount),fee_payments(id,amount,method,provider,reference,status,receipt_no,paid_at,payer_name,created_at),invoice_installments(seq,label,amount,due_date,late_fee_applied)")
       .eq("tenant_id", tid).eq("id", id).maybeSingle();
     return invoice ? NextResponse.json(invoice) : jsonError("not found", 404);
   }

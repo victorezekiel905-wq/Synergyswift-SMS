@@ -7,6 +7,7 @@ import { notifyGuardians, money } from "./notify";
 import { feeReceipt, feeReminder } from "./messaging/notices";
 import { initializePayment, verifyPayment, matchesExpected, newReference, providerConfigured, type Provider } from "./payments";
 import { studentName } from "./school";
+import { chargesFor, invoiceLines, siblingRanks, splitInstallments, type Rule, type Award, type Part } from "./fee-rules";
 
 export async function financeSettings(svc: any, tenantId: string) {
   const { data } = await svc.from("tenant_settings")
@@ -31,34 +32,64 @@ export function applicableCharges(schedules: { fee_item_id: string; class_group_
   return [...byItem.values()].filter(c => Number(c.amount) > 0);
 }
 
-export async function generateInvoices(svc: any, p: { tenantId: string; termId: string; classGroupIds: string[]; createdBy: string; dueDate?: string | null; title?: string }) {
+/**
+ * Term invoices for whole classes. Each child's charges come from the most
+ * specific schedule rows (class, fee category) plus the optional extras the
+ * family chose; then the best discount rule (sibling, staff child, category)
+ * and any approved scholarships or waivers. An instalment plan splits the
+ * total into dated parts.
+ */
+export async function generateInvoices(svc: any, p: { tenantId: string; termId: string; classGroupIds: string[]; createdBy: string; dueDate?: string | null; title?: string; planId?: string | null }) {
   const title = p.title?.trim() || "School fees";
-  const { data: schedules } = await svc.from("fee_schedules").select("fee_item_id,class_group_id,amount,optional,fee_items(name)")
-    .eq("tenant_id", p.tenantId).eq("term_id", p.termId);
+  const today = new Date().toISOString().slice(0, 10);
+  const [{ data: schedules }, { data: rules }, { data: plan }] = await Promise.all([
+    svc.from("fee_schedules").select("fee_item_id,class_group_id,category,amount,optional,fee_items(name)").eq("tenant_id", p.tenantId).eq("term_id", p.termId),
+    svc.from("fee_discount_rules").select("*").eq("tenant_id", p.tenantId).eq("active", true),
+    p.planId ? svc.from("installment_plans").select("parts").eq("tenant_id", p.tenantId).eq("id", p.planId).maybeSingle() : { data: null }
+  ]);
   const rows = (schedules ?? []).map((s: any) => ({ ...s, amount: Number(s.amount), name: s.fee_items?.name ?? "Fee" }));
   if (!rows.length) throw new Error("no fee schedule for this term yet; add fees under Fee setup first");
+  if (p.planId && !plan) throw new Error("instalment plan not found");
 
-  let q = svc.from("students").select("id,class_group_id").eq("tenant_id", p.tenantId).eq("status", "active");
-  if (p.classGroupIds.length) q = q.in("class_group_id", p.classGroupIds);
-  const { data: students } = await q.limit(20000);
-  const { data: existing } = await svc.from("fee_invoices").select("student_id").eq("tenant_id", p.tenantId)
-    .eq("term_id", p.termId).eq("title", title).neq("status", "void").limit(20000);
+  // Every active student (sibling order counts the whole family, not only the classes chosen).
+  const { data: all } = await svc.from("students").select("id,class_group_id,fee_category,date_of_birth,admitted_on").eq("tenant_id", p.tenantId).eq("status", "active").limit(20000);
+  const students = (all ?? []).filter((s: any) => !p.classGroupIds.length || p.classGroupIds.includes(s.class_group_id));
+  const ids = (all ?? []).map((s: any) => s.id);
+  const [{ data: links }, { data: existing }, { data: choices }, { data: awards }] = await Promise.all([
+    svc.from("student_guardians").select("student_id,guardian_id,guardians(user_id)").eq("tenant_id", p.tenantId).limit(40000),
+    svc.from("fee_invoices").select("student_id").eq("tenant_id", p.tenantId).eq("term_id", p.termId).eq("title", title).neq("status", "void").limit(20000),
+    svc.from("fee_optional_choices").select("student_id,fee_item_id,term_id").eq("tenant_id", p.tenantId).limit(40000),
+    svc.from("fee_awards").select("*").eq("tenant_id", p.tenantId).not("approved_by", "is", null).limit(20000)
+  ]);
+  const ranks = siblingRanks(all ?? [], (links ?? []).filter((l: any) => ids.includes(l.student_id)));
+  // A child of a member of staff: a guardian who signs in as staff.
+  const guardianUsers = [...new Set((links ?? []).map((l: any) => l.guardians?.user_id).filter(Boolean))] as string[];
+  const { data: staffUsers } = guardianUsers.length ? await svc.from("users").select("id,role").in("id", guardianUsers).not("role", "in", "(parent,student,alumni)") : { data: [] };
+  const staffSet = new Set((staffUsers ?? []).map((u: any) => u.id));
+  const staffChildren = new Set((links ?? []).filter((l: any) => staffSet.has(l.guardians?.user_id)).map((l: any) => l.student_id));
   const have = new Set((existing ?? []).map((e: { student_id: string }) => e.student_id));
 
-  let created = 0, skipped = 0;
-  for (const s of students ?? []) {
+  let created = 0, skipped = 0, discounted = 0;
+  for (const s of students) {
     if (have.has(s.id)) { skipped++; continue; }
-    const charges = applicableCharges(rows, s.class_group_id);
+    const chosen = new Set<string>((choices ?? []).filter((c: any) => c.student_id === s.id && (!c.term_id || c.term_id === p.termId)).map((c: any) => c.fee_item_id));
+    const charges = chargesFor(rows, { classGroupId: s.class_group_id, category: s.fee_category ?? null, chosenOptional: chosen });
     if (!charges.length) { skipped++; continue; }
+    const lines = invoiceLines(charges, { rank: ranks.get(s.id) ?? 1, staffChild: staffChildren.has(s.id) || s.fee_category === "staff_child", category: s.fee_category ?? null,
+      rules: (rules ?? []) as Rule[], awards: ((awards ?? []) as (Award & { student_id: string })[]).filter(a => a.student_id === s.id), on: today });
+    const total = lines.reduce((a, l) => a + l.amount, 0);
+    const parts = plan ? splitInstallments(total, plan.parts as Part[], p.dueDate ?? today) : [];
     const { data: no } = await svc.rpc("next_doc_no", { p_tenant: p.tenantId, p_kind: "inv" });
     const { data: inv, error } = await svc.from("fee_invoices").insert({
-      tenant_id: p.tenantId, student_id: s.id, term_id: p.termId, invoice_no: no, title, due_date: p.dueDate ?? null, created_by: p.createdBy
+      tenant_id: p.tenantId, student_id: s.id, term_id: p.termId, invoice_no: no, title, due_date: parts[0]?.due_date ?? p.dueDate ?? null, created_by: p.createdBy
     }).select("id").single();
     if (error) { skipped++; continue; }
-    await svc.from("fee_invoice_lines").insert(charges.map(c => ({ invoice_id: inv.id, tenant_id: p.tenantId, fee_item_id: c.fee_item_id, description: c.name, amount: c.amount })));
+    await svc.from("fee_invoice_lines").insert(lines.map(l => ({ invoice_id: inv.id, tenant_id: p.tenantId, fee_item_id: l.fee_item_id, kind: l.kind, description: l.description, amount: l.amount, source: l.source })));
+    if (parts.length) await svc.from("invoice_installments").insert(parts.map(x => ({ ...x, tenant_id: p.tenantId, invoice_id: inv.id })));
+    if (lines.some(l => l.amount < 0)) discounted++;
     created++;
   }
-  return { created, skipped };
+  return { created, skipped, discounted };
 }
 
 /** One-off invoice (trip, uniform, application fee…). */
@@ -108,13 +139,14 @@ export async function recordManualPayment(svc: any, p: {
 }
 
 /** Parent starts an online payment from the pay link. */
-export async function startOnlinePayment(svc: any, p: { payToken: string; amount?: number | null; email?: string | null; baseUrl: string }) {
+export async function startOnlinePayment(svc: any, p: { payToken: string; amount?: number | null; email?: string | null; baseUrl: string; method?: "card" | "remita" | "stripe" | null }) {
   const { data: inv } = await svc.from("fee_invoices")
     .select("id,tenant_id,student_id,title,invoice_no,status,total,amount_paid,tenants(status)").eq("pay_token", p.payToken).maybeSingle();
   if (!inv || inv.tenants?.status !== "active") throw new Error("invoice not found");
   if (inv.status === "void" || inv.status === "paid") throw new Error(`this invoice is ${inv.status}`);
   const s = await financeSettings(svc, inv.tenant_id);
-  if (!providerConfigured(s.provider)) throw new Error("online payment is not enabled for this school; please pay by transfer or at the bursary");
+  const method = p.method ?? "card";
+  if (method === "card" && !providerConfigured(s.provider)) throw new Error("online payment is not enabled for this school; please pay by transfer or at the bursary");
   const balance = Math.round((Number(inv.total) - Number(inv.amount_paid)) * 100) / 100;
   const amount = p.amount ? Math.min(Math.round(p.amount * 100) / 100, balance) : balance;
   if (!(amount > 0)) throw new Error("nothing to pay");
@@ -128,6 +160,10 @@ export async function startOnlinePayment(svc: any, p: { payToken: string; amount
   if (!email) throw new Error("enter an email address for the payment receipt");
 
   const reference = newReference("FEE");
+  if (method === "remita" || method === "stripe") {
+    const { startMorePayment } = await import("./fees-plus");
+    return startMorePayment(svc, { method, inv, amount, currency: s.currency, email, reference, schoolName: s.schoolName, baseUrl: p.baseUrl, payToken: p.payToken });
+  }
   const { error } = await svc.from("fee_payments").insert({
     tenant_id: inv.tenant_id, invoice_id: inv.id, student_id: inv.student_id, amount, currency: s.currency, method: "online",
     provider: s.provider, reference, status: "pending", payer_email: email
@@ -148,13 +184,15 @@ export async function startOnlinePayment(svc: any, p: { payToken: string; amount
 
 /** Verify with the provider and settle. Idempotent: safe for both the redirect and the webhook. */
 export async function confirmOnlinePayment(svc: any, reference: string, baseUrl: string) {
-  const { data: pay } = await svc.from("fee_payments").select("id,tenant_id,amount,currency,provider,status,fee_invoices(pay_token)")
+  const { data: pay } = await svc.from("fee_payments").select("id,tenant_id,amount,currency,provider,status,meta,fee_invoices(pay_token)")
     .eq("reference", reference).maybeSingle();
   if (!pay) return { status: "unknown" as const };
   const token = pay.fee_invoices?.pay_token as string | undefined;
   if (pay.status === "success") return { status: "success" as const, token };
   if (pay.status !== "pending") return { status: pay.status as string, token };
-  const v = await verifyPayment(pay.provider as Provider, reference);
+  const v = pay.provider === "remita" || pay.provider === "stripe"
+    ? await (await import("./fees-plus")).verifyMorePayment(svc, { ...pay, reference })
+    : await verifyPayment(pay.provider as Provider, reference);
   if ("error" in v) return { status: "pending" as const, token };
   if (matchesExpected(v, Number(pay.amount), pay.currency)) {
     const { data: updated } = await svc.from("fee_payments").update({ status: "success", meta: v.raw ?? {} })

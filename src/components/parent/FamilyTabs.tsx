@@ -65,6 +65,7 @@ export default function FamilyTabs({ extras, kids, token, onChange }: { extras: 
       <Tabs value={tab} onChange={setTab} tabs={tabs} />
       {msg?.text && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
 
+      {tab === "fees" && extras.invoices.length > 0 && <FamilyStatement token={token} currency={extras.currency} />}
       {tab === "fees" && (!extras.invoices.length ? <Empty>No invoices.</Empty> : (
         <ul className="space-y-2">{extras.invoices.map(i => {
           const bal = Number(i.total) - Number(i.amount_paid);
@@ -210,6 +211,27 @@ function MeetingPicker({ extras, kids, onBook }: { extras: Extras; kids: Child[]
           ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Each child's statement of account for the last year (invoices, payments, running balance). */
+function FamilyStatement({ token, currency }: { token?: string; currency: string }) {
+  const [data, setData] = useState<{ statements: { student: { name: string }; opening: number; closing: number; lines: { date: string; ref: string; description: string; debit: number; credit: number; balance: number }[] }[] } | null>(null);
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-3">
+      <button className="text-xs text-brand-700 underline" onClick={async () => { setOpen(!open); if (!data) { const r = await send<any>("/api/family", { action: "statement", token }); if (r.ok) setData(r.data); } }}>{open ? "Hide statement of account" : "Statement of account (last 12 months)"}</button>
+      {open && data && data.statements.map((s, i) => (
+        <div key={i} className="mt-2 overflow-x-auto rounded border border-slate-200 p-2 text-xs">
+          <p className="font-semibold">{s.student.name}</p>
+          <table className="w-full"><tbody>
+            <tr><td colSpan={4} className="py-0.5">Brought forward</td><td className="text-right tabular-nums">{money(s.opening, currency)}</td></tr>
+            {s.lines.map((l, j) => <tr key={j} className="border-t border-slate-100"><td className="py-0.5">{fmtDate(l.date)}</td><td className="font-mono">{l.ref}</td><td>{l.description}</td>
+              <td className="text-right tabular-nums">{l.debit ? money(l.debit, currency) : `−${money(l.credit, currency)}`}</td><td className="text-right tabular-nums">{money(l.balance, currency)}</td></tr>)}
+            <tr className="border-t-2 border-slate-300 font-semibold"><td colSpan={4} className="py-0.5">Balance now</td><td className="text-right tabular-nums">{money(s.closing, currency)}</td></tr>
+          </tbody></table>
+        </div>))}
     </div>
   );
 }

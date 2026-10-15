@@ -46,6 +46,7 @@ export async function initializePayment(i: InitInput): Promise<{ ok: true; url: 
         headers: { Authorization: `Bearer ${env("PAYSTACK_SECRET_KEY")}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           email: i.email, amount: toMinor(i.amount), currency: i.currency, reference: i.reference, callback_url: i.callbackUrl,
+          channels: ["card", "bank", "ussd", "bank_transfer", "qr", "mobile_money"],
           ...(i.subaccount ? { subaccount: i.subaccount, bearer: "subaccount" } : {}),
           metadata: { ...i.metadata, custom_fields: [{ display_name: "Description", variable_name: "description", value: i.description }] }
         })
@@ -58,7 +59,7 @@ export async function initializePayment(i: InitInput): Promise<{ ok: true; url: 
       method: "POST",
       headers: { Authorization: `Bearer ${env("FLW_SECRET_KEY")}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        tx_ref: i.reference, amount: Number(i.amount.toFixed(2)), currency: i.currency, redirect_url: i.callbackUrl,
+        tx_ref: i.reference, amount: Number(i.amount.toFixed(2)), currency: i.currency, redirect_url: i.callbackUrl, payment_options: "card,banktransfer,ussd,account",
         customer: { email: i.email, name: i.name ?? undefined, phonenumber: i.phone ?? undefined },
         customizations: { title: i.description.slice(0, 60), logo: i.logoUrl ?? undefined },
         ...(i.subaccount ? { subaccounts: [{ id: i.subaccount }] } : {}),

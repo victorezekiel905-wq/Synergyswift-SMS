@@ -4,6 +4,8 @@ import { guardiansByStudent, rowsForGuardian, enqueue, loadBrand, dispatchDue, f
 import { libraryOverdue } from "@/lib/messaging/templates";
 import { studentName } from "@/lib/school";
 import { expireOffers } from "@/lib/admissions-crm";
+import { runFeeAutomation } from "@/lib/fees-plus";
+import { appUrl } from "@/lib/school";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -27,6 +29,8 @@ export async function GET(req: NextRequest) {
   const { data: closed } = await svc.from("exams").update({ status: "closed" }).eq("status", "published").lt("closes_at", now).select("id");
 
   const offersExpired = await expireOffers(svc).catch(() => 0);
+  // Fee reminders before and after due dates, and late fees after the grace period.
+  const fees = await runFeeAutomation(svc, appUrl(req)).catch(() => null);
   // Change history is kept for each school's chosen period; spent sign-in codes and access grants go at once.
   let historyPurged = 0;
   const { data: keep } = await svc.from("tenant_settings").select("tenant_id,audit_retention_days");
@@ -72,5 +76,5 @@ export async function GET(req: NextRequest) {
   }
   if (rows.length) await enqueue(svc, rows);
   const delivery = rows.length ? await dispatchDue(svc, { budgetMs: 40_000 }) : null;
-  return NextResponse.json({ expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, webcam_photos_deleted: snapPaths.length, admission_offers_expired: offersExpired, change_history_purged: historyPurged, delivery });
+  return NextResponse.json({ expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, webcam_photos_deleted: snapPaths.length, admission_offers_expired: offersExpired, change_history_purged: historyPurged, fees, delivery });
 }

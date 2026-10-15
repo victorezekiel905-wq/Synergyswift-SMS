@@ -155,9 +155,23 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Emergency broadcast alerts | ✅ ready-made wording (closure, early dismissal, lockdown, weather, all clear), every channel including SMS whatever a parent's settings, "I received this" on every screen until confirmed, live confirmation count |
 | Message templates and multi-language translation | ✅ saved templates with placeholders; translation into each family's home language |
 
-## 12–23
+## 12. Finance and fees (phase 9)
 
-Sections 12 (finance), 12 (finance), 13 (HR and payroll), 14 (welfare), 15 (boarding), 16 (transport), 17 (library), 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
+| Feature | Status |
+|---|---|
+| Fee structures by class, term, category and optional items | ✅ amounts per term for all classes, a class, a fee category (day, boarding, staff child …) or both, the most specific winning; optional extras (bus, lunch, clubs, uniform) charged only to the students given them, for one term or every term |
+| Invoices, discounts, sibling discounts, scholarships, waivers | ✅ invoices in one step; discount rules (sibling from the nth child, staff children, a category) with the best one applied; scholarships, bursaries and waivers by percentage or amount on chosen fees, approved by a second person (changes need re-approval); manual lines still available |
+| Online payments: Paystack, Flutterwave, Remita, bank transfer, USSD, card, Stripe | ✅ Paystack and Flutterwave (card, bank, USSD, transfer, QR) into the school's subaccount; Remita RRR (pay online or at a bank) 🔑; Stripe for cards from abroad 🔑; parents report bank transfers with proof and the bursary confirms; every payment re-checked with the provider |
+| Installment plans and part-payments | ✅ plans (e.g. 50/25/25 with due dates) chosen when invoicing or per invoice; payments clear the earliest instalment first; part-payments |
+| Automated reminders, late fees, defaulter lists | ✅ automatic reminders before the due date and every N days after; late fee (percentage and/or fixed) after a grace period, once per invoice or instalment; debtors list with ageing (current, 1–30, 31–60, 61–90, 90+ days), CSV |
+| Receipts, statements of account, parent wallet | ✅ numbered receipts; statements with opening balance, running balance and totals (staff, and parents in their portal); wallet |
+| Expense tracking, budgeting, petty cash | 🟡 expenses; budgets and petty cash in 9b |
+| Accounting integration (QuickBooks, Sage, Zoho Books) and a general ledger | ⬜ 9b |
+| Financial reports: collections, outstanding balances, revenue by class | 🟡 collections by method and class, outstanding and ageing; full reports in 9b |
+
+## 13–23
+
+Sections 13 (HR and payroll), 12 (finance), 13 (HR and payroll), 14 (welfare), 15 (boarding), 16 (transport), 17 (library), 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
 
 ## Database updates to run
 
@@ -180,3 +194,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101003600_attendance.sql` | 7a |
 | `20260101003700_timetable_calendar.sql` | 7b |
 | `20260101003800_communication.sql` | 8 |
+| `20260101003900_fees_plus.sql` | 9a |

@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const termId = u.searchParams.get("term_id") ?? (await currentTerm(ctx.sb, tid))?.id ?? null;
   const [items, schedules, invoices, payments, expenses, settings] = await Promise.all([
     ctx.sb.from("fee_items").select("id,name,description").eq("tenant_id", tid).order("name"),
-    termId ? ctx.sb.from("fee_schedules").select("id,fee_item_id,class_group_id,amount,optional").eq("tenant_id", tid).eq("term_id", termId) : { data: [] },
+    termId ? ctx.sb.from("fee_schedules").select("id,fee_item_id,class_group_id,category,amount,optional").eq("tenant_id", tid).eq("term_id", termId) : { data: [] },
     termId ? ctx.sb.from("fee_invoices").select("id,status,total,amount_paid,student_id,invoice_no,title,due_date,students(first_name,last_name,other_names,admission_no,class_groups(name))")
       .eq("tenant_id", tid).eq("term_id", termId).neq("status", "void").limit(20000) : { data: [] },
     ctx.sb.from("fee_payments").select("amount,method,paid_at").eq("tenant_id", tid).eq("status", "success")
@@ -59,11 +59,11 @@ const money = z.number().min(0).max(1e10);
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("save_item"), id: z.string().uuid().optional(), name: z.string().trim().min(1).max(80), description: z.string().trim().max(300).nullish() }),
   z.object({ action: z.literal("delete_item"), id: z.string().uuid() }),
-  z.object({ action: z.literal("save_schedule"), term_id: z.string().uuid(), fee_item_id: z.string().uuid(), class_group_id: z.string().uuid().nullable(), amount: money, optional: z.boolean().default(false) }),
+  z.object({ action: z.literal("save_schedule"), term_id: z.string().uuid(), fee_item_id: z.string().uuid(), class_group_id: z.string().uuid().nullable(), category: z.string().trim().max(40).nullish(), amount: money, optional: z.boolean().default(false) }),
   z.object({ action: z.literal("delete_schedule"), id: z.string().uuid() }),
   z.object({ action: z.literal("copy_schedule"), from_term_id: z.string().uuid(), to_term_id: z.string().uuid() }),
-  z.object({ action: z.literal("generate_invoices"), term_id: z.string().uuid(), class_group_ids: z.array(z.string().uuid()).default([]), due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(), title: z.string().trim().max(80).optional() }),
-  z.object({ action: z.literal("add_line"), invoice_id: z.string().uuid(), kind: z.enum(["charge", "discount", "scholarship", "adjustment"]), description: z.string().trim().min(1).max(120), amount: z.number().min(-1e10).max(1e10), fee_item_id: z.string().uuid().nullish() }),
+  z.object({ action: z.literal("generate_invoices"), term_id: z.string().uuid(), class_group_ids: z.array(z.string().uuid()).default([]), due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(), title: z.string().trim().max(80).optional(), plan_id: z.string().uuid().nullish() }),
+  z.object({ action: z.literal("add_line"), invoice_id: z.string().uuid(), kind: z.enum(["charge", "discount", "scholarship", "adjustment", "late_fee"]), description: z.string().trim().min(1).max(120), amount: z.number().min(-1e10).max(1e10), fee_item_id: z.string().uuid().nullish() }),
   z.object({ action: z.literal("remove_line"), line_id: z.string().uuid() }),
   z.object({ action: z.literal("void_invoice"), invoice_id: z.string().uuid(), reason: z.string().trim().min(2).max(300) }),
   z.object({ action: z.literal("record_payment"), invoice_id: z.string().uuid(), amount: z.number().positive().max(1e10), method: z.enum(["cash", "transfer", "pos", "cheque"]), reference: z.string().trim().max(80).nullish(), payer_name: z.string().trim().max(120).nullish(), paid_at: z.string().datetime({ offset: true }).nullish() }),
@@ -98,8 +98,8 @@ export async function POST(req: NextRequest) {
         return error ? jsonError(error.message) : NextResponse.json({ ok: true });
       }
       case "save_schedule": {
-        const { error } = await sb.from("fee_schedules").upsert({ tenant_id: tid, term_id: b.term_id, fee_item_id: b.fee_item_id, class_group_id: b.class_group_id, amount: b.amount, optional: b.optional },
-          { onConflict: "term_id,class_group_id,fee_item_id" });
+        const { error } = await sb.from("fee_schedules").upsert({ tenant_id: tid, term_id: b.term_id, fee_item_id: b.fee_item_id, class_group_id: b.class_group_id, category: b.category || null, amount: b.amount, optional: b.optional },
+          { onConflict: "term_id,class_group_id,fee_item_id,category" });
         return error ? jsonError(error.message) : NextResponse.json({ ok: true });
       }
       case "delete_schedule": {
@@ -107,13 +107,13 @@ export async function POST(req: NextRequest) {
         return error ? jsonError(error.message) : NextResponse.json({ ok: true });
       }
       case "copy_schedule": {
-        const { data: rows } = await sb.from("fee_schedules").select("fee_item_id,class_group_id,amount,optional").eq("tenant_id", tid).eq("term_id", b.from_term_id);
+        const { data: rows } = await sb.from("fee_schedules").select("fee_item_id,class_group_id,category,amount,optional").eq("tenant_id", tid).eq("term_id", b.from_term_id);
         if (!rows?.length) return jsonError("the source term has no fees");
-        const { error } = await sb.from("fee_schedules").upsert(rows.map((r: any) => ({ ...r, tenant_id: tid, term_id: b.to_term_id })), { onConflict: "term_id,class_group_id,fee_item_id" });
+        const { error } = await sb.from("fee_schedules").upsert(rows.map((r: any) => ({ ...r, tenant_id: tid, term_id: b.to_term_id })), { onConflict: "term_id,class_group_id,fee_item_id,category" });
         return error ? jsonError(error.message) : NextResponse.json({ copied: rows.length });
       }
       case "generate_invoices": {
-        const r = await generateInvoices(svc, { tenantId: tid, termId: b.term_id, classGroupIds: b.class_group_ids, createdBy: ctx.userId, dueDate: b.due_date, title: b.title });
+        const r = await generateInvoices(svc, { tenantId: tid, termId: b.term_id, classGroupIds: b.class_group_ids, createdBy: ctx.userId, dueDate: b.due_date, title: b.title, planId: b.plan_id ?? null });
         await audit("fees.invoices_generated", { term_id: b.term_id, ...r });
         return NextResponse.json(r);
       }

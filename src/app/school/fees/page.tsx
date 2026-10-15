@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, Stat, statusTone, money, fmtDate, Loading } from "@/components/ui";
+import { Discounts, Instalments, Transfers, Debtors, ExtrasAndCategories, PaymentKeys, type PlusData } from "@/components/fees/FeesMore";
 
 type Term = { id: string; name: string; is_current: boolean };
 type Session = { id: string; name: string; terms: Term[] };
@@ -8,7 +9,7 @@ type Overview = {
   term_id: string | null;
   settings: { currency: string; provider: string | null; subaccount: string | null; bankDetails: string | null; withholdResults: boolean };
   items: { id: string; name: string; description: string | null }[];
-  schedules: { id: string; fee_item_id: string; class_group_id: string | null; amount: number; optional: boolean }[];
+  schedules: { id: string; fee_item_id: string; class_group_id: string | null; category?: string | null; amount: number; optional: boolean }[];
   summary: { invoices: number; billed: number; collected: number; outstanding: number; collection_rate: number | null; paid: number; part_paid: number; unpaid: number;
     collected_30d: number; expenses_30d: number; by_method_30d: Record<string, number>; by_class: Record<string, { billed: number; paid: number }> };
 };
@@ -21,7 +22,8 @@ export default function FeesPage() {
   const [termId, setTermId] = useState("");
   useEffect(() => { if (!termId && sessions) { const t = sessions.flatMap(s => s.terms).find(t => t.is_current) ?? sessions[0]?.terms[0]; if (t) setTermId(t.id); } }, [sessions, termId]);
   const ov = useApi<Overview>(termId ? `/api/fees?term_id=${termId}` : null, [termId]);
-  const [tab, setTab] = useState<"overview" | "setup" | "invoices" | "settings">("overview");
+  const [tab, setTab] = useState<"overview" | "setup" | "invoices" | "settings" | "discounts" | "instalments" | "transfers" | "debtors" | "extras">("overview");
+  const plus = useApi<PlusData>("/api/fees/plus");
   const cur = ov.data?.settings.currency ?? "NGN";
   const s = ov.data?.summary;
   const groups = structure?.class_groups ?? [];
@@ -34,7 +36,9 @@ export default function FeesPage() {
           {(sessions ?? []).map(se => <optgroup key={se.id} label={se.name}>{se.terms.map(t => <option key={t.id} value={t.id}>{t.name} {se.name}</option>)}</optgroup>)}
         </select>} />
       {ov.error && <Alert>{ov.error}</Alert>}
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "overview", label: "Overview" }, { id: "setup", label: "Fee setup" }, { id: "invoices", label: "Invoices & payments" }, { id: "settings", label: "Online payments" }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "overview", label: "Overview" }, { id: "setup", label: "Fee setup" }, { id: "extras", label: "Categories & extras" }, { id: "discounts", label: "Discounts & scholarships" },
+        { id: "invoices", label: "Invoices & payments" }, { id: "instalments", label: "Instalments & reminders" }, { id: "transfers", label: `Transfers to confirm${plus.data?.claims.length ? ` (${plus.data.claims.length})` : ""}` },
+        { id: "debtors", label: "Debtors & statements" }, { id: "settings", label: "Online payments" }]} />
       {tab === "overview" && s && (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
@@ -71,7 +75,12 @@ export default function FeesPage() {
       )}
       {tab === "setup" && ov.data && termId && <Setup ov={ov.data} termId={termId} groups={groups} sessions={sessions ?? []} reload={ov.reload} />}
       {tab === "invoices" && termId && <Invoices termId={termId} groups={groups} currency={cur} />}
-      {tab === "settings" && ov.data && <Settings ov={ov.data} reload={ov.reload} />}
+      {tab === "settings" && ov.data && <><Settings ov={ov.data} reload={ov.reload} />{plus.data && <PaymentKeys data={plus.data} reload={plus.reload} />}</>}
+      {plus.data && tab === "discounts" && <Discounts data={plus.data} reload={plus.reload} currency={cur} />}
+      {plus.data && tab === "instalments" && <Instalments data={plus.data} reload={plus.reload} currency={cur} />}
+      {plus.data && tab === "transfers" && <Transfers data={plus.data} reload={plus.reload} currency={cur} />}
+      {tab === "debtors" && <Debtors groups={groups} currency={cur} />}
+      {plus.data && tab === "extras" && termId && <ExtrasAndCategories data={plus.data} reload={plus.reload} groups={groups} termId={termId} />}
     </Page>
   );
 }
@@ -83,7 +92,9 @@ function useFlash() {
 
 function Setup({ ov, termId, groups, sessions, reload }: { ov: Overview; termId: string; groups: { id: string; name: string }[]; sessions: Session[]; reload: () => void }) {
   const [item, setItem] = useState("");
-  const [row, setRow] = useState({ fee_item_id: "", class_group_id: "", amount: "", optional: false });
+  const [row, setRow] = useState({ fee_item_id: "", class_group_id: "", category: "", amount: "", optional: false });
+  const { data: plus } = useApi<PlusData>("/api/fees/plus");
+  const [plan, setPlan] = useState("");
   const [gen, setGen] = useState<{ classes: string[]; due: string }>({ classes: [], due: "" });
   const [copyFrom, setCopyFrom] = useState("");
   const { flash, node } = useFlash();
@@ -107,19 +118,21 @@ function Setup({ ov, termId, groups, sessions, reload }: { ov: Overview; termId:
         </section>
         <section className="card p-5 lg:col-span-2">
           <h2 className="mb-3 font-semibold">Amounts this term</h2>
-          <form className="mb-4 grid gap-2 sm:grid-cols-5" onSubmit={e => { e.preventDefault(); act({ action: "save_schedule", term_id: termId, fee_item_id: row.fee_item_id, class_group_id: row.class_group_id || null, amount: Number(row.amount), optional: row.optional }, "Saved."); }}>
+          <form className="mb-4 grid gap-2 sm:grid-cols-6" onSubmit={e => { e.preventDefault(); act({ action: "save_schedule", term_id: termId, fee_item_id: row.fee_item_id, class_group_id: row.class_group_id || null, category: row.category || null, amount: Number(row.amount), optional: row.optional }, "Saved."); }}>
             <select className="input" required value={row.fee_item_id} onChange={e => setRow({ ...row, fee_item_id: e.target.value })} aria-label="Fee item"><option value="">Fee item…</option>{ov.items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select>
             <select className="input" value={row.class_group_id} onChange={e => setRow({ ...row, class_group_id: e.target.value })} aria-label="Class"><option value="">All classes</option>{groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
+            <input className="input" list="fee-categories" value={row.category} onChange={e => setRow({ ...row, category: e.target.value })} placeholder="Every category" aria-label="Fee category" title="Only for students in this fee category, e.g. boarding" />
+            <datalist id="fee-categories">{(plus?.categories ?? []).map(c => <option key={c} value={c} />)}</datalist>
             <input className="input" type="number" min={0} step="any" required placeholder="Amount" value={row.amount} onChange={e => setRow({ ...row, amount: e.target.value })} aria-label="Amount" />
             <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={row.optional} onChange={e => setRow({ ...row, optional: e.target.checked })} /> Optional</label>
             <button className="btn btn-primary">Save</button>
           </form>
           {!ov.schedules.length ? <Empty>No fees set for this term.{terms.length ? " You can copy them from another term." : ""}</Empty> : (
-            <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Item</th><th>Class</th><th className="text-right">Amount</th><th /></tr></thead>
-              <tbody>{ov.schedules.map(sc => <tr key={sc.id} className="border-t border-slate-100"><td className="py-1.5">{itemName(sc.fee_item_id)} {sc.optional && <Badge>optional</Badge>}</td><td>{groupName(sc.class_group_id)}</td>
+            <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Item</th><th>Class</th><th>Category</th><th className="text-right">Amount</th><th /></tr></thead>
+              <tbody>{ov.schedules.map(sc => <tr key={sc.id} className="border-t border-slate-100"><td className="py-1.5">{itemName(sc.fee_item_id)} {sc.optional && <Badge>optional</Badge>}</td><td>{groupName(sc.class_group_id)}</td><td>{sc.category ?? "—"}</td>
                 <td className="text-right tabular-nums">{money(sc.amount, cur)}</td><td className="text-right"><button className="text-xs text-rose-600" onClick={() => act({ action: "delete_schedule", id: sc.id }, "Removed.")}>Remove</button></td></tr>)}</tbody></table></div>
           )}
-          <p className="mt-2 text-xs text-slate-500">A class-specific amount replaces the &ldquo;All classes&rdquo; amount for that class. Optional fees (bus, boarding) are added per student on the invoice.</p>
+          <p className="mt-2 text-xs text-slate-500">The most specific amount wins: class and category, then class, then category, then &ldquo;All classes&rdquo;. Optional fees (bus, lunch, clubs) are charged only to students given them under Categories &amp; extras. Discounts and approved scholarships are applied automatically.</p>
           {terms.length > 0 && (
             <div className="mt-3 flex gap-2">
               <select className="input max-w-xs" value={copyFrom} onChange={e => setCopyFrom(e.target.value)} aria-label="Copy from term"><option value="">Copy fees from…</option>{terms.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}</select>
@@ -137,7 +150,8 @@ function Setup({ ov, termId, groups, sessions, reload }: { ov: Overview; termId:
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <Field label="Due date"><input className="input" type="date" value={gen.due} onChange={e => setGen({ ...gen, due: e.target.value })} /></Field>
-          <button className="btn btn-primary" onClick={() => confirm(`Generate invoices for ${gen.classes.length ? `${gen.classes.length} classes` : "every class"}?`) && act({ action: "generate_invoices", term_id: termId, class_group_ids: gen.classes, due_date: gen.due || null }, "Invoices generated.")}>
+          <Field label="Instalments"><select className="input" value={plan} onChange={e => setPlan(e.target.value)}><option value="">Pay in full</option>{(plus?.plans ?? []).filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+          <button className="btn btn-primary" onClick={() => confirm(`Generate invoices for ${gen.classes.length ? `${gen.classes.length} classes` : "every class"}?`) && act({ action: "generate_invoices", term_id: termId, class_group_ids: gen.classes, due_date: gen.due || null, plan_id: plan || null }, "Invoices generated.")}>
             Generate for {gen.classes.length ? `${gen.classes.length} classes` : "all classes"}
           </button>
           <button className="btn btn-outline" onClick={() => confirm("Send a fee reminder with a pay link to every parent with a balance?") && act({ action: "send_reminders", term_id: termId, class_group_ids: gen.classes }, "Reminders queued.")}>Send reminders to debtors</button>
@@ -190,6 +204,8 @@ function InvoiceDetail({ id, currency, onChange }: { id: string; currency: strin
   const [pay, setPay] = useState({ amount: "", method: "cash", reference: "", payer_name: "" });
   const [line, setLine] = useState({ kind: "discount", description: "", amount: "" });
   const { flash, node } = useFlash();
+  const { data: plus } = useApi<PlusData>("/api/fees/plus");
+  const planAct = async (planId: string | null) => { const r = await send("/api/fees/plus", { action: "apply_plan", invoice_id: id, plan_id: planId }); flash(r.ok, r.ok ? (planId ? "Instalments set." : "Instalments removed.") : r.error ?? "failed"); if (r.ok) { reload(); onChange(); } };
   if (!data) return <Loading />;
   const balance = Number(data.total) - Number(data.amount_paid);
   const act = async (body: Record<string, unknown>, ok: string) => { const r = await send("/api/fees", body); flash(r.ok, r.ok ? ok : r.error ?? "failed"); if (r.ok) { reload(); onChange(); } };
@@ -205,10 +221,19 @@ function InvoiceDetail({ id, currency, onChange }: { id: string; currency: strin
         <tr key={l.id} className="border-t border-slate-100"><td className="py-1.5">{l.description} {l.kind !== "charge" && <Badge tone="violet">{l.kind}</Badge>}</td><td className="text-right tabular-nums">{money(l.amount, currency)}</td>
           <td className="w-16 text-right">{data.status !== "void" && <button className="text-xs text-rose-600" onClick={() => act({ action: "remove_line", line_id: l.id }, "Removed.")}>Remove</button>}</td></tr>))}
         <tr className="border-t-2 border-slate-300 font-semibold"><td className="py-1.5">Total</td><td className="text-right tabular-nums">{money(data.total, currency)}</td><td /></tr></tbody></table></div>
+      {(data.invoice_installments ?? []).length > 0 && (
+        <div><p className="text-xs font-semibold uppercase text-slate-500">Instalments</p>
+          <ul>{[...data.invoice_installments].sort((a: any, b: any) => a.seq - b.seq).map((i: any) => <li key={i.seq} className="flex justify-between"><span>{i.label} · due {fmtDate(i.due_date)}{i.late_fee_applied ? " · late fee added" : ""}</span><span className="tabular-nums">{money(i.amount, currency)}</span></li>)}</ul></div>
+      )}
+      {data.status !== "void" && data.status !== "paid" && (plus?.plans ?? []).length > 0 && (
+        <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-slate-500">Instalments:</span>
+          <select className="input w-auto py-1 text-xs" defaultValue="" onChange={e => e.target.value && planAct(e.target.value === "none" ? null : e.target.value)} aria-label="Instalment plan">
+            <option value="">Change…</option>{plus!.plans.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}<option value="none">Pay in full</option></select></div>
+      )}
       {data.status !== "void" && (
         <>
           <form className="grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-4" onSubmit={e => { e.preventDefault(); act({ action: "add_line", invoice_id: id, kind: line.kind, description: line.description, amount: Number(line.amount) }, "Line added."); setLine({ ...line, description: "", amount: "" }); }}>
-            <select className="input" value={line.kind} onChange={e => setLine({ ...line, kind: e.target.value })} aria-label="Line type"><option value="discount">Discount</option><option value="scholarship">Scholarship</option><option value="charge">Extra charge</option><option value="adjustment">Adjustment</option></select>
+            <select className="input" value={line.kind} onChange={e => setLine({ ...line, kind: e.target.value })} aria-label="Line type"><option value="discount">Discount</option><option value="scholarship">Scholarship</option><option value="charge">Extra charge</option><option value="adjustment">Adjustment</option><option value="late_fee">Late fee</option></select>
             <input className="input" placeholder="Description" required value={line.description} onChange={e => setLine({ ...line, description: e.target.value })} aria-label="Description" />
             <input className="input" type="number" step="any" placeholder="Amount" required value={line.amount} onChange={e => setLine({ ...line, amount: e.target.value })} aria-label="Amount" />
             <button className="btn btn-outline">Add line</button>
