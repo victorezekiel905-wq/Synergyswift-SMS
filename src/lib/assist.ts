@@ -264,3 +264,109 @@ export async function draftFeedback(p: { subject: string | null; level: string |
   const cap = p.maxScore ?? null;
   return { ...out, suggested_score: cap === null || out.suggested_score === null ? null : Math.max(0, Math.min(cap, out.suggested_score)) };
 }
+
+// ---------------- quiz generation ----------------
+
+const QuizSchema = z.object({
+  questions: z.array(z.object({
+    type: z.enum(["mcq_single", "true_false", "short_answer", "numeric"]),
+    prompt: z.string(),
+    options: z.array(z.string()),
+    correct_option: z.number().nullable(),
+    correct_true: z.boolean().nullable(),
+    accepted_answers: z.array(z.string()),
+    numeric_answer: z.number().nullable(),
+    tolerance: z.number().nullable(),
+    unit: z.string().nullable(),
+    explanation: z.string(),
+    difficulty: z.enum(["easy", "medium", "hard"]),
+    bloom: z.enum(["remember", "understand", "apply", "analyse", "evaluate", "create"]),
+    objective: z.string().nullable()
+  }))
+});
+export type GeneratedQuestion = z.infer<typeof QuizSchema>["questions"][number];
+
+/**
+ * Practice or quiz questions on a topic for a teacher to review before saving
+ * to the question bank. Objectives and source notes are optional.
+ */
+export async function generateQuiz(p: { subject: string; level: string; topic: string; count: number; types: string[]; difficulty: "mixed" | "easy" | "medium" | "hard";
+  objectives?: string[]; source?: string | null; curriculum?: string | null; country?: string | null }): Promise<GeneratedQuestion[]> {
+  const response = await anthropic().messages.parse(
+    {
+      model: LEARNING_MODEL,
+      max_tokens: 16000,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "medium", format: zodOutputFormat(QuizSchema) },
+      system:
+        "You write school quiz questions for teachers to review. Every question must have exactly one defensible correct answer, be answerable from what the class is expected to know, " +
+        "and suit the stated class level and curriculum. Vary what is tested and avoid giving answers away in the wording. Use plain text: write maths as you would type it (x^2, 3/4, sqrt(2)). " +
+        "For mcq_single give four options and the 0-based index of the correct one; for true_false set correct_true; for short_answer list every acceptable answer (short words or phrases); " +
+        "for numeric give the number, a sensible tolerance and the unit (or null). Leave the fields a type does not use as empty lists or null. " +
+        "Each explanation says in one or two sentences why the answer is right, for a student who got it wrong. When objectives are given, set objective to the one the question tests.",
+      messages: [{
+        role: "user",
+        content: [
+          `Subject: ${p.subject}`, `Class level: ${p.level}`, `Topic: ${p.topic}`,
+          p.curriculum ? `Curriculum: ${p.curriculum}` : "", p.country ? `Country: ${p.country}` : "",
+          `Write ${Math.min(20, Math.max(1, p.count))} questions. Allowed types: ${p.types.join(", ")}. Difficulty: ${p.difficulty === "mixed" ? "a mix of easy, medium and hard" : p.difficulty}.`,
+          p.objectives?.length ? `Curriculum objectives to cover:\n${p.objectives.map(o => `- ${o}`).join("\n")}` : "",
+          p.source ? `Base the questions on these lesson notes:\n${p.source.slice(0, 30000)}` : ""
+        ].filter(Boolean).join("\n\n")
+      }],
+      fallbacks: "default"
+    },
+    { headers: { "anthropic-beta": FALLBACK_BETA } }
+  );
+  if (response.stop_reason === "refusal") throw new DraftDeclined("Questions for this topic could not be drafted. Try rewording the topic.");
+  if (!response.parsed_output) throw new Error("The questions could not be completed. Please try again.");
+  return response.parsed_output.questions.filter(q => p.types.includes(q.type));
+}
+
+// ---------------- study tutor ----------------
+
+const TutorSchema = z.object({ reply: z.string(), concern: z.enum(["none", "wellbeing", "safety"]), title: z.string() });
+export type TutorTurn = { role: "student" | "tutor"; content: string };
+
+/**
+ * One reply from the study tutor. Students are told they are talking to an AI
+ * study helper and that their teachers and parents can read the chat.
+ */
+export async function tutorReply(p: { level: string | null; subject: string | null; schoolName: string; context?: { kind: string; title: string; text: string } | null; history: TutorTurn[] }) {
+  // The API needs turns to alternate, starting with the student.
+  const turns: { role: "user" | "assistant"; content: string }[] = [];
+  for (const t of p.history.slice(-24)) {
+    const role = t.role === "student" ? "user" : "assistant";
+    if (!turns.length && role === "assistant") continue;
+    const last = turns[turns.length - 1];
+    if (last && last.role === role) last.content += `\n\n${t.content}`;
+    else turns.push({ role, content: t.content.slice(0, 8000) });
+  }
+  const response = await anthropic().messages.parse(
+    {
+      model: LEARNING_MODEL,
+      max_tokens: 6000,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "low", format: zodOutputFormat(TutorSchema) },
+      system:
+        `You are the study helper for students at ${p.schoolName}${p.level ? `, talking with a student in ${p.level}` : ""}${p.subject ? ` about ${p.subject}` : ""}. ` +
+        "The student knows you are an AI study helper and that their teachers and parents can read this chat. " +
+        "Help them learn rather than doing the work for them: ask what they already know, give hints and the next step, explain ideas simply with short examples, and check understanding with a quick question. " +
+        "When they are working on homework or a quiz, never give the final answers to those questions; work through a similar example instead. Once they have made a real attempt, you may confirm or correct it. " +
+        "Keep replies short and friendly (usually under 150 words) and suited to their age. Write maths between $ signs (LaTeX) and code in fenced blocks. " +
+        "Stay on school learning; kindly steer anything else back to their studies. Never ask for or encourage sharing personal details, photos or contact information, and never suggest meeting anyone. " +
+        "If the student says they are being hurt, are in danger, are thinking about harming themselves, or someone is harming them, reply with warmth, tell them it matters, and urge them to talk to a trusted adult or the school counsellor today; set concern to \"safety\". " +
+        "If they seem very upset, stressed, lonely or bullied, be kind, suggest talking to someone they trust at school, and set concern to \"wellbeing\". Otherwise set concern to \"none\". " +
+        "Set title to a short name (two to six words) for what this conversation is about." +
+        (p.context ? `\n\nThe student opened this chat from their ${p.context.kind} "${p.context.title}":\n${p.context.text.slice(0, 6000)}` : ""),
+      messages: turns,
+      fallbacks: "default"
+    },
+    { headers: { "anthropic-beta": FALLBACK_BETA } }
+  );
+  if (response.stop_reason === "refusal") {
+    return { reply: "I can't help with that one. Let's get back to your school work, or talk to your teacher about it.", concern: "none" as const, title: "" };
+  }
+  if (!response.parsed_output) throw new Error("The study helper did not finish. Please try again.");
+  return response.parsed_output;
+}

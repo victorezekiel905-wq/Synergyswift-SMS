@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const session = req.nextUrl.searchParams.get("session_id");
   if (!session) return NextResponse.json({ error: "session_id required" }, { status: 400 });
   const { data } = await sb.from("rtc_rooms")
-    .select("id,host_user_id,state,created_at").eq("session_id", session)
+    .select("id,host_user_id,state,created_at,kind,name").eq("session_id", session).eq("kind", "main")
     .order("created_at", { ascending: false }).limit(5);
   return NextResponse.json(data ?? []);
 }

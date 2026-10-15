@@ -23,6 +23,7 @@ const GROUPS: NavGroup[] = [
     { href: "/school", label: "School overview", roles: STAFF.filter(r => r !== "cashier") },
     { href: "/school/inbox", label: "Parent messages", roles: STAFF.filter(r => r !== "cashier"), module: "inbox" },
     { href: "/student", label: "My school", roles: ["student"] },
+    { href: "/student/learn", label: "My learning", roles: ["student"], module: "lms" },
     { href: "/student/practice", label: "Past-question practice", roles: ["student"], module: "exams" },
     { href: "/forums", label: "Discussions", roles: [...STAFF, "student"], module: "lms" },
     { href: "/parent", label: "My children", roles: ["parent"] }
@@ -33,6 +34,7 @@ const GROUPS: NavGroup[] = [
     { href: "/school/schemes", label: "Schemes of work", roles: [...TEACH, "qa_officer"], module: "lesson_notes" },
     { href: "/school/lesson-notes", label: "Lesson notes", roles: [...TEACH, "qa_officer"], module: "lesson_notes" },
     { href: "/school/homework", label: "Homework", roles: TEACH, module: "homework" },
+    { href: "/school/learning", label: "Learning library", roles: [...TEACH, "counsellor"], module: "lms" },
     { href: "/school/timetable", label: "Timetable", roles: STAFF, module: "timetable" },
     { href: "/school/cover", label: "Cover", roles: TEACH, module: "cover" },
     { href: "/exams", label: "Secure exams", roles: TEACH, module: "exams" },
@@ -103,6 +105,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [idleWarn, setIdleWarn] = useState(false);
   const lastActive = useRef(Date.now());
   const bare = BARE.some(r => r.test(pathname));
+  // Lite mode (set on My learning) is kept per device.
+  useEffect(() => { try { document.documentElement.dataset.lite = localStorage.getItem("ecf-lite") === "1" ? "1" : ""; } catch { /* storage unavailable */ } }, []);
 
   useEffect(() => {
     if (bare) return;

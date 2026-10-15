@@ -3,6 +3,7 @@ import { useState } from "react";
 import { send, Alert, Badge, Empty, fmtDate } from "@/components/ui";
 import { CERT_LABEL, PROGRESS, type CertKind } from "@/lib/sis";
 import MyProgress from "@/components/student/MyProgress";
+import ChildLearning, { FamilyOnlineLessons } from "@/components/parent/ChildLearning";
 
 export type RecordsData = {
   achievements: { id: string; student_id: string; kind: string; title: string; award: string | null; level: string; achieved_on: string }[];
@@ -27,6 +28,7 @@ export default function Records({ data, kids, token, onChange }: { data: Records
   return (
     <div className="space-y-5 text-sm">
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
+      {!token && <FamilyOnlineLessons />}
       {kids.map(k => {
         const a = data.achievements.filter(x => x.student_id === k.id), c = data.certificates.filter(x => x.student_id === k.id), p = data.portfolio.filter(x => x.student_id === k.id);
         const d = data.documents.filter(x => x.student_id === k.id), plans = data.plans.filter(x => x.student_id === k.id);
@@ -35,6 +37,7 @@ export default function Records({ data, kids, token, onChange }: { data: Records
           <section key={k.id} className="space-y-3">
             <h3 className="font-semibold">{k.name}</h3>
             {!token && <MyProgress studentId={k.id} compact />}
+            {!token && <ChildLearning studentId={k.id} />}
             {plans.map(pl => (
               <div key={pl.id} className="rounded-lg border border-brand-200 bg-brand-50/40 p-3">
                 <p className="font-medium">{pl.title} <span className="text-xs font-normal text-slate-500">from {fmtDate(pl.starts_on)}{pl.review_on ? ` · next review ${fmtDate(pl.review_on)}` : ""}</span></p>

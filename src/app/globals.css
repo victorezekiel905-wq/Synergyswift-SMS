@@ -57,3 +57,8 @@
 .hljs-title, .hljs-function .hljs-title, .hljs-title.function_ { color: #93c5fd; }
 .hljs-tag, .hljs-name { color: #f9a8d4; }
 .hljs-type, .hljs-class .hljs-title { color: #fde68a; }
+
+/* Lite mode: less data and less work for slow phones. */
+html[data-lite="1"] *, html[data-lite="1"] *::before, html[data-lite="1"] *::after { animation: none !important; transition: none !important; }
+html[data-lite="1"] video:not([data-keep]) { background: #0f172a; }
+html[data-lite="1"] .lite-hide { display: none !important; }

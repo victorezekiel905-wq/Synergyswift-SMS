@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management · **7** attendance, timetable, calendar · **8** communication · **9** finance · **10** HR and payroll · **11** welfare, boarding, transport, library, inventory, co-curricular · **12** portals and apps · **13** analytics, integrations, compliance.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar · **8** communication · **9** finance · **10** HR and payroll · **11** welfare, boarding, transport, library, inventory, co-curricular · **12** portals and apps · **13** analytics, integrations, compliance.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -102,25 +102,25 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Portfolio, achievements, certificates | ✅ achievements and positions, portfolio work added by staff or by students (approved by a teacher), numbered certificates signed by the server with a QR check page, bulk issue for a class |
 | Transfer certificates and testimonials | ✅ worded from the record (dates, last class, reason, conduct, fees, positions, achievements, attendance), editable before issuing, revocable |
 
-## 6. Learning management (phase 6)
+## 6. Learning management (phase 6, done)
 
 | Feature | Status |
 |---|---|
 | Lesson studio, slides, live class, games, homework, rubrics | ✅ |
 | Lesson notes with approval | ✅ |
 | Schemes of work with curriculum objective mapping | ✅ curriculum objectives per subject and level (added one by one or pasted from the curriculum), week-by-week schemes mapped to them, coverage showing what is planned, taught and missing, approval by the head of department, QA or the principal (never the author), copying to another term, lesson notes linked to a week |
-| Content library incl. SCORM/xAPI, H5P | 🟡 media in lessons; no SCORM/xAPI/H5P |
+| Content library incl. SCORM/xAPI, H5P | ✅ upload SCORM 1.2, SCORM 2004, xAPI (Tin Can), H5P or zipped web pages; packages run in a sandbox with no access to the school's session; SCORM progress, scores and time saved per student (resumes where they left off); a built-in xAPI record store; H5P state and results; results per package for staff |
 | Authoring with LaTeX and code blocks | ✅ text slides, homework instructions and discussions take headings, lists, links, LaTeX maths (KaTeX) and highlighted code in 12 languages, always escaped; HTML embed slides now run in a sandbox |
-| Learning paths with prerequisites | ⬜ |
+| Learning paths with prerequisites | ✅ ordered steps (reading with maths and code, links, videos, interactive content, quizzes from the question bank, homework) with prerequisites (loops refused), published to classes; quizzes marked at once with explanations; content and homework steps tick themselves off; progress grid for teachers, progress for parents |
 | Assignments: late penalties, resubmission | ✅ penalty per day late with a cap, resubmission with an attempt limit and every earlier attempt kept, "send back to improve", file uploads (PDF, Word, PowerPoint, images, audio, video), homework for chosen learning groups only |
 | Inline annotation, voice/video feedback | ✅ comments on highlighted words in the answer and pins on uploaded images, recorded voice or video feedback, all shown to the student and family once the work is returned or marked |
 | Plagiarism and AI-content checks | ✅ similarity against classmates' answers and the student's own earlier work, with the matching passages; a writing-style change check against the student's earlier work as the sign of outside or AI help. Both are labelled as prompts for a conversation, never proof |
 | Discussion forums | ✅ class, school-wide and staff-room forums, threads and replies with maths and code, pinning, locking, hiding, reports from students, a language filter and a posting limit for students |
-| Zoom, Google Meet, Teams | ⬜ 🔑 (built-in video exists) |
-| Whiteboard, polls, breakout rooms, hand raise | 🟡 whiteboard, polls, hand raise exist; breakout rooms missing |
+| Zoom, Google Meet, Teams | ✅ online lessons for one or more classes with a Meet, Teams or Zoom link, or the Zoom meeting created automatically (waiting room, muted entry) 🔑 school's own Zoom app or ZOOM_*; join opens 15 minutes early, who joined is recorded, teacher starts Zoom as host |
+| Whiteboard, polls, breakout rooms, hand raise | ✅ breakout rooms in the live audio/video room: split at random with a time limit, move students, visit rooms, message every room, close and bring everyone back. Live rooms are now limited to the session's class (they were open to the whole school) |
 | Differentiation, gamification (badges, streaks) | ✅ learning groups inside a class (support, core, extension) that homework can target; points for homework, practice and discussion, school-day streaks, automatic and teacher-given badges, a class overview, shown to students and parents |
-| AI assistant: lesson plans, quiz generation, feedback, tutor bot | 🟡 lesson notes, comments and now draft homework feedback with a suggested mark 🔑 (ANTHROPIC_API_KEY); quiz generation and tutor in 6b |
-| Offline and low-bandwidth mode | 🟡 offline register; installable app |
+| AI assistant: lesson plans, quiz generation, feedback, tutor bot | ✅ 🔑 (ANTHROPIC_API_KEY) lesson notes, report comments, homework feedback; quiz questions on a topic, matched to curriculum objectives or lesson notes, checked by the teacher before they reach the bank; a study helper for students (hints, not answers) that the school switches on, with a daily limit, chats readable by teachers and parents, and safety or wellbeing concerns sent to counsellors at once |
+| Offline and low-bandwidth mode | ✅ interactive content kept on the device opens without a connection, and its progress is sent when the connection returns; lite mode (audio-only live classes, no animations); offline register; installable app |
 
 ## 9–23
 
@@ -143,3 +143,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101003200_core_security.sql` | 4 |
 | `20260101003300_sis.sql` | 5 |
 | `20260101003400_lms_teaching.sql` | 6a |
+| `20260101003500_lms_content.sql` | 6b |

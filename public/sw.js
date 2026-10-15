@@ -5,8 +5,10 @@
  * - Never caches API responses or pages: school data is always live and private.
  * - When offline, page navigations show a small offline notice instead of an error.
  * - Shows push notifications (results, sign-in alerts, messages, bus, wallet).
+ * - Learning content a student chose to keep offline ("ecf-content-<id>"
+ *   caches, filled by the page) opens without a connection.
  */
-const CACHE = "educlass-static-v2";
+const CACHE = "educlass-static-v3";
 // App pages that must open without a connection. They hold no school data:
 // the data is fetched by the page, and the register keeps its own offline copy.
 const PAGES = "educlass-pages-v1";
@@ -21,7 +23,7 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== PAGES).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== PAGES && !k.startsWith("ecf-content-")).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
 self.addEventListener("fetch", (event) => {
@@ -30,6 +32,12 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return; // never cache data
+
+  // Content packages: always the network; a copy kept for offline use when there is none.
+  if (url.pathname.startsWith("/pkg/")) {
+    event.respondWith(fetch(req).catch(() => offlinePackageFile(url)));
+    return;
+  }
 
   // Immutable build assets: cache first.
   if (url.pathname.startsWith("/_next/static/") || url.pathname === "/icon.svg") {
@@ -55,6 +63,19 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(fetch(req).catch(() => new Response(OFFLINE_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } })));
   }
 });
+
+// /pkg/<token>/<path>: the token's middle names the package; kept copies are stored as /__pkg/<package>/<path>.
+async function offlinePackageFile(url) {
+  try {
+    const parts = url.pathname.split("/");
+    const body = parts[2].split(".")[0].replace(/-/g, "+").replace(/_/g, "/");
+    const pkg = JSON.parse(atob(body + "===".slice((body.length + 3) % 4))).p;
+    const path = parts.slice(3).map(decodeURIComponent).join("/");
+    const hit = await caches.match(`/__pkg/${pkg}/${path}`, { cacheName: `ecf-content-${pkg}` });
+    if (hit) return hit;
+  } catch (e) { /* not a package link */ }
+  return new Response(OFFLINE_HTML, { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } });
+}
 
 // Push notifications. The payload is { title, body, url, tag } from the server.
 self.addEventListener("push", (event) => {

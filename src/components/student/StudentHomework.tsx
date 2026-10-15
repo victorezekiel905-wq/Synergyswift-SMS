@@ -102,7 +102,10 @@ export function StudentHomework() {
                   {s && <p className="text-xs text-slate-500">This will be try {s.attempt + 1} of {h.max_attempts}. Your earlier try is kept.</p>}
                   <textarea className="input h-32" value={text} onChange={e => setText(e.target.value)} placeholder="Type your answer" aria-label="Your answer" />
                   {h.accept_files && <input className="input" type="file" name="files" multiple accept="application/pdf,image/*,audio/*,video/*,.docx,.pptx" aria-label="Attach work (up to 5 files, 20 MB each)" />}
-                  <button className="btn btn-primary" disabled={busy}>{busy ? "Sending…" : s ? "Hand in again" : "Hand in"}</button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button className="btn btn-primary" disabled={busy}>{busy ? "Sending…" : s ? "Hand in again" : "Hand in"}</button>
+                    <a className="text-xs text-brand-700 hover:underline" href={`/student/learn?tab=tutor&homework=${h.id}&title=${encodeURIComponent(h.title)}`}>Stuck? Ask the study helper</a>
+                  </div>
                 </form>
               )}
               {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
