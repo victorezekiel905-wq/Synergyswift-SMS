@@ -1,7 +1,11 @@
 "use client";
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { useApi, send, Page, PageHeader, Alert, Badge, statusTone, Field, fmtDate, fmtTime, Modal, Loading } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Badge, statusTone, Field, fmtDate, fmtTime, Modal, Loading, Tabs, rolesOf, type Me } from "@/components/ui";
+import Documents from "@/components/sis/Documents";
+import Sen from "@/components/sis/Sen";
+import Achievements from "@/components/sis/Achievements";
+import History from "@/components/sis/History";
 import { LANGUAGES } from "@/lib/languages";
 import QrCode from "@/components/QrCode";
 
@@ -22,6 +26,10 @@ export default function StudentDetail(props: { params: Promise<{ id: string }> }
   const [edit, setEdit] = useState<Record<string, any> | null>(null);
   const [addG, setAddG] = useState(false);
   const [card, setCard] = useState(false);
+  const [tab, setTab] = useState<"profile" | "documents" | "sen" | "achievements" | "history">("profile");
+  const { data: me } = useApi<Me>("/api/me");
+  const admin = ["school_admin", "principal", "platform_admin"].some(r => rolesOf(me).has(r));
+  useEffect(() => { const h = window.location.hash.slice(1); if (["documents", "sen", "achievements", "history"].includes(h)) setTab(h as typeof tab); }, []);
   useEffect(() => { if (data) setEdit({ ...data.student, class_group_id: data.student.class_group_id ?? "" }); }, [data]);
 
   async function guardianAction(body: Record<string, unknown>, ok: string) {
@@ -63,7 +71,14 @@ export default function StudentDetail(props: { params: Promise<{ id: string }> }
           <a className="btn btn-outline" href={`/api/sims/students/${s.id}/export`} title="Everything held about this student, for a data access request">Export data</a>
         </>} />
       {msg && <div className="mb-4"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
-
+      <Tabs value={tab} onChange={t => { setTab(t); history.replaceState(null, "", `#${t}`); }} tabs={[
+        { id: "profile", label: "Profile" }, { id: "documents", label: "Documents" }, { id: "sen", label: "SEN & support" },
+        { id: "achievements", label: "Achievements & certificates" }, { id: "history", label: "History & leaving" }]} />
+      {tab === "documents" && <Documents studentId={s.id} />}
+      {tab === "sen" && <Sen studentId={s.id} />}
+      {tab === "achievements" && <Achievements studentId={s.id} admin={admin} />}
+      {tab === "history" && <History studentId={s.id} classes={structure?.class_groups ?? []} onChanged={reload} />}
+      {tab === "profile" && <>
       <div className="grid gap-5 xl:grid-cols-3">
         <form onSubmit={saveStudent} className="card grid gap-3 p-5 sm:grid-cols-2 xl:col-span-2">
           <h2 className="font-semibold sm:col-span-2">Record</h2>
@@ -136,6 +151,7 @@ export default function StudentDetail(props: { params: Promise<{ id: string }> }
           </ul>
         </section>
       </div>
+      </>}
 
       <AddGuardian open={addG} onClose={() => setAddG(false)} onSave={async (g) => { await guardianAction({ action: "add", student_id: s.id, guardian: g }, "Guardian added"); setAddG(false); }} />
       <Modal open={card} onClose={() => setCard(false)} title="ID card">

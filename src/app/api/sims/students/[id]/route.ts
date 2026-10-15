@@ -4,6 +4,7 @@ import { StudentInput, cleanStudent } from "@/lib/validators";
 import { createServiceClient } from "@/lib/supabase/service";
 import { provisionUser } from "@/lib/provision";
 import { appUrl, studentName } from "@/lib/school";
+import { recordMovement } from "@/lib/sis-server";
 
 /** Full student profile: bio, guardians, recent gate events, report cards, library loans. */
 export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -37,11 +38,17 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
   if (ctx instanceof NextResponse) return ctx;
   const parsed = StudentInput.partial().safeParse(await readJson(req));
   if (!parsed.success) return jsonError(parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "));
+  const { data: before } = await ctx.sb.from("students").select("class_group_id,status,class_groups(name)").eq("tenant_id", ctx.tenant.id).eq("id", params.id).maybeSingle();
   const { data, error } = await ctx.sb.from("students").update(cleanStudent(parsed.data))
-    .eq("tenant_id", ctx.tenant.id).eq("id", params.id).select("id").maybeSingle();
+    .eq("tenant_id", ctx.tenant.id).eq("id", params.id).select("id,class_group_id,status,class_groups(name)").maybeSingle();
   if (error) return jsonError(error.message.includes("duplicate") ? "admission number already exists" : error.message);
   if (!data) return jsonError("not found", 404);
-  return NextResponse.json(data);
+  // Class moves and suspensions made here go into the enrolment history too (leaving has its own steps).
+  if (before && before.class_group_id !== data.class_group_id && data.status === "active")
+    await recordMovement(ctx.sb, { tenantId: ctx.tenant.id, studentId: data.id, kind: "class_change", fromClass: before.class_groups?.name ?? null, toClass: data.class_groups?.name ?? null, recordedBy: ctx.userId });
+  if (before && before.status !== data.status && (data.status === "suspended" || (before.status === "suspended" && data.status === "active")))
+    await recordMovement(ctx.sb, { tenantId: ctx.tenant.id, studentId: data.id, kind: data.status === "suspended" ? "suspended" : "reinstated", recordedBy: ctx.userId });
+  return NextResponse.json({ id: data.id });
 }
 
 /** POST { action: "create_login", email } → gives the student a portal/exam login. */

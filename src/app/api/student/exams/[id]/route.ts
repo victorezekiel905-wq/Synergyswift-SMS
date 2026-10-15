@@ -11,6 +11,7 @@ import {
 } from "@/lib/exams/server";
 import { appUrl } from "@/lib/school";
 import { clientIp, ipAllowed } from "@/lib/net";
+import { extraMinutes } from "@/lib/sis";
 
 export const dynamic = "force-dynamic";
 
@@ -106,9 +107,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     if (b.access_code.toUpperCase() !== String(exam.access_code).toUpperCase()) return jsonError("wrong exam code", 403);
     const layout = buildAttemptLayout(questions, { shuffleQuestions: Boolean(settings.shuffle_questions), shuffleOptions: settings.shuffle_options !== false, draw: settings.draw });
     const now = new Date();
+    // Access arrangements: a student on the SEN register with extra time gets it automatically.
+    const { data: me } = await svc.from("students").select("id,sen_profiles(extra_time_pct,status)").eq("tenant_id", ctx.tenant.id).eq("user_id", ctx.userId).maybeSingle();
+    const sen = (me as any)?.sen_profiles;
+    const extra = sen && sen.status !== "closed" ? extraMinutes(exam.duration_minutes, sen.extra_time_pct) : 0;
     const { data: attempt, error } = await svc.from("exam_attempts").insert({
       tenant_id: ctx.tenant.id, exam_id: exam.id, student_user_id: ctx.userId, started_at: now.toISOString(),
-      deadline_at: computeDeadline(exam, now).toISOString(), question_order: layout.question_order, option_orders: layout.option_orders,
+      deadline_at: computeDeadline(exam, now, extra).toISOString(), question_order: layout.question_order, option_orders: layout.option_orders,
       seb_verified: seb.ok && seb.level !== "none", client_ip: ip,
       user_agent: req.headers.get("user-agent")?.slice(0, 300) ?? null
     }).select("*").single();

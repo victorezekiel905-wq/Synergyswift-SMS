@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { send, Alert, Badge, Empty, Tabs, Field, fmtDate, fmtTime, money } from "@/components/ui";
 import { ParentMessages, ParentWallet, ParentBus } from "./FamilyConnect";
 import { ReenrolCard, SurveyPrompt, SupportTab, ConsentCard, type SupportData } from "./Support";
+import Records, { type RecordsData } from "./Records";
 
 export type Extras = {
   currency: string;
@@ -18,9 +19,10 @@ export type Extras = {
   transport: { student_id: string; stop_name: string | null; transport_routes: { name: string; vehicle: string | null; driver_name: string | null; driver_phone: string | null } | null }[];
   hostel: { student_id: string; bed_label: string | null; hostel_rooms: { name: string; hostels: { name: string } | null } | null }[];
   support?: SupportData;
+  records?: RecordsData | null;
 };
 type Child = { id: string; name: string; class_group_id?: string | null };
-type Tab = "messages" | "fees" | "wallet" | "bus" | "events" | "meetings" | "learning" | "boarding" | "support";
+type Tab = "messages" | "fees" | "wallet" | "bus" | "events" | "meetings" | "learning" | "boarding" | "support" | "records";
 
 /** Extra parent-portal tabs: fees, events and consent, meetings, learning, boarding. */
 export default function FamilyTabs({ extras, kids, token, onChange }: { extras: Extras; kids: Child[]; token?: string; onChange: () => void }) {
@@ -32,13 +34,14 @@ export default function FamilyTabs({ extras, kids, token, onChange }: { extras: 
     ...(extras.transport.length ? [{ id: "bus" as const, label: "Bus" }] : []),
     { id: "events", label: "Events" }, { id: "meetings", label: "Meetings" }, { id: "learning", label: "Learning" },
     ...(boarding ? [{ id: "boarding" as const, label: "Boarding" }] : []),
+    ...(extras.records ? [{ id: "records" as const, label: `Records${extras.records.plans.some(p => !p.parent_agreed_at) ? " •" : ""}` }] : []),
     ...(extras.support ? [{ id: "support" as const, label: `Help & feedback${extras.support.tickets.some(t => t.status === "waiting") ? " •" : ""}` }] : [])
   ];
   const [tab, setTab] = useState<Tab>("fees");
   // Links in notifications open the right tab (#messages, #wallet, #bus).
   useEffect(() => {
     const h = window.location.hash.slice(1) as Tab;
-    if (["messages", "wallet", "bus", "events", "support"].includes(h)) { setTab(h); setTimeout(() => document.getElementById("events")?.scrollIntoView({ behavior: "smooth" }), 300); }
+    if (["messages", "wallet", "bus", "events", "support", "records"].includes(h)) { setTab(h); setTimeout(() => document.getElementById("events")?.scrollIntoView({ behavior: "smooth" }), 300); }
   }, []);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const name = (sid: string) => kids.find(k => k.id === sid)?.name.split(" ")[0] ?? "";
@@ -135,6 +138,7 @@ export default function FamilyTabs({ extras, kids, token, onChange }: { extras: 
       {tab === "bus" && <ParentBus token={token} kids={kids} />}
       {tab === "boarding" && <Boarding extras={extras} kids={kids} name={name} onRequest={b => act({ action: "exeat", ...b }, "Exeat requested. The house staff will reply shortly.")} />}
       {tab === "support" && extras.support && <SupportTab data={extras.support} kids={kids} token={token} onChange={onChange} />}
+      {tab === "records" && extras.records && <Records data={extras.records} kids={kids} token={token} onChange={onChange} />}
     </section>
     </>
   );

@@ -45,6 +45,8 @@ const GROUPS: NavGroup[] = [
   { title: "Students", links: [
     { href: "/school/students", label: "Students & parents", roles: STAFF, module: "sims" },
     { href: "/school/analytics", label: "Early warning", roles: [...PASTORAL, "qa_officer"], module: "analytics" },
+    { href: "/school/sen", label: "SEN register", roles: PASTORAL, module: "sims" },
+    { href: "/school/certificates", label: "Certificates", roles: ADMIN, module: "sims" },
     { href: "/school/behaviour", label: "Behaviour & houses", roles: [...PASTORAL, "hostel_warden"], module: "behaviour" },
     { href: "/school/health", label: "Health & sick bay", roles: ["nurse", "hostel_warden", ...PASTORAL], module: "health" },
     { href: "/school/gate", label: "Sign in / out", roles: STAFF, module: "gate" },
@@ -89,7 +91,7 @@ const GROUPS: NavGroup[] = [
 ];
 
 // Pages that render without the app chrome (public links, kiosk, exam lockdown).
-const BARE = [/^\/login$/, /^\/signup$/, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/pay\//, /^\/apply\//, /^\/enquire\//, /^\/visit\//, /^\/entrance\//, /^\/t\//, /^\/s\//, /^\/unsubscribe\//, /^\/alumni\//, /\/print$/, /\/transcript$/];
+const BARE = [/^\/login$/, /^\/signup$/, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/pay\//, /^\/apply\//, /^\/enquire\//, /^\/visit\//, /^\/entrance\//, /^\/t\//, /^\/s\//, /^\/unsubscribe\//, /^\/alumni\//, /^\/v\//, /\/print$/, /\/transcript$/];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

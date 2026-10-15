@@ -139,9 +139,18 @@ v46 adds the modules that the leading systems sell separately, so one login runs
 - **Search**: press Ctrl K (⌘ K on a Mac) anywhere.
 - **Counsellors** see behaviour, early warning and health records (read only). **Alumni** invited from the alumni directory sign in to their own alumni page and never see school data.
 
+### Student records (phase 5)
+
+- Each student's page has tabs: **Documents**, **SEN & support**, **Achievements & certificates** and **History & leaving**.
+- **Leaving**: under History & leaving, record a transfer, withdrawal or graduation with the last day, reason and new school. The checklist shows unpaid fees, unreturned books, a boarding bed and wallet money to refund. The child's place, bed, bus seat and own sign-in are released; nothing is deleted, and they can be re-admitted.
+- **Certificates** (`/school/certificates`): issue to a whole class (attendance, completion, participation) or, from a student's page, a transfer certificate, testimonial or award with the wording prepared from their record. Each certificate has a number and a QR code; scanning it shows whether it is genuine or has been revoked.
+- **SEN register** (`/school/sen`): children with special educational needs, their support plans and review dates, and a printable list of exam arrangements for invigilators. Extra time is added automatically to online exams.
+- Promoting students at the end of the session records each move in their history and can add graduates to the alumni list.
+
 ### Parents and students
 
-- The parent portal adds tabs for **Fees**, **Events**, **Meetings**, **Learning** (homework, timetable, behaviour, attendance), **Boarding** and **Help & feedback** (raise and follow complaints and requests). It also asks about re-enrolment, shows waiting surveys, and lists the permissions the school asks for (**Permissions and privacy**). It works both after sign-in and through the private WhatsApp link.
+- The parent portal adds tabs for **Fees**, **Events**, **Meetings**, **Learning** (homework, timetable, behaviour, attendance), **Boarding** and **Help & feedback** (raise and follow complaints and requests). It also asks about re-enrolment, shows waiting surveys, and lists the permissions the school asks for (**Permissions and privacy**). **Records** shows each child's achievements, certificates, approved work, shared documents and support plan, which parents can agree to.
+- Students add their own work to **My portfolio**; a teacher approves it before families see it. It works both after sign-in and through the private WhatsApp link.
 - Students see their homework and timetable on `/student`.
 - The app can be installed on a phone's home screen. It shows an offline page when there is no connection, and it never caches school data.
 

@@ -6,6 +6,7 @@
  */
 import { familyReenrolment } from "./community-server";
 import { familyConsent } from "./consent-server";
+import { familyRecords } from "./sis-server";
 import { createInvoice } from "./fees";
 import { notifyGuardians, notifyContact, money } from "./notify";
 import { meetingBooked } from "./messaging/notices";
@@ -116,7 +117,8 @@ export async function familyExtras(svc: any, tenantId: string, guardianId: strin
     slots: slots ?? [],
     transport: transport.data ?? [],
     hostel: hostel.data ?? [],
-    support: await familySupport(svc, tenantId, guardianId)
+    support: await familySupport(svc, tenantId, guardianId),
+    records: await familyRecords(svc, tenantId, studentIds).catch(() => null)
   };
 }
 

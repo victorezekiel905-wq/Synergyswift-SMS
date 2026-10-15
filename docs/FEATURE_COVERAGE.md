@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS · **6** learning management · **7** attendance, timetable, calendar · **8** communication · **9** finance · **10** HR and payroll · **11** welfare, boarding, transport, library, inventory, co-curricular · **12** portals and apps · **13** analytics, integrations, compliance.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management · **7** attendance, timetable, calendar · **8** communication · **9** finance · **10** HR and payroll · **11** welfare, boarding, transport, library, inventory, co-curricular · **12** portals and apps · **13** analytics, integrations, compliance.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -90,17 +90,17 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Email/SMS campaigns and newsletters to families, segments, alumni or partners: sections with images and links, personalisation, preview, test send, scheduling, delivery numbers, one-click unsubscribe | ✅ (WhatsApp campaigns reach only people who messaged in the last 24 hours, as Meta requires) |
 | Partner and vendor CRM: suppliers, sponsors and partners with contracts, renewal alerts, ratings, tags, contact log and spend from expenses | ✅ |
 
-## 5. Student information system (phase 5)
+## 5. Student information system (phase 5, done)
 
 | Feature | Status |
 |---|---|
-| Student profile, guardians, photo, documents | ✅ |
+| Student profile, guardians, photo, documents | ✅ documents stored privately (birth certificate, reports, medical, court orders …), confidential ones limited to admins, counsellors and the nurse, some shared with the family, admissions papers kept on file in one click |
 | Admission numbers, QR ID cards | ✅ |
-| Promotion, transfers, withdrawals, graduation | 🟡 promotion and rollover; transfer and graduation records missing |
+| Promotion, transfers, withdrawals, graduation | ✅ enrolment history for every child (admitted, promoted, repeated, moved class, suspended, transferred, withdrawn, graduated, re-admitted); leaving with a clearance checklist (fees, library, boarding, wallet) that releases the bed, bus seat and sign-in; graduates join the alumni list |
 | Behaviour, merits, house points | ✅ |
-| SEN records and IEPs | ⬜ |
-| Portfolio, achievements, certificates | ⬜ |
-| Transfer certificates and testimonials | ⬜ |
+| SEN records and IEPs | ✅ SEN register with areas and needs, strategies shared with the child's teachers, exam access arrangements (extra time applied automatically to online exams), coordinators, support plans with targets owned by teachers, progress, reviews and parents' agreement in the portal |
+| Portfolio, achievements, certificates | ✅ achievements and positions, portfolio work added by staff or by students (approved by a teacher), numbered certificates signed by the server with a QR check page, bulk issue for a class |
+| Transfer certificates and testimonials | ✅ worded from the record (dates, last class, reason, conduct, fees, positions, achievements, attendance), editable before issuing, revocable |
 
 ## 6. Learning management (phase 6)
 
@@ -141,3 +141,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101003000_review_fixes.sql` | 2 fixes |
 | `20260101003100_community_crm.sql` | 3 |
 | `20260101003200_core_security.sql` | 4 |
+| `20260101003300_sis.sql` | 5 |

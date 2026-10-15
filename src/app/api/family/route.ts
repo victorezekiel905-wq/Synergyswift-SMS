@@ -9,6 +9,7 @@ import { appUrl } from "@/lib/school";
 import { createTicket, respondReenrolment } from "@/lib/community-server";
 import { TICKET_CATEGORIES, REENROL_REASONS } from "@/lib/community";
 import { recordConsent } from "@/lib/consent-server";
+import { familyFileLink } from "@/lib/sis-server";
 import { clientIp } from "@/lib/net";
 
 /**
@@ -28,6 +29,8 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reenrol"), token: z.string().optional(), round_id: z.string().uuid(), student_id: z.string().uuid(), intent: z.enum(["returning", "not_returning", "undecided"]),
     reason: z.enum(REENROL_REASONS).nullish(), note: z.string().trim().max(500).nullish() }),
   z.object({ action: z.literal("consent"), token: z.string().optional(), purpose_id: z.string().uuid(), student_id: z.string().uuid().nullish(), granted: z.boolean() }),
+  z.object({ action: z.literal("iep_agree"), token: z.string().optional(), iep_id: z.string().uuid(), views: z.string().trim().max(2000).nullish() }),
+  z.object({ action: z.literal("open_file"), token: z.string().optional(), kind: z.enum(["document", "portfolio"]), id: z.string().uuid() }),
   z.object({ action: z.literal("language"), token: z.string().optional(), language: z.string().refine(l => l in LANGUAGES, "unsupported language").nullable() })
 ]);
 
@@ -66,6 +69,20 @@ export async function POST(req: NextRequest) {
       case "consent":
         return NextResponse.json(await recordConsent(svc, { tenantId, guardianId, purposeId: b.purpose_id, studentId: b.student_id ?? null, granted: b.granted,
           method: b.token ? "link" : "portal", ip: clientIp(req.headers), userAgent: req.headers.get("user-agent") }));
+      case "iep_agree": {
+        // The family reads the support plan and agrees, adding their own views.
+        const { data: links } = await svc.from("student_guardians").select("student_id").eq("tenant_id", tenantId).eq("guardian_id", guardianId);
+        const ids = (links ?? []).map((l: { student_id: string }) => l.student_id);
+        const { data: plan } = await svc.from("ieps").select("id,parent_views").eq("tenant_id", tenantId).eq("id", b.iep_id).eq("status", "active").in("student_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).maybeSingle();
+        if (!plan) return jsonError("plan not found", 404);
+        const views = b.views ? [plan.parent_views, `${new Date().toISOString().slice(0, 10)}: ${b.views}`].filter(Boolean).join("\n") : plan.parent_views;
+        const { error } = await svc.from("ieps").update({ parent_agreed_at: new Date().toISOString(), parent_views: views, updated_at: new Date().toISOString() }).eq("id", plan.id);
+        return error ? jsonError(error.message) : NextResponse.json({ ok: true });
+      }
+      case "open_file": {
+        const { data: links } = await svc.from("student_guardians").select("student_id").eq("tenant_id", tenantId).eq("guardian_id", guardianId);
+        return NextResponse.json({ url: await familyFileLink(svc, tenantId, (links ?? []).map((l: { student_id: string }) => l.student_id), b.kind, b.id) });
+      }
       case "language": {
         const { error } = await svc.from("guardians").update({ language: b.language }).eq("tenant_id", tenantId).eq("id", guardianId);
         return error ? jsonError(error.message) : NextResponse.json({ ok: true });

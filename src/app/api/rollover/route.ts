@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { studentName } from "@/lib/school";
+import { createServiceClient } from "@/lib/supabase/service";
 
 /**
  * Year-end promotion wizard (fixes the painful "rollover" other systems are
@@ -44,6 +45,7 @@ export async function GET() {
 const Body = z.object({
   moves: z.array(z.object({ from: z.string().uuid(), to: z.union([z.string().uuid(), z.literal("graduate"), z.literal("stay")]) })).min(1).max(500),
   repeat_student_ids: z.array(z.string().uuid()).max(5000).default([]),
+  add_graduates_to_alumni: z.boolean().default(true),
   confirm: z.literal(true)
 });
 
@@ -63,18 +65,52 @@ export async function POST(req: NextRequest) {
     snapshot.set(m.from, (data ?? []).map((s: any) => s.id).filter((id: string) => !repeat.has(id)));
   }
   let promoted = 0, graduated = 0;
+  const today = new Date().toISOString().slice(0, 10);
+  // Every move goes into each child's history, under the session that is ending.
+  const [{ data: groups }, { data: session }] = await Promise.all([
+    ctx.sb.from("class_groups").select("id,name").eq("tenant_id", tid),
+    ctx.sb.from("terms").select("academic_sessions(name)").eq("tenant_id", tid).eq("is_current", true).maybeSingle()
+  ]);
+  const className = new Map<string, string>((groups ?? []).map((g: any) => [g.id, g.name]));
+  const sessionName = (session as any)?.academic_sessions?.name ?? null;
+  const history: Record<string, unknown>[] = [];
+  const graduates: { id: string; from: string }[] = [];
   for (const m of b.moves) {
     const ids = snapshot.get(m.from) ?? [];
     if (!ids.length || m.to === "stay") continue;
     for (let i = 0; i < ids.length; i += 400) {
       const part = ids.slice(i, i + 400);
       const { error } = m.to === "graduate"
-        ? await ctx.sb.from("students").update({ status: "graduated", class_group_id: null }).eq("tenant_id", tid).in("id", part)
+        ? await ctx.sb.from("students").update({ status: "graduated", class_group_id: null, left_on: today, leaving_kind: "graduated", leaving_reason: "Completed school" }).eq("tenant_id", tid).in("id", part)
         : await ctx.sb.from("students").update({ class_group_id: m.to }).eq("tenant_id", tid).in("id", part);
       if (error) return jsonError(error.message);
     }
+    for (const sid of ids) {
+      history.push({ tenant_id: tid, student_id: sid, kind: m.to === "graduate" ? "graduated" : "promoted", effective_on: today, from_class: className.get(m.from) ?? null,
+        to_class: m.to === "graduate" ? null : className.get(m.to) ?? null, session_name: sessionName, recorded_by: ctx.userId });
+      if (m.to === "graduate") graduates.push({ id: sid, from: className.get(m.from) ?? "" });
+    }
     if (m.to === "graduate") graduated += ids.length; else promoted += ids.length;
   }
+  if (repeat.size) {
+    const { data: rep } = await ctx.sb.from("students").select("id,class_group_id").eq("tenant_id", tid).in("id", [...repeat]);
+    for (const s of rep ?? []) history.push({ tenant_id: tid, student_id: s.id, kind: "repeated", effective_on: today, from_class: className.get(s.class_group_id) ?? null,
+      to_class: className.get(s.class_group_id) ?? null, session_name: sessionName, recorded_by: ctx.userId });
+  }
+  for (let i = 0; i < history.length; i += 500) await ctx.sb.from("student_movements").insert(history.slice(i, i + 500));
+  let alumni = 0;
+  if (b.add_graduates_to_alumni && graduates.length) {
+    const svc = createServiceClient();
+    const { data: have } = await svc.from("alumni").select("student_id").eq("tenant_id", tid).in("student_id", graduates.map(g => g.id));
+    const skip = new Set((have ?? []).map((a: any) => a.student_id));
+    const { data: names } = await svc.from("students").select("id,first_name,last_name,other_names").in("id", graduates.map(g => g.id));
+    const rows = graduates.filter(g => !skip.has(g.id)).map(g => {
+      const s = (names ?? []).find((x: any) => x.id === g.id);
+      return { tenant_id: tid, student_id: g.id, full_name: studentName(s), graduation_year: Number(today.slice(0, 4)), last_class: g.from || null, source: "graduated", status: "active" };
+    });
+    for (let i = 0; i < rows.length; i += 500) await svc.from("alumni").insert(rows.slice(i, i + 500));
+    alumni = rows.length;
+  }
   await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "students.rollover", meta: { promoted, graduated, repeating: repeat.size } });
-  return NextResponse.json({ promoted, graduated, repeating: repeat.size });
+  return NextResponse.json({ promoted, graduated, repeating: repeat.size, alumni });
 }

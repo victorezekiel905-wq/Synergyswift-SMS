@@ -33,6 +33,13 @@ const TABLES: { key: string; table: string; select: string; by?: string }[] = [
   { key: "reenrolment", table: "reenrolment_responses", select: "intent,reason,note,responded_at,reenrolment_rounds(title)" },
   { key: "contact_log", table: "crm_interactions", select: "kind,body,occurred_at" },
   { key: "consents", table: "consent_records", select: "granted,version,method,created_at,consent_purposes(title)" },
+  { key: "enrolment_history", table: "student_movements", select: "kind,effective_on,from_class,to_class,session_name,school,reason" },
+  { key: "documents", table: "student_documents", select: "kind,name,created_at,shared_with_family,confidential" },
+  { key: "sen_profile", table: "sen_profiles", select: "status,areas,needs,summary,strengths,strategies,extra_time_pct,arrangements,agencies,updated_at" },
+  { key: "support_plans", table: "ieps", select: "title,starts_on,review_on,status,student_voice,parent_views,iep_targets(target,strategies,progress),iep_reviews(reviewed_on,summary)" },
+  { key: "achievements", table: "student_achievements", select: "kind,title,award,level,achieved_on" },
+  { key: "portfolio", table: "portfolio_items", select: "title,kind,description,link_url,status,created_at" },
+  { key: "certificates", table: "certificates", select: "kind,serial_no,title,issued_on,status" },
   { key: "alumni_record", table: "alumni", select: "full_name,graduation_year,email,phone,occupation,employer,further_study,city,country,consent_contact,created_at" }
 ];
 

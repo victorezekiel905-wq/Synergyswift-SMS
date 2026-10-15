@@ -11,6 +11,7 @@ export default function RolloverPage() {
   const [repeat, setRepeat] = useState<Set<string>>(new Set());
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [alumni, setAlumni] = useState(true);
   useEffect(() => {
     if (!data) return;
     setMoves(Object.fromEntries(data.classes.map(c => [c.id, c.suggested ?? "stay"])));
@@ -22,16 +23,18 @@ export default function RolloverPage() {
   async function run() {
     if (!confirm(`Promote ${total - repeat.size} students and keep ${repeat.size} in their class? This cannot be undone automatically.`)) return;
     setBusy(true);
-    const r = await send("/api/rollover", { moves: Object.entries(moves).map(([from, to]) => ({ from, to })), repeat_student_ids: [...repeat], confirm: true });
+    const r = await send("/api/rollover", { moves: Object.entries(moves).map(([from, to]) => ({ from, to })), repeat_student_ids: [...repeat], add_graduates_to_alumni: alumni, confirm: true });
     setBusy(false);
-    setMsg({ ok: r.ok, text: r.ok ? `Done: ${r.data.promoted} promoted, ${r.data.graduated} graduated, ${r.data.repeating} repeating.` : r.error ?? "failed" });
+    setMsg({ ok: r.ok, text: r.ok ? `Done: ${r.data.promoted} promoted, ${r.data.graduated} graduated, ${r.data.repeating} repeating${r.data.alumni ? `, ${r.data.alumni} added to alumni` : ""}. Each move is saved in the student's history.` : r.error ?? "failed" });
     if (r.ok) reload();
   }
   return (
     <Page wide>
       <PageHeader eyebrow="End of session" title="Promote students"
         subtitle={`Choose where each class goes next. Students below the pass mark (${data.pass_mark}%) are highlighted; tick anyone who should repeat. Do this after publishing the final term's results.`}
-        actions={<button className="btn btn-primary" disabled={busy} onClick={run}>{busy ? "Promoting…" : "Promote everyone"}</button>} />
+        actions={<>
+          <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={alumni} onChange={e => setAlumni(e.target.checked)} /> Add graduates to the alumni list</label>
+          <button className="btn btn-primary" disabled={busy} onClick={run}>{busy ? "Promoting…" : "Promote everyone"}</button></>} />
       {msg && <div className="mb-4"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
       {!data.classes.length ? <Empty>No classes.</Empty> : (
         <div className="space-y-3">{data.classes.map(c => (
