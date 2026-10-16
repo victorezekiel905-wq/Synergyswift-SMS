@@ -238,6 +238,13 @@ Under **HR**:
   - **Dining**: the week's menus (copy a week forward), how many to cook for, special diets and allergies, and the dining register.
 - **School buses** (`/school/transport`) adds **Buses & drivers**: record each bus's insurance, roadworthiness, licence and service dates, and each driver's licence and medical. Warnings show 30 days ahead; a bus with lapsed insurance or roadworthiness, or marked in for repair, cannot start a trip. Choose which bus and driver run each route. Putting a child on a route adds its bus fee to their extras; ending a trip lists anyone never scanned off.
 
+### Library (phase 11)
+
+- **Desk**: scan the reader's ID card (or type an admission or staff number), then each book's barcode to lend; scan returned books to take them back. Late fines are worked out, and a book someone reserved is flagged to put aside for them.
+- **Catalogue**: add a title by scanning its ISBN; details and the cover come from Open Library where it knows the book. For e-books, audiobooks and videos, upload the file or give a link and choose who may open it. Only share books the school has the right to share.
+- **Reservations**: students reserve from their Library page; when a copy comes back it is held for the first in the queue for a few days, and they (and their parents) are told. Uncollected holds pass to the next reader.
+- **Loans, fines and settings**: renew, mark lost (the reader owes the book's price), and mark fines paid or waived. Admins set the loan length, fine per day, books per student, days a hold is kept and renewals allowed.
+
 ### Payroll (phase 10)
 
 - **Tax & pension** (payroll staff): the starting rates follow the Nigeria Tax Act 2025 (PAYE bands from 0% on the first ₦800,000 a year to 25% above ₦50m; pension, NHF and NHIS deducted first; rent relief of 20% of rent up to ₦500,000) and the Pension Reform Act (8% staff, 10% school on basic + housing + transport), plus NSITF 1%. **Check every rate with your tax adviser before the first run**; they are all editable, including the bands, and a flat percentage per person is still available.

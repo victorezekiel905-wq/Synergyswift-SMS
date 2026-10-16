@@ -31,6 +31,7 @@ const GROUPS: NavGroup[] = [
     { href: "/student/learn", label: "My learning", roles: ["student"], module: "lms" },
     { href: "/student/messages", label: "Messages with teachers", roles: ["student"] },
     { href: "/student/practice", label: "Past-question practice", roles: ["student"], module: "exams" },
+    { href: "/school/library", label: "Library & e-books", roles: ["student"], module: "library" },
     { href: "/forums", label: "Discussions", roles: [...STAFF, "student"], module: "lms" },
     { href: "/calendar", label: "Calendar", roles: [...STAFF, "student", "parent"] },
     { href: "/parent", label: "My children", roles: ["parent"] }

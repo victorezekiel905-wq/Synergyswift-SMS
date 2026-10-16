@@ -208,9 +208,17 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Pickup and drop-off alerts | ✅ scans on and off with parents told each time, and an alert as the bus nears their stop; at the end of a trip, children never scanned off are flagged to the attendant and the transport officer |
 | Transport fee linkage | ✅ the route's bus fee is added to a rider's extras when they are put on a route (and removed when taken off), so it appears on their next invoices |
 
-## 17–23
+## 17. Library (phase 11c)
 
-Sections 17 (library), 17 (library), 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
+| Feature | Status |
+|---|---|
+| Catalogue (physical and e-books), ISBN/barcode scanning | ✅ print books, e-books, audiobooks, videos and links with covers, descriptions and subjects; scan an ISBN (USB scanner or the phone camera where the browser reads barcodes) to fill in details from Open Library; a library barcode for books without an ISBN; reader cards scanned at the desk |
+| Borrowing, returns, reservations, fines | ✅ lend and return by scanning; a loan limit per student; renewals (none while someone is waiting); a reservation queue where a returned copy is held for the next reader, who is told, and lapses to the next if not collected; late fines per day begun, marked paid or waived; lost books charged at the book's price; overdue reminders to readers and (weekly) parents |
+| E-library with digital resource access | ✅ files or links opened online by everyone, students and staff, or staff only; students reach the library and their loans from their menu |
+
+## 18–23
+
+Sections 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
 
 ## Database updates to run
 
@@ -239,3 +247,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101004200_payroll_appraisals.sql` | 10b |
 | `20260101004300_welfare.sql` | 11a |
 | `20260101004400_boarding_transport.sql` | 11b |
+| `20260101004500_library.sql` | 11c |

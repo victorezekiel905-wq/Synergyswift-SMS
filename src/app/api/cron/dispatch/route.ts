@@ -6,6 +6,7 @@ import { escalateTickets, sendDueCampaigns } from "@/lib/community-server";
 import { sendScheduledNotices } from "@/lib/notices-server";
 import { escalateConcerns } from "@/lib/welfare-server";
 import { alertLateReturns } from "@/lib/boarding-server";
+import { notifyReadyHolds } from "@/lib/library-server";
 import { appUrl } from "@/lib/school";
 
 export const dynamic = "force-dynamic";
@@ -35,8 +36,10 @@ async function run(req: NextRequest) {
   const safeguarding = await escalateConcerns(svc, base).catch(() => 0);
   // Boarders not back from exeat on time.
   const lateReturns = await alertLateReturns(svc, base).catch(() => 0);
+  // Reserved library books waiting to be collected.
+  const holds = await notifyReadyHolds(svc, base).catch(() => 0);
   const stats = await dispatchDue(svc, { budgetMs: 40_000, limit: 100, concurrency: 10 });
-  return NextResponse.json({ ok: true, ...stats, admissions_follow_ups: followUps, visit_reminders: reminders, tickets_escalated: escalated, campaigns_sent: campaigns, notices_sent: notices, safeguarding_escalated: safeguarding, late_exeat_returns: lateReturns });
+  return NextResponse.json({ ok: true, ...stats, admissions_follow_ups: followUps, visit_reminders: reminders, tickets_escalated: escalated, campaigns_sent: campaigns, notices_sent: notices, safeguarding_escalated: safeguarding, late_exeat_returns: lateReturns, library_holds_ready: holds });
 }
 
 export const GET = run;
