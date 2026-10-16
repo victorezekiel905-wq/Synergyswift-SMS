@@ -289,6 +289,15 @@ Under **Administration → Integrations & website**:
 - **Google Classroom & Teams**, under Teaching: each teacher connects their own account once, links their classes, then uses **Send to …** on a homework and later **Bring marks back**. With Microsoft connected, lesson notes can be sent to OneNote.
 - **Learning tools (LTI 1.3)**, under Teaching. An admin registers the tool using the details its makers give (login URL, launch URL, their public keys) and sends them the platform details shown on the page. Teachers then add the tool to a class (and, if they like, to a homework) and students open it from My school. Scores come back to the tool's **Scores** list, and into the homework when it is linked.
 
+### Policies, certificates and inspections (phase 13)
+
+Under **Administration → Policies & compliance**:
+
+- **Document library**: leaders, QA and HR add documents with a category, who may see them, and a review date (policies) or expiry date (certificates). Approve a document to publish it. To update one, use **New version**; approving it retires the old version. Tick "Staff must read and confirm" for policies such as safeguarding, and the library shows how many staff have confirmed. Reminders go to the document's owner while a review is due or a certificate has expired.
+- **Policies to read**: every member of staff sees the policies waiting for them and confirms each one.
+- **Single central record** (HR and leaders): record each check for each member of staff. Missing, pending and expired checks stand out; print it for inspectors.
+- **Inspection readiness**: an admin ticks the frameworks the school follows. For each requirement, set the status, an owner, notes and the documents that show it. **Print inspection pack** gives the whole framework with statuses and evidence. Not every item applies to every school: mark those not applicable.
+
 ### Payroll (phase 10)
 
 - **Tax & pension** (payroll staff): the starting rates follow the Nigeria Tax Act 2025 (PAYE bands from 0% on the first ₦800,000 a year to 25% above ₦50m; pension, NHF and NHIS deducted first; rent relief of 20% of rent up to ₦500,000) and the Pension Reform Act (8% staff, 10% school on basic + housing + transport), plus NSITF 1%. **Check every rate with your tax adviser before the first run**; they are all editable, including the bands, and a flat percentage per person is still available.

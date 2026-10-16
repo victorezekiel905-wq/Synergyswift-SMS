@@ -106,6 +106,7 @@ const GROUPS: NavGroup[] = [
     { href: "/school/data", label: "Import & export", roles: [...ADMIN, "it_admin"] },
     { href: "/school/integrations", label: "Integrations & website", roles: [...ADMIN, "admissions_officer"] },
     { href: "/school/audit", label: "Change history", roles: ADMIN },
+    { href: "/school/compliance", label: "Policies & compliance", roles: STAFF },
     { href: "/account/security", label: "Account security", roles: [...STAFF, "parent", "student"] },
     { href: "/school/rollover", label: "Promote students", roles: ADMIN, module: "sims" },
     { href: "/teacher/admin", label: "Policies & audit", roles: [...ADMIN, "it_admin"] },

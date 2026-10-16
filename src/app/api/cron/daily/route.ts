@@ -6,6 +6,7 @@ import { studentName } from "@/lib/school";
 import { expireOffers } from "@/lib/admissions-crm";
 import { runFeeAutomation } from "@/lib/fees-plus";
 import { sendOverdueReminders } from "@/lib/library-server";
+import { remindDocuments } from "@/lib/compliance-server";
 import { appUrl } from "@/lib/school";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,8 @@ export async function GET(req: NextRequest) {
   const fees = await runFeeAutomation(svc, appUrl(req)).catch(() => null);
   // Readers hear about overdue books; holds not collected in time pass to the next reader.
   const readerReminders = await sendOverdueReminders(svc).catch(() => 0);
+  // Policies due for review and certificates running out.
+  const documentReminders = await remindDocuments(svc, appUrl(req)).catch(() => 0);
   // Change history is kept for each school's chosen period; spent sign-in codes and access grants go at once.
   let historyPurged = 0;
   const { data: keep } = await svc.from("tenant_settings").select("tenant_id,audit_retention_days");
@@ -79,5 +82,5 @@ export async function GET(req: NextRequest) {
   }
   if (rows.length) await enqueue(svc, rows);
   const delivery = rows.length ? await dispatchDue(svc, { budgetMs: 40_000 }) : null;
-  return NextResponse.json({ expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, reader_reminders: readerReminders, webcam_photos_deleted: snapPaths.length, admission_offers_expired: offersExpired, change_history_purged: historyPurged, fees, delivery });
+  return NextResponse.json({ document_reminders: documentReminders, expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, reader_reminders: readerReminders, webcam_photos_deleted: snapPaths.length, admission_offers_expired: offersExpired, change_history_purged: historyPurged, fees, delivery });
 }
