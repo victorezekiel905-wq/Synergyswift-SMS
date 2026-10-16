@@ -275,6 +275,7 @@ Under **Students → Insights & returns** (each tab shows only to those allowed)
 - **Results**: pick a term and group by class, subject, teacher, year group, boys and girls, or student. It needs results compiled under Results & report cards. Click a student's name to see every subject across every term. Teachers see their own classes and subjects.
 - **Value added** (heads, principals and QA): needs results for two terms in a row. Read it as a prompt for conversation: "above" or "below" appears only when the evidence is clear.
 - **Fees** (bursary and heads) and **Admissions** (admissions staff and heads): the year month by month, collection by class, sources and conversion.
+- **Report builder** (`/school/reports`, under Students): choose a dataset, the term, dates or class, then columns, filters, grouping and totals, and **Run**. Save it to use again, tick **Share** for colleagues, or choose **Email it** every day, week or month. Recipients must be staff of the school. If the author leaves, the report stops sending and shows why.
 - **Government returns** (admins): fill in the school details once (school code, state, LGA…). Each year choose **Work out the census**, then check the figures and correct any with a note. Download the spreadsheet and enter or upload it on the ministry's form. When it has gone, **Mark as submitted** with their reference. Staff counts depend on staff qualifications and sex being recorded under HR; repeaters come from "repeated" movements on student records.
 
 ### Payroll (phase 10)

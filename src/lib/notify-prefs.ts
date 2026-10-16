@@ -28,7 +28,7 @@ const RULES: [GroupId, RegExp][] = [
   ["fees", /fee|invoice|payment|receipt|wallet|scholarship|instal|balance|debt/],
   ["transport", /bus|transport|route/],
   ["activities", /club|event|competition|library|book|activity|alumni/],
-  ["work", /leave|payslip|payroll|appraisal|recruit|hr_|contract|detention_duty|pastoral_referral|cover|requisition|approv|task|checklist|duty|purchase|procure/],
+  ["work", /schedul|leave|payslip|payroll|appraisal|recruit|hr_|contract|detention_duty|pastoral_referral|cover|requisition|approv|task|checklist|duty|purchase|procure/],
   ["messages", /message|broadcast|notice|announce|newsletter|survey|reenrol|meeting|conference|campaign|community|support|ticket|complaint/]
 ];
 

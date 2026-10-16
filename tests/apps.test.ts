@@ -21,6 +21,7 @@ describe("groupOf", () => {
     expect(groupOf("club")).toBe("activities");
     expect(groupOf("leave_decided")).toBe("work");
     expect(groupOf("payslip_ready")).toBe("work");
+    expect(groupOf("scheduled_summary")).toBe("work");
     expect(groupOf("broadcast")).toBe("messages");
     expect(groupOf("message")).toBe("messages");
     expect(groupOf("survey")).toBe("messages");
