@@ -46,6 +46,7 @@ const GROUPS: NavGroup[] = [
     { href: "/school/lesson-notes", label: "Lesson notes", roles: [...TEACH, "qa_officer"], module: "lesson_notes" },
     { href: "/school/homework", label: "Homework", roles: TEACH, module: "homework" },
     { href: "/school/learning", label: "Learning library", roles: [...TEACH, "counsellor"], module: "lms" },
+    { href: "/school/tools", label: "Learning tools (LTI)", roles: [...TEACH, "it_admin"], module: "lms" },
     { href: "/school/timetable", label: "Timetable", roles: STAFF, module: "timetable" },
     { href: "/school/cover", label: "Cover", roles: TEACH, module: "cover" },
     { href: "/school/rooms", label: "Rooms & booking", roles: STAFF.filter(r => r !== "cashier") },

@@ -286,6 +286,7 @@ Under **Administration → Integrations & website**:
 - **API keys** (admins): make one key per system, with only the scopes it needs. Copy it when shown; it is not shown again. Revoke a key the moment a system stops being used or a key may have leaked.
 - **Webhooks** (admins): add the https address of the system to notify and choose the events. Use **Send a test**, then check deliveries in the log. Give the receiver the secret so it can check the X-Webhook-Signature header.
 - **Connected services** shows which payment, messaging and lesson services are set up.
+- **Learning tools (LTI 1.3)**, under Teaching. An admin registers the tool using the details its makers give (login URL, launch URL, their public keys) and sends them the platform details shown on the page. Teachers then add the tool to a class (and, if they like, to a homework) and students open it from My school. Scores come back to the tool's **Scores** list, and into the homework when it is linked.
 
 ### Payroll (phase 10)
 
