@@ -9,7 +9,10 @@ export type Extras = {
   currency: string;
   invoices: { id: string; student_id: string; invoice_no: string; title: string; status: string; total: number; amount_paid: number; due_date: string | null; pay_token: string }[];
   events: { id: string; title: string; description: string | null; kind: string; starts_at: string; location: string | null; class_group_ids: string[]; requires_consent: boolean; fee: number; respond_by: string | null;
-    responses: { student_id: string; consent: boolean; invoice_id: string | null }[] }[];
+    departs_at?: string | null; returns_at?: string | null; meeting_point?: string | null;
+    responses: { student_id: string; consent: boolean; invoice_id: string | null }[]; roster?: { student_id: string; status: string; departed_at: string | null; returned_at: string | null }[] }[];
+  clubs?: { student_id: string; status: string; role: string; cc_groups: { name: string; meets: string | null; location: string | null } | null }[];
+  competition_results?: { id: string; student_id: string; event: string | null; position: number | null; award: string | null; score: string | null; competitions: { title: string; held_on: string; level: string } }[];
   homework: { id: string; class_group_id: string; title: string; due_at: string; subjects: { name: string } | null; submissions: { student_id: string; submitted_at: string; score: number | null; late: boolean }[] }[];
   behaviour: { student_id: string; kind: string; points: number; note: string | null; occurred_at: string; behaviour_categories: { name: string } | null }[];
   attendance: { student_id: string; status: string }[];
@@ -81,6 +84,7 @@ export default function FamilyTabs({ extras, kids, token, onChange }: { extras: 
         })}</ul>
       ))}
 
+      {tab === "events" && <ChildActivities extras={extras} kids={kids} />}
       {tab === "events" && (!extras.events.length ? <Empty>No upcoming events.</Empty> : (
         <ul className="space-y-3">{extras.events.map(e => {
           const eligible = kids.filter(k => !e.class_group_ids.length || (k.class_group_id && e.class_group_ids.includes(k.class_group_id)));
@@ -90,6 +94,12 @@ export default function FamilyTabs({ extras, kids, token, onChange }: { extras: 
               <p className="font-semibold">{e.title} <Badge tone="violet">{e.kind}</Badge></p>
               <p className="text-xs text-slate-500">{fmtDate(e.starts_at, true)}{e.location ? ` · ${e.location}` : ""}{e.fee > 0 ? ` · ${money(e.fee, extras.currency)}` : ""}{e.respond_by ? ` · reply by ${fmtDate(e.respond_by)}` : ""}</p>
               {e.description && <p className="mt-1 whitespace-pre-wrap">{e.description}</p>}
+              {(e.departs_at || e.returns_at) && <p className="mt-1 text-xs">{e.departs_at ? `Leaves ${fmtDate(e.departs_at, true)}${e.meeting_point ? ` from ${e.meeting_point}` : ""}` : ""}{e.returns_at ? ` · back about ${fmtDate(e.returns_at, true)}` : ""}</p>}
+              {(e.roster ?? []).map(r => {
+                const k = kids.find(x => x.id === r.student_id);
+                if (!k || !["departed", "returned"].includes(r.status)) return null;
+                return <p key={r.student_id} className="mt-1"><Badge tone={r.status === "returned" ? "green" : "blue"}>{k.name.split(" ")[0]} {r.status === "returned" ? `back at school ${fmtTime(r.returned_at)}` : `left with the group ${fmtTime(r.departed_at)}`}</Badge></p>;
+              })}
               {e.requires_consent && eligible.map(k => {
                 const r = e.responses.find(x => x.student_id === k.id);
                 return (
@@ -281,5 +291,26 @@ function Boarding({ extras, kids, name, onRequest, onConsent }: { extras: Extras
         <button className="btn btn-primary sm:col-span-2">Send request</button>
       </form>
     </div>
+  );
+}
+
+/** Each child's clubs and teams, and competition results this past year. */
+function ChildActivities({ extras, kids }: { extras: Extras; kids: Child[] }) {
+  const clubs = extras.clubs ?? [], results = extras.competition_results ?? [];
+  if (!clubs.length && !results.length) return null;
+  return (
+    <div className="mb-4 grid gap-3 sm:grid-cols-2">{kids.map(k => {
+      const c = clubs.filter(x => x.student_id === k.id), r = results.filter(x => x.student_id === k.id);
+      if (!c.length && !r.length) return null;
+      return (
+        <div key={k.id} className="rounded-lg border border-slate-200 p-3 text-sm">
+          <p className="font-semibold">{k.name.split(" ")[0]}&apos;s clubs &amp; teams</p>
+          {!c.length ? <p className="text-slate-500">None yet.</p> : <ul className="mt-1 space-y-0.5">{c.map((x, i) => (
+            <li key={i}>{x.cc_groups?.name}{x.cc_groups?.meets ? <span className="text-slate-500"> · {x.cc_groups.meets}</span> : null} {x.status === "requested" ? <Badge tone="amber">asked to join</Badge> : x.role !== "member" ? <Badge tone="violet">{x.role.replace("_", "-")}</Badge> : null}</li>))}</ul>}
+          {r.length > 0 && <><p className="mt-2 font-medium">Competitions</p><ul className="space-y-0.5">{r.map(x => (
+            <li key={x.id}>{x.competitions.title}{x.event ? `: ${x.event}` : ""} <span className="text-slate-500">({fmtDate(x.competitions.held_on)})</span> {x.award ? <Badge tone="green">{x.award}</Badge> : x.position ? <Badge tone={x.position <= 3 ? "green" : "slate"}>position {x.position}</Badge> : null}</li>))}</ul></>}
+        </div>
+      );
+    })}</div>
   );
 }

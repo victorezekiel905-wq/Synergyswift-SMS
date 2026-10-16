@@ -112,7 +112,7 @@ export async function familyExtras(svc: any, tenantId: string, guardianId: strin
   const [settings, invoices, events, responses, homework, behaviour, attendance, exeats, bookings, transport, hostel, teachers] = await Promise.all([
     svc.from("tenant_settings").select("currency").eq("tenant_id", tenantId).maybeSingle(),
     svc.from("fee_invoices").select("id,student_id,invoice_no,title,status,total,amount_paid,due_date,pay_token").eq("tenant_id", tenantId).in("student_id", studentIds).neq("status", "void").order("created_at", { ascending: false }).limit(50),
-    svc.from("school_events").select("id,title,description,kind,starts_at,ends_at,location,class_group_ids,requires_consent,fee,respond_by").eq("tenant_id", tenantId).gte("starts_at", new Date(Date.now() - 86400_000).toISOString()).order("starts_at").limit(40),
+    svc.from("school_events").select("id,title,description,kind,starts_at,ends_at,location,class_group_ids,requires_consent,fee,respond_by,departs_at,returns_at,meeting_point").eq("tenant_id", tenantId).gte("starts_at", new Date(Date.now() - 86400_000).toISOString()).order("starts_at").limit(40),
     svc.from("event_responses").select("event_id,student_id,consent,invoice_id").eq("tenant_id", tenantId).in("student_id", studentIds),
     classGroupIds.length ? svc.from("homework").select("id,class_group_id,title,due_at,group_ids,subjects(name)").eq("tenant_id", tenantId).in("class_group_id", classGroupIds).gte("due_at", since30).order("due_at", { ascending: false }).limit(60) : { data: [] },
     svc.from("behaviour_records").select("student_id,kind,points,note,occurred_at,behaviour_categories(name)").eq("tenant_id", tenantId).in("student_id", studentIds).gte("occurred_at", since30).order("occurred_at", { ascending: false }).limit(60),
@@ -137,13 +137,23 @@ export async function familyExtras(svc: any, tenantId: string, guardianId: strin
     svc.from("boarding_notes").select("id,student_id,kind,note,created_at").eq("tenant_id", tenantId).in("student_id", studentIds).eq("visible_to_parent", true).order("created_at", { ascending: false }).limit(30),
     svc.from("meal_menus").select("on_date,meal,items,alternatives,hostel_id").eq("tenant_id", tenantId).gte("on_date", now.slice(0, 10)).lte("on_date", new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)).order("on_date")
   ]) : [{ data: [] }, { data: [] }];
+  // Clubs and teams, competition results this past year, and where each child is on a trip.
+  const eventIds = (events.data ?? []).map((e: any) => e.id);
+  const [clubs, results, roster] = await Promise.all([
+    svc.from("cc_members").select("student_id,status,role,cc_groups(name,meets,location)").eq("tenant_id", tenantId).in("student_id", studentIds).in("status", ["active", "requested"]),
+    svc.from("competition_entries").select("id,student_id,event,position,award,score,competitions!inner(title,held_on,level)").eq("tenant_id", tenantId).in("student_id", studentIds)
+      .gte("competitions.held_on", new Date(Date.now() - 365 * 86400_000).toISOString().slice(0, 10)).limit(60),
+    eventIds.length ? svc.from("trip_roster").select("event_id,student_id,status,departed_at,returned_at").in("event_id", eventIds).in("student_id", studentIds) : { data: [] }
+  ]);
   const { data: absences } = await svc.from("student_absence_requests").select("id,student_id,kind,starts_on,ends_on,reason,status,decision_note,created_at")
     .eq("tenant_id", tenantId).in("student_id", studentIds).gte("ends_on", new Date(Date.now() - 60 * 86400_000).toISOString().slice(0, 10)).order("starts_on", { ascending: false }).limit(40);
   return {
     currency: settings.data?.currency ?? "NGN",
     absences: absences ?? [],
     invoices: invoices.data ?? [],
-    events: (events.data ?? []).map((e: any) => ({ ...e, responses: (responses.data ?? []).filter((r: any) => r.event_id === e.id) })),
+    events: (events.data ?? []).map((e: any) => ({ ...e, responses: (responses.data ?? []).filter((r: any) => r.event_id === e.id), roster: (roster.data ?? []).filter((r: any) => r.event_id === e.id) })),
+    clubs: clubs.data ?? [],
+    competition_results: (results.data ?? []).sort((a: any, b: any) => b.competitions.held_on.localeCompare(a.competitions.held_on)),
     // Homework set for groups shows only to families with a child in one of them.
     homework: (homework.data ?? []).filter((h: any) => !h.group_ids?.length || h.group_ids.some((g: string) => myGroups.has(g)))
       .map((h: any) => ({ ...h, group_ids: undefined, submissions: (subs ?? []).filter((s: any) => s.homework_id === h.id) })),

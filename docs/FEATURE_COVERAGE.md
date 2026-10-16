@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance · **10** HR and payroll · **11** welfare, boarding, transport, library, inventory, co-curricular · **12** portals and apps · **13** analytics, integrations, compliance.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -225,9 +225,17 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | School shop / POS with student wallet payments | ✅ (v47) the till charges the student's wallet; now items scan by barcode and sell from stock, and a sale cannot sell what is not on the shelf |
 | Procurement requests and approvals | ✅ requisitions from any staff member; above a set amount they are endorsed and then approved by the principal or an admin (different people, never the requester); suppliers and quotes (best one marked); purchase orders with lines into stock or the asset register; goods received in part or in full, closing the order and the requisition; payment recorded as an expense against the order |
 
-## 19–23
+## 19. Co-curricular (phase 11e)
 
-Sections 19 (co-curricular), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
+| Feature | Status |
+|---|---|
+| Clubs, societies, sports teams: membership and attendance | ✅ clubs, societies, teams, choirs and bands with a lead and helpers, the classes they are open to and a number of places; students join themselves, ask to join (the lead accepts or declines) or are added by the lead; captains and other roles; a register for each meeting, training or match, with each member's attendance rate; a club fee goes onto members' invoices while they belong; leads run their group, while who leads it and its fee stay with admins; students and parents see their clubs |
+| Events and competitions management | ✅ events as before; competitions (inter-house to international) with the team, venue and organiser; students entered by event with position, score or time and award; podium places and awards go on the child's achievements and portfolio automatically; results shown to the student and family |
+| Excursions and trips: consent forms, payments, rosters | ✅ consent and payment online (v47); now the trip's departure, return, meeting point, staff going, risk assessment and emergency contact; the roster built from consent (paid only, or everyone who said yes) with each child's allergies, conditions and medication; children ticked out and back with parents told each time; staff and admins alerted if anyone is not back 30 minutes after the planned return; printable roster |
+
+## 20–23
+
+Sections 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
 
 ## Database updates to run
 
@@ -258,3 +266,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101004400_boarding_transport.sql` | 11b |
 | `20260101004500_library.sql` | 11c |
 | `20260101004600_inventory_procurement.sql` | 11d |
+| `20260101004700_cocurricular.sql` | 11e |

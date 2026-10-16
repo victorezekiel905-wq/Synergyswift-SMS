@@ -252,6 +252,14 @@ Under **HR**:
 - **Buying** (Finance → Buying): approved requisitions to order, stock running low (order it all in one go), orders in progress, and assets that need attention. Add suppliers, compare quotes, raise a purchase order, **Send** it (it gets a number), **receive** goods as they arrive (into stock or the asset register), and **record payment** (it becomes an expense).
 - **Approvals**: requisitions above the school's limit (₦500,000 to start; change it under Buying settings, admins only) are endorsed by one approver and approved by the principal or an admin who is someone else.
 
+### Clubs, competitions and trips (phase 11)
+
+Under **Students → Clubs, competitions & trips**:
+
+- **Clubs & teams**: an admin starts each club, society or team, chooses who leads it (and helpers), which classes may join and how: students join themselves, ask and wait for the lead, or are added by the lead. To charge for it, make an optional fee item under Fees and choose it here; members are billed on the next invoices and stop being billed when they leave. The lead adds members a class at a time, gives roles (captain, secretary…), accepts requests and takes attendance at each meeting, training or match. Students see their clubs, and the ones they can join, on **My school**; parents see them under **Events**.
+- **Competitions**: any member of staff records a competition (inter-house to international), enters students by event and fills in positions, scores or times and awards. Podium places and named awards are added to each child's achievements once, so they show in the portfolio and on records.
+- **Trips**: publish the trip under **Events & trips** as before (type "Trip", with consent and a fee). Then, on the Trips tab, an admin adds the departure and return times, meeting point, staff going, risk assessment and emergency contact. Build the roster from parents who consented (paid only, or everyone who said yes). Staff on the trip see each child's allergies, conditions and medication, tick children **Left with us** and **Back at school** (parents are told each time) and can print the roster. If anyone is still out 30 minutes after the planned return, the trip staff and the head are alerted.
+
 ### Payroll (phase 10)
 
 - **Tax & pension** (payroll staff): the starting rates follow the Nigeria Tax Act 2025 (PAYE bands from 0% on the first ₦800,000 a year to 25% above ₦50m; pension, NHF and NHIS deducted first; rent relief of 20% of rent up to ₦500,000) and the Pension Reform Act (8% staff, 10% school on basic + housing + transport), plus NSITF 1%. **Check every rate with your tax adviser before the first run**; they are all editable, including the bands, and a flat percentage per person is still available.

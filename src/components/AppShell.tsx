@@ -62,6 +62,7 @@ const GROUPS: NavGroup[] = [
     { href: "/school/certificates", label: "Certificates", roles: ADMIN, module: "sims" },
     { href: "/school/pastoral", label: "Pastoral care", roles: STAFF.filter(r => r !== "cashier"), module: "behaviour" },
     { href: "/school/behaviour", label: "Behaviour & houses", roles: [...PASTORAL, "hostel_warden"], module: "behaviour" },
+    { href: "/school/activities", label: "Clubs, competitions & trips", roles: STAFF.filter(r => r !== "cashier"), module: "events" },
     { href: "/school/health", label: "Health & sick bay", roles: ["nurse", "hostel_warden", ...PASTORAL], module: "health" },
     { href: "/school/gate", label: "Sign in / out", roles: STAFF, module: "gate" },
     { href: "/school/pickup", label: "Pickup desk", roles: ["gate_officer", ...ADMIN], module: "pickup" },
