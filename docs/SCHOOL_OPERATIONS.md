@@ -260,6 +260,13 @@ Under **Students → Clubs, competitions & trips**:
 - **Competitions**: any member of staff records a competition (inter-house to international), enters students by event and fills in positions, scores or times and awards. Podium places and named awards are added to each child's achievements once, so they show in the portfolio and on records.
 - **Trips**: publish the trip under **Events & trips** as before (type "Trip", with consent and a fee). Then, on the Trips tab, an admin adds the departure and return times, meeting point, staff going, risk assessment and emergency contact. Build the roster from parents who consented (paid only, or everyone who said yes). Staff on the trip see each child's allergies, conditions and medication, tick children **Left with us** and **Back at school** (parents are told each time) and can print the roster. If anyone is still out 30 minutes after the planned return, the trip staff and the head are alerted.
 
+### Portals and the head's dashboard (phase 12)
+
+- **Students** open `/student` on **Today**: lessons (now and next), homework by urgency, attendance this term, library books and their fees. To hide fees from students, open **School overview → Targets & settings** and untick "Students can see their own fees". Parents always see fees.
+- **Parents** see every child on one page. With two or more children, a table at the top shows who is in school, attendance, homework and fees owed, with the family total. Each child's card shows attendance this term, homework due or overdue and fees.
+- **Teachers** open **Teaching → My teaching day** (`/teacher`; the same panel is on the dashboard). It shows today's lessons, cover included, with a button on each lesson whose register is not taken yet. The to-do list covers score sheets sent back or unfinished, homework to mark, lesson notes sent back and unread parent messages.
+- **Heads and the bursary**: **School overview** opens with the key numbers. Under **Targets & settings**, set targets (for example attendance 95%, fees collected 90%, at most 5 incidents a week); each figure then shows green, amber or red. The every-minute job keeps each school's figures once a day after 4pm local time, and the trend lines build up from then.
+
 ### Payroll (phase 10)
 
 - **Tax & pension** (payroll staff): the starting rates follow the Nigeria Tax Act 2025 (PAYE bands from 0% on the first ₦800,000 a year to 25% above ₦50m; pension, NHF and NHIS deducted first; rent relief of 20% of rent up to ₦500,000) and the Pension Reform Act (8% staff, 10% school on basic + housing + transport), plus NSITF 1%. **Check every rate with your tax adviser before the first run**; they are all editable, including the bands, and a flat percentage per person is still available.

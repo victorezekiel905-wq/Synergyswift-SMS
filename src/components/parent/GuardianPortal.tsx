@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useApi, send, Alert, Badge, Empty, fmtDate, fmtTime, Loading } from "@/components/ui";
 import FamilyTabs, { type Extras } from "./FamilyTabs";
 import { NotificationsToggle, LanguagePicker } from "./FamilyConnect";
+import { GlanceStrip, FamilySummary, type GlanceData } from "./ChildGlance";
 
 type Overview = {
   guardian: { id: string; full_name: string; notify_email: boolean; notify_whatsapp: boolean; email: string | null; phone: string | null; language?: string | null };
@@ -15,6 +16,7 @@ type Overview = {
     results: { id: string; term: string; average: number | null; position: number | null; class_size: number | null; access_token: string; published_at: string }[];
     pickup_codes: { id: string; delegate_name: string | null; expires_at: string }[];
     loans: { title: string; due_at: string }[];
+    glance?: GlanceData | null;
   }[];
 };
 
@@ -69,9 +71,10 @@ export default function GuardianPortal({ api, act, mode, token }: { api: string;
         </div>
       )}
       {!data.children.length && <Empty>No children are linked to you yet. Please contact the school.</Empty>}
+      <FamilySummary kids={data.children} />
       <div className="space-y-5">
         {data.children.map(c => (
-          <section key={c.id} className="card overflow-hidden">
+          <section key={c.id} id={`child-${c.id}`} className="card overflow-hidden">
             <div className="flex items-center gap-3 border-b border-slate-100 p-4">
               {c.photo_url
                 // eslint-disable-next-line @next/next/no-img-element
@@ -83,6 +86,7 @@ export default function GuardianPortal({ api, act, mode, token }: { api: string;
               </div>
               <Badge tone={c.on_site ? "green" : "slate"}>{c.on_site ? "In school now" : "Not in school"}</Badge>
             </div>
+            {c.glance && <GlanceStrip g={c.glance} />}
             <div className="grid gap-4 p-4 sm:grid-cols-2">
               <div>
                 <h3 className="mb-2 text-sm font-semibold">Today</h3>

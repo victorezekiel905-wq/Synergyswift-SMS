@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import MyExamTimetable from "@/components/exams/MyExamTimetable";
 import NoticeBoard from "@/components/comms/NoticeBoard";
+import MyTeaching from "@/components/portal/MyTeaching";
 
 export default async function Dashboard() {
   const sb = await createClient();
@@ -102,6 +103,7 @@ export default async function Dashboard() {
       </header>
 
       <NoticeBoard />
+      <MyTeaching compact />
       <MyExamTimetable />
 
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">

@@ -233,9 +233,20 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Events and competitions management | ✅ events as before; competitions (inter-house to international) with the team, venue and organiser; students entered by event with position, score or time and award; podium places and awards go on the child's achievements and portfolio automatically; results shown to the student and family |
 | Excursions and trips: consent forms, payments, rosters | ✅ consent and payment online (v47); now the trip's departure, return, meeting point, staff going, risk assessment and emergency contact; the roster built from consent (paid only, or everyone who said yes) with each child's allergies, conditions and medication; children ticked out and back with parents told each time; staff and admins alerted if anyone is not back 30 minutes after the planned return; printable roster |
 
-## 20–23
+## 20. Portals and apps (phase 12)
 
-Sections 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
+| Feature | Status |
+|---|---|
+| Student portal: timetable, assignments, results, lessons, library, fees view | ✅ `/student` opens on **Today**: the day's lessons with what is on now and next, homework (overdue, due today, handed in, marked with the score), attendance this term, library books with due dates, and their fees (what is owed, past due, next due date; the school can turn the fees view off). Below: notices, exams, report cards, progress, portfolio, clubs, exeats; lessons and content under **My learning** |
+| Parent portal/app: all children in one view, results, attendance, fees, messages, bus tracking | ✅ one page for all children: a family table (in school now, attendance, homework, fees owed, family total) when there is more than one child, then each child with attendance this term, homework due or overdue, fees owed, sign-ins, results and report cards, library books and pickup codes; tabs for messages, fees and payment, wallet, live bus, events, meetings, learning, boarding, records and help. Works signed in or from the private WhatsApp link |
+| Teacher portal/app: classes, register, gradebook, lesson plans, messages | ✅ `/teacher` (**My teaching day**, also on the dashboard): today's lessons including cover, with a "take register" button until each register is taken; a to-do list (registers, score sheets sent back or unfinished, homework to mark (urgent after a week), lesson notes sent back, unread parent messages); their classes and form class; one tap to registers, gradebook, homework, lesson plans, schemes of work, content, messages and calendar |
+| Admin dashboard with KPIs | ✅ `/school` for heads and the bursary: attendance today, registers taken, fees collected this term, past-due fees, students and new joiners, staff on leave, behaviour incidents, admissions in progress, overdue books, stock to reorder; each with a 60-day trend line and change on the week; targets set by the school colour each figure (met, close, short). Figures are kept each afternoon after school |
+| Mobile apps (iOS/Android) with push notifications | 🟡 installable app (PWA) with push notifications on Android and desktop, and iPhone (iOS 16.4+, once added to the home screen), for parents and staff. Native store apps come in 12b |
+| PWA support and offline caching | 🟡 installable, fast start, offline register and offline lesson content; wider offline reading comes in 12b |
+
+## 21–23
+
+Sections 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
 
 ## Database updates to run
 
@@ -267,3 +278,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101004500_library.sql` | 11c |
 | `20260101004600_inventory_procurement.sql` | 11d |
 | `20260101004700_cocurricular.sql` | 11e |
+| `20260101004800_portals.sql` | 12a |

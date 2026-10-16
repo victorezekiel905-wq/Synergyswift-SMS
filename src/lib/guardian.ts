@@ -4,6 +4,7 @@
  */
 import { startOfTodayIso, studentName } from "./school";
 import { familyExtras } from "./family";
+import { familyGlance } from "./portal-server";
 import { beginRequest } from "./request-actor";
 
 export async function guardianByToken(svc: any, token: string) {
@@ -40,7 +41,10 @@ export async function guardianOverview(svc: any, tenantId: string, guardianId: s
     svc.from("library_loans").select("student_id,due_at,library_books(title)").eq("tenant_id", tenantId).in("student_id", ids).is("returned_at", null)
   ]) : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
-  const extras = await familyExtras(svc, tenantId, guardianId, ids, [...new Set(students.map((l: any) => l.students.class_group_id).filter(Boolean))] as string[]);
+  const [extras, glance] = await Promise.all([
+    familyExtras(svc, tenantId, guardianId, ids, [...new Set(students.map((l: any) => l.students.class_group_id).filter(Boolean))] as string[]),
+    familyGlance(svc, tenantId, timezone, students.map((l: any) => ({ id: l.students.id, class_group_id: l.students.class_group_id }))).catch(() => ({} as Record<string, any>))
+  ]);
   return {
     guardian: g,
     school: school ?? null,
@@ -60,7 +64,8 @@ export async function guardianOverview(svc: any, tenantId: string, guardianId: s
           class_size: r.class_size, published_at: r.published_at, access_token: r.access_token
         })),
         pickup_codes: (codes.data ?? []).filter((c: any) => c.student_id === s.id),
-        loans: (loans.data ?? []).filter((x: any) => x.student_id === s.id).map((x: any) => ({ title: x.library_books?.title, due_at: x.due_at }))
+        loans: (loans.data ?? []).filter((x: any) => x.student_id === s.id).map((x: any) => ({ title: x.library_books?.title, due_at: x.due_at })),
+        glance: glance[s.id] ?? null
       };
     })
   };

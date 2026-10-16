@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useApi, Page, PageHeader, Stat, Alert } from "@/components/ui";
+import KpiBoard from "@/components/school/KpiBoard";
 
 type Overview = {
   school: string; term: string | null; roles: string[];
@@ -33,6 +34,8 @@ export default function SchoolHome() {
       {data && !data.term && (
         <div className="mb-5"><Alert tone="amber">No current term is set. Go to <Link className="font-semibold underline" href="/school/setup">School setup</Link> to create a session and mark a term as current.</Alert></div>
       )}
+      <KpiBoard />
+      <h2 className="mb-3 text-lg font-semibold">Right now</h2>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
         <Stat label="Students" value={c.students ?? "…"} />
         <Stat label="On site now" value={c.students_on_site ?? "…"} hint="students signed in" tone="good" />

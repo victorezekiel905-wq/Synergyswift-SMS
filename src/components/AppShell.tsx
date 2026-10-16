@@ -37,6 +37,7 @@ const GROUPS: NavGroup[] = [
     { href: "/parent", label: "My children", roles: ["parent"] }
   ] },
   { title: "Teaching", links: [
+    { href: "/teacher", label: "My teaching day", roles: TEACH },
     { href: "/school/attendance", label: "Class register", roles: TEACH, module: "attendance" },
     { href: "/school/results", label: "Results & report cards", roles: ACADEMIC, module: "results" },
     { href: "/school/schemes", label: "Schemes of work", roles: [...TEACH, "qa_officer"], module: "lesson_notes" },
