@@ -20,11 +20,11 @@ export default function ApplyPage(props: { params: Promise<{ slug: string }> }) 
 
   if (error) return <main className="mx-auto max-w-xl p-6"><p className="rounded-lg bg-slate-100 p-4">{error}</p></main>;
   if (!data) return <main className="p-10 text-center text-sm text-slate-500">Loading…</main>;
-  const color = data.school.brand_color ?? "#1d5ddb";
+  const color = data.school.brand_color ?? "#2f4f8f";
 
   if (done) return (
     <main className="mx-auto max-w-xl p-6 text-center">
-      <h1 className="text-2xl font-bold" style={{ color }}>Application received</h1>
+      <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]" style={{ color }}>Application received</h1>
       <p className="mt-2">Your application number is <b className="font-mono">{done.application_no}</b>. We have sent a confirmation to your WhatsApp and email.</p>
       <p className="mt-2 text-sm text-slate-600">Next, upload the child&apos;s documents (birth certificate, last school report, passport photo){data.application_fee > 0 ? " and pay the application fee" : ""} on your application page.</p>
       <a className="btn mt-4 text-white" style={{ background: color }} href={`/apply/track/${done.tracking_token}`}>Continue: documents and tracking</a>
@@ -36,7 +36,7 @@ export default function ApplyPage(props: { params: Promise<{ slug: string }> }) 
       <header className="mb-5 flex items-center gap-3 border-b-4 pb-3" style={{ borderColor: color }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {data.school.logo_url && <img src={data.school.logo_url} alt="" className="h-14 w-14 object-contain" />}
-        <div><h1 className="text-xl font-bold" style={{ color }}>{data.school.name}: admissions</h1><p className="text-xs text-slate-600">{data.school.address}{data.school.phone ? ` · ${data.school.phone}` : ""}</p></div>
+        <div><h1 className="text-[22px] font-serif font-semibold tracking-[-0.01em]" style={{ color }}>{data.school.name}: admissions</h1><p className="text-xs text-slate-600">{data.school.address}{data.school.phone ? ` · ${data.school.phone}` : ""}</p></div>
       </header>
       {data.intro && <p className="mb-4 whitespace-pre-wrap text-sm">{data.intro}</p>}
       {data.application_fee > 0 && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm">Application fee: <b>{money(data.application_fee, data.currency)}</b>. You can pay it online after submitting, or as the school directs.</p>}

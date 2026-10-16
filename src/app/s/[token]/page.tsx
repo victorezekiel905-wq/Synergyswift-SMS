@@ -15,7 +15,7 @@ export default function SurveyPage(props: { params: Promise<{ token: string }> }
   const [busy, setBusy] = useState(false);
   if (error) return <main className="mx-auto max-w-xl p-6"><p className="rounded-lg bg-slate-100 p-4">{error}</p></main>;
   if (!data) return <main className="p-10 text-center text-sm text-slate-500">Loading…</main>;
-  const color = data.school.brand_color ?? "#1d5ddb";
+  const color = data.school.brand_color ?? "#2f4f8f";
   const head = (
     <header className="mb-4 flex items-center gap-3">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -23,13 +23,13 @@ export default function SurveyPage(props: { params: Promise<{ token: string }> }
       <p className="font-semibold" style={{ color }}>{data.school.name}</p>
     </header>
   );
-  if (done || data.answered) return <main className="mx-auto max-w-xl p-6">{head}<h1 className="text-xl font-bold">Thank you</h1><p className="mt-2 text-slate-600">{done ? "Your answers have been sent." : "You have already answered this survey."} We read every response.</p></main>;
-  if (data.closed) return <main className="mx-auto max-w-xl p-6">{head}<h1 className="text-xl font-bold">{data.survey.title}</h1><p className="mt-2 text-slate-600">This survey has closed. Thank you.</p></main>;
+  if (done || data.answered) return <main className="mx-auto max-w-xl p-6">{head}<h1 className="text-[22px] font-serif font-semibold tracking-[-0.01em]">Thank you</h1><p className="mt-2 text-slate-600">{done ? "Your answers have been sent." : "You have already answered this survey."} We read every response.</p></main>;
+  if (data.closed) return <main className="mx-auto max-w-xl p-6">{head}<h1 className="text-[22px] font-serif font-semibold tracking-[-0.01em]">{data.survey.title}</h1><p className="mt-2 text-slate-600">This survey has closed. Thank you.</p></main>;
   const set = (id: string, v: string | number) => setAnswers(a => ({ ...a, [id]: v }));
   return (
     <main className="mx-auto max-w-xl p-6">
       {head}
-      <h1 className="text-2xl font-bold">{data.survey.title}</h1>
+      <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">{data.survey.title}</h1>
       {data.name && <p className="text-slate-600">For {data.name}</p>}
       {data.survey.intro && <p className="mt-2 whitespace-pre-wrap text-slate-700">{data.survey.intro}</p>}
       {data.survey.anonymous && <p className="mt-1 text-xs text-slate-500">Your answers are anonymous: the school cannot see who wrote them.</p>}

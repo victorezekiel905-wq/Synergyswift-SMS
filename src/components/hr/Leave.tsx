@@ -81,7 +81,7 @@ export function Leave({ staff }: { staff: { id: string; full_name: string; statu
         <div className="flex gap-1 text-sm">{([["action", "Needs attention"], ["mine", "Mine"], ["all", "All I can see"]] as const).map(([k, l]) => <button key={k} className={"rounded px-3 py-1 " + (filter === k ? "bg-brand-600 text-white" : "bg-slate-100")} onClick={() => setFilter(k)}>{l}</button>)}</div>
         {!rows.length ? <Empty>{filter === "action" ? "Nothing waiting." : "No leave requests."}</Empty> : (
           <div className="card overflow-x-auto"><table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-3">Staff</th><th className="p-3">Leave</th><th className="p-3">Days</th><th className="p-3">Status</th><th className="p-3" /></tr></thead>
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-3">Staff</th><th className="p-3">Leave</th><th className="p-3">Days</th><th className="p-3">Status</th><th className="p-3" /></tr></thead>
             <tbody>{rows.map(l => (
               <tr key={l.id} className="border-t border-slate-100 align-top">
                 <td className="p-3">{l.staff?.full_name}<div className="text-xs text-slate-500">{l.staff?.department}</div></td>
@@ -125,7 +125,7 @@ function Policies({ onSaved }: { onSaved: () => void }) {
     <div className="space-y-2">
       <p className="text-sm text-slate-600">Days per year for annual leave can be left blank to use each person’s own allowance (set on their staff record). Unpaid leave is deducted in payroll.</p>
       <div className="overflow-x-auto"><table className="w-full text-sm">
-        <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Type</th><th className="py-1">Days / year</th><th className="py-1">Paid</th><th className="py-1">Carry over</th><th className="py-1">Notice</th><th className="py-1">Document</th><th /></tr></thead>
+        <thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Type</th><th className="py-1">Days / year</th><th className="py-1">Paid</th><th className="py-1">Carry over</th><th className="py-1">Notice</th><th className="py-1">Document</th><th /></tr></thead>
         <tbody>{data.policies.map(p => <PolicyRow key={p.leave_type} p={p} onSaved={() => { setMsg(`Saved ${p.leave_type}.`); reload(); onSaved(); }} />)}</tbody></table></div>
       {msg && <Alert tone="green">{msg}</Alert>}
     </div>

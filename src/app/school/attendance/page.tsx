@@ -167,7 +167,7 @@ function ReportView({ cg }: { cg: string }) {
       </div>
       {!data?.students.length ? <Empty>No data.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Student</th><th className="p-2 text-right">Present</th><th className="p-2 text-right">Late</th><th className="p-2 text-right">Absent</th><th className="p-2 text-right">Excused</th><th className="p-2 text-right">Attendance</th></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Student</th><th className="p-2 text-right">Present</th><th className="p-2 text-right">Late</th><th className="p-2 text-right">Absent</th><th className="p-2 text-right">Excused</th><th className="p-2 text-right">Attendance</th></tr></thead>
           <tbody>{[...data.students].sort((a, b) => (a.rate ?? 101) - (b.rate ?? 101)).map(s => (
             <tr key={s.id} className="border-t border-slate-100"><td className="p-2">{s.last_name}, {s.first_name}</td><td className="p-2 text-right">{s.present}</td><td className="p-2 text-right">{s.late}</td><td className="p-2 text-right">{s.absent}</td><td className="p-2 text-right">{s.excused}</td>
               <td className={"p-2 text-right font-semibold " + (s.rate !== null && s.rate < 90 ? "text-rose-600" : "")}>{s.rate === null ? "—" : `${s.rate}%`}</td></tr>))}</tbody></table></div>

@@ -21,10 +21,10 @@ export default function EnquirePage(props: { params: Promise<{ slug: string }> }
 
   if (error) return <main className="mx-auto max-w-xl p-6"><p className="rounded-lg bg-slate-100 p-4">{error}</p></main>;
   if (!data) return <main className="p-10 text-center text-sm text-slate-500">Loading…</main>;
-  const color = data.school.brand_color ?? "#1d5ddb";
+  const color = data.school.brand_color ?? "#2f4f8f";
   if (done) return (
     <main className="mx-auto max-w-xl p-6 text-center">
-      <h1 className="text-2xl font-bold" style={{ color }}>Thank you</h1>
+      <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]" style={{ color }}>Thank you</h1>
       <p className="mt-2">We have received your enquiry and will contact you shortly.</p>
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         <a className="btn text-white" style={{ background: color }} href={`/visit/${slug}${ref ? `?ref=${ref}` : ""}`} target={embed ? "_top" : undefined}>Book a school tour</a>
@@ -40,7 +40,7 @@ export default function EnquirePage(props: { params: Promise<{ slug: string }> }
             // eslint-disable-next-line @next/next/no-img-element
             <img src={data.school.logo_url} alt="" className="h-14 w-14 object-contain" />
           )}
-          <div><h1 className="text-xl font-bold" style={{ color }}>{data.school.name}</h1><p className="text-sm text-slate-600">Ask about admission. We usually reply the same day.</p></div>
+          <div><h1 className="text-[22px] font-serif font-semibold tracking-[-0.01em]" style={{ color }}>{data.school.name}</h1><p className="text-sm text-slate-600">Ask about admission. We usually reply the same day.</p></div>
         </header>
       )}
       {data.whatsapp && <a className="mb-4 flex items-center justify-center gap-2 rounded-lg bg-emerald-600 py-2 font-semibold text-white" href={`https://wa.me/${data.whatsapp}?text=${encodeURIComponent(`Hello ${data.school.name}, I would like to know more about admission.`)}`} target="_blank" rel="noreferrer">Chat with us on WhatsApp</a>}

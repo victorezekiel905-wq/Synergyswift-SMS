@@ -46,7 +46,7 @@ export default function ReportCardView({ card, school, studentPhoto, verifyUrl, 
   const showPos = Boolean(d.scheme?.show_position) && template !== "british";
   const showAvg = d.scheme?.show_class_average !== false;
   const cum = d.cumulative && d.cumulative.terms?.length > 1 ? d.cumulative : null;
-  const color = /^#[0-9a-f]{6}$/i.test(school?.brand_color ?? "") ? school!.brand_color! : "#1d5ddb";
+  const color = /^#[0-9a-f]{6}$/i.test(school?.brand_color ?? "") ? school!.brand_color! : "#2f4f8f";
   const head = { background: color };
 
   return (
@@ -63,7 +63,7 @@ export default function ReportCardView({ card, school, studentPhoto, verifyUrl, 
           <img src={school.logo_url} alt="" className="h-20 w-20 rounded object-contain" />
         )}
         <div className="flex-1 text-center">
-          <h1 className="text-2xl font-black uppercase tracking-wide" style={{ color }}>{school?.school_name ?? tenantName}</h1>
+          <h1 className="text-2xl font-bold uppercase tracking-wide" style={{ color }}>{school?.school_name ?? tenantName}</h1>
           {school?.motto && <p className="text-sm italic text-slate-600">{school.motto}</p>}
           {school?.address && <p className="text-xs text-slate-600">{school.address}{school.phone ? ` · ${school.phone}` : ""}{school.email ? ` · ${school.email}` : ""}</p>}
           <p className="mt-2 text-sm font-bold uppercase tracking-widest">{midterm ? "Mid-term progress report" : template === "american" ? "Report card" : template === "british" ? "School report" : "Report card"}: {d.term_label}</p>

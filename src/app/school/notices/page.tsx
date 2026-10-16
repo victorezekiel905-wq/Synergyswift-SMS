@@ -49,7 +49,7 @@ function SentList({ items, onOpen, onEdit }: { items: Row[]; onOpen: (id: string
   const who = (r: Row) => [r.to_parents && "parents", r.to_students && "students", r.to_staff && "staff"].filter(Boolean).join(", ");
   return (
     <div className="card overflow-x-auto"><table className="w-full text-sm">
-      <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Title</th><th className="p-2">To</th><th className="p-2">Status</th><th className="p-2">Read</th><th className="p-2">Confirmed</th><th className="p-2" /></tr></thead>
+      <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Title</th><th className="p-2">To</th><th className="p-2">Status</th><th className="p-2">Read</th><th className="p-2">Confirmed</th><th className="p-2" /></tr></thead>
       <tbody>{items.map(r => (
         <tr key={r.id} className="border-t border-slate-100">
           <td className="p-2"><Badge tone={r.kind === "emergency" ? "red" : r.kind === "circular" ? "violet" : "blue"}>{KIND[r.kind]}</Badge> <b>{r.title}</b></td>

@@ -29,7 +29,7 @@ export function Safeguarding({ initial }: { initial?: string | null }) {
         <div className="flex gap-1 text-sm">{(["open", "all"] as const).map(f => <button key={f} className={"rounded px-3 py-1 " + (filter === f ? "bg-brand-600 text-white" : "bg-slate-100")} onClick={() => setFilter(f)}>{f === "open" ? "Open" : "All"}</button>)}</div>
         {!rows.length ? <Empty>No open concerns.</Empty> : (
           <div className="card overflow-x-auto"><table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Reported</th><th className="p-2">Student</th><th className="p-2">Concern</th><th className="p-2">Status</th><th className="p-2">With</th></tr></thead>
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Reported</th><th className="p-2">Student</th><th className="p-2">Concern</th><th className="p-2">Status</th><th className="p-2">With</th></tr></thead>
             <tbody>{rows.map(c => (
               <tr key={c.id} className={"cursor-pointer border-t border-slate-100 hover:bg-slate-50 " + (c.status === "new" ? "bg-rose-50" : "")} onClick={() => setOpen(c.id)}>
                 <td className="p-2 text-xs">{fmtDate(c.created_at)} {fmtTime(c.created_at)}<div className="text-slate-400">{c.reporter_name}</div></td>
@@ -155,7 +155,7 @@ export function Counselling() {
         <section><h2 className="mb-2 font-semibold">Cases</h2>
           {!cases.data?.cases.length ? <Empty>No cases.</Empty> : (
             <div className="card overflow-x-auto"><table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">About</th><th className="p-2">Risk</th><th className="p-2">Sessions</th><th className="p-2">Next</th><th className="p-2">Status</th></tr></thead>
+              <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">About</th><th className="p-2">Risk</th><th className="p-2">Sessions</th><th className="p-2">Next</th><th className="p-2">Status</th></tr></thead>
               <tbody>{cases.data.cases.map(c => <tr key={c.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => setOpenCase(c.id)}>
                 <td className="p-2">{c.student}<div className="text-xs text-slate-400">{c.class}</div></td><td className="p-2 capitalize">{c.category}</td>
                 <td className="p-2"><Badge tone={c.risk_level === "high" ? "red" : c.risk_level === "medium" ? "amber" : "slate"}>{c.risk_level}</Badge>{c.shared_with_dsl && <Badge tone="violet">shared</Badge>}</td>

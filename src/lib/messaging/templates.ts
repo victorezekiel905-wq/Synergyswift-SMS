@@ -26,7 +26,7 @@ export function escapeHtml(s: unknown): string {
 }
 
 export function layout(brand: Brand, title: string, bodyHtml: string, cta?: { href: string; label: string }) {
-  const color = brand.color && /^#[0-9a-f]{3,8}$/i.test(brand.color) ? brand.color : "#1d5ddb";
+  const color = brand.color && /^#[0-9a-f]{3,8}$/i.test(brand.color) ? brand.color : "#2f4f8f";
   return `<!doctype html><html><body style="margin:0;background:#f1f5f9;font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#0f172a">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0">

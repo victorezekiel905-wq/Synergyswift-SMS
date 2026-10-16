@@ -11,7 +11,7 @@ export default function KioskPage() {
     <main className="min-h-screen bg-slate-900 p-6 text-white sm:p-10">
       <div className="mx-auto max-w-3xl">
         <div className="mb-8 flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Gate sign in / out</h1>
+          <h1 className="font-serif text-[32px] font-semibold tracking-[-0.015em]">Gate sign in / out</h1>
           <p className="text-3xl font-light tabular-nums">{now?.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })}</p>
         </div>
         <div className="rounded-2xl bg-white p-6 text-slate-900"><GateScanner big /></div>

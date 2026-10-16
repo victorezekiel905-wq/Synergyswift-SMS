@@ -30,7 +30,7 @@ export default function TrackPage(props: { params: Promise<{ token: string }> })
   if (error) return <main className="mx-auto max-w-xl p-6"><p className="rounded-lg bg-slate-100 p-4">{error}</p></main>;
   if (!data) return <main className="p-10 text-center text-sm text-slate-500">Loading…</main>;
   const a = data.application;
-  const color = data.school.brand_color ?? "#1d5ddb";
+  const color = data.school.brand_color ?? "#2f4f8f";
   const idx = STEPS.indexOf(a.status);
   const closed = ["rejected", "withdrawn", "declined", "expired", "enrolled"].includes(a.status);
   async function pay(k: "application_fee" | "acceptance_fee") {
@@ -52,7 +52,7 @@ export default function TrackPage(props: { params: Promise<{ token: string }> })
   return (
     <main className="mx-auto max-w-xl p-6">
       <p className="text-sm font-semibold" style={{ color }}>{data.school.name}</p>
-      <h1 className="text-2xl font-bold">{a.first_name} {a.last_name}</h1>
+      <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">{a.first_name} {a.last_name}</h1>
       <p className="text-sm text-slate-600">Application {a.application_no} · {a.applying_for} · received {fmtDate(a.created_at)}</p>
       {msg && <p role="status" className={"mt-3 rounded-lg p-3 text-sm " + (msg.ok ? "bg-emerald-50 text-emerald-900" : "bg-rose-50 text-rose-900")}>{msg.text}</p>}
 

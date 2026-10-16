@@ -16,7 +16,7 @@ export default function JobPage(props: { params: Promise<{ slug: string; token: 
   const [track, setTrack] = useState<string | null>(null);
   if (error) return <main className="mx-auto max-w-xl p-6"><p className="rounded-lg bg-slate-100 p-4">{error}</p><p className="mt-3 text-sm"><a className="underline" href={`/careers/${slug}`}>All vacancies</a></p></main>;
   if (!data) return <main className="p-10 text-center text-sm text-slate-500">Loading…</main>;
-  const color = data.school.brand_color ?? "#1d5ddb";
+  const color = data.school.brand_color ?? "#2f4f8f";
   const j = data.job;
   return (
     <main className="mx-auto max-w-3xl bg-white p-4 sm:p-8">
@@ -25,7 +25,7 @@ export default function JobPage(props: { params: Promise<{ slug: string; token: 
           // eslint-disable-next-line @next/next/no-img-element
           <img src={data.school.logo_url} alt="" className="h-12 w-12 object-contain" />
         )}
-        <div><p className="text-sm text-slate-600"><a className="underline" href={`/careers/${slug}`}>{data.school.name} careers</a></p><h1 className="text-2xl font-bold" style={{ color }}>{j.title}</h1>
+        <div><p className="text-sm text-slate-600"><a className="underline" href={`/careers/${slug}`}>{data.school.name} careers</a></p><h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]" style={{ color }}>{j.title}</h1>
           <p className="text-sm text-slate-600">{[j.department, TYPE[j.employment_type], j.location, j.salary_range].filter(Boolean).join(" · ")}</p></div>
       </header>
       <section className="space-y-4">

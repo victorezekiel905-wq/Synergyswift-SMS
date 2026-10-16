@@ -16,7 +16,7 @@ export default async function NewLiveSession() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
       <p className="text-sm font-medium text-brand-600">Fusion Live · Setup</p>
-      <h1 className="text-2xl font-semibold">Start a new live session</h1>
+      <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Start a new live session</h1>
       <NewSessionForm
         classes={(classes ?? []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))}
         lessons={(lessons ?? []).map((l: { id: string; title: string }) => ({ id: l.id, title: l.title }))}

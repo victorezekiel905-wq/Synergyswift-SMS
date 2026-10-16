@@ -71,7 +71,7 @@ function StaffTab({ isHr, isAdmin, myId, data, error, reload, onOpen }: { isHr: 
       {!data?.length ? <Empty>No staff records yet.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-3">Staff</th><th className="p-3">Position</th><th className="p-3">Access</th><th className="p-3">Leave</th><th className="p-3">Status</th><th className="p-3" /></tr></thead>
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-3">Staff</th><th className="p-3">Position</th><th className="p-3">Access</th><th className="p-3">Leave</th><th className="p-3">Status</th><th className="p-3" /></tr></thead>
             <tbody>
               {data.map(s => (
                 <tr key={s.id} className="border-t border-slate-100">

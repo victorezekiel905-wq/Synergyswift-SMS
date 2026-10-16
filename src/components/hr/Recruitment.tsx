@@ -45,7 +45,7 @@ export function Recruitment({ initialPosting, initialApplication }: { initialPos
       </div>
       {!data.postings.length ? <Empty>No jobs yet. Add one, publish it, and share the careers page link.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-3">Job</th><th className="p-3">Status</th><th className="p-3">Candidates</th><th className="p-3">Closes</th><th className="p-3" /></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-3">Job</th><th className="p-3">Status</th><th className="p-3">Candidates</th><th className="p-3">Closes</th><th className="p-3" /></tr></thead>
           <tbody>{data.postings.map(p => {
             const pl = p.pipeline!;
             const active = pl.applied + pl.shortlisted + pl.interview + pl.offer;
@@ -127,7 +127,7 @@ function PostingDetail({ id, slug, onOpen, onChange }: { id: string; slug: strin
       </div>
       {!rows.length ? <Empty>No candidates here.</Empty> : (
         <div className="overflow-x-auto"><table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Candidate</th><th className="py-1">Stage</th><th className="py-1">Rating</th><th className="py-1">Panel</th><th className="py-1">Applied</th></tr></thead>
+          <thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Candidate</th><th className="py-1">Stage</th><th className="py-1">Rating</th><th className="py-1">Panel</th><th className="py-1">Applied</th></tr></thead>
           <tbody>{rows.map(a => (
             <tr key={a.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => onOpen(a.id)}>
               <td className="py-2"><span className="font-medium">{a.full_name}</span>{a.internal && <Badge tone="blue">staff</Badge>}<div className="text-xs text-slate-500">{a.email}{a.source ? ` · ${a.source}` : ""}</div></td>

@@ -16,7 +16,7 @@ export function FinanceDashboard() {
     <div className="space-y-4">
       <section className="card p-4">
         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2"><h3 className="font-semibold">Billed and collected, last 12 months</h3><span className="text-sm text-slate-500">{money(got)} collected of {money(billed)} billed</span></div>
-        <MonthBars format={v => money(v)} series={[{ label: "Billed", color: "#cbd5e1", points: data.billed }, { label: "Collected", color: "#1d5ddb", points: data.collected }]} />
+        <MonthBars format={v => money(v)} series={[{ label: "Billed", color: "#cbd5e1", points: data.billed }, { label: "Collected", color: "#2f4f8f", points: data.collected }]} />
       </section>
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="card overflow-x-auto lg:col-span-2">
@@ -49,7 +49,7 @@ export function AdmissionsDashboard() {
     <div className="space-y-4">
       <section className="card p-4">
         <h3 className="mb-2 font-semibold">Applications, last 12 months</h3>
-        <MonthBars series={[{ label: "Applications", color: "#93c5fd", points: data.by_month }, { label: "Enrolled", color: "#059669", points: data.enrolled_by_month }]} />
+        <MonthBars series={[{ label: "Applications", color: "#a0b5d8", points: data.by_month }, { label: "Enrolled", color: "#059669", points: data.enrolled_by_month }]} />
       </section>
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card overflow-x-auto">

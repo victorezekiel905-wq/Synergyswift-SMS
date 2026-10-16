@@ -39,8 +39,8 @@ export default function ValueAdded() {
                 <td className="p-2">
                   <svg viewBox="0 0 100 10" className="h-3 w-full" aria-hidden>
                     <line x1="50" x2="50" y1="0" y2="10" stroke="#94a3b8" strokeWidth="0.5" />
-                    {g.low !== null && g.high !== null && <line x1={x(g.low)} x2={x(g.high)} y1="5" y2="5" stroke="#1d5ddb" strokeWidth="2" />}
-                    {g.va !== null && <circle cx={x(g.va)} cy="5" r="2" fill="#1d5ddb" />}
+                    {g.low !== null && g.high !== null && <line x1={x(g.low)} x2={x(g.high)} y1="5" y2="5" stroke="#2f4f8f" strokeWidth="2" />}
+                    {g.va !== null && <circle cx={x(g.va)} cy="5" r="2" fill="#2f4f8f" />}
                   </svg>
                   <div className="text-center text-[10px] text-slate-500">{g.low !== null ? `${g.low} to ${g.high}` : ""}</div>
                 </td>

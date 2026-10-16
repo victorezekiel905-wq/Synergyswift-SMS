@@ -2,7 +2,16 @@
 import { useState } from "react";
 import { useApi, send } from "@/components/ui";
 
-const FACES = ["", "😢", "🙁", "😐", "🙂", "😄"];
+// Mouths from a deep frown to a wide smile.
+const MOUTHS = ["", "M8 17q4-4 8 0", "M8.5 16.5q3.5-2.2 7 0", "M8.5 15.5h7", "M8.5 14.5q3.5 2.2 7 0", "M8 14q4 4.2 8 0"];
+function Face({ m }: { m: number }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" aria-hidden>
+      <circle cx="12" cy="12" r="9.5" /><circle cx="9" cy="10" r=".9" fill="currentColor" stroke="none" /><circle cx="15" cy="10" r=".9" fill="currentColor" stroke="none" />
+      <path d={MOUTHS[m]} />
+    </svg>
+  );
+}
 const LABELS = ["", "Very low", "Low", "Okay", "Good", "Great"];
 
 /** A quick daily check-in for students: how they feel, and whether they would like to talk to someone. */
@@ -27,8 +36,8 @@ export default function WellbeingCheckin() {
       <h2 className="font-semibold">How are you today?</h2>
       <div className="flex gap-2" role="radiogroup" aria-label="How you feel">{[1, 2, 3, 4, 5].map(m => (
         <button key={m} type="button" role="radio" aria-checked={mood === m} aria-label={LABELS[m]} onClick={() => setMood(m)}
-          className={"flex flex-1 flex-col items-center rounded-lg border p-2 text-2xl " + (mood === m ? "border-brand-500 bg-brand-50" : "border-slate-200")}>
-          {FACES[m]}<span className="text-xs text-slate-600">{LABELS[m]}</span></button>))}</div>
+          className={"flex flex-1 flex-col items-center gap-1 rounded-md border px-1 py-2.5 transition-colors " + (mood === m ? "border-brand-600 bg-brand-50 text-brand-700" : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700")}>
+          <Face m={m} /><span className="text-xs">{LABELS[m]}</span></button>))}</div>
       {mood > 0 && <>
         <div className="flex flex-wrap gap-1">{(data.feelings ?? []).map(f => (
           <button key={f} type="button" aria-pressed={feelings.includes(f)} onClick={() => setFeelings(feelings.includes(f) ? feelings.filter(x => x !== f) : feelings.length < 6 ? [...feelings, f] : feelings)}

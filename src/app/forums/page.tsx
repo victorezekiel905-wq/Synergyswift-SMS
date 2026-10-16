@@ -99,7 +99,7 @@ function ForumView({ id }: { id: string }) {
       {!data.threads.length ? <Empty>No topics yet. Start one.</Empty> : (
         <ul className="card divide-y divide-slate-100">{data.threads.map(t => (
           <li key={t.id}><Link className={"flex items-center gap-3 p-3 hover:bg-slate-50 " + (t.hidden ? "opacity-50" : "")} href={`/forums?thread=${t.id}`}>
-            <span className="flex-1">{t.pinned && "📌 "}<b>{t.title}</b> {t.locked && <Badge>closed</Badge>}{t.hidden && <Badge tone="red">hidden</Badge>}<span className="block text-xs text-slate-500">{who(t.users)} · {fmtDate(t.last_post_at, true)}</span></span>
+            <span className="flex-1">{t.pinned && <span className="mr-1.5"><Badge tone="blue">pinned</Badge></span>}<b>{t.title}</b> {t.locked && <Badge>closed</Badge>}{t.hidden && <Badge tone="red">hidden</Badge>}<span className="block text-xs text-slate-500">{who(t.users)} · {fmtDate(t.last_post_at, true)}</span></span>
             <span className="text-xs text-slate-500">{t.post_count} repl{t.post_count === 1 ? "y" : "ies"}</span>
           </Link></li>
         ))}</ul>
@@ -132,7 +132,7 @@ function ThreadView({ id }: { id: string }) {
     <div className="space-y-4">
       <Link href={`/forums?forum=${t.forums.id}`} className="text-sm text-brand-700 hover:underline">← {t.forums.title}</Link>
       <header className="flex flex-wrap items-start gap-2">
-        <h1 className="flex-1 text-2xl font-semibold">{t.pinned && "📌 "}{t.title}</h1>
+        <h1 className="flex-1 font-serif text-2xl font-semibold">{t.title}{t.pinned && <span className="ml-2 align-middle"><Badge tone="blue">pinned</Badge></span>}</h1>
         {data.staff && <>
           <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => act({ action: "thread_flags", thread_id: id, pinned: !t.pinned })}>{t.pinned ? "Unpin" : "Pin"}</button>
           <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => act({ action: "thread_flags", thread_id: id, locked: !t.locked })}>{t.locked ? "Reopen" : "Close"}</button>

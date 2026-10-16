@@ -53,7 +53,7 @@ export default function FeesPage() {
             <section className="card p-5">
               <h2 className="mb-3 font-semibold">By class</h2>
               {!Object.keys(s.by_class).length ? <Empty>No invoices this term.</Empty> : (
-                <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Class</th><th className="text-right">Billed</th><th className="text-right">Paid</th><th className="text-right">Rate</th></tr></thead>
+                <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Class</th><th className="text-right">Billed</th><th className="text-right">Paid</th><th className="text-right">Rate</th></tr></thead>
                   <tbody>{Object.entries(s.by_class).sort().map(([k, v]) => (
                     <tr key={k} className="border-t border-slate-100"><td className="py-1.5">{k}</td><td className="text-right tabular-nums">{money(v.billed, cur)}</td><td className="text-right tabular-nums">{money(v.paid, cur)}</td>
                       <td className="text-right tabular-nums">{v.billed ? Math.round((v.paid / v.billed) * 100) : 0}%</td></tr>))}</tbody></table></div>
@@ -128,7 +128,7 @@ function Setup({ ov, termId, groups, sessions, reload }: { ov: Overview; termId:
             <button className="btn btn-primary">Save</button>
           </form>
           {!ov.schedules.length ? <Empty>No fees set for this term.{terms.length ? " You can copy them from another term." : ""}</Empty> : (
-            <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Item</th><th>Class</th><th>Category</th><th className="text-right">Amount</th><th /></tr></thead>
+            <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Item</th><th>Class</th><th>Category</th><th className="text-right">Amount</th><th /></tr></thead>
               <tbody>{ov.schedules.map(sc => <tr key={sc.id} className="border-t border-slate-100"><td className="py-1.5">{itemName(sc.fee_item_id)} {sc.optional && <Badge>optional</Badge>}</td><td>{groupName(sc.class_group_id)}</td><td>{sc.category ?? "—"}</td>
                 <td className="text-right tabular-nums">{money(sc.amount, cur)}</td><td className="text-right"><button className="text-xs text-rose-600" onClick={() => act({ action: "delete_schedule", id: sc.id }, "Removed.")}>Remove</button></td></tr>)}</tbody></table></div>
           )}
@@ -181,7 +181,7 @@ function Invoices({ termId, groups, currency }: { termId: string; groups: { id: 
       {!list.data?.length ? <Empty>No invoices match.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Invoice</th><th className="p-2">Student</th><th className="p-2">Class</th><th className="p-2 text-right">Total</th><th className="p-2 text-right">Paid</th><th className="p-2 text-right">Balance</th><th className="p-2">Status</th></tr></thead>
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Invoice</th><th className="p-2">Student</th><th className="p-2">Class</th><th className="p-2 text-right">Total</th><th className="p-2 text-right">Paid</th><th className="p-2 text-right">Balance</th><th className="p-2">Status</th></tr></thead>
             <tbody>{list.data.map(i => (
               <tr key={i.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => setOpen(i.id)}>
                 <td className="p-2 font-mono text-xs">{i.invoice_no}<div className="font-sans text-slate-500">{i.title}</div></td>
@@ -215,7 +215,7 @@ function InvoiceDetail({ id, currency, onChange }: { id: string; currency: strin
       {node}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div><p className="font-mono text-xs">{data.invoice_no}</p><p className="text-lg font-semibold">{data.students?.first_name} {data.students?.last_name}</p><p className="text-slate-500">{data.title} · {data.students?.class_groups?.name}</p></div>
-        <div className="text-right"><p className="text-xs uppercase text-slate-500">Balance</p><p className="text-2xl font-bold tabular-nums">{money(balance, currency)}</p><Badge tone={statusTone(data.status === "part_paid" ? "pending" : data.status)}>{data.status.replace("_", " ")}</Badge></div>
+        <div className="text-right"><p className="text-[13px] text-slate-500">Balance</p><p className="text-2xl font-bold tabular-nums">{money(balance, currency)}</p><Badge tone={statusTone(data.status === "part_paid" ? "pending" : data.status)}>{data.status.replace("_", " ")}</Badge></div>
       </div>
       <div className="overflow-x-auto print:overflow-visible"><table className="w-full"><tbody>{(data.fee_invoice_lines ?? []).map((l: any) => (
         <tr key={l.id} className="border-t border-slate-100"><td className="py-1.5">{l.description} {l.kind !== "charge" && <Badge tone="violet">{l.kind}</Badge>}</td><td className="text-right tabular-nums">{money(l.amount, currency)}</td>

@@ -137,7 +137,7 @@ function Profile() {
         <Field label="Principal's signature (image URL)" hint="A transparent PNG prints best. Shown on published report cards."><input className="input" {...text("principal_signature_url")} /></Field>
         <Field label="School stamp (image URL)"><input className="input" {...text("stamp_url")} /></Field>
         <div className="md:col-span-2"><Field label="Report card footer" hint="For example the school's fees reminder or contact line."><textarea className="input h-16" {...text("report_footer")} /></Field></div>
-        <Field label="Brand colour"><input className="input h-10" type="color" value={s.brand_color ?? "#1d5ddb"} onChange={e => setS({ ...s, brand_color: e.target.value })} /></Field>
+        <Field label="Brand colour"><input className="input h-10" type="color" value={s.brand_color ?? "#2f4f8f"} onChange={e => setS({ ...s, brand_color: e.target.value })} /></Field>
         <Field label="Message sender name"><input className="input" {...text("sender_name")} /></Field>
         <Field label="Reply-to email for parents"><input className="input" type="email" {...text("reply_to_email")} /></Field>
       </section>
@@ -207,7 +207,7 @@ function Academic() {
           <h3 className="mb-3 font-semibold">{s.name} {s.is_current && <Badge tone="green">current</Badge>}</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-2">Term</th><th>Starts</th><th>Ends</th><th>Next term begins</th><th /></tr></thead>
+              <thead className="text-left text-[13px] text-slate-500"><tr><th className="py-2">Term</th><th>Starts</th><th>Ends</th><th>Next term begins</th><th /></tr></thead>
               <tbody>
                 {s.terms.map(t => <TermRow key={t.id} t={t} onSave={(b) => act({ kind: "update_term", term_id: t.id, ...b }, "Dates saved")} onCurrent={() => act({ kind: "set_current_term", term_id: t.id }, `${t.name} is now current`)} />)}
               </tbody>
@@ -299,7 +299,7 @@ function Grading() {
                 <span className={"text-xs font-semibold " + (Math.abs(weight - 100) < 0.001 ? "text-emerald-600" : "text-rose-600")}>Weights total {weight}% (must be 100)</span>
               </div>
               <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
-                <thead className="text-left text-xs uppercase text-slate-500"><tr><th>Name</th><th>Max score</th><th>Weight %</th><th title="Counts on mid-term progress reports">Mid-term</th><th /></tr></thead>
+                <thead className="text-left text-[13px] text-slate-500"><tr><th>Name</th><th>Max score</th><th>Weight %</th><th title="Counts on mid-term progress reports">Mid-term</th><th /></tr></thead>
                 <tbody>
                   {comps.map((c, i) => (
                     <tr key={i}>
@@ -319,7 +319,7 @@ function Grading() {
           <section className="card p-5">
             <h3 className="mb-2 font-semibold">Grade bands</h3>
             <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase text-slate-500"><tr><th>Grade</th><th>From</th><th>To</th><th>Remark</th><th>Points</th><th /></tr></thead>
+              <thead className="text-left text-[13px] text-slate-500"><tr><th>Grade</th><th>From</th><th>To</th><th>Remark</th><th>Points</th><th /></tr></thead>
               <tbody>
                 {bands.map((b, i) => (
                   <tr key={i}>
@@ -422,7 +422,7 @@ function Classes() {
             <button className="btn btn-ghost text-rose-600" onClick={() => confirm(`Delete ${group.name}? Students stay but lose their class.`) && act({ kind: "delete", table: "class_groups", id: group.id }, "Class deleted").then(() => setSel(""))}>Delete class</button>
           </div>
           <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-2">Subject</th><th>Subject teacher (can enter scores)</th><th /></tr></thead>
+            <thead className="text-left text-[13px] text-slate-500"><tr><th className="py-2">Subject</th><th>Subject teacher (can enter scores)</th><th /></tr></thead>
             <tbody>
               {(data?.subjects ?? []).map(s => {
                 const o = offered.find(x => x.subject_id === s.id);

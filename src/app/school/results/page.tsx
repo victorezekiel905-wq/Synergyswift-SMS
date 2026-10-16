@@ -179,7 +179,7 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
       {data && !notes && (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500">
               <tr><th className="p-2">#</th><th className="p-2">Student</th>{comps.map(c => <th key={c.id} className="p-2 text-center">{c.name}<div className="font-normal normal-case">/ {c.max_score}</div></th>)}<th className="p-2 text-center">Total</th><th className="p-2 text-center">Grade</th></tr>
             </thead>
             <tbody>
@@ -299,7 +299,7 @@ function SubjectNotes({ termId, cg, subject, students, canEdit, bands }: { termI
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Comment</th><th className="p-2">Effort</th><th className="p-2">Target</th><th className="p-2">Predicted</th></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Comment</th><th className="p-2">Effort</th><th className="p-2">Target</th><th className="p-2">Predicted</th></tr></thead>
           <tbody>{students.map(s => (
             <tr key={s.id} className="border-t border-slate-100">
               <td className="whitespace-nowrap p-2 font-medium">{s.last_name}, {s.first_name}</td>
@@ -391,7 +391,7 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
       {!data?.length ? <Empty>No report cards yet. Enter scores, then compile.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500">
               <tr><th className="p-2">Pos</th><th className="p-2">Student</th>{subjects.map(s => <th key={s.id} className="p-2 text-center">{s.name}</th>)}<th className="p-2 text-center">Avg</th><th className="p-2">Status</th><th className="p-2" /></tr>
             </thead>
             <tbody>

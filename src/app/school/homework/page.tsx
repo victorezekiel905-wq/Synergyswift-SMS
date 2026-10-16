@@ -23,7 +23,7 @@ export default function HomeworkPage() {
       {error && <Alert>{error}</Alert>}
       {tab === "badges" ? <Badges classes={structure?.class_groups ?? []} /> : tab === "groups" ? <Groups classes={structure?.class_groups ?? []} /> : !data?.length ? <Empty>No homework set yet.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Homework</th><th className="p-2">Class</th><th className="p-2">Due</th><th className="p-2 text-center">Handed in</th><th className="p-2" /></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Homework</th><th className="p-2">Class</th><th className="p-2">Due</th><th className="p-2 text-center">Handed in</th><th className="p-2" /></tr></thead>
           <tbody>{data.map(h => (
             <tr key={h.id} className="border-t border-slate-100"><td className="p-2 font-medium">{h.title}<div className="text-xs text-slate-400">{h.subjects?.name}</div></td>
               <td className="p-2">{h.class_groups?.name}{h.group_ids?.length ? <Badge tone="violet">groups</Badge> : null}</td>

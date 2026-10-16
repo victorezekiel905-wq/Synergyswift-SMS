@@ -18,7 +18,7 @@ export default async function ClassesPage() {
       <header className="mb-8 flex items-end justify-between">
         <div>
           <p className="text-sm font-medium text-brand-600">Classes & rosters</p>
-          <h1 className="text-2xl font-semibold">Your classes</h1>
+          <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Your classes</h1>
         </div>
         {me && <CreateClassForm />}
       </header>

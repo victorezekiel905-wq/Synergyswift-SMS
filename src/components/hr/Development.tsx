@@ -86,7 +86,7 @@ function Appraisals() {
 function Rows({ rows, onOpen, showStaff, hr }: { rows: ARow[]; onOpen: (id: string) => void; showStaff?: boolean; hr?: boolean }) {
   return (
     <div className="card overflow-x-auto"><table className="w-full text-sm">
-      <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr>{showStaff && <th className="p-2">Staff</th>}<th className="p-2">Reviewer</th><th className="p-2">Stage</th>{hr && <th className="p-2">Overall</th>}<th className="p-2" /></tr></thead>
+      <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr>{showStaff && <th className="p-2">Staff</th>}<th className="p-2">Reviewer</th><th className="p-2">Stage</th>{hr && <th className="p-2">Overall</th>}<th className="p-2" /></tr></thead>
       <tbody>{rows.map(a => (
         <tr key={a.id} className="border-t border-slate-100">
           {showStaff && <td className="p-2">{a.staff?.full_name}<div className="text-xs text-slate-500">{a.staff?.position}</div></td>}
@@ -117,7 +117,7 @@ function CycleForm({ cycle, onSaved }: { cycle: Partial<Cycle>; onSaved: (id: st
         <Field label="To"><input className="input" type="date" required value={c.ends_on ?? ""} onChange={e => setC({ ...c, ends_on: e.target.value })} /></Field>
       </div>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={c.self_review !== false} onChange={e => setC({ ...c, self_review: e.target.checked })} />Staff review themselves first</label>
-      <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th>Area</th><th className="w-24">Weight</th><th /></tr></thead>
+      <table className="w-full text-sm"><thead className="text-left text-[13px] text-slate-500"><tr><th>Area</th><th className="w-24">Weight</th><th /></tr></thead>
         <tbody>{crit.map((x, i) => (
           <tr key={i}><td className="py-1 pr-2"><input className="input" value={x.label} onChange={e => setC({ ...c, criteria: crit.map((y, j) => j === i ? { ...y, label: e.target.value } : y) })} /></td>
             <td className="py-1 pr-2"><input className="input" type="number" min={0} max={100} value={x.weight} onChange={e => setC({ ...c, criteria: crit.map((y, j) => j === i ? { ...y, weight: Number(e.target.value) } : y) })} /></td>
@@ -158,7 +158,7 @@ function AppraisalDetail({ id, onClose, people }: { id: string | null; onClose: 
           <button className="btn btn-ghost ml-auto px-2 py-1 text-xs" onClick={() => window.print()}>Print</button></div>
         {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
         <div className="overflow-x-auto"><table className="w-full">
-          <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Area</th><th className="py-1">Weight</th><th className="py-1">Self</th>{showReview && <th className="py-1">Reviewer</th>}</tr></thead>
+          <thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Area</th><th className="py-1">Weight</th><th className="py-1">Self</th>{showReview && <th className="py-1">Reviewer</th>}</tr></thead>
           <tbody>{criteria.map(c => (
             <tr key={c.id} className="border-t border-slate-100"><td className="py-1.5">{c.label}</td><td className="py-1.5 text-slate-500">{c.weight}</td>
               <td className="py-1.5">{pick(s.scores[c.id], v => setSelf({ ...s, scores: { ...s.scores, [c.id]: v } }), !selfEditable)}</td>
@@ -195,7 +195,7 @@ function AppraisalDetail({ id, onClose, people }: { id: string | null; onClose: 
           {goals && <button className="btn btn-outline mt-2" onClick={() => call({ action: "set_goals", id: a.id, goals: g.filter((x: any) => x.text?.trim()).map((x: any) => ({ ...x, measure: x.measure || null })) }, "Goals saved.")}>Save goals</button>}
         </section>
 
-        {a.status === "discussion" && role.self && <section className="space-y-2 rounded-lg border border-violet-200 p-3">
+        {a.status === "discussion" && role.self && <section className="space-y-2 rounded-lg border border-slate-200 p-3">
           <Field label="Your comment on the review"><textarea className="input" rows={2} value={comment} onChange={e => setComment(e.target.value)} /></Field>
           <button className="btn btn-primary" onClick={() => call({ action: "acknowledge", id: a.id, comment: comment || null }, "Acknowledged. The appraisal is complete.")}>Acknowledge and complete</button></section>}
         {a.staff_comment && <p><span className="font-semibold">Their comment:</span> {a.staff_comment}</p>}
@@ -249,7 +249,7 @@ function Cpd() {
         <div className="grid grid-cols-3 gap-3"><Stat label="Hours this year" value={sum.hours} tone={sum.met ? "good" : undefined} /><Stat label="Target" value={data.target} /><Stat label="Still to do" value={sum.remaining} tone={sum.remaining ? "warn" : "good"} /></div>
         {!data.items.length ? <Empty>No CPD logged yet: workshops, courses, conferences, in-house training, mentoring, reading.</Empty> : (
           <div className="card overflow-x-auto"><table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Date</th><th className="p-2">Activity</th><th className="p-2 text-right">Hours</th><th className="p-2">Status</th><th className="p-2" /></tr></thead>
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Date</th><th className="p-2">Activity</th><th className="p-2 text-right">Hours</th><th className="p-2">Status</th><th className="p-2" /></tr></thead>
             <tbody>{data.items.map(c => (
               <tr key={c.id} className="border-t border-slate-100 align-top"><td className="whitespace-nowrap p-2">{fmtDate(c.starts_on)}</td>
                 <td className="p-2"><span className="font-medium">{c.title}</span><div className="text-xs text-slate-500">{[KINDS[c.kind], c.provider].filter(Boolean).join(" · ")}</div>{c.reflection && <p className="text-xs text-slate-600">{c.reflection}</p>}</td>

@@ -19,10 +19,10 @@ export default function VisitPage(props: { params: Promise<{ slug: string }> }) 
   const [done, setDone] = useState<string | null>(null);
   if (error) return <main className="mx-auto max-w-xl p-6"><p className="rounded-lg bg-slate-100 p-4">{error}</p></main>;
   if (!data) return <main className="p-10 text-center text-sm text-slate-500">Loading…</main>;
-  const color = data.school.brand_color ?? "#1d5ddb";
+  const color = data.school.brand_color ?? "#2f4f8f";
   if (done) return (
     <main className="mx-auto max-w-xl p-6 text-center">
-      <h1 className="text-2xl font-bold" style={{ color }}>You are booked</h1>
+      <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]" style={{ color }}>You are booked</h1>
       <p className="mt-2">We have sent the details to your WhatsApp and email, with a reminder the day before.</p>
       <div className="mt-4 flex justify-center gap-2"><a className="btn text-white" style={{ background: color }} href={`/api/visit/booking/${done}/ics`}>Add to calendar</a><a className="btn btn-outline" href={`/visit/booking/${done}`}>View booking</a></div>
     </main>
@@ -34,7 +34,7 @@ export default function VisitPage(props: { params: Promise<{ slug: string }> }) 
           // eslint-disable-next-line @next/next/no-img-element
           <img src={data.school.logo_url} alt="" className="h-14 w-14 object-contain" />
         )}
-        <div><h1 className="text-xl font-bold" style={{ color }}>Visit {data.school.name}</h1><p className="text-sm text-slate-600">{data.school.address}</p></div>
+        <div><h1 className="text-[22px] font-serif font-semibold tracking-[-0.01em]" style={{ color }}>Visit {data.school.name}</h1><p className="text-sm text-slate-600">{data.school.address}</p></div>
       </header>
       {!data.events.length ? <p className="rounded-lg bg-slate-50 p-4">No tours are open for booking right now. Please call {data.school.phone ?? "the school"} to arrange a visit.</p> : (
         <ul className="space-y-2">{data.events.map(e => (

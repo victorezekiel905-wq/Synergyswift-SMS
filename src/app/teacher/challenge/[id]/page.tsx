@@ -18,7 +18,7 @@ export default async function ChallengeRoom(props: { params: Promise<{ id: strin
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-brand-600">Fusion Challenge · Lobby</p>
-          <h1 className="text-3xl font-bold">Join code: <span className="font-mono text-brand-600">{game.join_code}</span></h1>
+          <h1 className="font-serif text-[32px] font-semibold tracking-[-0.015em]">Join code: <span className="font-mono text-brand-600">{game.join_code}</span></h1>
           <p className="mt-1 text-sm text-slate-500">
             Students enter the code at <Link href="/student/game" className="font-medium text-brand-600">/student/game</Link>.
             {game.state === "running" && <> Current question: <span className="font-mono">#{Math.max(0, (game.current_question ?? 0) + 1)}</span></>}

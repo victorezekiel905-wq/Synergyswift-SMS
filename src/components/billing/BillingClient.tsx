@@ -48,7 +48,7 @@ export default function BillingClient({ initialPlans }: { initialPlans: Plan[] }
         <section className="card p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs uppercase text-slate-500">Current plan</p>
+              <p className="text-[13px] text-slate-500">Current plan</p>
               <p className="text-xl font-bold">{sub.plan} <span className={"ml-2 rounded-full px-2 py-0.5 text-xs " + (sub.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>{sub.status}</span></p>
             </div>
             {sub.renews_at && <p className="text-xs text-slate-500">Renews {new Date(sub.renews_at).toLocaleDateString()}</p>}
@@ -77,7 +77,7 @@ export default function BillingClient({ initialPlans }: { initialPlans: Plan[] }
         <h2 className="mb-3 text-lg font-semibold">Invoices</h2>
         {invoices.length === 0 && <p className="py-3 text-sm text-slate-400">No invoices yet.</p>}
         <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-left text-sm">
-          <thead className="text-xs uppercase text-slate-500"><tr><th className="py-2">Date</th><th>Amount</th><th>Status</th></tr></thead>
+          <thead className="text-[13px] text-slate-500"><tr><th className="py-2">Date</th><th>Amount</th><th>Status</th></tr></thead>
           <tbody>
             {invoices.map(i => (
               <tr key={i.id} className="border-t border-slate-100">

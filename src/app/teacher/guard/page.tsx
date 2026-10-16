@@ -13,12 +13,12 @@ export default async function GuardPage() {
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
       <p className="text-sm font-medium text-brand-600">Fusion Guard</p>
-      <h1 className="text-2xl font-semibold">Devices & telemetry</h1>
+      <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Devices & telemetry</h1>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 mt-6">
         <section className="card lg:col-span-2 p-4">
           <h2 className="mb-3 text-sm font-semibold uppercase text-slate-600">Enrolled devices</h2>
           <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase text-slate-500"><tr><th>UID</th><th>Kind</th><th>Status</th><th>Last seen</th></tr></thead>
+            <thead className="text-[13px] text-slate-500"><tr><th>UID</th><th>Kind</th><th>Status</th><th>Last seen</th></tr></thead>
             <tbody>
               {(devices ?? []).length === 0 && <tr><td colSpan={4} className="py-6 text-slate-400 text-center">No devices. Install the browser extension and call /api/devices/enroll.</td></tr>}
               {(devices ?? []).map((d: { id: string; device_uid: string; kind: string; status: string; last_seen_at: string | null }) => (

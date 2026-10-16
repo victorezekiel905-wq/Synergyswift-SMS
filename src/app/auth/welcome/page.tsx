@@ -59,7 +59,7 @@ export default function WelcomePage() {
 
   return (
     <main className="mx-auto max-w-md px-6 py-16">
-      <h1 className="text-2xl font-semibold">Welcome</h1>
+      <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Welcome</h1>
       {state === "loading" && <p className="mt-4 text-sm text-slate-600">Signing you in…</p>}
       {state === "error" && <p role="alert" className="mt-4 rounded-md bg-rose-50 p-3 text-sm text-rose-700">{err}</p>}
       {state === "password" && (

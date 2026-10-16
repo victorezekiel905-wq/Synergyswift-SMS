@@ -63,7 +63,7 @@ export function StaffAttendance() {
         <div className="grid gap-2 sm:grid-cols-4"><Stat label="Present" value={data.summary.present} /><Stat label={`Late (after ${data.start})`} value={data.summary.late} tone={data.summary.late ? "warn" : undefined} />
           <Stat label="Absent" value={data.summary.absent} tone={data.summary.absent ? "bad" : undefined} /><Stat label="On leave or away" value={data.summary.on_leave} /></div>
         <div className="card overflow-x-auto"><table className="w-full">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Staff</th><th className="p-2">Status</th><th className="p-2">In</th><th className="p-2">Out</th><th className="p-2">Hours</th><th className="p-2">How</th></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Staff</th><th className="p-2">Status</th><th className="p-2">In</th><th className="p-2">Out</th><th className="p-2">Hours</th><th className="p-2">How</th></tr></thead>
           <tbody>{data.rows.filter(r => !filter || (filter === "on_leave" ? ["on_leave", "away"].includes(r.status) : r.status === filter)).map(r => (
             <tr key={r.id} className="border-t border-slate-100"><td className="p-2">{r.name} <span className="text-xs text-slate-500">{r.staff_no}{r.department ? ` · ${r.department}` : ""}</span></td>
               <td className="p-2"><Badge tone={r.status === "present" ? "green" : r.status === "late" ? "amber" : r.status === "absent" ? "red" : "slate"}>{r.status.replace("_", " ")}</Badge>{r.note && <span className="block text-xs text-slate-500">{r.note}</span>}</td>

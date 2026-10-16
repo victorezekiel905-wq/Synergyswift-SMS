@@ -23,7 +23,7 @@ export default function GameLookup() {
 
   return (
     <main className="mx-auto max-w-md px-6 py-16">
-      <h1 className="text-2xl font-semibold">Join a game</h1>
+      <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Join a game</h1>
       <p className="mt-1 text-sm text-slate-600">Enter the lobby code your teacher showed.</p>
       <form onSubmit={onSubmit} className="card mt-8 space-y-4 p-6">
         <div>

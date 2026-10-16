@@ -29,7 +29,7 @@ export default function Partners() {
       </div>
       {!items.length ? <Empty>No partners or vendors yet.</Empty> : (
         <div className="card overflow-x-auto">
-          <table className="w-full"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Name</th><th className="p-2">Kind</th><th className="p-2">Contact</th><th className="p-2">Contract</th><th className="p-2">Rating</th></tr></thead>
+          <table className="w-full"><thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Name</th><th className="p-2">Kind</th><th className="p-2">Contact</th><th className="p-2">Contract</th><th className="p-2">Rating</th></tr></thead>
             <tbody className="divide-y divide-slate-100">{items.map(p => (
               <tr key={p.id} className={"cursor-pointer hover:bg-slate-50 " + (p.status === "inactive" ? "text-slate-400" : "")} onClick={() => setOpen(p.id)}>
                 <td className="p-2 font-medium">{p.name}{p.status === "prospect" && <> <Badge tone="violet">prospect</Badge></>}<span className="block text-xs font-normal text-slate-500">{p.tags.join(", ")}</span></td>

@@ -49,7 +49,7 @@ export default function Analytics({ currency }: { currency: string }) {
         <section className="card overflow-x-auto p-4">
           <h3 className="mb-2 font-semibold">Where families come from</h3>
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="p-1">Source</th><th className="p-1 text-right">Enquiries</th><th className="p-1 text-right">Applied</th><th className="p-1 text-right">Enrolled</th><th className="p-1 text-right">Conversion</th><th className="p-1 text-right">Spend</th><th className="p-1 text-right">Per enquiry</th><th className="p-1 text-right">Per enrolment</th></tr></thead>
+            <thead className="text-left text-[13px] text-slate-500"><tr><th className="p-1">Source</th><th className="p-1 text-right">Enquiries</th><th className="p-1 text-right">Applied</th><th className="p-1 text-right">Enrolled</th><th className="p-1 text-right">Conversion</th><th className="p-1 text-right">Spend</th><th className="p-1 text-right">Per enquiry</th><th className="p-1 text-right">Per enrolment</th></tr></thead>
             <tbody>{data.sources.map(s => (
               <tr key={s.source} className="border-t border-slate-100"><td className="p-1">{SOURCE_LABEL[s.source]}</td><td className="p-1 text-right tabular-nums">{s.leads}</td><td className="p-1 text-right tabular-nums">{s.applied}</td>
                 <td className="p-1 text-right tabular-nums">{s.enrolled}</td><td className="p-1 text-right tabular-nums">{pct(s.conversion)}</td><td className="p-1 text-right tabular-nums">{s.spend ? m(s.spend) : "—"}</td>
@@ -77,7 +77,7 @@ export default function Analytics({ currency }: { currency: string }) {
         <section className="card overflow-x-auto p-4">
           <h3 className="mb-2 font-semibold">Team</h3>
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="p-1">Staff</th><th className="p-1 text-right">Families</th><th className="p-1 text-right">Enrolled</th><th className="p-1 text-right">Conversion</th><th className="p-1 text-right">Median first reply</th><th className="p-1 text-right">Not contacted</th></tr></thead>
+            <thead className="text-left text-[13px] text-slate-500"><tr><th className="p-1">Staff</th><th className="p-1 text-right">Families</th><th className="p-1 text-right">Enrolled</th><th className="p-1 text-right">Conversion</th><th className="p-1 text-right">Median first reply</th><th className="p-1 text-right">Not contacted</th></tr></thead>
             <tbody>{data.staff.map(s => (
               <tr key={s.owner_id} className="border-t border-slate-100"><td className="p-1">{s.name}</td><td className="p-1 text-right tabular-nums">{s.leads}</td><td className="p-1 text-right tabular-nums">{s.enrolled}</td><td className="p-1 text-right tabular-nums">{pct(s.conversion)}</td>
                 <td className="p-1 text-right tabular-nums">{s.median_first_response_hours === null ? "—" : s.median_first_response_hours < 1 ? `${Math.round(s.median_first_response_hours * 60)} min` : `${s.median_first_response_hours} h`}</td>

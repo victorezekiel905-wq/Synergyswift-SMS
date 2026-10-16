@@ -17,7 +17,7 @@ export default async function ChallengeIndex() {
       <header className="mb-8 flex items-end justify-between">
         <div>
           <p className="text-sm font-medium text-brand-600">Fusion Challenge</p>
-          <h1 className="text-2xl font-semibold">Game-based quizzes</h1>
+          <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Game-based quizzes</h1>
           <p className="mt-1 text-sm text-slate-500">Competitive quiz games with live leaderboards, streaks and speed scoring.</p>
         </div>
         <Link href="/teacher/challenge/new" className="btn btn-primary">+ New game</Link>

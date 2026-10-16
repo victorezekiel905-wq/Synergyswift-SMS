@@ -43,7 +43,7 @@ function List({ items, showAuthor, onOpen }: { items: Note[]; showAuthor: boolea
   if (!items.length) return <Empty>Nothing here yet.</Empty>;
   return (
     <div className="card overflow-x-auto"><table className="w-full text-sm">
-      <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Topic</th>{showAuthor && <th className="p-2">Teacher</th>}<th className="p-2">Subject / class</th><th className="p-2">Week</th><th className="p-2">Status</th><th className="p-2">Updated</th></tr></thead>
+      <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Topic</th>{showAuthor && <th className="p-2">Teacher</th>}<th className="p-2">Subject / class</th><th className="p-2">Week</th><th className="p-2">Status</th><th className="p-2">Updated</th></tr></thead>
       <tbody>{items.map(n => (
         <tr key={n.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => onOpen(n.id)}>
           <td className="p-2 font-medium">{n.topic}{n.status === "returned" && n.review_comment && <div className="text-xs text-rose-600">{n.review_comment}</div>}</td>

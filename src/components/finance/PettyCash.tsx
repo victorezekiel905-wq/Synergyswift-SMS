@@ -60,7 +60,7 @@ export function PettyCash() {
           </div>
           {!moves.length ? <Empty>Nothing recorded yet.</Empty> : (
             <div className="overflow-x-auto"><table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Date</th><th className="p-2">What</th><th className="p-2">Details</th><th className="p-2 text-right">In</th><th className="p-2 text-right">Out</th><th className="p-2" /></tr></thead>
+              <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Date</th><th className="p-2">What</th><th className="p-2">Details</th><th className="p-2 text-right">In</th><th className="p-2 text-right">Out</th><th className="p-2" /></tr></thead>
               <tbody>{moves.map(m => {
                 const inflow = m.kind === "topup" || (m.kind === "adjust" && m.amount > 0);
                 return (

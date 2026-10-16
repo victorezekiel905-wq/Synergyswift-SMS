@@ -36,7 +36,7 @@ export default function SenRegister() {
       </div>
       {!items.length ? <Empty>No children match.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Status</th><th className="p-2">Needs</th><th className="p-2">Exams</th><th className="p-2">Plan</th></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Status</th><th className="p-2">Needs</th><th className="p-2">Exams</th><th className="p-2">Plan</th></tr></thead>
           <tbody className="divide-y divide-slate-100">{items.map(i => (
             <tr key={i.student_id}>
               <td className="p-2"><Link className="font-medium text-brand-700 hover:underline" href={`/school/students/${i.student_id}#sen`}>{i.name}</Link><span className="block text-xs text-slate-500">{i.admission_no} · {i.class_name ?? "no class"}</span></td>

@@ -97,7 +97,7 @@ function TripDetail({ id, currency }: { id: string; currency: string }) {
           )}
         </div>
         {!data.roster.length ? <Empty>Nobody on the roster yet.</Empty> : (
-          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-[13px] text-slate-500"><tr>
             {data.can_manage && <th className="print:hidden"><input type="checkbox" aria-label="Select everyone" checked={sel.length === data.roster.length} onChange={x => setSel(x.target.checked ? data.roster.map(r => r.student_id) : [])} /></th>}
             <th className="py-1">Student</th><th>Class</th><th>Status</th><th>Paid</th><th>Medical</th></tr></thead>
             <tbody>{data.roster.map(r => (

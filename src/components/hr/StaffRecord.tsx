@@ -43,7 +43,7 @@ export function StaffRecord({ staffId }: { staffId?: string }) {
       <section className="card p-4">
         <h3 className="mb-2 font-semibold">Leave this year</h3>
         <div className="overflow-x-auto"><table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Type</th><th className="py-1 text-right">Allowed</th><th className="py-1 text-right">Carried in</th><th className="py-1 text-right">Taken</th><th className="py-1 text-right">Waiting</th><th className="py-1 text-right">Left</th></tr></thead>
+          <thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Type</th><th className="py-1 text-right">Allowed</th><th className="py-1 text-right">Carried in</th><th className="py-1 text-right">Taken</th><th className="py-1 text-right">Waiting</th><th className="py-1 text-right">Left</th></tr></thead>
           <tbody>{data.balances.filter(b => b.taken || b.pending || ["annual", "sick"].includes(b.leave_type)).map(b => (
             <tr key={b.leave_type} className="border-t border-slate-100"><td className="py-1 capitalize">{b.leave_type}{!b.paid && <span className="text-xs text-slate-500"> (unpaid)</span>}</td>
               <td className="py-1 text-right tabular-nums">{b.entitlement ?? "—"}</td><td className="py-1 text-right tabular-nums">{b.carried || ""}</td><td className="py-1 text-right tabular-nums">{b.taken}</td>

@@ -68,14 +68,14 @@ export default function EntrancePage(props: { params: Promise<{ token: string }>
 
   if (err && !info) return <main className="mx-auto max-w-xl p-6"><p className="rounded-lg bg-slate-100 p-4">{err}</p></main>;
   if (!info) return <main className="p-10 text-center text-sm text-slate-500">Loading…</main>;
-  const color = info.school.brand_color ?? "#1d5ddb";
+  const color = info.school.brand_color ?? "#2f4f8f";
 
   if (!attempt) {
     const finished = ["submitted", "graded"].includes(info.status);
     return (
       <main className="mx-auto max-w-xl p-6">
         <p className="text-sm font-semibold" style={{ color }}>{info.school.name}</p>
-        <h1 className="text-2xl font-bold">{info.title}</h1>
+        <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">{info.title}</h1>
         {finished ? <p className="mt-4 rounded-lg bg-emerald-50 p-4">Thank you, {info.child}. Your test has been submitted. The school will be in touch.</p> : (<>
           <p className="mt-2">Hello {info.child}. This test takes {info.duration_minutes} minutes and must be done in one sitting.</p>
           {info.instructions && <div className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm">{info.instructions}</div>}

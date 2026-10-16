@@ -25,7 +25,7 @@ export default function HealthPage() {
       {tab === "medication" && <Medication canEdit={canEdit} />}
       {tab === "alerts" && (!data?.alerts.length ? <Empty>No allergies or conditions recorded.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Allergies</th><th className="p-2">Conditions</th><th className="p-2">Medication</th><th className="p-2">Care plan</th><th className="p-2">Blood / genotype</th></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Allergies</th><th className="p-2">Conditions</th><th className="p-2">Medication</th><th className="p-2">Care plan</th><th className="p-2">Blood / genotype</th></tr></thead>
           <tbody>{data.alerts.map(a => <tr key={a.student_id} className="border-t border-slate-100 align-top"><td className="p-2">{a.students.first_name} {a.students.last_name}<div className="text-xs text-slate-400">{a.students.class_groups?.name}</div></td>
             <td className="p-2"><span className="font-medium text-rose-700">{a.allergies}</span>{a.allergy_severity && a.allergy_severity !== "none" && <Badge tone={SEVERITY_TONE[a.allergy_severity] ?? "slate"}>{a.allergy_severity}</Badge>}{a.has_epipen && <Badge tone="red">EpiPen</Badge>}</td>
             <td className="p-2">{a.conditions}</td><td className="p-2">{a.medications}</td><td className="max-w-xs p-2 text-xs">{a.care_plan}</td><td className="p-2">{[a.blood_group, a.genotype].filter(Boolean).join(" / ")}</td></tr>)}</tbody></table></div>
@@ -92,7 +92,7 @@ function SickBay({ visits, reload, canEdit }: { visits: Visit[]; reload: () => v
         {resting.length > 0 && <Alert tone="amber">In the sick bay now: {resting.map(v => <span key={v.id} className="mr-2">{v.students.first_name} {v.students.last_name} (since {fmtTime(v.at)}){canEdit && <button className="ml-1 text-xs underline" onClick={async () => { await send("/api/health", { action: "visit_left", id: v.id }); reload(); }}>left</button>}</span>)}</Alert>}
         {!visits.length ? <Empty>No sick-bay visits yet.</Empty> : (
           <div className="card overflow-x-auto"><table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">When</th><th className="p-2">Student</th><th className="p-2">Complaint</th><th className="p-2">Outcome</th></tr></thead>
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">When</th><th className="p-2">Student</th><th className="p-2">Complaint</th><th className="p-2">Outcome</th></tr></thead>
             <tbody>{visits.map(v => <tr key={v.id} className="border-t border-slate-100"><td className="p-2 text-xs">{fmtDate(v.at)} {fmtTime(v.at)}</td>
               <td className="p-2">{v.students.first_name} {v.students.last_name}<div className="text-xs text-slate-400">{v.students.class_groups?.name}</div></td>
               <td className="p-2">{v.complaint}{[v.temperature ? `${v.temperature}°C` : "", v.pulse ? `pulse ${v.pulse}` : "", v.blood_pressure ? `BP ${v.blood_pressure}` : ""].filter(Boolean).map(x => ` · ${x}`).join("")}
@@ -146,7 +146,7 @@ function ImmunisationsDue() {
   if (!data) return null;
   return !data.due.length ? <Empty>No immunisations due in the next 30 days. Record them under Medical records.</Empty> : (
     <div className="card overflow-x-auto"><table className="w-full text-sm">
-      <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Vaccine</th><th className="p-2">Due</th></tr></thead>
+      <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Vaccine</th><th className="p-2">Due</th></tr></thead>
       <tbody>{data.due.map((d, i) => <tr key={i} className="border-t border-slate-100"><td className="p-2">{d.student}<div className="text-xs text-slate-400">{d.class}</div></td><td className="p-2">{d.vaccine}</td>
         <td className="p-2">{fmtDate(d.next_due_on)} {d.overdue && <Badge tone="red">overdue</Badge>}</td></tr>)}</tbody></table></div>
   );

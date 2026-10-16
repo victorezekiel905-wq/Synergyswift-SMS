@@ -38,7 +38,7 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
     <main className="mx-auto max-w-6xl px-6 py-8">
       <header className="mb-6">
         <p className="text-sm font-medium text-brand-600">Fusion Studio · Interactive Video</p>
-        <h1 className="text-2xl font-semibold">Timestamped questions + notes</h1>
+        <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Timestamped questions + notes</h1>
         <p className="mt-1 text-sm text-slate-600">Paste a video URL (mp4 or HLS). Add a question or note at any second; students in live mode will see a prompt when playback crosses that timestamp.</p>
       </header>
 

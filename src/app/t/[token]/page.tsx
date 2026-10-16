@@ -21,7 +21,7 @@ export default function TicketPage(props: { params: Promise<{ token: string }> }
   if (error) return <main className="mx-auto max-w-xl p-6"><p className="rounded-lg bg-slate-100 p-4">{error}</p></main>;
   if (!data) return <main className="p-10 text-center text-sm text-slate-500">Loading…</main>;
   const t = data.ticket;
-  const color = data.school.brand_color ?? "#1d5ddb";
+  const color = data.school.brand_color ?? "#2f4f8f";
   const done = ["resolved", "closed"].includes(t.status);
   const post = async (body: Record<string, unknown>, ok: string) => {
     setBusy(true);
@@ -40,7 +40,7 @@ export default function TicketPage(props: { params: Promise<{ token: string }> }
       </header>
       <div>
         <p className="font-mono text-xs text-slate-500">{t.ticket_no}</p>
-        <h1 className="text-xl font-bold">{t.subject}</h1>
+        <h1 className="text-[22px] font-serif font-semibold tracking-[-0.01em]">{t.subject}</h1>
         <p className="text-sm">Status: <b>{t.status_label}</b></p>
       </div>
       {msg && <p className="rounded bg-slate-100 p-2 text-sm" role="status">{msg}</p>}

@@ -57,7 +57,7 @@ export default function Alumni() {
       )}
       {!items.length ? <Empty>No alumni yet. Add graduated students or share the sign-up link.</Empty> : (
         <div className="card overflow-x-auto">
-          <table className="w-full"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Name</th><th className="p-2">Year</th><th className="p-2">Now</th><th className="p-2">Where</th><th className="p-2">Contact</th></tr></thead>
+          <table className="w-full"><thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Name</th><th className="p-2">Year</th><th className="p-2">Now</th><th className="p-2">Where</th><th className="p-2">Contact</th></tr></thead>
             <tbody className="divide-y divide-slate-100">{items.filter(a => a.status !== "pending").map(a => (
               <tr key={a.id} className={"cursor-pointer hover:bg-slate-50 " + (a.status === "archived" ? "text-slate-400" : "")} onClick={() => setOpen(a.id)}>
                 <td className="p-2 font-medium">{a.full_name} {a.mentor && <Badge tone="green">mentor</Badge>}</td>

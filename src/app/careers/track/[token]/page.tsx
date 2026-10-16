@@ -12,11 +12,11 @@ export default function TrackApplication(props: { params: Promise<{ token: strin
   const [msg, setMsg] = useState<string | null>(null);
   if (error) return <main className="mx-auto max-w-xl p-6"><p className="rounded-lg bg-slate-100 p-4">This link is not valid.</p></main>;
   if (!data) return <main className="p-10 text-center text-sm text-slate-500">Loading…</main>;
-  const color = data.school.brand_color ?? "#1d5ddb";
+  const color = data.school.brand_color ?? "#2f4f8f";
   const at = (iso: string) => new Intl.DateTimeFormat("en-GB", { timeZone: data.timezone, weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
   return (
     <main className="mx-auto max-w-xl bg-white p-4 sm:p-8">
-      <header className="mb-5 border-b-4 pb-3" style={{ borderColor: color }}><p className="text-sm text-slate-600">{data.school.name}</p><h1 className="text-xl font-bold" style={{ color }}>{data.title}</h1></header>
+      <header className="mb-5 border-b-4 pb-3" style={{ borderColor: color }}><p className="text-sm text-slate-600">{data.school.name}</p><h1 className="text-[22px] font-serif font-semibold tracking-[-0.01em]" style={{ color }}>{data.title}</h1></header>
       <p>Hello {data.name}. You applied on {fmtDate(data.applied_on)}.</p>
       <p className="mt-3 text-lg">Status: <b>{data.stage}</b></p>
       {data.interviews.map((i, k) => (

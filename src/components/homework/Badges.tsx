@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useApi, send, Alert, Badge, Empty, Field } from "@/components/ui";
+import { useApi, send, Alert, Badge, Empty, Field, Icon } from "@/components/ui";
 
 type BadgeRow = { id: string; name: string; description: string | null; emoji: string; rule: { type: string; threshold: number } | null; active: boolean; student_badges: { count: number }[] };
 const RULE_LABEL: Record<string, string> = { streak: "school-day streak of", points: "learning points reaching", homework: "pieces of homework handed in:", practice: "practice sessions finished:", forum: "discussion posts:" };
@@ -55,7 +55,7 @@ export default function Badges({ classes }: { classes: { id: string; name: strin
             <table className="w-full text-xs"><thead className="text-left text-slate-500"><tr><th className="p-1" /><th className="p-1">Student</th><th className="p-1">Streak</th><th className="p-1">Points</th><th className="p-1">Homework</th><th className="p-1">Badges</th></tr></thead>
               <tbody className="divide-y divide-slate-100">{[...overview.students].sort((a, b) => b.points - a.points).map(s => (
                 <tr key={s.id}><td className="p-1"><input type="checkbox" checked={award.ids.includes(s.id)} onChange={e => setAward({ ...award, ids: e.target.checked ? [...award.ids, s.id] : award.ids.filter(x => x !== s.id) })} aria-label={`Select ${s.name}`} /></td>
-                  <td className="p-1">{s.name}</td><td className="p-1">{s.streak ? `🔥 ${s.streak}` : "—"}</td><td className="p-1">{s.points}</td><td className="p-1">{s.homework}</td><td className="p-1">{s.badges.map(b => b.emoji).join(" ")}</td></tr>
+                  <td className="p-1">{s.name}</td><td className="p-1">{s.streak ? <span className="inline-flex items-center gap-1"><Icon name="flame" className="h-3.5 w-3.5 text-amber-600" />{s.streak}</span> : "—"}</td><td className="p-1">{s.points}</td><td className="p-1">{s.homework}</td><td className="p-1">{s.badges.map(b => b.emoji).join(" ")}</td></tr>
               ))}</tbody></table>
             {manual.length > 0 && (
               <form className="flex flex-wrap items-end gap-2" onSubmit={async e => { e.preventDefault(); if (await act({ action: "award", badge_id: award.badge, student_ids: award.ids, reason: award.reason || null }, `Awarded to ${award.ids.length}.`)) setAward({ badge: "", ids: [], reason: "" }); }}>

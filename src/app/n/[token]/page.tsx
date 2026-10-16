@@ -21,7 +21,7 @@ export default function NoticeLink(props: { params: Promise<{ token: string }> }
       <p className="text-sm font-semibold text-slate-500">{data.school}</p>
       <article className={"rounded-xl border bg-white p-5 shadow-sm " + (urgent ? "border-rose-300" : "border-slate-200")}>
         {urgent && <p className="mb-2 inline-block rounded bg-rose-600 px-2 py-0.5 text-xs font-bold uppercase text-white">Urgent</p>}
-        <h1 className="mb-1 text-xl font-semibold">{data.title}</h1>
+        <h1 className="mb-1 text-[22px] font-serif font-semibold tracking-[-0.01em]">{data.title}</h1>
         {data.sent_at && <p className="mb-3 text-xs text-slate-500">{new Date(data.sent_at).toLocaleString()}</p>}
         <RichText text={data.body} />
       </article>

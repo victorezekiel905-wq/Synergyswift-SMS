@@ -21,7 +21,7 @@ export default async function StudioLesson(props: { params: Promise<{ id: string
       <header className="mb-6 flex items-end justify-between">
         <div>
           <p className="text-sm font-medium text-brand-600">Editing</p>
-          <h1 className="text-2xl font-semibold">{lesson.title}</h1>
+          <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">{lesson.title}</h1>
         </div>
         <form action={`/api/lessons/${lesson.id}/publish`} method="POST">
           <button className="btn btn-primary" type="submit">{lesson.status === "published" ? "Republish" : "Publish"}</button>

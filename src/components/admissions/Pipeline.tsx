@@ -9,7 +9,7 @@ export type LeadCard = {
 };
 export type LeadsData = { leads: LeadCard[]; staff: { id: string; full_name: string }[]; tasks: { id: string; lead_id: string; body: string; due_at: string; assigned_to: string | null }[]; me: string };
 
-const STAGE_TONE: Record<Stage, string> = { enquiry: "border-slate-300", tour_booked: "border-sky-300", applied: "border-indigo-300", assessed: "border-violet-300", offered: "border-amber-300", accepted: "border-emerald-300", enrolled: "border-emerald-500", lost: "border-rose-300" };
+const STAGE_TONE: Record<Stage, string> = { enquiry: "border-slate-300", tour_booked: "border-sky-300", applied: "border-slate-300", assessed: "border-slate-300", offered: "border-amber-300", accepted: "border-emerald-300", enrolled: "border-emerald-500", lost: "border-rose-300" };
 export const scoreTone = (s: number) => (s >= 60 ? "green" : s >= 30 ? "amber" : "slate") as "green" | "amber" | "slate";
 
 /**

@@ -49,7 +49,7 @@ export default function GatePage() {
               {!log.data?.events.length ? <Empty>No sign-ins recorded.</Empty> : (
                 <div className="max-h-[480px] overflow-y-auto">
                   <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-white text-left text-xs uppercase text-slate-500"><tr><th className="py-2">Time</th><th>Name</th><th>Class / no.</th><th>Direction</th><th>How</th></tr></thead>
+                    <thead className="sticky top-0 bg-white text-left text-[13px] text-slate-500"><tr><th className="py-2">Time</th><th>Name</th><th>Class / no.</th><th>Direction</th><th>How</th></tr></thead>
                     <tbody>
                       {log.data.events.map(e => (
                         <tr key={e.id} className="border-t border-slate-100">

@@ -7,7 +7,7 @@
  *
  * Widgets: news (latest posts, click to read), events (upcoming), apply (the
  * admissions form), enquire (the enquiry form). Options: data-limit="5",
- * data-color="#1d5ddb". The widgets keep their own styles (shadow DOM), so
+ * data-color="#2f4f8f". The widgets keep their own styles (shadow DOM), so
  * the site's theme does not break them.
  */
 (function () {
@@ -73,7 +73,7 @@
       var kind = el.getAttribute("data-educlass"), school = el.getAttribute("data-school");
       if (!school) return;
       var limit = Math.min(50, Math.max(1, Number(el.getAttribute("data-limit")) || 5));
-      var color = /^#[0-9a-f]{3,8}$/i.test(el.getAttribute("data-color") || "") ? el.getAttribute("data-color") : "#1d5ddb";
+      var color = /^#[0-9a-f]{3,8}$/i.test(el.getAttribute("data-color") || "") ? el.getAttribute("data-color") : "#2f4f8f";
       if (kind === "apply" || kind === "enquire") frame(el, kind, school);
       else if (kind === "news" || kind === "events") list(el, kind, school, limit, color);
     });

@@ -49,7 +49,7 @@ export default function RequisitionsPage() {
                 {r.justification && <p className="mb-2 text-slate-700">{r.justification}</p>}
                 {r.needed_by && <p className="mb-2 text-xs text-slate-500">Needed by {fmtDate(r.needed_by)}</p>}
                 <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
-                  <thead className="text-left text-xs uppercase text-slate-500"><tr><th>Item</th><th className="text-right">Qty</th><th className="text-right">Unit</th><th className="text-right">Amount</th></tr></thead>
+                  <thead className="text-left text-[13px] text-slate-500"><tr><th>Item</th><th className="text-right">Qty</th><th className="text-right">Unit</th><th className="text-right">Amount</th></tr></thead>
                   <tbody>{r.requisition_items.map(i => <tr key={i.id}><td>{i.description}</td><td className="text-right">{i.quantity}</td><td className="text-right">{money(i.unit_cost, currency)}</td><td className="text-right">{money(i.quantity * i.unit_cost, currency)}</td></tr>)}</tbody>
                 </table></div>
                 {r.decider && <p className="mt-2 text-xs text-slate-500">Decided by {r.decider.full_name} on {fmtDate(r.decided_at)}{r.decision_note ? `: ${r.decision_note}` : ""}</p>}
@@ -96,7 +96,7 @@ function NewRequisition({ open, onClose, onDone, currency }: { open: boolean; on
         <Field label="Why is it needed?"><textarea className="input h-20" value={f.justification} onChange={e => setF({ ...f, justification: e.target.value })} /></Field>
         <Field label="Needed by"><input className="input max-w-xs" type="date" value={f.needed_by} onChange={e => setF({ ...f, needed_by: e.target.value })} /></Field>
         <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase text-slate-500"><tr><th>Item</th><th>Qty</th><th>Unit cost</th><th /></tr></thead>
+          <thead className="text-left text-[13px] text-slate-500"><tr><th>Item</th><th>Qty</th><th>Unit cost</th><th /></tr></thead>
           <tbody>
             {items.map((i, k) => (
               <tr key={k}>

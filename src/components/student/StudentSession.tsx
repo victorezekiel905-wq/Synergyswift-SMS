@@ -1,4 +1,5 @@
 "use client";
+import { Icon } from "@/components/ui";
 import RichText from "@/components/content/RichText";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -127,7 +128,7 @@ export default function StudentSession(props: {
     <main className="mx-auto max-w-3xl px-6 py-6">
       {notice && (
         <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          ⚠️ {notice}
+          {notice}
         </div>
       )}
       <header className="card mb-4 flex items-center justify-between p-4">
@@ -221,7 +222,7 @@ export default function StudentSession(props: {
         <input className="input text-sm" placeholder="Raise hand — tell your teacher (optional)"
           value={handMsg} onChange={(e) => setHandMsg(e.target.value)} disabled={handSent || props.session.state !== "live"} />
         <button className="btn btn-ghost text-sm" onClick={raiseHand} disabled={handSent || props.session.state !== "live"}>
-          {handSent ? "Hand raised ✋" : "Raise hand"}
+          <Icon name="hand" className="h-4 w-4" />{handSent ? "Hand raised" : "Raise hand"}
         </button>
       </section>
 

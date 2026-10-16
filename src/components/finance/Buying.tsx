@@ -113,7 +113,7 @@ function Orders({ currency, onOpen }: { currency: string; onOpen: (id: string) =
   if (!data) return null;
   return !data.length ? <Empty>No purchase orders yet.</Empty> : (
     <div className="card overflow-x-auto"><table className="w-full text-sm">
-      <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Order</th><th className="p-2">Supplier</th><th className="p-2">For</th><th className="p-2 text-right">Total</th><th className="p-2">Status</th><th className="p-2">Paid</th></tr></thead>
+      <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Order</th><th className="p-2">Supplier</th><th className="p-2">For</th><th className="p-2 text-right">Total</th><th className="p-2">Status</th><th className="p-2">Paid</th></tr></thead>
       <tbody>{data.map(o => <tr key={o.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => onOpen(o.id)}>
         <td className="p-2 font-mono text-xs">{o.po_no ?? "draft"}</td><td className="p-2">{o.suppliers?.name}</td><td className="p-2">{o.requisitions?.title ?? ""}</td>
         <td className="p-2 text-right tabular-nums">{money(o.total, currency)}</td><td className="p-2"><Badge tone={STATUS_TONE[o.status]}>{o.status.replace("_", " ")}</Badge></td><td className="p-2">{o.paid_at ? fmtDate(o.paid_at) : ""}</td></tr>)}</tbody></table></div>
@@ -140,7 +140,7 @@ function OrderDetail({ id, currency, onClose }: { id: string | null; currency: s
             {["draft", "sent"].includes(o.status) && <button className="btn btn-ghost px-2 py-1 text-xs text-rose-600" onClick={() => confirm("Cancel this order?") && call({ action: "order_status", po_id: o.id, status: "cancelled" }, "Cancelled.")}>Cancel</button>}
           </span></div>
         {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
-        <table className="w-full"><thead className="text-left text-xs uppercase text-slate-500"><tr><th>Item</th><th className="text-right">Qty</th><th className="text-right">Unit cost</th><th>Goes into</th>{!draft && <th>Received</th>}<th /></tr></thead>
+        <table className="w-full"><thead className="text-left text-[13px] text-slate-500"><tr><th>Item</th><th className="text-right">Qty</th><th className="text-right">Unit cost</th><th>Goes into</th>{!draft && <th>Received</th>}<th /></tr></thead>
           <tbody>{ls.map((l, i) => (
             <tr key={l.id ?? i} className="border-t border-slate-100 align-top">
               <td className="py-1 pr-2">{draft ? <input className="input" value={l.description} onChange={e => setL(i, { description: e.target.value })} /> : l.description}</td>
@@ -181,7 +181,7 @@ function Suppliers({ list, reload }: { list: Supplier[]; reload: () => void }) {
     <div className="space-y-3">
       <button className="btn btn-primary" onClick={() => setEdit({ active: true })}>+ Supplier</button>
       {!list.length ? <Empty>No suppliers yet.</Empty> : <div className="card overflow-x-auto"><table className="w-full text-sm">
-        <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Supplier</th><th className="p-2">Supplies</th><th className="p-2">Contact</th><th className="p-2">Bank</th><th /></tr></thead>
+        <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Supplier</th><th className="p-2">Supplies</th><th className="p-2">Contact</th><th className="p-2">Bank</th><th /></tr></thead>
         <tbody>{list.map(s => <tr key={s.id} className={"border-t border-slate-100 " + (s.active ? "" : "text-slate-400")}><td className="p-2 font-medium">{s.name}</td><td className="p-2">{s.category}</td>
           <td className="p-2 text-xs">{[s.contact_name, s.phone, s.email].filter(Boolean).join(" · ")}</td><td className="p-2 text-xs">{s.bank_name} {s.account_no}</td>
           <td className="p-2 text-right"><button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setEdit(s)}>Edit</button></td></tr>)}</tbody></table></div>}

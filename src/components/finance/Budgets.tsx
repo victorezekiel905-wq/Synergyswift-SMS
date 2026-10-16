@@ -60,7 +60,7 @@ export function Budgets() {
               return (
                 <div key={kind} className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">{kind === "income" ? "Income" : "Spending"}</th><th className="p-2 text-right">Budget</th><th className="p-2 text-right">Actual</th><th className="p-2 w-40">Used</th><th className="p-2 text-right">Variance</th></tr></thead>
+                    <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">{kind === "income" ? "Income" : "Spending"}</th><th className="p-2 text-right">Budget</th><th className="p-2 text-right">Actual</th><th className="p-2 w-40">Used</th><th className="p-2 text-right">Variance</th></tr></thead>
                     <tbody>{rows.map(r => {
                       const over = kind === "expense" && r.used !== null && r.used > 100;
                       return (
@@ -96,7 +96,7 @@ export function Budgets() {
           <datalist id="bud-income">{data.income_categories.map(c => <option key={c} value={c} />)}</datalist>
           <datalist id="bud-expense">{data.expense_categories.map(c => <option key={c} value={c} />)}</datalist>
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Kind</th><th className="py-1">Category</th><th className="py-1 text-right">Amount</th><th /></tr></thead>
+            <thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Kind</th><th className="py-1">Category</th><th className="py-1 text-right">Amount</th><th /></tr></thead>
             <tbody>{edit.lines.map((l, i) => (
               <tr key={i}>
                 <td className="py-1 pr-2"><select className="input" value={l.kind} onChange={e => setEdit({ ...edit, lines: edit.lines.map((x, j) => j === i ? { ...x, kind: e.target.value as BLine["kind"] } : x) })}><option value="income">Income</option><option value="expense">Spending</option></select></td>
@@ -124,7 +124,7 @@ function Summary({ label, budget, actual, cur, good }: { label: string; budget: 
   const bad = pct !== null && (good === "down" ? pct > 100 : false);
   return (
     <div className="rounded-lg border border-slate-200 p-3">
-      <p className="text-xs uppercase text-slate-500">{label}</p>
+      <p className="text-[13px] text-slate-500">{label}</p>
       <p className="text-lg font-semibold tabular-nums">{money(actual, cur)} <span className="text-sm font-normal text-slate-500">of {money(budget, cur)}</span></p>
       {pct !== null && <div className="mt-1 h-2 rounded bg-slate-100"><div className={"h-2 rounded " + (bad ? "bg-rose-500" : "bg-brand-500")} style={{ width: `${Math.min(100, pct)}%` }} /></div>}
       {pct !== null && <p className="mt-1 text-xs text-slate-500">{pct}%</p>}

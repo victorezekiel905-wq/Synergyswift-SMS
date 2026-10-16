@@ -172,7 +172,7 @@ export function Debtors({ groups, currency }: { groups: { id: string; name: stri
         <div className="grid gap-2 sm:grid-cols-6"><Stat label="Outstanding" value={money(data.total, currency)} tone={data.total ? "bad" : "good"} />
           {Object.entries(data.buckets).map(([k, v]) => <Stat key={k} label={k === "current" ? "Not yet due" : `${k} days overdue`} value={money(v, currency)} tone={k === "90+" && v ? "bad" : undefined} />)}</div>
         {!data.debtors.length ? <Empty>No one owes anything.</Empty> : <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Class</th><th className="p-2 text-right">Balance</th><th className="p-2">Oldest due</th><th className="p-2" /></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Class</th><th className="p-2 text-right">Balance</th><th className="p-2">Oldest due</th><th className="p-2" /></tr></thead>
           <tbody>{data.debtors.map(d => <tr key={d.student_id} className="border-t border-slate-100"><td className="p-2">{d.name} <span className="text-xs text-slate-500">{d.admission_no}</span></td><td className="p-2">{d.class_name}</td>
             <td className="p-2 text-right tabular-nums">{money(d.balance, currency)}</td><td className="p-2">{d.oldest_due ? fmtDate(d.oldest_due) : "—"}</td>
             <td className="p-2 text-right"><button className="text-xs text-brand-700" onClick={() => setSt({ id: d.student_id, name: d.name })}>Statement</button></td></tr>)}</tbody></table></div>}
@@ -196,7 +196,7 @@ export function Statement({ studentId, currency, onClose }: { studentId: string;
         <button className="btn btn-outline" onClick={() => window.print()}>Print</button>{onClose && <button className="btn btn-ghost" onClick={onClose}>Close</button>}</div>
       {!s ? <Loading /> : <>
         <p><b>{s.student.name}</b> {s.student.admission_no} {s.student.class_name ? `· ${s.student.class_name}` : ""} · {fmtDate(from)} to {fmtDate(to)}</p>
-        <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Date</th><th>Reference</th><th>Details</th><th className="text-right">Charged</th><th className="text-right">Paid</th><th className="text-right">Balance</th></tr></thead>
+        <table className="w-full text-sm"><thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Date</th><th>Reference</th><th>Details</th><th className="text-right">Charged</th><th className="text-right">Paid</th><th className="text-right">Balance</th></tr></thead>
           <tbody><tr className="border-t border-slate-100"><td className="py-1" colSpan={5}>Balance brought forward</td><td className="text-right tabular-nums">{money(s.opening, currency)}</td></tr>
             {s.lines.map((l, i) => <tr key={i} className="border-t border-slate-100"><td className="py-1">{fmtDate(l.date)}</td><td className="font-mono text-xs">{l.ref}</td><td>{l.description}</td>
               <td className="text-right tabular-nums">{l.debit ? money(l.debit, currency) : ""}</td><td className="text-right tabular-nums">{l.credit ? money(l.credit, currency) : ""}</td><td className="text-right tabular-nums">{money(l.balance, currency)}</td></tr>)}

@@ -46,13 +46,13 @@ export default function MyDay() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="card p-3">
-            <p className="text-xs uppercase text-slate-500">Attendance this term</p>
+            <p className="text-[13px] text-slate-500">Attendance this term</p>
             <p className={`text-xl font-bold ${a.rate !== null && a.rate < 90 ? "text-amber-600" : ""}`}>{a.rate === null ? "—" : `${a.rate}%`}</p>
             <p className="text-xs text-slate-500">{a.absences} absent · {a.late} late</p>
           </div>
           {data.fees && (
             <div className="card p-3">
-              <p className="text-xs uppercase text-slate-500">School fees</p>
+              <p className="text-[13px] text-slate-500">School fees</p>
               <p className={`text-xl font-bold ${data.fees.overdue > 0 ? "text-rose-600" : data.fees.owed > 0 ? "text-amber-600" : "text-emerald-600"}`}>{data.fees.owed > 0 ? money(data.fees.owed) : "Paid"}</p>
               <p className="text-xs text-slate-500">{data.fees.overdue > 0 ? `${money(data.fees.overdue)} past due` : data.fees.next_due ? `next due ${fmtDate(data.fees.next_due)}` : data.fees.invoices ? "nothing outstanding" : "no bills yet"}</p>
             </div>

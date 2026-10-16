@@ -418,7 +418,7 @@ export default function WebRtcMesh(props: {
       <header className="mb-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-sm font-medium text-brand-600">Fusion Live Audio / Video</p>
-          <h1 className="text-2xl font-semibold">Realtime class room</h1>
+          <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Realtime class room</h1>
           <p className="mt-1 text-sm text-slate-600">Talk with your class by sound and video. The teacher can split the class into breakout rooms for group work and bring everyone back.</p>
         </div>
         <div className="flex flex-wrap gap-2">

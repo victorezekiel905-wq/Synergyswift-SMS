@@ -45,7 +45,7 @@ function PrintInner() {
 
       {view === "timetable" && data.class_groups.filter(g => placed.some(p => p.class_group_ids.includes(g.id))).map(g => (
         <section key={g.id} className="mb-8 break-after-page">
-          <h1 className="text-xl font-bold">{s.name}: {g.name}</h1>
+          <h1 className="text-[22px] font-serif font-semibold tracking-[-0.01em]">{s.name}: {g.name}</h1>
           <p className="mb-3 text-sm text-slate-600">{fmtDate(s.starts_on)} – {fmtDate(s.ends_on)}</p>
           <table className="w-full border-collapse text-sm">
             <thead><tr className="bg-slate-100"><th className="border border-slate-300 p-1.5 text-left">Date and time</th><th className="border border-slate-300 p-1.5 text-left">Paper</th><th className="border border-slate-300 p-1.5">Minutes</th></tr></thead>
@@ -94,7 +94,7 @@ function PrintInner() {
 
       {view === "roster" && (
         <section>
-          <h1 className="text-xl font-bold">{s.name}: invigilation roster</h1>
+          <h1 className="text-[22px] font-serif font-semibold tracking-[-0.01em]">{s.name}: invigilation roster</h1>
           <table className="mt-3 w-full border-collapse text-sm">
             <thead><tr className="bg-slate-100"><th className="border border-slate-300 p-1.5 text-left">Session</th><th className="border border-slate-300 p-1.5 text-left">Hall</th><th className="border border-slate-300 p-1.5 text-left">Invigilators (chief first)</th></tr></thead>
             <tbody>{[...new Set(data.duties.map(d => `${d.slot_date}#${d.slot_session}#${d.hall_id}`))].sort().map(k => {

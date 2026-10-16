@@ -68,7 +68,7 @@ function Statements({ chart }: { chart: Chart }) {
       )}
       {data && kind === "trial_balance" && (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Code</th><th className="p-2">Account</th><th className="p-2 text-right">Debit</th><th className="p-2 text-right">Credit</th></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Code</th><th className="p-2">Account</th><th className="p-2 text-right">Debit</th><th className="p-2 text-right">Credit</th></tr></thead>
           <tbody>{data.rows.map((r: { account: Account; debit: number; credit: number }) => <tr key={r.account.id} className="border-t border-slate-100"><td className="p-2 font-mono text-xs">{r.account.code}</td><td className="p-2">{r.account.name}</td>
             <td className="p-2 text-right tabular-nums">{r.debit ? money(r.debit, cur) : ""}</td><td className="p-2 text-right tabular-nums">{r.credit ? money(r.credit, cur) : ""}</td></tr>)}
             <tr className="border-t-2 border-slate-300 font-semibold"><td /><td className="p-2">Total {data.balanced ? <Badge tone="green">balances</Badge> : <Badge tone="red">out by {money(Math.abs(data.debit - data.credit), cur)}</Badge>}</td>
@@ -76,7 +76,7 @@ function Statements({ chart }: { chart: Chart }) {
       )}
       {data && kind === "ledger" && (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Date</th><th className="p-2">Ref</th><th className="p-2">Details</th><th className="p-2 text-right">Debit</th><th className="p-2 text-right">Credit</th><th className="p-2 text-right">Balance</th></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Date</th><th className="p-2">Ref</th><th className="p-2">Details</th><th className="p-2 text-right">Debit</th><th className="p-2 text-right">Credit</th><th className="p-2 text-right">Balance</th></tr></thead>
           <tbody><tr className="text-slate-500"><td className="p-2" colSpan={5}>Brought forward</td><td className="p-2 text-right tabular-nums">{money(data.opening, cur)}</td></tr>
             {data.rows.map((r: any, i: number) => <tr key={i} className="border-t border-slate-100"><td className="p-2 whitespace-nowrap">{fmtDate(r.date)}</td><td className="p-2 font-mono text-xs">{r.ref}</td><td className="p-2">{r.memo} <span className="text-xs text-slate-400">{SRC[r.source]}</span></td>
               <td className="p-2 text-right tabular-nums">{r.debit ? money(r.debit, cur) : ""}</td><td className="p-2 text-right tabular-nums">{r.credit ? money(r.credit, cur) : ""}</td><td className="p-2 text-right tabular-nums">{money(r.balance, cur)}</td></tr>)}
@@ -156,7 +156,7 @@ function Journals({ chart }: { chart: Chart }) {
             <div className="sm:col-span-2"><Field label="Narration"><input className="input" maxLength={300} value={edit.memo} onChange={e => setEdit({ ...edit, memo: e.target.value })} /></Field></div>
           </div>
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Account</th><th className="py-1">Details</th><th className="py-1 text-right">Debit</th><th className="py-1 text-right">Credit</th><th /></tr></thead>
+            <thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Account</th><th className="py-1">Details</th><th className="py-1 text-right">Debit</th><th className="py-1 text-right">Credit</th><th /></tr></thead>
             <tbody>{edit.lines.map((l, i) => {
               const set = (p: Partial<JLine>) => setEdit({ ...edit, lines: edit.lines.map((x, j) => j === i ? { ...x, ...p } : x) });
               return (
@@ -202,7 +202,7 @@ function ChartSetup({ chart, reload }: { chart: Chart; reload: () => void }) {
       <section className="space-y-2">
         <div className="flex items-center gap-2"><h2 className="font-semibold">Accounts</h2><button className="btn btn-outline ml-auto" onClick={() => setEdit({ type: "expense", active: true })}>+ Account</button></div>
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Code</th><th className="p-2">Name</th><th className="p-2">Type</th><th className="p-2" /></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Code</th><th className="p-2">Name</th><th className="p-2">Type</th><th className="p-2" /></tr></thead>
           <tbody>{chart.accounts.slice().sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })).map(a => (
             <tr key={a.id} className={"border-t border-slate-100 " + (a.active ? "" : "text-slate-400")}><td className="p-2 font-mono text-xs">{a.code}</td><td className="p-2">{a.name}{a.system_key && <span className="ml-1 text-xs text-slate-400">built-in</span>}{!a.active && " (hidden)"}</td>
               <td className="p-2 capitalize">{a.type}</td><td className="p-2 text-right"><button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setEdit(a)}>Edit</button></td></tr>))}</tbody></table></div>

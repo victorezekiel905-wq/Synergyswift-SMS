@@ -18,7 +18,7 @@ export default async function StudioList() {
       <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-sm font-medium text-brand-600">Fusion Studio</p>
-          <h1 className="text-2xl font-semibold">Your lessons</h1>
+          <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Your lessons</h1>
         </div>
         <form action="/api/lessons" method="POST">
           <input type="hidden" name="op" value="create" />

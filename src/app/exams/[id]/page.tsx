@@ -350,7 +350,7 @@ function Monitor({ examId }: { examId: string }) {
       {!list.length ? <Empty>Nobody has started yet.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Status</th><th className="p-2">Progress</th><th className="p-2">Time left</th><th className="p-2">Violations</th><th className="p-2">Last seen</th><th className="p-2" /></tr></thead>
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Status</th><th className="p-2">Progress</th><th className="p-2">Time left</th><th className="p-2">Violations</th><th className="p-2">Last seen</th><th className="p-2" /></tr></thead>
             <tbody>
               {list.map(a => {
                 const left = Math.max(0, new Date(a.deadline_at).getTime() - now);
@@ -548,7 +548,7 @@ function Analysis({ examId }: { examId: string }) {
 
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr>
             <th className="p-2">Q</th><th className="p-2">Question</th><th className="p-2 text-center" title="Share of marks earned">Difficulty</th>
             <th className="p-2 text-center" title="Top 27% minus bottom 27%">Discrimination</th><th className="p-2 text-center">Point-biserial</th><th className="p-2 text-center">Answered</th><th className="p-2">Notes</th>
           </tr></thead>

@@ -98,7 +98,7 @@ export function Dining() {
       </div>
       {msg && <Alert tone="green">{msg}</Alert>}
       <div className="card overflow-x-auto"><table className="w-full text-sm">
-        <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Day</th>{MEALS.map(m => <th key={m} className="p-2 capitalize">{m}</th>)}</tr></thead>
+        <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Day</th>{MEALS.map(m => <th key={m} className="p-2 capitalize">{m}</th>)}</tr></thead>
         <tbody>{days.map(d => <tr key={d} className="border-t border-slate-100 align-top"><td className="whitespace-nowrap p-2 font-medium">{fmtDate(d)}</td>
           {MEALS.map(m => { const x = menu(d, m); return <td key={m} className="p-2">{x ? <>{x.items}{x.alternatives && <span className="block text-xs text-slate-500">or {x.alternatives}</span>}</> : <span className="text-slate-300">—</span>}
             {data.can_edit && <button className="ml-1 text-xs text-brand-700" onClick={() => setEdit({ on_date: d, meal: m, items: x?.items ?? "", alternatives: x?.alternatives ?? "" })}>{x ? "edit" : "add"}</button>}</td>; })}</tr>)}</tbody></table></div>

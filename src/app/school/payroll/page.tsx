@@ -51,7 +51,7 @@ function Runs({ currency }: { currency: string }) {
       </div>
       {!data?.runs.length ? <Empty>No payroll runs yet. Set salaries first, then prepare the month.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Month</th><th className="p-2 text-right">Gross</th><th className="p-2 text-right">Deductions</th><th className="p-2 text-right">Net</th><th className="p-2 text-right">Employer cost</th><th className="p-2">Status</th><th className="p-2" /></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Month</th><th className="p-2 text-right">Gross</th><th className="p-2 text-right">Deductions</th><th className="p-2 text-right">Net</th><th className="p-2 text-right">Employer cost</th><th className="p-2">Status</th><th className="p-2" /></tr></thead>
           <tbody>{data.runs.map(r => <tr key={r.id} className="border-t border-slate-100"><td className="p-2 font-medium">{r.period}</td><td className="p-2 text-right tabular-nums">{money(r.gross, currency)}</td>
             <td className="p-2 text-right tabular-nums">{money(r.deductions, currency)}</td><td className="p-2 text-right font-semibold tabular-nums">{money(r.net, currency)}</td>
             <td className="p-2 text-right tabular-nums text-slate-600">{money(r.employer_total, currency)}</td>
@@ -92,7 +92,7 @@ function RunDetail({ id, currency }: { id: string; currency: string }) {
         <p className="rounded bg-slate-50 p-2">NHF <b className="block tabular-nums">{money(sum("nhf"), currency)}</b></p>
         <p className="rounded bg-slate-50 p-2">Employer contributions <b className="block tabular-nums">{money(sum("employer_total"), currency)}</b></p>
       </div>
-      <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Staff</th><th className="text-right">Gross</th><th className="text-right">PAYE</th><th className="text-right">Pension</th><th className="text-right">Other</th><th className="text-right">Net</th><th>Bank</th></tr></thead>
+      <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Staff</th><th className="text-right">Gross</th><th className="text-right">PAYE</th><th className="text-right">Pension</th><th className="text-right">Other</th><th className="text-right">Net</th><th>Bank</th></tr></thead>
         <tbody>{data.payslips.map(p => {
           const other = Number(p.total_deductions) - Number(p.paye) - Number(p.pension_employee);
           return (
@@ -133,7 +133,7 @@ function Profiles({ currency }: { currency: string }) {
     <div>
       {!data?.staff.length ? <Empty>No staff records. Add staff under HR first.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Staff</th><th className="p-2">Grade</th><th className="p-2 text-right">Basic</th><th className="p-2 text-right">Allowances</th><th className="p-2">For remittances</th><th className="p-2">Bank</th><th className="p-2" /></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Staff</th><th className="p-2">Grade</th><th className="p-2 text-right">Basic</th><th className="p-2 text-right">Allowances</th><th className="p-2">For remittances</th><th className="p-2">Bank</th><th className="p-2" /></tr></thead>
           <tbody>{data.staff.map(s => {
             const g = grade(s.profile?.grade_id ?? null);
             const basic = g ? g.basic : s.profile?.basic;
@@ -214,7 +214,7 @@ function Loans({ currency }: { currency: string }) {
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
       {!data.loans.length ? <Empty>No loans or advances.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Staff</th><th className="p-2">Kind</th><th className="p-2 text-right">Amount</th><th className="p-2 text-right">Monthly</th><th className="p-2 text-right">Balance</th><th className="p-2">From</th><th className="p-2">Status</th><th className="p-2" /></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Staff</th><th className="p-2">Kind</th><th className="p-2 text-right">Amount</th><th className="p-2 text-right">Monthly</th><th className="p-2 text-right">Balance</th><th className="p-2">From</th><th className="p-2">Status</th><th className="p-2" /></tr></thead>
           <tbody>{data.loans.map(l => (
             <tr key={l.id} className="border-t border-slate-100"><td className="p-2">{l.staff?.full_name}{l.note && <div className="text-xs text-slate-500">{l.note}</div>}</td><td className="p-2 capitalize">{l.kind}</td>
               <td className="p-2 text-right tabular-nums">{money(l.principal, currency)}</td><td className="p-2 text-right tabular-nums">{money(l.monthly_deduction, currency)}</td><td className="p-2 text-right font-semibold tabular-nums">{money(l.balance, currency)}</td>

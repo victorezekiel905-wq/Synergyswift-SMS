@@ -123,7 +123,7 @@ function GroupDetail({ id, list, onEdit }: { id: string; list: List; onEdit: (g:
       <section>
         <h3 className="mb-2 font-semibold">Members ({active.length})</h3>
         {!active.length ? <Empty>No members yet.</Empty> : (
-          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Student</th><th>Class</th><th>Role</th><th>Attendance</th><th>Joined</th><th /></tr></thead>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Student</th><th>Class</th><th>Role</th><th>Attendance</th><th>Joined</th><th /></tr></thead>
             <tbody>{active.map(m => (
               <tr key={m.student_id} className="border-t border-slate-100">
                 <td className="py-1.5">{m.name}</td><td>{m.class}</td>

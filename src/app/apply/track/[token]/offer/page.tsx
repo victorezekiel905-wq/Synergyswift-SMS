@@ -32,7 +32,7 @@ export default function OfferPage(props: { params: Promise<{ token: string }> })
 
   if (error) return <main className="mx-auto max-w-2xl p-6"><p className="rounded-lg bg-slate-100 p-4">{error}</p></main>;
   if (!data) return <main className="p-10 text-center text-sm text-slate-500">Loading…</main>;
-  const color = data.school.brand_color ?? "#1d5ddb";
+  const color = data.school.brand_color ?? "#2f4f8f";
   const signed = data.status !== "offered";
   return (
     <main className="mx-auto max-w-2xl bg-white p-4 sm:p-8 print:p-0">

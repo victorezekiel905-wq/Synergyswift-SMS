@@ -133,7 +133,7 @@ export default function AttendanceTracker({ classId }: { classId: string }) {
       {students.length > 0 && (
         <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-[860px] text-left text-sm">
-            <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-slate-200 text-xs text-slate-500">
               <tr>
                 <th className="pb-3">Student</th>
                 <th className="pb-3">Email</th>

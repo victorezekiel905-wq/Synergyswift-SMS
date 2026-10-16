@@ -76,7 +76,7 @@ function Responses({ id }: { id: string }) {
   const { data } = useApi<{ event: Ev; responses: any[] }>(`/api/events?id=${id}`, [id]);
   if (!data) return <Loading />;
   return (
-    <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Student</th><th>Class</th><th>Consent</th><th>Payment</th><th>Note</th></tr></thead>
+    <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Student</th><th>Class</th><th>Consent</th><th>Payment</th><th>Note</th></tr></thead>
       <tbody>{data.responses.map((r: any) => <tr key={r.student_id} className="border-t border-slate-100"><td className="py-1.5">{r.students?.first_name} {r.students?.last_name}</td><td>{r.students?.class_groups?.name}</td>
         <td><Badge tone={r.consent ? "green" : "red"}>{r.consent ? "yes" : "no"}</Badge></td><td>{r.fee_invoices ? <Badge tone={r.fee_invoices.status === "paid" ? "green" : "amber"}>{r.fee_invoices.status}</Badge> : "—"}</td><td className="text-xs">{r.note}</td></tr>)}</tbody></table></div>
   );

@@ -72,7 +72,7 @@ export function Availability({ admin, me }: { admin: boolean; me: string | null 
       {err && <Alert>{err}</Alert>}
       {user && (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-2 text-left">Period</th>{days.map(d => <th key={d} className="p-2">{DAYS[d]}</th>)}</tr></thead>
+          <thead className="bg-slate-50 text-[13px] text-slate-500"><tr><th className="p-2 text-left">Period</th>{days.map(d => <th key={d} className="p-2">{DAYS[d]}</th>)}</tr></thead>
           <tbody>{data.periods.filter(p => !p.is_break).map(p => (
             <tr key={p.id} className="border-t border-slate-100"><td className="p-2 text-xs"><b>{p.name}</b> {p.starts_at.slice(0, 5)}</td>
               {days.map(d => { const k = `${d}|${p.id}`; return (

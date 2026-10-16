@@ -18,7 +18,7 @@ export default async function LiveIndex() {
       <header className="mb-8 flex items-end justify-between">
         <div>
           <p className="text-sm font-medium text-brand-600">Fusion Live</p>
-          <h1 className="text-2xl font-semibold">Live classroom sessions</h1>
+          <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Live classroom sessions</h1>
         </div>
         <Link href="/teacher/live/new" className="btn btn-primary">+ New session</Link>
       </header>

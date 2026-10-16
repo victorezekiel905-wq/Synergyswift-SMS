@@ -28,7 +28,7 @@ export default function AnalyticsPage() {
           <div className="mb-3 flex gap-2">{(["high", "medium", "all"] as const).map(l => <button key={l} className={"btn " + (level === l ? "btn-primary" : "btn-ghost border border-slate-200")} onClick={() => setLevel(l)}>{l === "medium" ? "Medium and high" : l === "all" ? "Everyone" : "High"}</button>)}</div>
           {!list.length ? <Empty>No students at this level. </Empty> : (
             <div className="card overflow-x-auto"><table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Class</th><th className="p-2 text-center">Risk</th><th className="p-2">Why</th><th className="p-2" /></tr></thead>
+              <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Class</th><th className="p-2 text-center">Risk</th><th className="p-2">Why</th><th className="p-2" /></tr></thead>
               <tbody>{list.map(s => {
                 const hasPlan = open.some(i => i.student_id === s.id);
                 return (

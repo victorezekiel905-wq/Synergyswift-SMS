@@ -70,7 +70,7 @@ export function ReenrolCard({ data, token, onChange }: { data: NonNullable<Suppo
 export function SurveyPrompt({ surveys }: { surveys: SupportData["surveys"] }) {
   if (!surveys.length) return null;
   return (
-    <section className="card mb-4 border-violet-200 bg-violet-50 p-3 text-sm">
+    <section className="card mb-4 border-slate-200 bg-slate-50 p-3 text-sm">
       {surveys.map(s => <p key={s.token}>We would value your views: <a className="font-semibold text-brand-700 hover:underline" href={`/s/${s.token}`}>{s.title}</a> (about two minutes)</p>)}
     </section>
   );

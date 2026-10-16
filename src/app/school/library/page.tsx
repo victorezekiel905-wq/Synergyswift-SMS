@@ -190,7 +190,7 @@ function Loans({ view }: { view: string }) {
       {view === "overdue" && <p className="text-sm text-slate-600">Parents get a weekly reminder and readers one every few days, without you doing anything.</p>}
       {!data.length ? <Empty>Nothing here.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Book</th><th className="p-2">Reader</th><th className="p-2">Out</th><th className="p-2">Due</th><th className="p-2">Fine</th><th className="p-2" /></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Book</th><th className="p-2">Reader</th><th className="p-2">Out</th><th className="p-2">Due</th><th className="p-2">Fine</th><th className="p-2" /></tr></thead>
           <tbody>{data.map(l => {
             const st = loanState(l);
             return (
@@ -219,7 +219,7 @@ function Reservations() {
   if (!data) return null;
   return !data.length ? <Empty>No reservations.</Empty> : (
     <div className="card overflow-x-auto"><table className="w-full text-sm">
-      <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Book</th><th className="p-2">Reader</th><th className="p-2">Status</th><th className="p-2" /></tr></thead>
+      <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Book</th><th className="p-2">Reader</th><th className="p-2">Status</th><th className="p-2" /></tr></thead>
       <tbody>{data.map(r => <tr key={r.id} className="border-t border-slate-100"><td className="p-2">{r.library_books?.title}</td><td className="p-2">{r.reader}</td>
         <td className="p-2">{r.status === "ready" ? <Badge tone="green">waiting at the desk until {fmtDate(r.expires_at)}</Badge> : <Badge>in the queue since {fmtDate(r.created_at)}</Badge>}</td>
         <td className="p-2 text-right"><button className="btn btn-ghost px-2 py-1 text-xs" onClick={async () => { await send("/api/library", { action: "cancel_reservation", id: r.id }); reload(); }}>Cancel</button></td></tr>)}</tbody></table></div>

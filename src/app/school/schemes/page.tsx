@@ -38,7 +38,7 @@ export default function SchemesPage() {
           </div>
           {!d.items.length ? <Empty>No schemes of work yet. Add the curriculum objectives for a subject first, then start a scheme.</Empty> : (
             <div className="card overflow-x-auto"><table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Scheme</th><th className="p-2">Subject · level</th><th className="p-2">Term</th><th className="p-2">Teacher</th><th className="p-2">Weeks</th><th className="p-2">Status</th><th className="p-2">Updated</th></tr></thead>
+              <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Scheme</th><th className="p-2">Subject · level</th><th className="p-2">Term</th><th className="p-2">Teacher</th><th className="p-2">Weeks</th><th className="p-2">Status</th><th className="p-2">Updated</th></tr></thead>
               <tbody>{d.items.map(s => (
                 <tr key={s.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => setOpen(s.id)}>
                   <td className="p-2 font-medium">{s.title}</td><td className="p-2">{s.subjects?.name} · {s.level}</td><td className="p-2">{s.terms?.name ?? "—"}</td>

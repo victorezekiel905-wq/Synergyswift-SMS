@@ -41,7 +41,7 @@ export default function ReportsPage() {
     <main className="mx-auto max-w-5xl px-6 py-10">
       <header className="mb-8">
         <p className="text-sm font-medium text-brand-600">Insights & Export</p>
-        <h1 className="text-2xl font-semibold">Reports</h1>
+        <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Reports</h1>
         <p className="mt-1 text-sm text-slate-600">Generate a server-side CSV, PDF, or JSON export for participation, attendance, environment alerts, or device health.</p>
       </header>
 

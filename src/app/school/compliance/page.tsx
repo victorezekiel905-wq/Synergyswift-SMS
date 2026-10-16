@@ -204,7 +204,7 @@ function InspectionTab() {
       )}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 print:hidden">{shown.map(x => (
         <button key={x.id} onClick={() => setFw(x.id)} className={`card p-3 text-left ${f?.id === x.id ? "ring-2 ring-brand-300" : ""}`}>
-          <p className="text-xs uppercase text-slate-500">{x.short}</p><p className="text-2xl font-bold">{x.readiness.pct ?? 0}%</p><p className="text-xs text-slate-500">{x.readiness.met} of {x.readiness.applicable} met</p>
+          <p className="text-[13px] text-slate-500">{x.short}</p><p className="text-2xl font-bold">{x.readiness.pct ?? 0}%</p><p className="text-xs text-slate-500">{x.readiness.met} of {x.readiness.applicable} met</p>
         </button>))}</div>
       {f && <>
         <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-lg font-semibold">{f.name}</h2><button className="btn btn-outline px-2 py-1 text-xs print:hidden" onClick={() => window.print()}>Print inspection pack</button></div>

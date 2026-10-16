@@ -15,7 +15,7 @@ export default async function NewChallenge() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
       <p className="text-sm font-medium text-brand-600">Fusion Challenge</p>
-      <h1 className="text-2xl font-semibold">Start a game-based quiz</h1>
+      <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Start a game-based quiz</h1>
       <p className="mt-1 text-slate-600">Pick a class and pick an activity as the source. Students join with the lobby code.</p>
       <ChallengeForm
         classes={(classes ?? []).map((c: { id: string; name: string; join_code: string }) => ({ id: c.id, name: c.name, join_code: c.join_code }))}

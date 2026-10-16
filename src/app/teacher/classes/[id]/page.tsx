@@ -26,7 +26,7 @@ export default function ClassRosterPage({ params }: { params: Promise<{ id: stri
       <header className="mb-6 flex items-end justify-between">
         <div>
           <p className="text-sm font-medium text-brand-600">Class operations</p>
-          <h1 className="text-2xl font-semibold">{cls?.name ?? "Class"}</h1>
+          <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">{cls?.name ?? "Class"}</h1>
           <p className="text-xs text-slate-500">Join code: <span className="font-mono">{cls?.join_code}</span></p>
         </div>
         <Link href="/teacher/classes" className="btn btn-ghost text-xs">← All classes</Link>
@@ -38,7 +38,7 @@ export default function ClassRosterPage({ params }: { params: Promise<{ id: stri
           <p className="mt-1 text-sm text-slate-600">See every enrolled learner, then import or update the roster in bulk.</p>
         </div>
         <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500">
             <tr>
               <th className="p-3">Name</th>
               <th className="p-3">Email</th>

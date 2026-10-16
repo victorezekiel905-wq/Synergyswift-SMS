@@ -126,7 +126,7 @@ function TemplateEditor({ templates, onChange }: { templates: Template[]; onChan
           <Field label="Kind"><select className="input" value={edit.kind} onChange={e => setEdit({ ...edit, kind: e.target.value as Template["kind"] })}><option value="onboarding">Onboarding</option><option value="offboarding">Offboarding</option></select></Field>
           <div className="sm:col-span-2"><Field label="Name"><input className="input" required value={edit.name ?? ""} onChange={e => setEdit({ ...edit, name: e.target.value })} /></Field></div>
         </div>
-        <table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th>Task</th><th>Who</th><th>Due after (days)</th><th /></tr></thead>
+        <table className="w-full text-sm"><thead className="text-left text-[13px] text-slate-500"><tr><th>Task</th><th>Who</th><th>Due after (days)</th><th /></tr></thead>
           <tbody>{items.map((it, i) => (
             <tr key={i}><td className="py-1 pr-2"><input className="input" value={it.label} onChange={e => set(i, { label: e.target.value })} /></td>
               <td className="py-1 pr-2"><select className="input" value={it.owner} onChange={e => set(i, { owner: e.target.value })}>{Object.entries(OWNERS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></td>

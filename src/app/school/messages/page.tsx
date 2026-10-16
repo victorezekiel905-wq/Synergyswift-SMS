@@ -93,7 +93,7 @@ export default function MessagesPage() {
           {!data?.items.length ? <Empty>No messages yet.</Empty> : (
             <div className="card overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">When</th><th className="p-2">To</th><th className="p-2">Kind</th><th className="p-2">Channel</th><th className="p-2">Status</th></tr></thead>
+                <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">When</th><th className="p-2">To</th><th className="p-2">Kind</th><th className="p-2">Channel</th><th className="p-2">Status</th></tr></thead>
                 <tbody>
                   {data.items.map(m => (
                     <tr key={m.id} className="border-t border-slate-100 align-top">

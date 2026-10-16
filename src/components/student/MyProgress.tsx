@@ -1,5 +1,5 @@
 "use client";
-import { useApi } from "@/components/ui";
+import { useApi, Icon } from "@/components/ui";
 
 type Data = {
   student: { id: string; name: string };
@@ -19,9 +19,9 @@ export default function MyProgress({ studentId, compact }: { studentId?: string;
   return (
     <section className={compact ? "space-y-2 text-sm" : "card mb-8 space-y-3 p-4 text-sm"}>
       {!compact && <h2 className="text-lg font-semibold">My progress</h2>}
-      {data.new_badges.length > 0 && <p className="rounded bg-amber-50 p-2">🎉 New badge{data.new_badges.length > 1 ? "s" : ""}: {data.new_badges.join(", ")}</p>}
+      {data.new_badges.length > 0 && <p className="rounded-md border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-emerald-900">New badge{data.new_badges.length > 1 ? "s" : ""}: <b>{data.new_badges.join(", ")}</b></p>}
       <div className="flex flex-wrap items-end gap-6">
-        <div><p className="text-3xl font-bold">{data.stats.streak > 0 ? "🔥" : "💤"} {data.stats.streak}</p><p className="text-xs text-slate-500">school-day streak</p></div>
+        <div><p className="flex items-center gap-1.5 text-3xl font-semibold tabular-nums"><Icon name={data.stats.streak > 0 ? "flame" : "moon"} className={"h-6 w-6 " + (data.stats.streak > 0 ? "text-amber-600" : "text-slate-400")} />{data.stats.streak}</p><p className="text-xs text-slate-500">school-day streak</p></div>
         <div><p className="text-3xl font-bold">{data.stats.points}</p><p className="text-xs text-slate-500">learning points</p></div>
         <div className="flex h-12 items-end gap-0.5" role="img" aria-label="Points in the last two weeks">
           {data.days.map(d => <span key={d.date} title={`${d.date}: ${d.points}`} className="w-2 rounded-t bg-brand-500" style={{ height: `${Math.max(2, (d.points / max) * 48)}px`, opacity: d.points ? 1 : 0.2 }} />)}

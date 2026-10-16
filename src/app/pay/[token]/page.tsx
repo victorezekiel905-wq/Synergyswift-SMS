@@ -30,7 +30,7 @@ export default function PayPage(props: { params: Promise<{ token: string }> }) {
   if (error) return <main className="mx-auto max-w-xl p-6"><p role="alert" className="rounded-lg bg-rose-50 p-4 text-rose-700">{error}</p></main>;
   if (!data) return <main className="p-10 text-center text-sm text-slate-500">Loading…</main>;
   const inv = data.invoice;
-  const color = data.school.brand_color ?? "#1d5ddb";
+  const color = data.school.brand_color ?? "#2f4f8f";
 
   async function pay(e: React.FormEvent) {
     e.preventDefault();
@@ -53,8 +53,8 @@ export default function PayPage(props: { params: Promise<{ token: string }> }) {
       {result === "failed" && <p role="alert" className="mt-4 rounded-lg bg-rose-50 p-3 text-rose-800">The payment did not go through. You have not been charged; please try again.</p>}
       {result === "pending" && <p className="mt-4 rounded-lg bg-amber-50 p-3 text-amber-900">We are confirming your payment. Refresh in a minute. <button className="underline" onClick={reload}>Refresh</button></p>}
       <section className="mt-4 flex flex-wrap justify-between gap-2 text-sm">
-        <div><p className="text-xs uppercase text-slate-500">Student</p><p className="font-semibold">{inv.student.name}</p><p className="text-slate-600">{inv.student.admission_no} · {inv.student.class_name}</p></div>
-        <div className="text-right"><p className="text-xs uppercase text-slate-500">{inv.title}</p><p className="text-3xl font-black tabular-nums">{money(inv.balance, data.currency)}</p><p className="text-xs text-slate-500">balance{inv.due_date ? ` · due ${fmtDate(inv.due_date)}` : ""}</p></div>
+        <div><p className="text-[13px] text-slate-500">Student</p><p className="font-semibold">{inv.student.name}</p><p className="text-slate-600">{inv.student.admission_no} · {inv.student.class_name}</p></div>
+        <div className="text-right"><p className="text-[13px] text-slate-500">{inv.title}</p><p className="text-3xl font-bold tabular-nums">{money(inv.balance, data.currency)}</p><p className="text-xs text-slate-500">balance{inv.due_date ? ` · due ${fmtDate(inv.due_date)}` : ""}</p></div>
       </section>
       <div className="overflow-x-auto print:overflow-visible"><table className="mt-4 w-full text-sm">
         <tbody>

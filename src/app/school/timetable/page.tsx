@@ -45,7 +45,7 @@ function Grid({ url, editable, cg, showClass }: { url: string; editable?: boolea
       {err && <div className="mb-2"><Alert>{err}</Alert></div>}
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-2 text-left">Period</th>{days.map(d => <th key={d} className="p-2">{DAYS[d]}</th>)}</tr></thead>
+          <thead className="bg-slate-50 text-[13px] text-slate-500"><tr><th className="p-2 text-left">Period</th>{days.map(d => <th key={d} className="p-2">{DAYS[d]}</th>)}</tr></thead>
           <tbody>{data.periods.map(p => (
             <tr key={p.id} className={"border-t border-slate-100 " + (p.is_break ? "bg-slate-50" : "")}>
               <td className="whitespace-nowrap p-2 text-xs"><b>{p.name}</b><div className="text-slate-400">{p.starts_at.slice(0, 5)}–{p.ends_at.slice(0, 5)}</div></td>

@@ -14,7 +14,7 @@ export default async function AssessPage() {
     <main className="mx-auto max-w-5xl px-6 py-12">
       <header className="mb-8">
         <p className="text-sm font-medium text-brand-600">Fusion Assess</p>
-        <h1 className="text-2xl font-semibold">Activity & question bank</h1>
+        <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Activity & question bank</h1>
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

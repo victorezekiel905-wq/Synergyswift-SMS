@@ -38,7 +38,7 @@ export default function ConsentPage() {
       {msg && <div className="mb-4"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
       <section className="card mb-5 overflow-x-auto p-0">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Permission</th><th className="p-2 text-right">Yes</th><th className="p-2 text-right">No</th><th className="p-2 text-right">Needs answer</th><th className="p-2" /></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Permission</th><th className="p-2 text-right">Yes</th><th className="p-2 text-right">No</th><th className="p-2 text-right">Needs answer</th><th className="p-2" /></tr></thead>
           <tbody className="divide-y divide-slate-100">{data.coverage.map(c => (
             <tr key={c.id}>
               <td className="p-2"><b>{c.title}</b> {c.required && <Badge>needed</Badge>}<span className="block text-xs text-slate-500">{c.per_child ? `${c.total} children` : `${c.total} families`}</span></td>

@@ -71,7 +71,7 @@ export default function GamePlayer({ gameId }: { gameId: string }) {
       <header className="mb-6 flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-brand-600">Fusion Challenge</p>
-          <h1 className="text-2xl font-bold">Game lobby <span className={"ml-2 rounded-full px-2 py-0.5 text-xs " + (game.state === "running" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>{game.state}</span></h1>
+          <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Game lobby <span className={"ml-2 rounded-full px-2 py-0.5 text-xs " + (game.state === "running" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>{game.state}</span></h1>
         </div>
         <Link href="/student/join" className="btn btn-ghost text-xs">← Back</Link>
       </header>
@@ -135,7 +135,7 @@ export default function GamePlayer({ gameId }: { gameId: string }) {
                 </div>
               )}
               <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase text-slate-500"><tr><th className="py-2">#</th><th>Player</th><th>Score</th><th>Streak</th></tr></thead>
+                <thead className="text-[13px] text-slate-500"><tr><th className="py-2">#</th><th>Player</th><th>Score</th><th>Streak</th></tr></thead>
                 <tbody>
                   {board.ranking.map((p, i) => (
                     <tr key={p.id} className="border-t border-slate-100">

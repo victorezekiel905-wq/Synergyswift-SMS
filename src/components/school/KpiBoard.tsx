@@ -76,16 +76,18 @@ export default function KpiBoard() {
           const path = sparkline(series.map(s => s.value), 100, 24);
           const good = tr.direction === "flat" || tr.direction === null ? null : (tr.direction === "up") === (t.higherIsBetter !== false);
           return (
-            <div key={t.key} className="card p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t.label}</p>
-              <p className={`mt-1 text-xl font-bold tabular-nums ${tone === "good" ? "text-emerald-600" : tone === "warn" ? "text-amber-600" : tone === "bad" ? "text-rose-600" : "text-slate-900"}`}>{t.fmt(value)}</p>
+            <div key={t.key} className="card px-4 py-3.5">
+              <p className="flex items-center gap-1.5 text-[13px] text-slate-500">
+                {tone && <span aria-label={tone === "good" ? "meets target" : tone === "warn" ? "close to target" : "short of target"} className={`h-1.5 w-1.5 shrink-0 rounded-full ${tone === "good" ? "bg-emerald-500" : tone === "warn" ? "bg-amber-500" : "bg-rose-600"}`} />}{t.label}
+              </p>
+              <p className="mt-1.5 text-[22px] font-semibold tracking-tight tabular-nums text-slate-900">{t.fmt(value)}</p>
               <p className="text-xs text-slate-500">
                 {t.hint ? t.hint(k) : ""}{target !== undefined ? `${t.hint ? " · " : ""}target ${t.fmt(target)}` : ""}
               </p>
               {path && (
                 <div className="mt-1 flex items-center gap-2">
                   <svg viewBox="0 0 100 24" className="h-6 w-24" aria-hidden><path d={path} fill="none" stroke="currentColor" strokeWidth="1.5" className="text-brand-500" /></svg>
-                  {tr.change !== null && <span className={`text-xs ${good === null ? "text-slate-500" : good ? "text-emerald-600" : "text-rose-600"}`}>{tr.direction === "up" ? "▲" : tr.direction === "down" ? "▼" : "▶"} {Math.abs(tr.change)}</span>}
+                  {tr.change !== null && <span className={`text-xs ${good === null ? "text-slate-500" : good ? "text-emerald-600" : "text-rose-600"}`}>{tr.direction === "up" ? "↑" : tr.direction === "down" ? "↓" : "→"} {Math.abs(tr.change)} on the week</span>}
                 </div>
               )}
             </div>

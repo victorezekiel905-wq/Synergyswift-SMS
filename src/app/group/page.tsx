@@ -23,7 +23,7 @@ export default function GroupPage() {
       </div>
       {!data.schools.length ? <Empty>No schools in this group yet.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">School</th><th className="p-2 text-right">Students</th><th className="p-2 text-right">Staff</th><th className="p-2 text-right">Fee collection</th><th className="p-2 text-right">Outstanding</th><th className="p-2 text-right">Attendance (30d)</th><th className="p-2 text-right">Average score</th></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">School</th><th className="p-2 text-right">Students</th><th className="p-2 text-right">Staff</th><th className="p-2 text-right">Fee collection</th><th className="p-2 text-right">Outstanding</th><th className="p-2 text-right">Attendance (30d)</th><th className="p-2 text-right">Average score</th></tr></thead>
           <tbody>{data.schools.map(s => (
             <tr key={s.id} className="border-t border-slate-100"><td className="p-2 font-medium">{s.name}<div className="text-xs text-slate-400">{s.term ?? "no current term"}{s.status !== "active" ? " · suspended" : ""}</div></td>
               <td className="p-2 text-right tabular-nums">{s.students}</td><td className="p-2 text-right tabular-nums">{s.staff}</td>

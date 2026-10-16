@@ -17,7 +17,7 @@ export default function TranscriptPage(props: { params: Promise<{ id: string }> 
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Loading />;
   const sc = data.school ?? {};
-  const color = /^#[0-9a-f]{6}$/i.test(sc.brand_color ?? "") ? sc.brand_color! : "#1d5ddb";
+  const color = /^#[0-9a-f]{6}$/i.test(sc.brand_color ?? "") ? sc.brand_color! : "#2f4f8f";
   const cell = "border border-slate-300 p-1";
   return (
     <main className="mx-auto max-w-4xl bg-white p-6 text-slate-900 print:p-0">
@@ -31,7 +31,7 @@ export default function TranscriptPage(props: { params: Promise<{ id: string }> 
           <img src={sc.logo_url} alt="" className="h-16 w-16 object-contain" />
         )}
         <div className="flex-1 text-center">
-          <h1 className="text-xl font-black uppercase" style={{ color }}>{sc.school_name}</h1>
+          <h1 className="text-xl font-bold uppercase" style={{ color }}>{sc.school_name}</h1>
           {sc.address && <p className="text-xs text-slate-600">{sc.address}</p>}
           <p className="mt-1 text-sm font-bold uppercase tracking-widest">Academic transcript</p>
         </div>

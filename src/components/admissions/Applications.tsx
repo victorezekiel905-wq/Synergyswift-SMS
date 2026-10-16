@@ -55,7 +55,7 @@ export default function Applications({ openId, admin, onOpenLead }: { openId?: s
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
       {!data?.applications.length ? <Empty>No applications here.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2" /><th className="p-2">Application</th><th className="p-2">Child</th><th className="p-2">For</th><th className="p-2">Parent</th><th className="p-2">Progress</th><th className="p-2">Status</th><th className="p-2">Received</th></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2" /><th className="p-2">Application</th><th className="p-2">Child</th><th className="p-2">For</th><th className="p-2">Parent</th><th className="p-2">Progress</th><th className="p-2">Status</th><th className="p-2">Received</th></tr></thead>
           <tbody>{data.applications.map(a => (
             <tr key={a.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => setOpen(a)}>
               <td className="p-2" onClick={e => e.stopPropagation()}><input type="checkbox" aria-label={`Select ${a.first_name}`} checked={picked.has(a.id)} onChange={e => { const n = new Set(picked); if (e.target.checked) n.add(a.id); else n.delete(a.id); setPicked(n); }} /></td>

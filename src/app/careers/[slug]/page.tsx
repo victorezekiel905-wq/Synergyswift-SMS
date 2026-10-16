@@ -13,7 +13,7 @@ export default function CareersPage(props: { params: Promise<{ slug: string }> }
   const { data, error } = useApi<Data>(`/api/careers/${slug}`);
   if (error) return <main className="mx-auto max-w-xl p-6"><p className="rounded-lg bg-slate-100 p-4">{error}</p></main>;
   if (!data) return <main className="p-10 text-center text-sm text-slate-500">Loading…</main>;
-  const color = data.school.brand_color ?? "#1d5ddb";
+  const color = data.school.brand_color ?? "#2f4f8f";
   return (
     <main className="mx-auto max-w-3xl bg-white p-4 sm:p-8">
       <header className="mb-6 flex items-center gap-3 border-b-4 pb-3" style={{ borderColor: color }}>
@@ -21,7 +21,7 @@ export default function CareersPage(props: { params: Promise<{ slug: string }> }
           // eslint-disable-next-line @next/next/no-img-element
           <img src={data.school.logo_url} alt="" className="h-14 w-14 object-contain" />
         )}
-        <div><h1 className="text-xl font-bold" style={{ color }}>Careers at {data.school.name}</h1>{data.school.address && <p className="text-sm text-slate-600">{data.school.address}</p>}</div>
+        <div><h1 className="text-[22px] font-serif font-semibold tracking-[-0.01em]" style={{ color }}>Careers at {data.school.name}</h1>{data.school.address && <p className="text-sm text-slate-600">{data.school.address}</p>}</div>
       </header>
       {!data.jobs.length ? (
         <p className="rounded-lg bg-slate-50 p-4 text-slate-700">There are no vacancies at the moment. Please check again later{data.school.email ? <>, or send your CV to <a className="underline" href={`mailto:${data.school.email}`}>{data.school.email}</a></> : null}.</p>

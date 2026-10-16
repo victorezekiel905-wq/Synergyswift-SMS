@@ -23,7 +23,7 @@ export default function SignPage(props: { params: Promise<{ token: string }> }) 
   if (error) return <main className="mx-auto max-w-2xl p-6"><Alert>{error}</Alert></main>;
   if (!data) return <Loading />;
   const r = data.request, s = data.signer;
-  const color = data.school?.brand_color ?? "#1d5ddb";
+  const color = data.school?.brand_color ?? "#2f4f8f";
   const open = r.status === "open" && ["pending", "viewed"].includes(s.status);
   async function submit(body: Record<string, unknown>) {
     setBusy(true); setMsg(null);
@@ -41,7 +41,7 @@ export default function SignPage(props: { params: Promise<{ token: string }> }) 
         <div><p className="font-bold">{data.school?.school_name ?? "School"}</p><p className="text-sm opacity-90">For {s.name}{s.child ? `, about ${s.child}` : ""}</p></div>
       </header>
       <article className="card space-y-3 p-5">
-        <h1 className="text-xl font-semibold">{r.title}</h1>
+        <h1 className="text-[22px] font-serif font-semibold tracking-[-0.01em]">{r.title}</h1>
         {r.due_on && open && <p className="text-sm text-slate-500">Please sign by {fmtDate(r.due_on)}.</p>}
         {r.body && <div className="whitespace-pre-wrap text-sm leading-relaxed">{r.body}</div>}
         {r.document && <p className="text-sm">Attached: {r.document.url ? <a className="text-brand-700 underline" href={r.document.url} target="_blank" rel="noreferrer">{r.document.title}</a> : r.document.title} (read it before signing)</p>}

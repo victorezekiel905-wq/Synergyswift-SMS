@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useApi, send, Alert, Empty, Badge, Modal, Loading, fmtDate } from "@/components/ui";
+import { useApi, send, Alert, Empty, Badge, Modal, Loading, fmtDate, Icon } from "@/components/ui";
 import RichText from "@/components/content/RichText";
 import ContentPlayer, { keepOffline, isKeptOffline, forgetOffline } from "@/components/content/ContentPlayer";
 import { KIND } from "@/components/learning/ContentLibrary";
@@ -51,7 +51,7 @@ function PathView({ id, onBack, onAsk }: { id: string; onBack: () => void; onAsk
       <ol className="space-y-2">{data.steps.map((s, i) => (
         <li key={s.id} className={"card p-4 " + (s.state === "locked" ? "opacity-60" : "")}>
           <div className="flex items-center gap-2">
-            <span className={"grid h-7 w-7 place-items-center rounded-full text-xs font-bold " + (s.state === "done" ? "bg-emerald-100 text-emerald-700" : s.state === "open" ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-500")}>{s.state === "done" ? "✓" : s.state === "locked" ? "🔒" : i + 1}</span>
+            <span className={"grid h-7 w-7 place-items-center rounded-full text-xs font-bold " + (s.state === "done" ? "bg-emerald-100 text-emerald-700" : s.state === "open" ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-500")}>{s.state === "done" ? "✓" : s.state === "locked" ? <Icon name="lock" className="h-3 w-3" label="locked" /> : i + 1}</span>
             <b className="mr-auto">{s.title}</b><Badge tone="slate">{STEP_KIND[s.kind]}</Badge>
             {s.progress?.score != null && <Badge tone={s.state === "done" ? "green" : "amber"}>{s.progress.score}%</Badge>}
           </div>

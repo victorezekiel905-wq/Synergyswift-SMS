@@ -237,7 +237,7 @@ function Settings({ data, patch }: { data: Detail; patch: Patch }) {
     if (f.kind === "bool") return <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(v[f.key])} onChange={e => setV({ ...v, [f.key]: e.target.checked })} />{f.label}</label>;
     if (f.kind === "select") return <Field label={f.label} hint={f.hint}><select className="input" {...common}>{f.options!.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>;
     if (f.kind === "area") return <Field label={f.label} hint={f.hint}><textarea className="input h-20" {...common} /></Field>;
-    if (f.kind === "color") return <Field label={f.label}><div className="flex gap-2"><input type="color" className="h-10 w-12 cursor-pointer rounded border border-slate-300" value={/^#[0-9a-fA-F]{6}$/.test(v[f.key]) ? v[f.key] : "#1d5ddb"} onChange={e => setV({ ...v, [f.key]: e.target.value })} aria-label="Pick brand colour" /><input className="input" {...common} placeholder="#1d5ddb" /></div></Field>;
+    if (f.kind === "color") return <Field label={f.label}><div className="flex gap-2"><input type="color" className="h-10 w-12 cursor-pointer rounded border border-slate-300" value={/^#[0-9a-fA-F]{6}$/.test(v[f.key]) ? v[f.key] : "#2f4f8f"} onChange={e => setV({ ...v, [f.key]: e.target.value })} aria-label="Pick brand colour" /><input className="input" {...common} placeholder="#2f4f8f" /></div></Field>;
     return <Field label={f.label} hint={f.hint}><input className="input" type={f.kind === "number" ? "number" : f.kind === "time" ? "time" : "text"} step={f.kind === "number" ? "any" : undefined} {...common} /></Field>;
   };
 
@@ -278,7 +278,7 @@ function Staff({ data, patch }: { data: Detail; patch: Patch }) {
         </div>
         {!list.length ? <Empty>No staff accounts.</Empty> : (
           <div className="overflow-x-auto"><table className="w-full text-sm">
-            <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-2">Name</th><th>Role</th><th>Access</th><th /></tr></thead>
+            <thead><tr className="text-left text-[13px] text-slate-500"><th className="py-2">Name</th><th>Role</th><th>Access</th><th /></tr></thead>
             <tbody>{list.map(s => (
               <tr key={s.id} className="border-t border-slate-100">
                 <td className="py-2">{s.full_name}<div className="text-xs text-slate-500">{s.email}</div></td>

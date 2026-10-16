@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useApi, send, Alert, Badge, Field, Modal, Loading, fmtDate } from "@/components/ui";
+import { useApi, send, Alert, Badge, Field, Modal, Loading, fmtDate, Icon } from "@/components/ui";
 import { STAGE_LABEL, SOURCE_LABEL, SOURCES, type Stage } from "@/lib/crm";
 import { LostForm, scoreTone } from "./Pipeline";
 
@@ -15,7 +15,7 @@ type Detail = {
     application_documents: { id: string }[]; entrance_attempts: { status: string; total_score: number | null; max_score: number | null; exams: { title: string } | null }[] } | null;
 };
 
-const KIND_ICON: Record<string, string> = { note: "📝", call: "📞", email: "✉️", sms: "💬", whatsapp: "🟢", meeting: "🤝", stage: "➡️", task: "☑️", system: "•" };
+const KIND_ICON: Record<string, "note" | "phone" | "mail" | "chat" | "people" | "repeat" | "check"> = { note: "note", call: "phone", email: "mail", sms: "chat", whatsapp: "chat", meeting: "people", stage: "repeat", task: "check" };
 
 /** Everything about one family: details, score, timeline, tasks, messages, visits and application. */
 export default function LeadDrawer({ id, onClose, onChanged, staff, openApplication }: {
@@ -84,7 +84,7 @@ export default function LeadDrawer({ id, onClose, onChanged, staff, openApplicat
       )}
 
       {data.application && (
-        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
           <p><b>Application {data.application.application_no}</b> · {data.application.status} · fee {data.application.fee_paid ? "paid" : "unpaid"} · {data.application.application_documents.length} documents
             {data.application.entrance_attempts.map((e, i) => <span key={i}> · {e.exams?.title}: {e.status === "assigned" ? "not started" : e.total_score !== null ? `${e.total_score}/${e.max_score}` : e.status}</span>)}</p>
         </div>
@@ -144,7 +144,7 @@ export default function LeadDrawer({ id, onClose, onChanged, staff, openApplicat
         <h3 className="mb-1 font-semibold">Timeline</h3>
         <ol className="space-y-1.5">{timeline.map(a => (
           <li key={a.id} className="flex gap-2">
-            <span aria-hidden className="w-5 text-center">{KIND_ICON[a.kind] ?? "•"}</span>
+            <span aria-hidden className="grid w-5 place-items-center pt-0.5 text-slate-400">{KIND_ICON[a.kind] ? <Icon name={KIND_ICON[a.kind]} className="h-3.5 w-3.5" /> : <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />}</span>
             <div className="flex-1"><p className="whitespace-pre-wrap">{a.kind === "stage" ? `Moved from ${STAGE_LABEL[a.meta?.from as Stage] ?? a.meta?.from} to ${STAGE_LABEL[a.meta?.to as Stage] ?? a.meta?.to}${a.body ? `: ${a.body}` : ""}` : a.body}</p>
               <p className="text-[11px] text-slate-500">{fmtDate(a.created_at, true)}{a.actor?.full_name ? ` · ${a.actor.full_name}` : a.meta?.automatic ? " · automatic follow-up" : ""}</p></div>
           </li>

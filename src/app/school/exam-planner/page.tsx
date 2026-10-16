@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Field, Badge, Modal, Loading, fmtDate } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Field, Badge, Modal, Loading, fmtDate, Icon } from "@/components/ui";
 import { buildSlots } from "@/lib/exams/schedule";
 
 type Hall = { id: string; name: string; capacity: number; rows: number; cols: number; notes: string | null; active: boolean };
@@ -67,7 +67,7 @@ function Halls({ halls, canEdit, reload }: { halls: Hall[]; canEdit: boolean; re
       {!halls.length ? <Empty>No halls yet.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Hall</th><th className="p-2 text-center">Seats</th><th className="p-2 text-center">Layout</th><th className="p-2">Status</th><th className="p-2" /></tr></thead>
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Hall</th><th className="p-2 text-center">Seats</th><th className="p-2 text-center">Layout</th><th className="p-2">Status</th><th className="p-2" /></tr></thead>
             <tbody>{halls.map(h => (
               <tr key={h.id} className="border-t border-slate-100">
                 <td className="p-2 font-medium">{h.name}{h.notes && <div className="text-xs text-slate-500">{h.notes}</div>}</td>
@@ -214,7 +214,7 @@ function Papers({ data, reload, act, busy }: { data: Full; reload: () => void; a
       {!data.papers.length ? <Empty>No papers yet. Create them from the subjects each class takes, or add them one by one.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Paper</th><th className="p-2">Classes</th><th className="p-2 text-center">Minutes</th><th className="p-2">When</th><th className="p-2" /></tr></thead>
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Paper</th><th className="p-2">Classes</th><th className="p-2 text-center">Minutes</th><th className="p-2">When</th><th className="p-2" /></tr></thead>
             <tbody>{data.papers.map(p => (
               <tr key={p.id} className="border-t border-slate-100">
                 <td className="p-2 font-medium">{p.title}{p.exam_id && <Badge tone="violet">CBT</Badge>}</td>
@@ -321,7 +321,7 @@ function Timetable({ data, act, busy, reload }: { data: Full; act: ActFn; busy: 
       {unplaced.length > 0 && <Alert tone="amber">Not timetabled: {unplaced.map(p => p.title).join(", ")}</Alert>}
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Day</th>{s.sessions.map((x, i) => <th key={i} className="p-2">{x.label} <span className="font-normal normal-case">{x.start} · {x.minutes} min</span></th>)}</tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Day</th>{s.sessions.map((x, i) => <th key={i} className="p-2">{x.label} <span className="font-normal normal-case">{x.start} · {x.minutes} min</span></th>)}</tr></thead>
           <tbody>{days.map(day => (
             <tr key={day} className="border-t border-slate-100 align-top">
               <td className="whitespace-nowrap p-2 font-medium">{fmtDate(day)}</td>
@@ -329,7 +329,7 @@ function Timetable({ data, act, busy, reload }: { data: Full; act: ActFn; busy: 
                 <td key={i} className="p-2">
                   <ul className="space-y-1">{data.papers.filter(p => p.slot_date === day && (p.slot_session ?? 0) === i).map(p => (
                     <li key={p.id} className="rounded border border-slate-200 bg-white p-1.5">
-                      <p className="text-xs font-semibold">{p.title}{p.locked && " 📌"}</p>
+                      <p className="flex items-center gap-1 text-xs font-semibold">{p.title}{p.locked && <Icon name="lock" className="h-3 w-3 text-slate-400" label="kept in place" />}</p>
                       <p className="text-[11px] text-slate-500">{p.class_group_ids.map(c => cls.get(c)).join(", ")} · {p.duration_minutes} min</p>
                       {data.can_edit && <select className="mt-1 w-full rounded border border-slate-200 text-[11px]" value={`${day}#${i}`} aria-label={`Move ${p.title}`} onChange={e => move(p, e.target.value)}>
                         <option value="">Unschedule</option>{slotsOf(s).map(x => <option key={`${x.date}#${x.session}`} value={`${x.date}#${x.session}`}>{fmtDate(x.date)} {s.sessions[x.session]?.label}</option>)}
@@ -354,7 +354,7 @@ function Seating({ data, act, busy }: { data: Full; act: ActFn; busy: string | n
   useEffect(() => { if (!slotKeys.includes(slot)) setSlot(slotKeys[0] ?? ""); }, [slotKeys.join()]); // eslint-disable-line react-hooks/exhaustive-deps
   const inSlot = data.seats.filter(x => { const p = paperBy.get(x.paper_id); return p?.slot_date && `${p.slot_date}#${p.slot_session ?? 0}` === slot; });
   const hallIds = [...new Set(inSlot.map(x => x.hall_id))];
-  const palette = ["bg-sky-100", "bg-amber-100", "bg-emerald-100", "bg-rose-100", "bg-violet-100", "bg-lime-100", "bg-orange-100", "bg-teal-100"];
+  const palette = ["bg-sky-100", "bg-amber-100", "bg-emerald-100", "bg-rose-100", "bg-slate-100", "bg-lime-100", "bg-orange-100", "bg-teal-100"];
   const paperIds = [...new Set(inSlot.map(x => x.paper_id))];
   const colour = new Map(paperIds.map((id, i) => [id, palette[i % palette.length]]));
   return (
@@ -413,7 +413,7 @@ function Invigilation({ data, act, busy }: { data: Full; act: ActFn; busy: strin
         <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
           <div className="card overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Session</th><th className="p-2">Hall</th><th className="p-2">Invigilators</th></tr></thead>
+              <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Session</th><th className="p-2">Hall</th><th className="p-2">Invigilators</th></tr></thead>
               <tbody>{[...bySlot].sort(([a], [b]) => a.localeCompare(b)).flatMap(([k, ds]) => {
                 const [d, i] = k.split("#");
                 return [...new Set(ds.map(x => x.hall_id))].map((h, j) => (

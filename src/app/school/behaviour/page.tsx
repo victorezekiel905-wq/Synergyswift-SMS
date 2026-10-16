@@ -106,7 +106,7 @@ function Actions({ data, reload }: { data: Data; reload: () => void }) {
 }
 
 function Houses({ data, admin, reload }: { data: Data; admin: boolean; reload: () => void }) {
-  const [h, setH] = useState({ name: "", color: "#1d5ddb" });
+  const [h, setH] = useState({ name: "", color: "#2f4f8f" });
   const max = Math.max(1, ...data.houses.map(x => Math.abs(x.points)));
   return (
     <div className="space-y-4">
@@ -118,7 +118,7 @@ function Houses({ data, admin, reload }: { data: Data; admin: boolean; reload: (
           </div>))}</div>
       )}
       {admin && (
-        <form className="card flex flex-wrap items-end gap-2 p-4" onSubmit={async e => { e.preventDefault(); await send("/api/behaviour", { action: "save_house", ...h }); setH({ name: "", color: "#1d5ddb" }); reload(); }}>
+        <form className="card flex flex-wrap items-end gap-2 p-4" onSubmit={async e => { e.preventDefault(); await send("/api/behaviour", { action: "save_house", ...h }); setH({ name: "", color: "#2f4f8f" }); reload(); }}>
           <Field label="House name"><input className="input" required value={h.name} onChange={e => setH({ ...h, name: e.target.value })} /></Field>
           <Field label="Colour"><input className="input h-10 w-20" type="color" value={h.color} onChange={e => setH({ ...h, color: e.target.value })} /></Field>
           <button className="btn btn-primary">Add house</button>

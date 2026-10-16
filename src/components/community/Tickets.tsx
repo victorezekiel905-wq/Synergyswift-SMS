@@ -66,7 +66,7 @@ export default function Tickets({ openId, guardian }: { openId?: string | null; 
       {!data.items.length ? <Empty>Nothing here. Families raise concerns from the parent portal; you can also log calls and walk-ins.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr>
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr>
               <th className="p-2">Ticket</th><th className="p-2">Family</th><th className="p-2">Category</th><th className="p-2">Priority</th><th className="p-2">Status</th><th className="p-2">Time</th><th className="p-2">Handled by</th>
             </tr></thead>
             <tbody className="divide-y divide-slate-100">{data.items.map(t => (

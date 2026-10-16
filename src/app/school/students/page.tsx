@@ -39,7 +39,7 @@ export default function StudentsPage() {
       {loading && !data ? <Loading /> : !data?.length ? <Empty>No students match.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500">
               <tr><th className="p-3">Adm. no</th><th className="p-3">Name</th><th className="p-3">Class</th><th className="p-3">Guardians</th><th className="p-3">Login</th><th className="p-3">Status</th></tr>
             </thead>
             <tbody>

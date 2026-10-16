@@ -63,7 +63,7 @@ export default function ContentLibrary({ classes, subjects }: { classes: Opt[]; 
 
       {!data ? null : !data.items.length ? <Empty>No content yet.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-2">Title</th><th className="p-2">Type</th><th className="p-2">Subject</th><th className="p-2">Classes</th><th className="p-2">Size</th><th className="p-2" /></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Title</th><th className="p-2">Type</th><th className="p-2">Subject</th><th className="p-2">Classes</th><th className="p-2">Size</th><th className="p-2" /></tr></thead>
           <tbody>{data.items.map(p => (
             <tr key={p.id} className="border-t border-slate-100">
               <td className="p-2 font-medium">{p.title}<span className="block text-xs font-normal text-slate-500">added {fmtDate(p.created_at)}</span></td>

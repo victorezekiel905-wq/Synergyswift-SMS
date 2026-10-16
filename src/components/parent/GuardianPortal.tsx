@@ -36,7 +36,7 @@ export default function GuardianPortal({ api, act, mode, token }: { api: string;
 
   if (error) return <div className="mx-auto max-w-2xl p-6"><Alert>{error}</Alert></div>;
   if (!data) return <Loading />;
-  const color = data.school?.brand_color ?? "#1d5ddb";
+  const color = data.school?.brand_color ?? "#2f4f8f";
 
   async function generate(studentId: string) {
     const d = delegate[studentId] ?? { name: "", phone: "" };
@@ -70,7 +70,7 @@ export default function GuardianPortal({ api, act, mode, token }: { api: string;
       {code && (
         <div className="mb-5 rounded-xl border-2 border-emerald-500 bg-emerald-50 p-5 text-center" role="status">
           <p className="text-sm">Pickup code for <b>{code.student}</b></p>
-          <p className="my-2 font-mono text-5xl font-black tracking-[0.3em]">{code.code}</p>
+          <p className="my-2 font-mono text-5xl font-bold tracking-[0.3em]">{code.code}</p>
           <p className="text-sm">Collector: {code.collector} · valid until {fmtTime(code.expires)}</p>
           <p className="mt-1 text-xs text-slate-600">We also sent it to your WhatsApp and email. Share it only with the person collecting your child.</p>
           <button className="btn btn-ghost mt-2 text-xs" onClick={() => setCode(null)}>Hide</button>

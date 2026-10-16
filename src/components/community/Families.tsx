@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { useApi, send, Alert, Badge, Empty, Field, Loading, Modal, Stat, fmtDate, money } from "@/components/ui";
+import { useApi, send, Alert, Badge, Empty, Field, Loading, Modal, Stat, fmtDate, money, Icon } from "@/components/ui";
 import type { FamilySummary, SegmentRules } from "@/lib/community";
 import { npsCategory } from "@/lib/community";
 import Tickets from "./Tickets";
@@ -103,7 +103,7 @@ export default function Families({ segments, openId }: { segments: { id: string;
       {!data.items.length ? <Empty>No families match.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr>
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr>
               <th className="p-2">Family</th><th className="p-2">Children</th><th className="p-2">Risk</th><th className="p-2">NPS</th><th className="p-2 text-right">Balance</th><th className="p-2">Complaints</th><th className="p-2">Next session</th><th className="p-2">Last contact</th>
             </tr></thead>
             <tbody className="divide-y divide-slate-100">{data.items.map(f => (
@@ -138,7 +138,7 @@ type Profile = {
   rewards: { id: string; kind: string; amount: number; status: string }[];
   timeline: { at: string; type: string; title: string; detail?: string | null; tone?: string }[];
 };
-const TYPE_ICON: Record<string, string> = { ticket: "🎫", message: "💬", survey: "📊", payment: "💳", meeting: "🤝", reenrolment: "🔁", event: "📅", referral: "🎁", sent: "✉️", result: "📄", call: "📞", note: "📝", visit: "🏫", email: "✉️", sms: "📱", whatsapp: "💬", retention: "⚠️", other: "•" };
+const TYPE_ICON: Record<string, "ticket" | "chat" | "chart" | "card" | "people" | "repeat" | "note" | "mail" | "phone" | "alert" | "star"> = { ticket: "ticket", message: "chat", survey: "chart", payment: "card", meeting: "people", reenrolment: "repeat", event: "note", referral: "star", sent: "mail", result: "note", call: "phone", note: "note", visit: "people", email: "mail", sms: "chat", whatsapp: "chat", retention: "alert" };
 
 /** 360° view of one family: children, fees, complaints, survey answers, messages, meetings, referrals and every logged contact. */
 export function FamilyProfile({ id, currency }: { id: string; currency: string }) {
@@ -210,7 +210,7 @@ export function FamilyProfile({ id, currency }: { id: string; currency: string }
         {!tl.length ? <Empty>Nothing recorded yet.</Empty> : (
           <ol className="relative space-y-2 border-l border-slate-200 pl-4">{tl.map((t, i) => (
             <li key={i}>
-              <span aria-hidden className="absolute -left-2.5 text-sm">{TYPE_ICON[t.type] ?? "•"}</span>
+              <span aria-hidden className="absolute -left-[11px] grid h-5 w-5 place-items-center rounded-full border border-slate-200 bg-white text-slate-500">{TYPE_ICON[t.type] ? <Icon name={TYPE_ICON[t.type]} className="h-3 w-3" /> : <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />}</span>
               <p className={t.tone === "red" ? "text-rose-700" : t.tone === "green" ? "text-emerald-700" : t.tone === "amber" ? "text-amber-800" : ""}>{t.title}</p>
               {t.detail && <p className="whitespace-pre-wrap text-xs text-slate-500">{t.detail}</p>}
               <p className="text-[11px] text-slate-400">{fmtDate(t.at, true)}</p>

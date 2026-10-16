@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { Monogram } from "@/components/AppShell";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -48,11 +49,12 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="mx-auto max-w-md px-6 py-16">
-      <h1 className="text-2xl font-semibold">Start your school workspace</h1>
-      <p className="mt-1 text-sm text-slate-600">Multi-tenant from the first account — your own tenant, your own data.</p>
+    <main className="mx-auto flex min-h-screen max-w-[420px] flex-col px-5 py-10 sm:py-16">
+      <Link href="/" className="flex items-center gap-2.5 self-start"><Monogram /><span className="text-[15px] font-semibold tracking-tight">EduClass Fusion</span></Link>
+      <h1 className="mt-14 font-serif text-[30px] font-semibold leading-tight tracking-[-0.01em]">Set up your school</h1>
+      <p className="mt-2 text-[15px] text-slate-600 sm:text-sm">Create the first admin account. Your school’s records are kept separate from every other school’s.</p>
 
-      <form onSubmit={onSubmit} className="card mt-8 space-y-4 p-6">
+      <form onSubmit={onSubmit} className="card mt-7 space-y-5 p-6">
         <div>
           <label className="label">I am a…</label>
           <select className="input" value={role} onChange={(e) => setRole(e.target.value as "teacher" | "student")}>

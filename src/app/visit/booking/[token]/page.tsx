@@ -11,12 +11,12 @@ export default function BookingPage(props: { params: Promise<{ token: string }> 
   const [msg, setMsg] = useState<string | null>(null);
   if (error) return <main className="mx-auto max-w-xl p-6"><p className="rounded-lg bg-slate-100 p-4">{error}</p></main>;
   if (!data) return <main className="p-10 text-center text-sm text-slate-500">Loading…</main>;
-  const color = data.school.brand_color ?? "#1d5ddb";
+  const color = data.school.brand_color ?? "#2f4f8f";
   const b = data.booking;
   return (
     <main className="mx-auto max-w-xl p-6">
       <p className="text-sm font-semibold" style={{ color }}>{data.school.name}</p>
-      <h1 className="text-2xl font-bold">{b.event.title}</h1>
+      <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">{b.event.title}</h1>
       <p className="mt-1">{new Date(b.event.starts_at).toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" })}</p>
       {b.event.location && <p className="text-slate-600">{b.event.location}</p>}
       {b.event.details && <p className="mt-2 text-sm">{b.event.details}</p>}

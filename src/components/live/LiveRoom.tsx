@@ -139,7 +139,7 @@ export default function LiveRoom(props: {
       <header className="card mb-6 flex items-end justify-between p-4">
         <div>
           <p className="text-xs uppercase text-brand-600">Fusion Live</p>
-          <h1 className="text-xl font-semibold">Session · Join code <span className="font-mono text-brand-600">{props.session.join_code}</span></h1>
+          <h1 className="text-[22px] font-serif font-semibold tracking-[-0.01em]">Session · Join code <span className="font-mono text-brand-600">{props.session.join_code}</span></h1>
         </div>
         <div className="flex items-center gap-2">
           {props.session.state === "scheduled" && <button className="btn btn-primary" onClick={start}>Start session</button>}
@@ -160,7 +160,7 @@ export default function LiveRoom(props: {
             {parts.length === 0 && <p className="col-span-full py-8 text-center text-slate-400">No students connected yet.</p>}
             {parts.map((p) => (
               <div key={p.id} className="rounded-md border border-slate-200 p-3">
-                <div className="mb-2 flex h-20 items-center justify-center rounded bg-slate-100 text-xl">{names[p.user_id] ? "🎓" : "…"}</div>
+                <div className="mb-2 flex h-20 items-center justify-center rounded bg-slate-100 text-xl">{names[p.user_id] ? String(names[p.user_id]).split(/\s+/).slice(0, 2).map((w: string) => w[0]?.toUpperCase()).join("") : "…"}</div>
                 <p className="truncate text-xs font-medium">{names[p.user_id] ?? p.user_id.slice(0, 8)}</p>
                 <p className="text-xs">Status: {p.status}</p>
                 <div className="mt-2 flex flex-wrap gap-1">
@@ -243,7 +243,7 @@ export default function LiveRoom(props: {
           <div className="card p-4">
             <h2 className="mb-3 text-sm font-semibold uppercase text-slate-600">Recent teacher commands</h2>
             <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-500"><tr><th className="py-2">When</th><th>Kind</th><th>Target</th><th>State</th></tr></thead>
+              <thead className="text-[13px] text-slate-500"><tr><th className="py-2">When</th><th>Kind</th><th>Target</th><th>State</th></tr></thead>
               <tbody>
                 {cmds.length === 0 && <tr><td colSpan={4} className="py-4 text-center text-xs text-slate-400">No commands sent.</td></tr>}
                 {cmds.map((c) => (

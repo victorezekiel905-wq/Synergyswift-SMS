@@ -35,7 +35,7 @@ export default async function InsightsPage() {
     <main className="mx-auto max-w-6xl px-6 py-10">
       <header className="mb-8">
         <p className="text-sm font-medium text-brand-600">Fusion Insights</p>
-        <h1 className="text-2xl font-semibold">Learning & classroom analytics</h1>
+        <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Learning & classroom analytics</h1>
         <p className="mt-1 text-sm text-slate-500">Learning signals (responses) and device telemetry (alerts, connectivity) are kept separate per blueprint §18.</p>
       </header>
 
@@ -49,7 +49,7 @@ export default async function InsightsPage() {
           { label: "Unacked alerts", value: unacked, sub: `of ${envEvents?.length ?? 0} total` }
         ].map(c => (
           <div key={c.label} className="card p-4">
-            <p className="text-xs uppercase text-slate-500">{c.label}</p>
+            <p className="text-[13px] text-slate-500">{c.label}</p>
             <p className="mt-1 text-2xl font-bold">{c.value}</p>
             <p className="text-xs text-slate-400">{c.sub}</p>
           </div>
@@ -63,7 +63,7 @@ export default async function InsightsPage() {
             {last7.map(d => (
               <div key={d.date} className="flex flex-1 flex-col items-center gap-1">
                 <span className="text-xs font-semibold text-brand-700">{d.count}</span>
-                <div className="w-full rounded-t bg-gradient-to-t from-brand-600 to-violet-500" style={{ height: `${Math.max(4, (d.count / Math.max(1, ...last7.map(x => x.count))) * 120)}px` }} />
+                <div className="w-full rounded-t bg-brand-600" style={{ height: `${Math.max(4, (d.count / Math.max(1, ...last7.map(x => x.count))) * 120)}px` }} />
                 <span className="text-[10px] text-slate-400">{d.date.slice(5)}</span>
               </div>
             ))}

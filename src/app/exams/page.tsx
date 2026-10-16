@@ -39,7 +39,7 @@ export default function ExamsPage() {
       {!data?.length ? <Empty>No exams yet.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-3">Exam</th><th className="p-3">Class</th><th className="p-3">Window</th><th className="p-3">Code</th><th className="p-3 text-center">Questions</th><th className="p-3 text-center">Attempts</th><th className="p-3">Status</th></tr></thead>
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-3">Exam</th><th className="p-3">Class</th><th className="p-3">Window</th><th className="p-3">Code</th><th className="p-3 text-center">Questions</th><th className="p-3 text-center">Attempts</th><th className="p-3">Status</th></tr></thead>
             <tbody>
               {data.map(x => (
                 <tr key={x.id} className="border-t border-slate-100 hover:bg-slate-50">

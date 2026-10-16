@@ -150,7 +150,7 @@ function SurveyResults({ id }: { id: string }) {
         <Stat label="Answered" value={`${data.responded}/${data.invited}`} hint={data.invited ? `${Math.round((data.responded / data.invited) * 100)}% response rate` : undefined} />
         <Stat label="NPS" value={n.nps ?? "—"} tone={npsTone(n.nps)} />
         <div className="card p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Promoters · passives · detractors</p>
+          <p className="text-[13px] text-slate-500">Promoters · passives · detractors</p>
           <div className="mt-2 flex overflow-hidden rounded" role="img" aria-label={`${n.promoters} promoters, ${n.passives} passives, ${n.detractors} detractors`}>{bar(n.promoters, "bg-emerald-500")}{bar(n.passives, "bg-slate-300")}{bar(n.detractors, "bg-rose-500")}</div>
           <p className="mt-1 text-xs text-slate-500">{n.promoters} · {n.passives} · {n.detractors}</p>
         </div>

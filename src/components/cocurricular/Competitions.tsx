@@ -21,7 +21,7 @@ export default function Competitions() {
     <>
       <div className="mb-3 flex justify-end"><button className="btn btn-primary" onClick={() => setEdit("new")}>+ Record a competition</button></div>
       {!data.length ? <Empty>No competitions yet. Record one, enter the students and their results; podium places and awards go on each child&apos;s achievements.</Empty> : (
-        <div className="card overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Date</th><th>Competition</th><th>Level</th><th>Team</th><th>Entries</th><th>Top three</th></tr></thead>
+        <div className="card overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="px-3 py-2">Date</th><th>Competition</th><th>Level</th><th>Team</th><th>Entries</th><th>Top three</th></tr></thead>
           <tbody>{data.map(c => (
             <tr key={c.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => setOpen(c)}>
               <td className="px-3 py-2">{fmtDate(c.held_on)}</td><td className="font-medium">{c.title} <Badge tone="violet">{c.kind}</Badge></td>
@@ -78,7 +78,7 @@ function Results({ comp, classes, onEdit }: { comp: Comp; classes: { id: string;
       </div>
       {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
       {!list.length ? <Empty>No students entered yet.</Empty> : (
-        <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Student</th><th>Event</th><th>Team</th><th>Position</th><th>Score / time</th><th>Award</th><th /></tr></thead>
+        <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Student</th><th>Event</th><th>Team</th><th>Position</th><th>Score / time</th><th>Award</th><th /></tr></thead>
           <tbody>{list.map((e, i) => (
             <tr key={e.id ?? `${e.student_id}-${i}`} className="border-t border-slate-100">
               <td className="py-1.5">{e.name}<div className="text-xs text-slate-400">{e.class}</div></td>

@@ -20,7 +20,7 @@ export default function CertificatePage(props: { params: Promise<{ token: string
   if (error) return <main className="mx-auto max-w-xl p-6"><p className="rounded-lg bg-rose-50 p-4 text-rose-800">{error} It may have been mistyped, or it is not a certificate from this system.</p></main>;
   if (!data) return <main className="p-10 text-center text-sm text-slate-500">Checking…</main>;
   const c = data.certificate, s = data.school;
-  const color = s.brand_color ?? "#1d5ddb";
+  const color = s.brand_color ?? "#2f4f8f";
   const award = ["award", "attendance", "participation", "completion", "custom"].includes(c.kind);
   return (
     <main className="mx-auto max-w-4xl p-4 print:p-0">
@@ -56,7 +56,7 @@ export default function CertificatePage(props: { params: Promise<{ token: string
             <p className="mt-1 text-[10px] text-slate-500">Scan to check this certificate</p>
           </div>
         </footer>
-        {c.status === "revoked" && <p className="absolute inset-0 grid place-items-center text-7xl font-black uppercase text-rose-600/20 -rotate-12 pointer-events-none">Revoked</p>}
+        {c.status === "revoked" && <p className="absolute inset-0 grid place-items-center text-7xl font-bold uppercase text-rose-600/20 -rotate-12 pointer-events-none">Revoked</p>}
       </article>
     </main>
   );

@@ -22,16 +22,16 @@ export default function PlatformPage() {
         actions={<button className="btn btn-primary" onClick={() => setOpen(true)}>+ New school</button>} />
       {error && <Alert>{error}</Alert>}
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="card p-4"><p className="text-xs uppercase text-slate-500">Schools</p><p className="text-2xl font-bold">{data?.length ?? "…"}</p></div>
-        <div className="card p-4"><p className="text-xs uppercase text-slate-500">Active students</p><p className="text-2xl font-bold">{totals.students}</p></div>
-        <div className="card p-4"><p className="text-xs uppercase text-slate-500">Staff</p><p className="text-2xl font-bold">{totals.staff}</p></div>
-        <div className="card p-4"><p className="text-xs uppercase text-slate-500">Messages sent (30 days)</p><p className="text-2xl font-bold">{totals.msgs}</p></div>
+        <div className="card p-4"><p className="text-[13px] text-slate-500">Schools</p><p className="text-2xl font-bold">{data?.length ?? "…"}</p></div>
+        <div className="card p-4"><p className="text-[13px] text-slate-500">Active students</p><p className="text-2xl font-bold">{totals.students}</p></div>
+        <div className="card p-4"><p className="text-[13px] text-slate-500">Staff</p><p className="text-2xl font-bold">{totals.staff}</p></div>
+        <div className="card p-4"><p className="text-[13px] text-slate-500">Messages sent (30 days)</p><p className="text-2xl font-bold">{totals.msgs}</p></div>
       </div>
       <input className="input mb-3 max-w-sm" placeholder="Search schools" value={q} onChange={e => setQ(e.target.value)} aria-label="Search schools" />
       {loading && !data ? <Loading /> : list.length === 0 ? <Empty>No schools yet. Create the first one.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500">
               <tr><th className="p-3">School</th><th className="p-3">Status</th><th className="p-3 text-right">Students</th><th className="p-3 text-right">Staff</th><th className="p-3 text-right">Users</th><th className="p-3 text-right">Msgs 30d</th><th className="p-3">Created</th></tr>
             </thead>
             <tbody>

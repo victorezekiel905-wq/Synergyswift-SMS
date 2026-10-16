@@ -14,7 +14,7 @@ export default async function AdminPage() {
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
       <p className="text-sm font-medium text-brand-600">Fusion Admin</p>
-      <h1 className="text-2xl font-semibold">Policies & audit</h1>
+      <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Policies & audit</h1>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 mt-6">
         <section className="card lg:col-span-2 p-4">
@@ -38,7 +38,7 @@ export default async function AdminPage() {
       <section className="card mt-6 p-4">
         <h2 className="mb-3 text-sm font-semibold uppercase text-slate-600">Audit log</h2>
         <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-left text-sm">
-          <thead className="text-xs uppercase text-slate-500"><tr><th>When</th><th>Actor</th><th>Action</th><th>Target</th></tr></thead>
+          <thead className="text-[13px] text-slate-500"><tr><th>When</th><th>Actor</th><th>Action</th><th>Target</th></tr></thead>
           <tbody>
             {(logs ?? []).length === 0 && <tr><td colSpan={4} className="py-6 text-slate-400 text-center">No audits.</td></tr>}
             {(logs ?? []).map((l: { id: string; ts: string; actor_id: string | null; action: string; target: string | null }) => (

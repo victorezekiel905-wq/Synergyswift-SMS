@@ -27,7 +27,7 @@ export function Fleet() {
       <section className="card p-4">
         <div className="mb-2 flex items-center"><h2 className="mr-auto font-semibold">Buses</h2>{data.can_edit && <button className="btn btn-outline" onClick={() => setV({ status: "active" })}>+ Bus</button>}</div>
         {!data.vehicles.length ? <Empty>No buses recorded.</Empty> : <div className="overflow-x-auto"><table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Bus</th><th className="py-1">Seats</th><th className="py-1">Insurance</th><th className="py-1">Roadworthy</th><th className="py-1">Next service</th><th className="py-1">Status</th><th /></tr></thead>
+          <thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Bus</th><th className="py-1">Seats</th><th className="py-1">Insurance</th><th className="py-1">Roadworthy</th><th className="py-1">Next service</th><th className="py-1">Status</th><th /></tr></thead>
           <tbody>{data.vehicles.map(x => <tr key={x.id} className="border-t border-slate-100"><td className="py-1.5 font-medium">{x.reg_no}<div className="text-xs text-slate-500">{x.make_model}</div></td><td>{x.seats}</td>
             <td>{fmtDate(x.insurance_expires)}</td><td>{fmtDate(x.roadworthy_expires)}</td><td>{fmtDate(x.next_service_on)}</td><td><Badge tone={x.status === "active" ? "green" : x.status === "repair" ? "amber" : "slate"}>{x.status}</Badge></td>
             <td className="text-right">{data.can_edit && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setV(x)}>Edit</button>}</td></tr>)}</tbody></table></div>}
@@ -35,7 +35,7 @@ export function Fleet() {
       <section className="card p-4">
         <div className="mb-2 flex items-center"><h2 className="mr-auto font-semibold">Drivers</h2>{data.can_edit && <button className="btn btn-outline" onClick={() => setD({ active: true })}>+ Driver</button>}</div>
         {!data.drivers.length ? <Empty>No drivers recorded.</Empty> : <div className="overflow-x-auto"><table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase text-slate-500"><tr><th className="py-1">Driver</th><th className="py-1">Licence</th><th className="py-1">Expires</th><th className="py-1">Medical</th><th className="py-1">Background check</th><th /></tr></thead>
+          <thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Driver</th><th className="py-1">Licence</th><th className="py-1">Expires</th><th className="py-1">Medical</th><th className="py-1">Background check</th><th /></tr></thead>
           <tbody>{data.drivers.map(x => <tr key={x.id} className={"border-t border-slate-100 " + (x.active ? "" : "text-slate-400")}><td className="py-1.5 font-medium">{x.full_name}<div className="text-xs text-slate-500">{x.phone}</div></td>
             <td>{x.licence_no}{x.licence_class ? ` (${x.licence_class})` : ""}</td><td>{fmtDate(x.licence_expires)}</td><td>{fmtDate(x.medical_expires)}</td><td>{fmtDate(x.background_check_on)}</td>
             <td className="text-right">{data.can_edit && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setD(x)}>Edit</button>}</td></tr>)}</tbody></table></div>}
