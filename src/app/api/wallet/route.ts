@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
 
   const today = startOfTodayIso(ctx.tenant.timezone);
   const [{ data: items }, { data: sales }] = await Promise.all([
-    ctx.sb.from("shop_items").select("id,name,price,category,active").eq("tenant_id", tid).order("category").order("name"),
+    ctx.sb.from("shop_items").select("id,name,price,category,active,barcode,inventory_item_id,inventory_items(quantity,unit)").eq("tenant_id", tid).order("category").order("name"),
     ctx.sb.from("wallet_transactions").select("id,amount,kind,description,items,created_at,students(first_name,last_name,other_names)").eq("tenant_id", tid)
       .gte("created_at", today).eq("status", "success").order("created_at", { ascending: false }).limit(500)
   ]);
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
 const Item = z.object({ id: z.string().uuid(), qty: z.number().int().min(1).max(50) });
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("save_item"), id: z.string().uuid().optional(), name: z.string().trim().min(1).max(80), price: z.number().min(0).max(1_000_000),
-    category: z.string().trim().max(40).nullish(), active: z.boolean().default(true) }),
+    category: z.string().trim().max(40).nullish(), active: z.boolean().default(true), barcode: z.string().trim().max(40).nullish(), inventory_item_id: z.string().uuid().nullish() }),
   z.object({ action: z.literal("delete_item"), id: z.string().uuid() }),
   z.object({ action: z.literal("charge"), student_id: z.string().uuid(), items: z.array(Item).max(40).default([]),
     amount: z.number().positive().max(1_000_000).nullish(), description: z.string().trim().max(120).nullish() }),
@@ -86,9 +86,9 @@ export async function POST(req: NextRequest) {
   try {
     switch (b.action) {
       case "save_item": {
-        const row = { tenant_id: tid, name: b.name, price: b.price, category: b.category ?? null, active: b.active };
+        const row = { tenant_id: tid, name: b.name, price: b.price, category: b.category ?? null, active: b.active, barcode: b.barcode || null, inventory_item_id: b.inventory_item_id ?? null };
         const { error } = b.id ? await ctx.sb.from("shop_items").update(row).eq("tenant_id", tid).eq("id", b.id) : await ctx.sb.from("shop_items").insert(row);
-        return error ? jsonError(error.message.includes("duplicate") ? "an item with that name already exists" : error.message) : NextResponse.json({ ok: true });
+        return error ? jsonError(error.message.includes("duplicate") ? "an item with that name or barcode already exists" : error.message) : NextResponse.json({ ok: true });
       }
       case "delete_item": {
         const { error } = await ctx.sb.from("shop_items").update({ active: false }).eq("tenant_id", tid).eq("id", b.id);

@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
   if (!hasAny(ctx, ROLES.approver)) q = q.eq("requested_by", ctx.userId);
   const { data, error } = await q;
   if (error) return jsonError(error.message);
-  return NextResponse.json({ items: data ?? [], can_approve: hasAny(ctx, ROLES.approver), me: ctx.userId });
+  const { data: st } = await ctx.sb.from("tenant_settings").select("procurement_second_approval_over").eq("tenant_id", ctx.tenant.id).maybeSingle();
+  return NextResponse.json({ items: data ?? [], can_approve: hasAny(ctx, ROLES.approver), is_head: hasAny(ctx, ROLES.admin), me: ctx.userId, limit: Number(st?.procurement_second_approval_over ?? 500000) });
 }
 
 const Create = z.object({
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
 
 const Decide = z.object({
   id: z.string().uuid(),
-  status: z.enum(["approved", "rejected", "fulfilled", "cancelled"]),
+  status: z.enum(["endorsed", "approved", "rejected", "fulfilled", "cancelled"]),
   note: z.string().trim().max(1000).nullish()
 });
 
@@ -60,7 +61,7 @@ export async function PATCH(req: NextRequest) {
   const b = parsed.data;
   const { data: cur } = await ctx.sb.from("requisitions").select("status,requested_by").eq("tenant_id", ctx.tenant.id).eq("id", b.id).maybeSingle();
   if (!cur) return jsonError("not found", 404);
-  const allowed: Record<string, string[]> = { submitted: ["approved", "rejected", "cancelled"], approved: ["fulfilled", "cancelled"] };
+  const allowed: Record<string, string[]> = { submitted: ["endorsed", "approved", "rejected", "cancelled"], endorsed: ["approved", "rejected", "cancelled"], approved: ["fulfilled", "cancelled"] };
   if (!(allowed[cur.status] ?? []).includes(b.status)) return jsonError(`cannot move a ${cur.status} requisition to ${b.status}`);
   const fields: Record<string, unknown> = { status: b.status };
   if (b.status !== "cancelled") Object.assign(fields, { decided_by: ctx.userId, decided_at: new Date().toISOString(), decision_note: b.note ?? null });

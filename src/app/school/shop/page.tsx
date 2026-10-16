@@ -2,7 +2,7 @@
 import { useRef, useState } from "react";
 import { useApi, send, Page, PageHeader, Alert, Badge, Empty, Field, Tabs, Stat, Icon, money, fmtTime, fmtDate } from "@/components/ui";
 
-type Item = { id: string; name: string; price: number; category: string | null; active: boolean };
+type Item = { id: string; name: string; price: number; category: string | null; active: boolean; barcode?: string | null; inventory_item_id?: string | null; inventory_items?: { quantity: number; unit: string } | null };
 type Overview = { currency: string; can_credit: boolean; items: Item[];
   today: { takings: number; sales: number; topups: number; recent: { id: string; kind: string; amount: number; description: string | null; at: string; student: string }[] } };
 type Tx = { id: string; kind: string; amount: number; balance_after: number | null; description: string | null; status: string; created_at: string };
@@ -68,6 +68,12 @@ function Till({ ov, reload }: { ov: Overview; reload: () => void }) {
   const scanRef = useRef<HTMLInputElement>(null);
   const cur = ov.currency;
   const active = ov.items.filter(i => i.active);
+  // A product barcode scanned at the till goes straight into the basket.
+  const addByBarcode = (code: string) => {
+    const it = active.find(i => i.barcode && i.barcode === code.trim());
+    if (!it) { setMsg({ ok: false, text: `No item with barcode ${code}.` }); return; }
+    setMsg(null); setCustom(""); setBasket(b => ({ ...b, [it.id]: (b[it.id] ?? 0) + 1 }));
+  };
   const total = Object.entries(basket).reduce((a, [id, q]) => a + q * Number(active.find(i => i.id === id)?.price ?? 0), 0) || Number(custom || 0);
   const cats = [...new Set(active.map(i => i.category ?? "Other"))];
 
@@ -104,12 +110,14 @@ function Till({ ov, reload }: { ov: Overview; reload: () => void }) {
         {card && <div className="card p-4"><StudentCard c={card} /></div>}
         {card && !card.wallet.frozen && (
           <div className="card p-4">
+            {active.some(i => i.barcode) && <form className="mb-3 flex gap-2" onSubmit={e => { e.preventDefault(); const v = (e.currentTarget.elements.namedItem("code") as HTMLInputElement); if (v.value.trim()) { addByBarcode(v.value); v.value = ""; } }}>
+              <input name="code" className="input" placeholder="Scan an item's barcode" aria-label="Item barcode" /><button className="btn btn-outline">Add</button></form>}
             {!active.length ? <p className="text-sm text-slate-500">No items yet. Add them under Items & prices, or enter an amount.</p> : cats.map(cat => (
               <div key={cat} className="mb-3">
                 <p className="mb-1 text-xs font-semibold uppercase text-slate-500">{cat}</p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{active.filter(i => (i.category ?? "Other") === cat).map(i => (
                   <button key={i.id} className="rounded-lg border border-slate-200 p-2 text-left text-sm hover:border-brand-400" onClick={() => { setCustom(""); setBasket(b => ({ ...b, [i.id]: (b[i.id] ?? 0) + 1 })); }}>
-                    <b className="block truncate">{i.name}</b><span className="text-xs text-slate-500">{money(i.price, cur)}</span>{basket[i.id] ? <Badge tone="blue">×{basket[i.id]}</Badge> : null}
+                    <b className="block truncate">{i.name}</b><span className="text-xs text-slate-500">{money(i.price, cur)}{i.inventory_items ? ` · ${i.inventory_items.quantity} left` : ""}</span>{basket[i.id] ? <Badge tone="blue">×{basket[i.id]}</Badge> : null}
                   </button>))}</div>
               </div>))}
             <div className="mt-3 flex flex-wrap items-end gap-2">
@@ -133,7 +141,8 @@ function Till({ ov, reload }: { ov: Overview; reload: () => void }) {
 }
 
 function Items({ items, currency, reload }: { items: Item[]; currency: string; reload: () => void }) {
-  const blank = { id: "", name: "", price: "", category: "", active: true };
+  const blank = { id: "", name: "", price: "", category: "", active: true, barcode: "", inventory_item_id: "" };
+  const { data: stock } = useApi<{ id: string; name: string; variant: string | null; quantity: number }[]>("/api/finance?view=inventory");
   const [f, setF] = useState(blank);
   const [err, setErr] = useState<string | null>(null);
   return (
@@ -143,12 +152,12 @@ function Items({ items, currency, reload }: { items: Item[]; currency: string; r
           <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm"><thead><tr className="text-left text-xs text-slate-500"><th>Item</th><th>Category</th><th className="text-right">Price</th><th /></tr></thead>
             <tbody>{items.map(i => <tr key={i.id} className={`border-t border-slate-100 ${i.active ? "" : "opacity-50"}`}><td className="py-1.5">{i.name}</td><td>{i.category}</td>
               <td className="text-right tabular-nums">{money(i.price, currency)}</td>
-              <td className="text-right"><button className="text-xs text-brand-700" onClick={() => setF({ id: i.id, name: i.name, price: String(i.price), category: i.category ?? "", active: i.active })}>Edit</button></td></tr>)}</tbody></table></div>
+              <td className="text-right"><button className="text-xs text-brand-700" onClick={() => setF({ id: i.id, name: i.name, price: String(i.price), category: i.category ?? "", active: i.active, barcode: i.barcode ?? "", inventory_item_id: i.inventory_item_id ?? "" })}>Edit</button></td></tr>)}</tbody></table></div>
         )}
       </section>
       <form className="card h-fit space-y-2 p-4" onSubmit={async e => {
         e.preventDefault();
-        const r = await send("/api/wallet", { action: "save_item", id: f.id || undefined, name: f.name, price: Number(f.price), category: f.category || null, active: f.active });
+        const r = await send("/api/wallet", { action: "save_item", id: f.id || undefined, name: f.name, price: Number(f.price), category: f.category || null, active: f.active, barcode: f.barcode || null, inventory_item_id: f.inventory_item_id || null });
         if (!r.ok) return setErr(r.error);
         setErr(null); setF(blank); reload();
       }}>
@@ -158,6 +167,8 @@ function Items({ items, currency, reload }: { items: Item[]; currency: string; r
           <Field label="Price"><input className="input" type="number" min="0" step="0.01" required value={f.price} onChange={e => setF({ ...f, price: e.target.value })} /></Field>
           <Field label="Category"><input className="input" value={f.category} onChange={e => setF({ ...f, category: e.target.value })} placeholder="Snacks, Drinks…" /></Field>
         </div>
+        <Field label="Barcode (to scan at the till)"><input className="input" value={f.barcode} onChange={e => setF({ ...f, barcode: e.target.value })} /></Field>
+        <Field label="Sells from stock item" hint="Each sale takes one off the store's stock."><select className="input" value={f.inventory_item_id} onChange={e => setF({ ...f, inventory_item_id: e.target.value })}><option value="">— not tracked —</option>{(stock ?? []).map(s => <option key={s.id} value={s.id}>{s.name}{s.variant ? ` (${s.variant})` : ""} · {s.quantity} in stock</option>)}</select></Field>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.active} onChange={e => setF({ ...f, active: e.target.checked })} /> For sale</label>
         {err && <Alert>{err}</Alert>}
         <div className="flex gap-2"><button className="btn btn-primary flex-1">Save</button>{f.id && <button type="button" className="btn btn-ghost" onClick={() => setF(blank)}>Cancel</button>}</div>

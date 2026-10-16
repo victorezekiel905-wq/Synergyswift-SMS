@@ -1,17 +1,18 @@
 "use client";
 import { useState } from "react";
 import { useApi, send, Page, PageHeader, Alert, Empty, Modal, Field, Badge, statusTone, fmtDate, money, Icon } from "@/components/ui";
+import { nextRequisitionSteps } from "@/lib/procurement";
 
 type Req = {
   id: string; title: string; department: string | null; justification: string | null; needed_by: string | null; status: string;
-  total_amount: number; created_at: string; decided_at: string | null; decision_note: string | null; requested_by: string;
+  total_amount: number; created_at: string; decided_at: string | null; decision_note: string | null; requested_by: string; endorsed_by?: string | null;
   requisition_items: { id: string; description: string; quantity: number; unit_cost: number }[];
   requester: { full_name: string } | null; decider: { full_name: string } | null;
 };
 
 export default function RequisitionsPage() {
   const [status, setStatus] = useState("");
-  const { data, error, reload } = useApi<{ items: Req[]; can_approve: boolean; me: string }>(`/api/requisitions${status ? `?status=${status}` : ""}`, [status]);
+  const { data, error, reload } = useApi<{ items: Req[]; can_approve: boolean; is_head: boolean; me: string; limit: number }>(`/api/requisitions${status ? `?status=${status}` : ""}`, [status]);
   const { data: settings } = useApi<{ settings: { currency?: string } }>("/api/school/settings");
   const currency = settings?.settings?.currency ?? "NGN";
   const [open, setOpen] = useState(false);
@@ -27,10 +28,10 @@ export default function RequisitionsPage() {
   return (
     <Page wide>
       <PageHeader eyebrow="Operations" title="Requisitions"
-        subtitle="Any staff member can request items. The bursar, principal or admin approves, rejects and marks items fulfilled. Nobody can approve their own request."
+        subtitle="Any staff member can request items. The bursar, principal or admin approves; requests above the school's limit are endorsed first and then approved by the principal or an admin. Approved requests are ordered under Finance → Buying. Nobody approves their own request."
         actions={<button className="btn btn-primary" onClick={() => setOpen(true)}>+ New requisition</button>} />
       <select className="input mb-4 max-w-[200px]" value={status} onChange={e => setStatus(e.target.value)} aria-label="Status filter">
-        <option value="">All</option><option value="submitted">Awaiting approval</option><option value="approved">Approved</option><option value="fulfilled">Fulfilled</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option>
+        <option value="">All</option><option value="submitted">Awaiting approval</option><option value="endorsed">Endorsed, awaiting second approval</option><option value="approved">Approved</option><option value="fulfilled">Fulfilled</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option>
       </select>
       {error && <Alert>{error}</Alert>}
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
@@ -53,12 +54,16 @@ export default function RequisitionsPage() {
                 </table></div>
                 {r.decider && <p className="mt-2 text-xs text-slate-500">Decided by {r.decider.full_name} on {fmtDate(r.decided_at)}{r.decision_note ? `: ${r.decision_note}` : ""}</p>}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {data.can_approve && r.status === "submitted" && r.requested_by !== data.me && <>
-                    <button className="btn btn-primary text-xs" onClick={() => decide(r.id, "approved")}>Approve</button>
-                    <button className="btn btn-danger text-xs" onClick={() => decide(r.id, "rejected")}>Reject</button>
-                  </>}
-                  {data.can_approve && r.status === "approved" && <button className="btn btn-primary text-xs" onClick={() => decide(r.id, "fulfilled")}>Mark fulfilled</button>}
-                  {r.requested_by === data.me && r.status === "submitted" && <button className="btn btn-ghost text-xs" onClick={() => decide(r.id, "cancelled")}>Cancel</button>}
+                  {(data.can_approve || r.requested_by === data.me) && nextRequisitionSteps({ ...r, endorsed_by: r.endorsed_by ?? null }, data.me, data.is_head, data.limit).map(step => ({
+                    endorse: <button key={step} className="btn btn-primary text-xs" onClick={() => decide(r.id, "endorsed")}>Endorse</button>,
+                    approve: <button key={step} className="btn btn-primary text-xs" onClick={() => decide(r.id, "approved")}>Approve</button>,
+                    reject: <button key={step} className="btn btn-danger text-xs" onClick={() => decide(r.id, "rejected")}>Reject</button>,
+                    fulfil: <button key={step} className="btn btn-outline text-xs" onClick={() => decide(r.id, "fulfilled")}>Mark fulfilled</button>,
+                    cancel: <button key={step} className="btn btn-ghost text-xs" onClick={() => decide(r.id, "cancelled")}>Cancel</button>,
+                    order: null
+                  } as Record<string, React.ReactNode>)[step])}
+                  {r.status === "submitted" && Number(r.total_amount) > data.limit && <span className="text-xs text-slate-500">Over {money(data.limit, currency)}: needs endorsing, then a second approval.</span>}
+                  {r.status === "endorsed" && <span className="text-xs text-slate-500">Endorsed; waiting for the principal or an admin.</span>}
                 </div>
               </div>
             </details>

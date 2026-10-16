@@ -216,9 +216,18 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Borrowing, returns, reservations, fines | ✅ lend and return by scanning; a loan limit per student; renewals (none while someone is waiting); a reservation queue where a returned copy is held for the next reader, who is told, and lapses to the next if not collected; late fines per day begun, marked paid or waived; lost books charged at the book's price; overdue reminders to readers and (weekly) parents |
 | E-library with digital resource access | ✅ files or links opened online by everyone, students and staff, or staff only; students reach the library and their loans from their menu |
 
-## 18–23
+## 18. Inventory and assets (phase 11d)
 
-Sections 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
+| Feature | Status |
+|---|---|
+| Asset register with maintenance schedules | ✅ tag, serial number, supplier, cost, location, who has it, condition, warranty; a service interval with the next date moved on by each service; services, repairs and inspections logged with cost and vendor; any member of staff reports a fault; due services and ending warranties listed |
+| Store and stock management: uniforms, books, stationery | ✅ items with a size or colour, a barcode, cost and selling price; received, used and issued to a named student or member of staff; reorder levels with suggested quantities and value of stock |
+| School shop / POS with student wallet payments | ✅ (v47) the till charges the student's wallet; now items scan by barcode and sell from stock, and a sale cannot sell what is not on the shelf |
+| Procurement requests and approvals | ✅ requisitions from any staff member; above a set amount they are endorsed and then approved by the principal or an admin (different people, never the requester); suppliers and quotes (best one marked); purchase orders with lines into stock or the asset register; goods received in part or in full, closing the order and the requisition; payment recorded as an expense against the order |
+
+## 19–23
+
+Sections 19 (co-curricular), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
 
 ## Database updates to run
 
@@ -248,3 +257,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101004300_welfare.sql` | 11a |
 | `20260101004400_boarding_transport.sql` | 11b |
 | `20260101004500_library.sql` | 11c |
+| `20260101004600_inventory_procurement.sql` | 11d |

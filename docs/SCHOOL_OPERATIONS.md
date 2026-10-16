@@ -245,6 +245,13 @@ Under **HR**:
 - **Reservations**: students reserve from their Library page; when a copy comes back it is held for the first in the queue for a few days, and they (and their parents) are told. Uncollected holds pass to the next reader.
 - **Loans, fines and settings**: renew, mark lost (the reader owes the book's price), and mark fines paid or waived. Admins set the loan length, fine per day, books per student, days a hold is kept and renewals allowed.
 
+### Stock, assets and buying (phase 11)
+
+- **Stock** (Finance → Stock): give uniforms a size or colour (each size is its own line), a barcode and a selling price. **Issue to…** a student or member of staff records who received what. Tuck-shop or uniform-shop items can be linked to a stock line: every sale at the till takes one off, and the till refuses to sell what is not in stock. Scan item barcodes at the till.
+- **Assets**: record the serial number, supplier, warranty and how often it is serviced. **Service log** records services and repairs (with cost and vendor) and moves the next service date on. Any member of staff can **Report fault**; the bursary sees it under Buying.
+- **Buying** (Finance → Buying): approved requisitions to order, stock running low (order it all in one go), orders in progress, and assets that need attention. Add suppliers, compare quotes, raise a purchase order, **Send** it (it gets a number), **receive** goods as they arrive (into stock or the asset register), and **record payment** (it becomes an expense).
+- **Approvals**: requisitions above the school's limit (₦500,000 to start; change it under Buying settings, admins only) are endorsed by one approver and approved by the principal or an admin who is someone else.
+
 ### Payroll (phase 10)
 
 - **Tax & pension** (payroll staff): the starting rates follow the Nigeria Tax Act 2025 (PAYE bands from 0% on the first ₦800,000 a year to 25% above ₦50m; pension, NHF and NHIS deducted first; rent relief of 20% of rent up to ₦500,000) and the Pension Reform Act (8% staff, 10% school on basic + housing + transport), plus NSITF 1%. **Check every rate with your tax adviser before the first run**; they are all editable, including the bands, and a flat percentage per person is still available.
