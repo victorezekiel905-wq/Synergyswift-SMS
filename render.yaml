@@ -77,6 +77,17 @@ services:
         sync: false
       - key: FCM_PRIVATE_KEY
         sync: false
+      # ---- Google Classroom and Microsoft Teams/OneNote (teachers connect their own accounts) ----
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_TENANT
+        value: common
       # ---- Drafting and translation ----
       - key: ANTHROPIC_API_KEY
         sync: false

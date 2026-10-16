@@ -286,6 +286,7 @@ Under **Administration → Integrations & website**:
 - **API keys** (admins): make one key per system, with only the scopes it needs. Copy it when shown; it is not shown again. Revoke a key the moment a system stops being used or a key may have leaked.
 - **Webhooks** (admins): add the https address of the system to notify and choose the events. Use **Send a test**, then check deliveries in the log. Give the receiver the secret so it can check the X-Webhook-Signature header.
 - **Connected services** shows which payment, messaging and lesson services are set up.
+- **Google Classroom & Teams**, under Teaching: each teacher connects their own account once, links their classes, then uses **Send to …** on a homework and later **Bring marks back**. With Microsoft connected, lesson notes can be sent to OneNote.
 - **Learning tools (LTI 1.3)**, under Teaching. An admin registers the tool using the details its makers give (login URL, launch URL, their public keys) and sends them the platform details shown on the page. Teachers then add the tool to a class (and, if they like, to a homework) and students open it from My school. Scores come back to the tool's **Scores** list, and into the homework when it is linked.
 
 ### Payroll (phase 10)
@@ -346,6 +347,7 @@ v47 adds what the market leaders sell as separate products (ParentSquare, Parent
    - For drafted lesson notes, report comments and notices, for translation, for homework feedback and quiz drafts, and for the students' study helper, set the service key `ANTHROPIC_API_KEY`. Everything else works without it, and the drafting buttons stay hidden.
    - For Zoom lessons created by the app, set `ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID` and `ZOOM_CLIENT_SECRET` (a Server-to-Server OAuth app), or let each school connect its own Zoom app. Without Zoom, teachers paste Meet, Teams or Zoom links.
    - For app notifications, run `npx web-push generate-vapid-keys` and set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT`.
+   - For Google Classroom, create an OAuth client (web application) in Google Cloud with the Classroom API turned on, add the redirect `<app>/api/connect/google/callback`, and set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. For Microsoft Teams and OneNote, register an app in Entra ID with the redirect `<app>/api/connect/microsoft/callback` and set `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` and `MICROSOFT_TENANT`. Google needs app verification before schools outside your own Workspace can use it.
    - For the Android and iPhone store apps, set `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL` and `FCM_PRIVATE_KEY` from a Firebase service account, then build the apps as in [MOBILE_APPS.md](MOBILE_APPS.md).
    - Point an uptime monitor at `/api/status`.
    - For Google Workspace or Microsoft 365 sign-in, enable the Google and/or Azure providers in Supabase Auth (redirect URL `<app>/auth/callback`) and set `NEXT_PUBLIC_SSO_PROVIDERS=google,azure`.
