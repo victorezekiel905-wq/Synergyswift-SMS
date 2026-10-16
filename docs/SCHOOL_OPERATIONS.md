@@ -229,6 +229,15 @@ Under **HR**:
 - **Behaviour** adds **Incidents** (who was involved and how, with points for those responsible) and **Detentions** (sessions with a room, supervisor and places; parents are told the date and time; mark served or missed).
 - **Health** adds the day's **medication round** (plans with times or "when needed", parental consent, and a dose log that cannot be changed), **immunisations** with what is due, allergy severity, EpiPen and emergency care plans, and vitals and follow-up dates on sick-bay visits.
 
+### Boarding and buses (phase 11)
+
+- **Boarding** (`/school/hostel`):
+  - **Arrange an exeat** for a boarder. Unless you untick "a parent must agree first", the parents are asked in their portal; once they agree it is approved. Boarders can ask from their own portal (their parents agree, then the house decides). Sign them out and back in; if a boarder is not back 30 minutes after the agreed time, the house staff and the parents are told.
+  - **Roll call**: pick the house and the roll. Everyone starts present (or on exeat, or in the sick bay); tap anyone missing. Saving with someone absent alerts the other house staff and the principal at once.
+  - **House notes**: notes about a boarder; tick "share with the family" for the ones parents should see.
+  - **Dining**: the week's menus (copy a week forward), how many to cook for, special diets and allergies, and the dining register.
+- **School buses** (`/school/transport`) adds **Buses & drivers**: record each bus's insurance, roadworthiness, licence and service dates, and each driver's licence and medical. Warnings show 30 days ahead; a bus with lapsed insurance or roadworthiness, or marked in for repair, cannot start a trip. Choose which bus and driver run each route. Putting a child on a route adds its bus fee to their extras; ending a trip lists anyone never scanned off.
+
 ### Payroll (phase 10)
 
 - **Tax & pension** (payroll staff): the starting rates follow the Nigeria Tax Act 2025 (PAYE bands from 0% on the first ₦800,000 a year to 25% above ₦50m; pension, NHF and NHIS deducted first; rent relief of 20% of rent up to ₦500,000) and the Pension Reform Act (8% staff, 10% school on basic + housing + transport), plus NSITF 1%. **Check every rate with your tax adviser before the first run**; they are all editable, including the bands, and a flat percentage per person is still available.

@@ -89,6 +89,21 @@ export async function requestExeat(svc: any, p: { tenantId: string; guardianId: 
   return { id: data.id };
 }
 
+/** A parent agrees (or not) to an exeat the boarding house or their child asked for. */
+export async function consentExeat(svc: any, p: { tenantId: string; guardianId: string; id: string; approve: boolean }) {
+  const { data: e } = await svc.from("exeat_requests").select("id,student_id,requested_by,status").eq("tenant_id", p.tenantId).eq("id", p.id).maybeSingle();
+  if (!e) throw new Error("exeat not found");
+  await assertLinked(svc, p.tenantId, p.guardianId, e.student_id);
+  if (e.status !== "awaiting_parent") throw new Error("this exeat no longer needs your answer");
+  const { exeatAfterParent } = await import("@/lib/boarding");
+  const status = exeatAfterParent(e.requested_by, p.approve);
+  const { data, error } = await svc.from("exeat_requests").update({ status, parent_decided_by: p.guardianId, parent_decided_at: new Date().toISOString(),
+    ...(p.approve ? {} : { decision_note: "Declined by the parent" }) }).eq("id", e.id).eq("status", "awaiting_parent").select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error("this exeat no longer needs your answer");
+  return { status };
+}
+
 /** Everything a guardian sees beyond the basics: fees, events, meetings, homework, behaviour, attendance, boarding. */
 export async function familyExtras(svc: any, tenantId: string, guardianId: string, studentIds: string[], classGroupIds: string[]) {
   if (!studentIds.length) return { invoices: [], events: [], slots: [], homework: [], behaviour: [], attendance: [], exeats: [], absences: [], currency: "NGN", bookings: [], transport: [], hostel: [], support: await familySupport(svc, tenantId, guardianId) };
@@ -102,7 +117,7 @@ export async function familyExtras(svc: any, tenantId: string, guardianId: strin
     classGroupIds.length ? svc.from("homework").select("id,class_group_id,title,due_at,group_ids,subjects(name)").eq("tenant_id", tenantId).in("class_group_id", classGroupIds).gte("due_at", since30).order("due_at", { ascending: false }).limit(60) : { data: [] },
     svc.from("behaviour_records").select("student_id,kind,points,note,occurred_at,behaviour_categories(name)").eq("tenant_id", tenantId).in("student_id", studentIds).gte("occurred_at", since30).order("occurred_at", { ascending: false }).limit(60),
     svc.from("class_attendance").select("student_id,status").eq("tenant_id", tenantId).in("student_id", studentIds).gte("date", since30.slice(0, 10)).limit(5000),
-    svc.from("exeat_requests").select("id,student_id,reason,leave_at,return_by,status,decision_note").eq("tenant_id", tenantId).in("student_id", studentIds).order("created_at", { ascending: false }).limit(20),
+    svc.from("exeat_requests").select("id,student_id,kind,reason,leave_at,return_by,status,decision_note,requested_by,collector_name").eq("tenant_id", tenantId).in("student_id", studentIds).order("created_at", { ascending: false }).limit(20),
     svc.from("consultation_slots").select("id,starts_at,ends_at,location,student_id,conference_id,users!consultation_slots_staff_user_id_fkey(full_name)").eq("tenant_id", tenantId).eq("guardian_id", guardianId).gte("starts_at", now).order("starts_at"),
     svc.from("transport_assignments").select("student_id,stop_name,transport_routes(name,vehicle,driver_name,driver_phone)").eq("tenant_id", tenantId).in("student_id", studentIds),
     svc.from("hostel_allocations").select("student_id,bed_label,hostel_rooms(name,hostels(name))").eq("tenant_id", tenantId).in("student_id", studentIds).is("ended_at", null),
@@ -117,6 +132,11 @@ export async function familyExtras(svc: any, tenantId: string, guardianId: strin
   const { data: memberships } = await svc.from("learning_group_members").select("group_id").in("student_id", studentIds);
   const myGroups = new Set((memberships ?? []).map((m: any) => m.group_id));
   const { data: subs } = (homework.data ?? []).length ? await svc.from("homework_submissions").select("homework_id,student_id,submitted_at,score,late").in("student_id", studentIds).in("homework_id", (homework.data ?? []).map((h: any) => h.id)) : { data: [] };
+  // Boarders: notes the house shared with the family, and this week's menus.
+  const boarding = (hostel.data ?? []).length ? await Promise.all([
+    svc.from("boarding_notes").select("id,student_id,kind,note,created_at").eq("tenant_id", tenantId).in("student_id", studentIds).eq("visible_to_parent", true).order("created_at", { ascending: false }).limit(30),
+    svc.from("meal_menus").select("on_date,meal,items,alternatives,hostel_id").eq("tenant_id", tenantId).gte("on_date", now.slice(0, 10)).lte("on_date", new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)).order("on_date")
+  ]) : [{ data: [] }, { data: [] }];
   const { data: absences } = await svc.from("student_absence_requests").select("id,student_id,kind,starts_on,ends_on,reason,status,decision_note,created_at")
     .eq("tenant_id", tenantId).in("student_id", studentIds).gte("ends_on", new Date(Date.now() - 60 * 86400_000).toISOString().slice(0, 10)).order("starts_on", { ascending: false }).limit(40);
   return {
@@ -135,6 +155,8 @@ export async function familyExtras(svc: any, tenantId: string, guardianId: strin
     notices: (notices ?? []).map((r: any) => ({ receipt_id: r.id, read_at: r.read_at, acknowledged_at: r.acknowledged_at, ...r.notices })),
     transport: transport.data ?? [],
     hostel: hostel.data ?? [],
+    boarding_notes: boarding[0].data ?? [],
+    menus: boarding[1].data ?? [],
     support: await familySupport(svc, tenantId, guardianId),
     records: await familyRecords(svc, tenantId, studentIds).catch(() => null)
   };

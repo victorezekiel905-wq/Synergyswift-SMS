@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, statusTone, fmtDate, fmtTime, Icon } from "@/components/ui";
+import { RollCall, HouseNotes, Dining, NewExeat } from "@/components/boarding/House";
 
 type Hostel = { id: string; name: string; gender: string | null; users: { full_name: string } | null;
   hostel_rooms: { id: string; name: string; capacity: number; occupants: { id: string; student_id: string; name: string; bed_label: string | null; students: { admission_no: string; class_groups: { name: string } | null } }[] }[] };
@@ -8,7 +9,8 @@ type Exeat = { id: string; name: string; reason: string; leave_at: string; retur
 
 export default function HostelPage() {
   const { data, error, reload } = useApi<{ hostels: Hostel[]; exeats: Exeat[]; can_manage: boolean }>("/api/hostel");
-  const [tab, setTab] = useState<"exeat" | "rooms">("exeat");
+  const [tab, setTab] = useState<"exeat" | "roll" | "notes" | "dining" | "rooms">("exeat");
+  const [arrange, setArrange] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const act = async (body: Record<string, unknown>, ok: string) => { const r = await send("/api/hostel", body); setMsg({ ok: r.ok, text: r.ok ? ok : r.error ?? "failed" }); if (r.ok) reload(); };
   const boarders = (data?.hostels ?? []).reduce((a, h) => a + h.hostel_rooms.reduce((b, r) => b + r.occupants.length, 0), 0);
@@ -16,11 +18,16 @@ export default function HostelPage() {
   const out = (data?.exeats ?? []).filter(e => e.status === "out");
   return (
     <Page wide>
-      <PageHeader eyebrow="Boarding" title="Hostels & exeat" subtitle={`${boarders} boarders in ${beds} beds. Parents request exeat from their portal; you approve, check out and check in, and they are told at each step.`} />
+      <PageHeader eyebrow="Boarding" title="Hostels & exeat" subtitle={`${boarders} boarders in ${beds} beds. Exeats need a parent and the house to agree; families are told at each step and when someone is late back. Roll calls, house notes and the dining hall are here too.`} />
       {error && <Alert>{error}</Alert>}
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
       {out.some(e => new Date(e.return_by) < new Date()) && <div className="mb-3"><Alert>Overdue: {out.filter(e => new Date(e.return_by) < new Date()).map(e => e.name).join(", ")} should be back already.</Alert></div>}
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "exeat", label: `Exeat${data?.exeats.filter(e => e.status === "pending").length ? ` (${data.exeats.filter(e => e.status === "pending").length} to decide)` : ""}` }, { id: "rooms", label: "Rooms" }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "exeat", label: `Exeat${data?.exeats.filter(e => e.status === "pending").length ? ` (${data.exeats.filter(e => e.status === "pending").length} to decide)` : ""}` }, { id: "roll", label: "Roll call" }, { id: "notes", label: "House notes" }, { id: "dining", label: "Dining" }, { id: "rooms", label: "Rooms" }]} />
+      {tab === "exeat" && data?.can_manage && <div className="mb-3"><button className="btn btn-outline" onClick={() => setArrange(true)}>Arrange an exeat</button></div>}
+      <NewExeat open={arrange} onClose={() => setArrange(false)} onDone={t => { setArrange(false); setMsg({ ok: true, text: t }); reload(); }} />
+      {tab === "roll" && data && <RollCall hostels={data.hostels.map(h => ({ id: h.id, name: h.name }))} />}
+      {tab === "notes" && <HouseNotes />}
+      {tab === "dining" && <Dining />}
       {tab === "exeat" && (!data?.exeats.length ? <Empty>No open exeat requests.</Empty> : (
         <div className="space-y-2">{data.exeats.map(e => (
           <div key={e.id} className="card flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
@@ -29,6 +36,8 @@ export default function HostelPage() {
             {data.can_manage && <div className="flex gap-2">
               {e.status === "pending" && <><button className="btn btn-primary px-3 py-1 text-xs" onClick={() => act({ action: "exeat_decide", id: e.id, decision: "approved" }, "Approved; parents told.")}>Approve</button>
                 <button className="btn btn-ghost px-3 py-1 text-xs text-rose-600" onClick={() => { const n = prompt("Reason for declining?"); if (n !== null) act({ action: "exeat_decide", id: e.id, decision: "rejected", note: n }, "Declined; parents told."); }}>Decline</button></>}
+              {e.status === "awaiting_parent" && <span className="text-xs text-amber-700">waiting for a parent to agree</span>}
+              {["awaiting_parent", "pending", "approved"].includes(e.status) && <button className="btn btn-ghost px-3 py-1 text-xs" onClick={() => confirm("Cancel this exeat?") && act({ action: "exeat_cancel", id: e.id }, "Cancelled.")}>Cancel</button>}
               {e.status === "approved" && <button className="btn btn-primary px-3 py-1 text-xs" onClick={() => act({ action: "exeat_out", id: e.id }, "Checked out; parents told.")}>Check out</button>}
               {e.status === "out" && <button className="btn btn-primary px-3 py-1 text-xs" onClick={() => act({ action: "exeat_return", id: e.id }, "Welcome back; parents told.")}>Check in</button>}
             </div>}

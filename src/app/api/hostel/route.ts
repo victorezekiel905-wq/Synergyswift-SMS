@@ -5,7 +5,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { notifyGuardians } from "@/lib/notify";
 import { exeatUpdate } from "@/lib/messaging/notices";
 import { formatInZone } from "@/lib/messaging/outbox";
-import { studentName } from "@/lib/school";
+import { studentName, appUrl } from "@/lib/school";
+import { askParentsForExeat } from "@/lib/boarding-server";
 
 /** Hostels with rooms and occupants, plus exeat requests. */
 export async function GET() {
@@ -16,7 +17,7 @@ export async function GET() {
     ctx.sb.from("hostels").select("*,users(full_name),hostel_rooms(id,name,capacity)").eq("tenant_id", tid).order("name"),
     ctx.sb.from("hostel_allocations").select("id,room_id,student_id,bed_label,allocated_at,students(first_name,last_name,other_names,admission_no,class_groups(name))").eq("tenant_id", tid).is("ended_at", null),
     ctx.sb.from("exeat_requests").select("*,students(first_name,last_name,other_names,admission_no,class_groups(name)),guardians(full_name,phone)").eq("tenant_id", tid)
-      .in("status", ["pending", "approved", "out"]).order("leave_at")
+      .in("status", ["awaiting_parent", "pending", "approved", "out"]).order("leave_at")
   ]);
   return NextResponse.json({
     hostels: (hostels ?? []).map((h: any) => ({ ...h, hostel_rooms: (h.hostel_rooms ?? []).map((r: any) => ({ ...r, occupants: (allocations ?? []).filter((a: any) => a.room_id === r.id).map((a: any) => ({ ...a, name: studentName(a.students) })) })) })),
@@ -31,7 +32,9 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("allocate"), room_id: z.string().uuid(), student_id: z.string().uuid(), bed_label: z.string().trim().max(20).nullish() }),
   z.object({ action: z.literal("vacate"), allocation_id: z.string().uuid() }),
   z.object({ action: z.literal("exeat_create"), student_id: z.string().uuid(), reason: z.string().trim().min(3).max(300), leave_at: z.string().datetime({ offset: true }),
-    return_by: z.string().datetime({ offset: true }), collector_name: z.string().trim().max(120).nullish() }),
+    return_by: z.string().datetime({ offset: true }), collector_name: z.string().trim().max(120).nullish(),
+    kind: z.enum(["weekend", "day", "medical", "holiday", "family", "other"]).default("weekend"), needs_parent: z.boolean().default(true) }),
+  z.object({ action: z.literal("exeat_cancel"), id: z.string().uuid() }),
   z.object({ action: z.literal("exeat_decide"), id: z.string().uuid(), decision: z.enum(["approved", "rejected"]), note: z.string().trim().max(300).nullish() }),
   z.object({ action: z.literal("exeat_out"), id: z.string().uuid() }),
   z.object({ action: z.literal("exeat_return"), id: z.string().uuid() })
@@ -75,11 +78,20 @@ export async function POST(req: NextRequest) {
       return error ? jsonError(error.message) : NextResponse.json({ ok: true });
     }
     case "exeat_create": {
-      const { data, error } = await svc.from("exeat_requests").insert({ tenant_id: tid, student_id: b.student_id, requested_by: "staff", reason: b.reason,
-        leave_at: b.leave_at, return_by: b.return_by, collector_name: b.collector_name ?? null, status: "approved", decided_by: ctx.userId, decided_at: new Date().toISOString() }).select("id").single();
+      if (new Date(b.return_by) <= new Date(b.leave_at)) return jsonError("the return time must be after leaving");
+      // The house agrees by creating it; unless told otherwise, a parent must agree too before the child leaves.
+      const { data, error } = await svc.from("exeat_requests").insert({ tenant_id: tid, student_id: b.student_id, requested_by: "staff", kind: b.kind, reason: b.reason,
+        leave_at: b.leave_at, return_by: b.return_by, collector_name: b.collector_name ?? null, status: b.needs_parent ? "awaiting_parent" : "approved",
+        decided_by: ctx.userId, decided_at: new Date().toISOString(), staff_created_by: ctx.userId }).select("id").single();
       if (error) return jsonError(error.message);
-      await tell(svc, tid, data.id, "approved", ctx.tenant.timezone, ctx.userId);
+      if (b.needs_parent) await askParentsForExeat(svc, tid, data.id, ctx.tenant.timezone, appUrl(req), ctx.userId);
+      else await tell(svc, tid, data.id, "approved", ctx.tenant.timezone, ctx.userId);
       return NextResponse.json(data, { status: 201 });
+    }
+    case "exeat_cancel": {
+      const { data, error } = await svc.from("exeat_requests").update({ status: "cancelled" }).eq("tenant_id", tid).eq("id", b.id).in("status", ["awaiting_parent", "pending", "approved"]).select("id").maybeSingle();
+      if (error) return jsonError(error.message);
+      return data ? NextResponse.json({ ok: true }) : jsonError("this exeat can no longer be cancelled", 409);
     }
     case "exeat_decide": {
       const { data, error } = await svc.from("exeat_requests").update({ status: b.decision, decided_by: ctx.userId, decided_at: new Date().toISOString(), decision_note: b.note ?? null })

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, Icon, fmtTime, rolesOf, type Me } from "@/components/ui";
+import { Fleet } from "@/components/transport/Fleet";
 
 type Route = { id: string; name: string; vehicle: string | null; driver_name: string | null; driver_phone: string | null; attendant_id: string | null; capacity: number | null;
   stops: { name: string; am?: string | null; pm?: string | null; lat?: number | null; lng?: number | null }[]; users: { full_name: string } | null; transport_assignments: { count: number }[] };
@@ -9,14 +10,14 @@ export default function TransportPage() {
   const { data: me } = useApi<Me>("/api/me");
   const manager = ["transport_officer", "school_admin", "principal", "platform_admin"].some(r => rolesOf(me).has(r));
   const { data, reload } = useApi<{ routes: Route[] }>("/api/transport");
-  const [tab, setTab] = useState<"bus" | "routes">("bus");
+  const [tab, setTab] = useState<"bus" | "routes" | "fleet">("bus");
   const [routeId, setRouteId] = useState("");
   useEffect(() => { if (!routeId && data?.routes[0]) setRouteId(data.routes[0].id); }, [data, routeId]);
   return (
     <Page wide>
-      <PageHeader eyebrow="Transport" title="School buses" subtitle="Routes, stops and riders. The bus attendant scans each child on and off, and parents get a WhatsApp message every time." />
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "bus", label: "On the bus" }, ...(manager ? [{ id: "routes" as const, label: "Routes & riders" }] : [])]} />
-      {!data?.routes.length ? <Empty>No routes yet.{manager ? " Add one under Routes & riders." : ""}</Empty> : tab === "bus" ? (
+      <PageHeader eyebrow="Transport" title="School buses" subtitle="Routes, stops and riders, buses and drivers. The attendant scans each child on and off and parents are told every time; the bus fee follows each rider onto their invoices." />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "bus", label: "On the bus" }, ...(manager ? [{ id: "routes" as const, label: "Routes & riders" }, { id: "fleet" as const, label: "Buses & drivers" }] : [])]} />
+      {tab === "fleet" ? <Fleet /> : !data?.routes.length ? <Empty>No routes yet.{manager ? " Add one under Routes & riders." : ""}</Empty> : tab === "bus" ? (
         <>
           <select className="input mb-3 w-auto" value={routeId} onChange={e => setRouteId(e.target.value)} aria-label="Route">{data.routes.map(r => <option key={r.id} value={r.id}>{r.name}{r.vehicle ? ` (${r.vehicle})` : ""}</option>)}</select>
           {routeId && <LiveTrip key={routeId} routeId={routeId} />}
@@ -64,8 +65,11 @@ function LiveTrip({ routeId }: { routeId: string }) {
   }
   async function end() {
     stopWatching();
-    await send("/api/transport/live", { action: "end", route_id: routeId });
-    setTrip(null); setStatus("Trip ended. Location is no longer shared.");
+    const r = await send<{ still_on_bus?: string[]; not_boarded?: string[] }>("/api/transport/live", { action: "end", route_id: routeId });
+    setTrip(null);
+    const still = r.data?.still_on_bus ?? [];
+    setStatus("Trip ended. Location is no longer shared.");
+    if (still.length) setErr(`Not scanned off the bus: ${still.join(", ")}. Walk the bus now; the transport officer has been told.`);
   }
   return (
     <section className="card mb-4 flex flex-wrap items-center gap-2 p-4">

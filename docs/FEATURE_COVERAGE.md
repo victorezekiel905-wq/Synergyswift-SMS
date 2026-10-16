@@ -190,9 +190,27 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Health / sick bay: medical records, allergies, clinic visits, medication log, immunisations | ✅ medical profile with allergy severity, EpiPen and emergency care plan; visits with temperature, pulse and blood pressure, follow-up date and who is resting now, parents told; medication plans (times or when needed, parental consent) with today's round and a dose log that cannot be edited; immunisations with next-due dates and a due list |
 | Wellbeing check-ins and mood surveys | ✅ daily student check-in (mood, feelings, a note, "I'd like to talk"), optionally without a name; check-ins that need a person go to the form teacher and counsellors at once; class and school mood with a daily trend and the feelings named most; followed up and recorded. Longer surveys use the survey tool (phase 3) |
 
-## 15–23
+## 15. Boarding (phase 11b)
 
-Sections 15 (boarding), 16 (transport), 17 (library), 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
+| Feature | Status |
+|---|---|
+| Room and bed allocation | ✅ houses (boys, girls, mixed), rooms with beds, one bed per boarder, gender checked |
+| Exeat / leave-out requests with parent approval | ✅ parents ask from their portal; the house or the student (from their portal) can ask too, and then a parent must agree in their portal before the child leaves; kinds (weekend, day, medical, family, holiday); sign out and back in with parents told; an alert to the house and the parents when a boarder is late back |
+| Roll calls, house parent notes | ✅ roll calls per house (morning, prep, evening, lights out) starting from who is on exeat or in the sick bay, absent boarders alerting the house staff and principal at once; house notes by kind, some shared with the family in their portal |
+| Meal plans and dining management | ✅ menus by day and meal with an alternative, copied week to week, shown to families; numbers to cook for and special diets and allergies from health records; a dining register |
+
+## 16. Transport (phase 11b)
+
+| Feature | Status |
+|---|---|
+| Routes, stops, vehicles, drivers | ✅ routes with stops and times; buses (insurance, roadworthiness, licence, service dates, status) and drivers (licence, medical, background check) with expiry warnings; a bus with lapsed insurance or roadworthiness, or in for repair, cannot start a trip |
+| Live GPS bus tracking for parents | ✅ (v47) the attendant's phone shares the bus position; parents see it live |
+| Pickup and drop-off alerts | ✅ scans on and off with parents told each time, and an alert as the bus nears their stop; at the end of a trip, children never scanned off are flagged to the attendant and the transport officer |
+| Transport fee linkage | ✅ the route's bus fee is added to a rider's extras when they are put on a route (and removed when taken off), so it appears on their next invoices |
+
+## 17–23
+
+Sections 17 (library), 17 (library), 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
 
 ## Database updates to run
 
@@ -220,3 +238,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101004100_hr_people.sql` | 10a |
 | `20260101004200_payroll_appraisals.sql` | 10b |
 | `20260101004300_welfare.sql` | 11a |
+| `20260101004400_boarding_transport.sql` | 11b |

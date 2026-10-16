@@ -13,7 +13,9 @@ export type Extras = {
   homework: { id: string; class_group_id: string; title: string; due_at: string; subjects: { name: string } | null; submissions: { student_id: string; submitted_at: string; score: number | null; late: boolean }[] }[];
   behaviour: { student_id: string; kind: string; points: number; note: string | null; occurred_at: string; behaviour_categories: { name: string } | null }[];
   attendance: { student_id: string; status: string }[];
-  exeats: { id: string; student_id: string; reason: string; leave_at: string; return_by: string; status: string; decision_note: string | null }[];
+  exeats: { id: string; student_id: string; kind?: string; reason: string; leave_at: string; return_by: string; status: string; decision_note: string | null; requested_by?: string; collector_name?: string | null }[];
+  boarding_notes?: { id: string; student_id: string; kind: string; note: string; created_at: string }[];
+  menus?: { on_date: string; meal: string; items: string; alternatives: string | null }[];
   absences?: { id: string; student_id: string; kind: string; starts_on: string; ends_on: string; reason: string; status: string; decision_note: string | null }[];
   notices?: { receipt_id: string; id: string; kind: string; title: string; body: string; requires_ack: boolean; sent_at: string; read_at: string | null; acknowledged_at: string | null }[];
   bookings: { id: string; starts_at: string; ends_at?: string; location: string | null; student_id: string; users: { full_name: string } | null }[];
@@ -143,7 +145,8 @@ export default function FamilyTabs({ extras, kids, token, onChange }: { extras: 
       {tab === "messages" && <ParentMessages token={token} />}
       {tab === "wallet" && <ParentWallet token={token} kids={kids} />}
       {tab === "bus" && <ParentBus token={token} kids={kids} />}
-      {tab === "boarding" && <Boarding extras={extras} kids={kids} name={name} onRequest={b => act({ action: "exeat", ...b }, "Exeat requested. The house staff will reply shortly.")} />}
+      {tab === "boarding" && <Boarding extras={extras} kids={kids} name={name} onRequest={b => act({ action: "exeat", ...b }, "Exeat requested. The house staff will reply shortly.")}
+        onConsent={(id, approve) => act({ action: "exeat_consent", id, approve }, approve ? "Thank you. The boarding house has your agreement." : "Declined. The boarding house has been told.")} />}
       {tab === "support" && extras.support && <SupportTab data={extras.support} kids={kids} token={token} onChange={onChange} />}
       {tab === "records" && extras.records && <Records data={extras.records} kids={kids} token={token} onChange={onChange} />}
     </section>
@@ -253,12 +256,20 @@ function FamilyNotices({ extras, act }: { extras: Extras; act: (b: Record<string
   );
 }
 
-function Boarding({ extras, kids, name, onRequest }: { extras: Extras; kids: Child[]; name: (id: string) => string; onRequest: (b: Record<string, unknown>) => void }) {
+function Boarding({ extras, kids, name, onRequest, onConsent }: { extras: Extras; kids: Child[]; name: (id: string) => string; onRequest: (b: Record<string, unknown>) => void; onConsent: (id: string, approve: boolean) => void }) {
   const boarders = kids.filter(k => extras.hostel.some(h => h.student_id === k.id));
   const [f, setF] = useState({ student_id: boarders[0]?.id ?? "", reason: "", leave: "", ret: "", collector: "" });
   return (
     <div className="space-y-4 text-sm">
       {extras.hostel.map(h => <p key={h.student_id}>{name(h.student_id)}: {h.hostel_rooms?.hostels?.name}, room {h.hostel_rooms?.name}{h.bed_label ? `, bed ${h.bed_label}` : ""}</p>)}
+      {extras.exeats.filter(e => e.status === "awaiting_parent").map(e => (
+        <div key={e.id} className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+          <p className="font-semibold">Please agree: {name(e.student_id)}{e.requested_by === "student" ? " has asked to leave" : " is due to leave"}</p>
+          <p>{e.reason} · {fmtDate(e.leave_at, true)} → {fmtDate(e.return_by, true)}{e.collector_name ? ` · collected by ${e.collector_name}` : ""}</p>
+          <div className="mt-2 flex gap-2"><button className="btn btn-primary" onClick={() => onConsent(e.id, true)}>I agree</button><button className="btn btn-ghost text-rose-700" onClick={() => onConsent(e.id, false)}>Decline</button></div>
+        </div>))}
+      {(extras.boarding_notes ?? []).length > 0 && <div><p className="font-semibold">From the boarding house</p><ul className="space-y-1">{extras.boarding_notes!.map(n => <li key={n.id} className="rounded bg-slate-50 px-3 py-2">{fmtDate(n.created_at)} · {name(n.student_id)}: {n.note}</li>)}</ul></div>}
+      {(extras.menus ?? []).length > 0 && <details><summary className="cursor-pointer font-semibold">This week’s menu</summary><ul className="mt-1 space-y-0.5">{extras.menus!.map((m, i) => <li key={i}>{fmtDate(m.on_date)} · <span className="capitalize">{m.meal}</span>: {m.items}{m.alternatives ? ` (or ${m.alternatives})` : ""}</li>)}</ul></details>}
       {extras.exeats.length > 0 && <ul className="space-y-1">{extras.exeats.map(e => <li key={e.id} className="rounded bg-slate-50 px-3 py-2">{name(e.student_id)}: {e.reason} ({fmtDate(e.leave_at)} → {fmtDate(e.return_by)}) <Badge tone={e.status === "approved" || e.status === "returned" ? "green" : e.status === "rejected" ? "red" : "amber"}>{e.status}</Badge>{e.decision_note ? ` ${e.decision_note}` : ""}</li>)}</ul>}
       <form className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-2" onSubmit={e => { e.preventDefault(); onRequest({ student_id: f.student_id, reason: f.reason, leave_at: new Date(f.leave).toISOString(), return_by: new Date(f.ret).toISOString(), collector: f.collector || null }); }}>
         <p className="font-semibold sm:col-span-2">Request an exeat</p>

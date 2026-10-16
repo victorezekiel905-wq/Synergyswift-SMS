@@ -21,6 +21,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("event"), token: z.string().optional(), student_id: z.string().uuid(), event_id: z.string().uuid(), consent: z.boolean(), note: z.string().trim().max(300).nullish() }),
   z.object({ action: z.literal("book"), token: z.string().optional(), student_id: z.string().uuid(), slot_id: z.string().uuid(), note: z.string().trim().max(300).nullish() }),
   z.object({ action: z.literal("cancel_booking"), token: z.string().optional(), slot_id: z.string().uuid() }),
+  z.object({ action: z.literal("exeat_consent"), token: z.string().optional(), id: z.string().uuid(), approve: z.boolean() }),
   z.object({ action: z.literal("exeat"), token: z.string().optional(), student_id: z.string().uuid(), reason: z.string().trim().min(3).max(300),
     leave_at: z.string().datetime({ offset: true }), return_by: z.string().datetime({ offset: true }), collector: z.string().trim().max(120).nullish() }),
   z.object({ action: z.literal("medical"), token: z.string().optional(), student_id: z.string().uuid(), allergies: z.string().trim().max(500).nullish(),
@@ -62,6 +63,10 @@ export async function POST(req: NextRequest) {
       case "event": return NextResponse.json(await respondToEvent(svc, { tenantId, guardianId, studentId: b.student_id, eventId: b.event_id, consent: b.consent, note: b.note }));
       case "book": return NextResponse.json(await bookMeeting(svc, { tenantId, guardianId, studentId: b.student_id, slotId: b.slot_id, note: b.note, timezone }));
       case "cancel_booking": return NextResponse.json(await cancelMeeting(svc, { tenantId, guardianId, slotId: b.slot_id }));
+      case "exeat_consent": {
+        const { consentExeat } = await import("@/lib/family");
+        return NextResponse.json(await consentExeat(svc, { tenantId, guardianId, id: b.id, approve: b.approve }));
+      }
       case "exeat": return NextResponse.json(await requestExeat(svc, { tenantId, guardianId, studentId: b.student_id, reason: b.reason, leaveAt: b.leave_at, returnBy: b.return_by, collector: b.collector }), { status: 201 });
       case "ticket": {
         const { count } = await svc.from("tickets").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("guardian_id", guardianId).gte("created_at", new Date(Date.now() - 86400_000).toISOString());

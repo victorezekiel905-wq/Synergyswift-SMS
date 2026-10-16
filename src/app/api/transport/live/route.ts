@@ -3,6 +3,10 @@ import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { alertStops, isLive, stopsToAlert, type Stop } from "@/lib/bus";
+import { vehicleBlocked, tripCheck } from "@/lib/boarding";
+import { localParts } from "@/lib/attendance";
+import { startOfTodayIso, studentName, appUrl } from "@/lib/school";
+import { tellStaff } from "@/lib/hr-server";
 
 /** Every bus currently on a trip (staff view). */
 export async function GET() {
@@ -28,18 +32,34 @@ export async function POST(req: NextRequest) {
   const b = parsed.data;
   const tid = ctx.tenant.id;
   const svc = createServiceClient();
-  const { data: route } = await svc.from("transport_routes").select("id,name,attendant_id,stops").eq("tenant_id", tid).eq("id", b.route_id).maybeSingle();
+  const { data: route } = await svc.from("transport_routes").select("id,name,attendant_id,stops,vehicle_id,vehicles(status,insurance_expires,roadworthy_expires,reg_no)").eq("tenant_id", tid).eq("id", b.route_id).maybeSingle();
   if (!route) return jsonError("route not found", 404);
   if (!hasAny(ctx, ROLES.transport) && route.attendant_id !== ctx.userId) return jsonError("only this bus's attendant or transport staff can share its location", 403);
 
   if (b.action === "start") {
+    // A bus with lapsed insurance or roadworthiness, or in for repair, does not carry children.
+    const v: any = (route as any).vehicles;
+    const blocked = v ? vehicleBlocked(v, localParts(new Date(), ctx.tenant.timezone).date) : null;
+    if (blocked) return jsonError(`This bus (${v.reg_no}) cannot run: ${blocked}. Tell the transport officer.`, 409);
     const { error } = await svc.from("transport_live").upsert({ route_id: route.id, tenant_id: tid, trip: b.trip, started_at: new Date().toISOString(),
       ended_at: null, lat: null, lng: null, accuracy: null, speed: null, updated_at: null, notified_stops: [], started_by: ctx.userId }, { onConflict: "route_id" });
     return error ? jsonError(error.message) : NextResponse.json({ ok: true });
   }
   if (b.action === "end") {
+    const { data: live } = await svc.from("transport_live").select("trip").eq("route_id", route.id).maybeSingle();
     await svc.from("transport_live").update({ ended_at: new Date().toISOString() }).eq("route_id", route.id).eq("tenant_id", tid);
-    return NextResponse.json({ ok: true });
+    // Before the attendant leaves the bus: anyone who got on and was never seen getting off.
+    const [{ data: riders }, { data: events }] = await Promise.all([
+      svc.from("transport_assignments").select("student_id,direction,students(first_name,last_name,other_names)").eq("tenant_id", tid).eq("route_id", route.id),
+      svc.from("transport_events").select("student_id,kind,at").eq("tenant_id", tid).eq("route_id", route.id).gte("at", startOfTodayIso(ctx.tenant.timezone))
+    ]);
+    const check = tripCheck((riders ?? []).map((r: any) => ({ student_id: r.student_id, name: studentName(r.students), direction: r.direction })), events ?? [], (live?.trip ?? "afternoon") as "morning" | "afternoon");
+    if (check.still_on_bus.length) {
+      const { data: users } = await svc.from("users").select("id,role,extra_roles").eq("tenant_id", tid).eq("active", true);
+      const to = (users ?? []).filter((u: any) => ["transport_officer", "principal"].some(r => u.role === r || (u.extra_roles ?? []).includes(r))).map((u: any) => u.id).filter((id: string) => id !== ctx.userId);
+      await tellStaff(svc, tid, to, "bus", `Check the bus: ${route.name}`, `The ${live?.trip ?? ""} trip ended with children not scanned off: ${check.still_on_bus.join(", ")}. Check the bus now.`, `${appUrl(req)}/school/transport`, route.id);
+    }
+    return NextResponse.json({ ok: true, ...check });
   }
 
   const { data: live } = await svc.from("transport_live").select("trip,started_at,ended_at,updated_at,notified_stops").eq("route_id", route.id).maybeSingle();

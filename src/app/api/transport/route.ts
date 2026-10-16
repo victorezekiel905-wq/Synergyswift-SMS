@@ -7,6 +7,7 @@ import { notifyGuardians } from "@/lib/notify";
 import { busEvent } from "@/lib/messaging/notices";
 import { formatInZone } from "@/lib/messaging/outbox";
 import { startOfTodayIso, studentName } from "@/lib/school";
+import { syncTransportFee } from "@/lib/boarding-server";
 
 /** Routes with riders; ?route_id= adds today's boarding log and who is on the bus now. */
 export async function GET(req: NextRequest) {
@@ -87,9 +88,16 @@ export async function POST(req: NextRequest) {
     const { data: route } = await sb.from("transport_routes").select("capacity,transport_assignments(count)").eq("tenant_id", tid).eq("id", b.route_id).maybeSingle();
     const used = route?.transport_assignments?.[0]?.count ?? 0;
     if (route?.capacity && used + b.student_ids.length > route.capacity) return jsonError(`this bus seats ${route.capacity}; ${used} already assigned`);
+    const { data: before } = await sb.from("transport_assignments").select("student_id,route_id").eq("tenant_id", tid).in("student_id", b.student_ids);
     const { error } = await sb.from("transport_assignments").upsert(b.student_ids.map(s => ({ student_id: s, tenant_id: tid, route_id: b.route_id, stop_name: b.stop_name ?? null, direction: b.direction })), { onConflict: "student_id" });
-    return error ? jsonError(error.message) : NextResponse.json({ ok: true });
+    if (error) return jsonError(error.message);
+    // The route's bus fee follows the child onto their next invoices.
+    await syncTransportFee(createServiceClient(), tid, b.student_ids, b.route_id, new Map((before ?? []).map((a: any) => [a.student_id, a.route_id]))).catch(() => null);
+    return NextResponse.json({ ok: true });
   }
+  const { data: before } = await sb.from("transport_assignments").select("route_id").eq("tenant_id", tid).eq("student_id", b.student_id).maybeSingle();
   const { error } = await sb.from("transport_assignments").delete().eq("tenant_id", tid).eq("student_id", b.student_id);
-  return error ? jsonError(error.message) : NextResponse.json({ ok: true });
+  if (error) return jsonError(error.message);
+  if (before?.route_id) await syncTransportFee(createServiceClient(), tid, [b.student_id], null, new Map([[b.student_id, before.route_id]])).catch(() => null);
+  return NextResponse.json({ ok: true });
 }
