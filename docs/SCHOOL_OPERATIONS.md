@@ -268,6 +268,15 @@ Under **Students → Clubs, competitions & trips**:
 - **Apps and notifications**: anyone can install the app from **Account security** (staff and students) or the parent portal. Under **Choose which messages you get**, each person turns groups off (attendance, results, fees, messages, bus, clubs and library, work) and sets quiet hours. Safety alerts always come at once and cannot be turned off: emergencies, safeguarding, pickup codes, sick bay and trips. The store apps for Android and iPhone are built from this code: see [MOBILE_APPS.md](MOBILE_APPS.md).
 - **Heads and the bursary**: **School overview** opens with the key numbers. Under **Targets & settings**, set targets (for example attendance 95%, fees collected 90%, at most 5 incidents a week); each figure then shows green, amber or red. The every-minute job keeps each school's figures once a day after 4pm local time, and the trend lines build up from then.
 
+### Insights and government returns (phase 13)
+
+Under **Students → Insights & returns** (each tab shows only to those allowed):
+
+- **Results**: pick a term and group by class, subject, teacher, year group, boys and girls, or student. It needs results compiled under Results & report cards. Click a student's name to see every subject across every term. Teachers see their own classes and subjects.
+- **Value added** (heads, principals and QA): needs results for two terms in a row. Read it as a prompt for conversation: "above" or "below" appears only when the evidence is clear.
+- **Fees** (bursary and heads) and **Admissions** (admissions staff and heads): the year month by month, collection by class, sources and conversion.
+- **Government returns** (admins): fill in the school details once (school code, state, LGA…). Each year choose **Work out the census**, then check the figures and correct any with a note. Download the spreadsheet and enter or upload it on the ministry's form. When it has gone, **Mark as submitted** with their reference. Staff counts depend on staff qualifications and sex being recorded under HR; repeaters come from "repeated" movements on student records.
+
 ### Payroll (phase 10)
 
 - **Tax & pension** (payroll staff): the starting rates follow the Nigeria Tax Act 2025 (PAYE bands from 0% on the first ₦800,000 a year to 25% above ₦50m; pension, NHF and NHIS deducted first; rent relief of 20% of rent up to ₦500,000) and the Pension Reform Act (8% staff, 10% school on basic + housing + transport), plus NSITF 1%. **Check every rate with your tax adviser before the first run**; they are all editable, including the bands, and a flat percentage per person is still available.

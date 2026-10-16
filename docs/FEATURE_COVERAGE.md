@@ -244,9 +244,20 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Mobile apps (iOS/Android) with push notifications | ✅ two routes. (1) The installable app (PWA), with an **Install** button or the iPhone steps, and push on Android, desktop and iPhone (iOS 16.4+). (2) Store apps through a Capacitor wrapper: `capacitor.config.json`, a start-up and offline page, a bridge that registers the phone with Firebase and opens the right page when a notification is tapped, and Firebase Cloud Messaging sending (Android, and iPhone through APNs). Every message that goes to web push also reaches the store apps. Signing out removes the device. Each person turns off groups of messages (never safety alerts) and sets quiet hours; app, WhatsApp and SMS messages wait until morning, email does not. Building, signing and submitting the store apps is a manual step (Android Studio, Xcode, store accounts): see `MOBILE_APPS.md` 🔑 |
 | PWA support and offline caching | ✅ installable with home-screen shortcuts (My children, My teaching day, Register, My school), fast start from cached build files; the student, teacher and parent portals (and a parent's private link) open offline with the last copy saved on the device and a note saying when it was saved; offline register and offline lesson content as before. Saved copies belong to the signed-in person and are removed on sign-out or when someone else signs in |
 
-## 21–23
+## 21. Analytics and reporting (phase 13a, 13b)
 
-Sections 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
+| Feature | Status |
+|---|---|
+| Academic performance dashboards by student, class, subject, teacher and cohort | ✅ **Insights & returns → Results**: for any term, results grouped by class, subject, teacher, year group, boys and girls, or student. Each group shows average, median, spread, pass rate and grade spread, with a subject-by-class grid (subject-by-student within a class). Click a student for every subject across every term. Teachers see the classes and subjects they teach and their form class; leaders see the whole school |
+| Early-warning system for at-risk students, combining attendance, grades and behaviour | ✅ (earlier phases) **Early warning**: a risk score from attendance, results and the change since last term, failing subjects, behaviour points and missing homework, with reasons and intervention plans |
+| Teacher effectiveness and value-added analysis | ✅ **Value added** (leaders only): each student's score against what students with the same score last term got in the same subject across the school (one line per subject, so hard subjects do not count against their teachers), averaged by teacher or class with a 95% range; groups are marked above or below only when the range is clear of zero and there are at least 10 scores |
+| Financial and admissions dashboards | ✅ **Fees**: billed and collected by month for a year, how families paid, collection by class this term (worst first), alongside the ledger reports and debtors. **Admissions**: applications and enrolments by month, by source with conversion, where applications stand, most-requested classes, alongside the admissions pipeline. Key numbers with trends are on the school overview (12a) |
+| Custom report builder and scheduled report emails | 🟡 phase 13b |
+| Government/statutory returns (e.g. state ministry census data) | ✅ **Government returns**: the school's census details (school/EMIS code, state, LGA, ownership, type, location…); the annual school census worked out from records (enrolment by class and sex, ages, new entrants, repeaters, special needs, teaching and non-teaching staff by sex, teachers by highest qualification, TRCN registration, classrooms, pupil–teacher and pupil–classroom ratios); figures checked and corrected with a note, downloaded as a spreadsheet for the ministry's form or portal, then marked submitted with the ministry's reference. Once submitted it cannot be changed or deleted. Direct upload to a state portal is not built (each state differs) |
+
+## 22–23
+
+Sections 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
 
 ## Database updates to run
 
@@ -280,3 +291,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101004700_cocurricular.sql` | 11e |
 | `20260101004800_portals.sql` | 12a |
 | `20260101004900_apps.sql` | 12b |
+| `20260101005000_insights.sql` | 13a |
