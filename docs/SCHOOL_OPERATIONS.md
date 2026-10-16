@@ -278,6 +278,15 @@ Under **Students → Insights & returns** (each tab shows only to those allowed)
 - **Report builder** (`/school/reports`, under Students): choose a dataset, the term, dates or class, then columns, filters, grouping and totals, and **Run**. Save it to use again, tick **Share** for colleagues, or choose **Email it** every day, week or month. Recipients must be staff of the school. If the author leaves, the report stops sending and shows why.
 - **Government returns** (admins): fill in the school details once (school code, state, LGA…). Each year choose **Work out the census**, then check the figures and correct any with a note. Download the spreadsheet and enter or upload it on the ministry's form. When it has gone, **Mark as submitted** with their reference. Staff counts depend on staff qualifications and sex being recorded under HR; repeaters come from "repeated" movements on student records.
 
+### Integrations and the school website (phase 13)
+
+Under **Administration → Integrations & website**:
+
+- **School website** (admins and admissions staff): write news and press **Publish**, and tick the upcoming events to show. Copy a snippet (news, events, admissions form, enquiry form) into your website. It needs the school's web address (public slug) set under Admissions.
+- **API keys** (admins): make one key per system, with only the scopes it needs. Copy it when shown; it is not shown again. Revoke a key the moment a system stops being used or a key may have leaked.
+- **Webhooks** (admins): add the https address of the system to notify and choose the events. Use **Send a test**, then check deliveries in the log. Give the receiver the secret so it can check the X-Webhook-Signature header.
+- **Connected services** shows which payment, messaging and lesson services are set up.
+
 ### Payroll (phase 10)
 
 - **Tax & pension** (payroll staff): the starting rates follow the Nigeria Tax Act 2025 (PAYE bands from 0% on the first ₦800,000 a year to 25% above ₦50m; pension, NHF and NHIS deducted first; rent relief of 20% of rent up to ₦500,000) and the Pension Reform Act (8% staff, 10% school on basic + housing + transport), plus NSITF 1%. **Check every rate with your tax adviser before the first run**; they are all editable, including the bands, and a flat percentage per person is still available.

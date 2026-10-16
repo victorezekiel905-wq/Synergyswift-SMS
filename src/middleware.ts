@@ -25,10 +25,13 @@ export async function middleware(request: NextRequest) {
     const id = Array.from(crypto.getRandomValues(new Uint8Array(20)), b => b.toString(16).padStart(2, "0")).join("");
     response.cookies.set("ecf_dev", id, { httpOnly: true, secure: request.nextUrl.protocol === "https:", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 400 });
   }
+  // Other websites may frame only the public admissions and enquiry forms (school sites embed them); nothing else, against clickjacking.
+  if (!/^\/(apply|enquire)\//.test(request.nextUrl.pathname)) response.headers.set("Content-Security-Policy", "frame-ancestors 'self'");
   return response;
 }
 
-// Content packages (/pkg/…), their record store (/api/xapi/…) and clocking machines (/iclock/…) do not use the session.
+// Content packages (/pkg/…), their record store (/api/xapi/…), clocking machines (/iclock/…), the open API (/api/v1/…)
+// and the public website feeds (/api/public/…) do not use the session.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|pkg/|api/xapi/|iclock/|.*\\.svg$).*)"]
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|pkg/|api/xapi/|api/v1/|api/v1$|api/public/|iclock/|embed\\.js|.*\\.svg$).*)"]
 };

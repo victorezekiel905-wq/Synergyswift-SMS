@@ -255,9 +255,19 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Custom report builder and scheduled report emails | ✅ **Report builder** (`/school/reports`): ten datasets (students, attendance, results by subject, report cards, fee invoices, payments, applications, staff, library loans, behaviour), each limited to the roles that may see it, with teachers' results limited to their classes. Choose the term, dates or class, then the columns, filters (is, contains, more/less than, blank…), grouping with totals (number, total, average, lowest, highest), sort and row limit. Run it, download it as CSV, save it privately or share it with colleagues. Email it daily, weekly or monthly at a chosen hour to staff of the school only (enforced in the database). Each run is as its author. Grouped reports carry their totals in the email; row-by-row reports send the count and a sign-in link. A 'Send now' button and a note when a send fails |
 | Government/statutory returns (e.g. state ministry census data) | ✅ **Government returns**: the school's census details (school/EMIS code, state, LGA, ownership, type, location…); the annual school census worked out from records (enrolment by class and sex, ages, new entrants, repeaters, special needs, teaching and non-teaching staff by sex, teachers by highest qualification, TRCN registration, classrooms, pupil–teacher and pupil–classroom ratios); figures checked and corrected with a note, downloaded as a spreadsheet for the ministry's form or portal, then marked submitted with the ministry's reference. Once submitted it cannot be changed or deleted. Direct upload to a state portal is not built (each state differs) |
 
-## 22–23
+## 22. Integrations and extensibility (phase 13c, 13d)
 
-Sections 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
+| Feature | Status |
+|---|---|
+| Google Classroom, Microsoft Teams/OneNote, Zoom | 🟡 Zoom ✅ (6b: lessons created by the app, per-school or platform account). Google Classroom and Teams/OneNote come in 13d |
+| Payment gateways, SMS gateways (Termii, Twilio), WhatsApp Business API | ✅ (earlier phases) Paystack and Flutterwave with school subaccounts, Remita and Stripe 🔑; SMS through Termii or Twilio with WhatsApp-to-SMS fallback; WhatsApp Business through Meta Cloud API or Twilio with approved templates; email through Resend or SendGrid. **Integrations → Connected services** shows which are set up |
+| LTI 1.3 for third-party learning tools | 🟡 phase 13d |
+| Public REST/GraphQL API and webhooks | ✅ **API keys** made by admins with chosen scopes (eleven, read-only except sending in applications), stored only as a hash, shown once, optional expiry, revocable, last-used shown; 120 requests a minute. **REST** at `/api/v1/<resource>` (students, classes, staff, attendance, results (published only), invoices, payments, applications (read and create), events, news) with paging and filters; the API's own description (OpenAPI 3.1) at `/api/v1`. **GraphQL** at `/api/v1/graphql` over the same resources (fields, aliases, arguments, variables; up to 5 resources per query; queries only). **Webhooks** for student created/updated, application created/status changed, payment received, invoice created, result published, news published: queued by the database itself, signed (HMAC-SHA256 with a timestamp), retried for about a day, turned off after 20 failures in a row, with a delivery log, retry, test and secret rotation; addresses must be public https sites |
+| Website CMS integration so admissions forms and news feed into the school site | ✅ news posts written in the app (draft, publish, unpublish) and events ticked "show on website", served as JSON, RSS and a copy-and-paste widget (`embed.js`) for WordPress, Wix, Squarespace or plain HTML: latest news (click to read), upcoming events, and the admissions and enquiry forms in a frame that sizes itself. Applications can also arrive through the API from a site's own form. Other sites can frame only those two forms (all other pages refuse to be framed) |
+
+## 23
+
+Section 23 (compliance) is partly built today. See `SCHOOL_OPERATIONS.md` and the README. It gets its own table here, with what is missing, when its phase starts.
 
 ## Database updates to run
 
@@ -293,3 +303,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101004900_apps.sql` | 12b |
 | `20260101005000_insights.sql` | 13a |
 | `20260101005100_report_builder.sql` | 13b |
+| `20260101005200_open_api.sql` | 13c |
