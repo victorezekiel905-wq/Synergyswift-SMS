@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Field, Badge, fmtDate, rolesOf, type Me } from "@/components/ui";
+import { Incidents, Detentions } from "@/components/pastoral/Discipline";
 
 type Data = {
   categories: { id: string; name: string; kind: "positive" | "negative"; points: number; notify_parent: boolean }[];
@@ -14,14 +15,17 @@ export default function BehaviourPage() {
   const { data: me } = useApi<Me>("/api/me");
   const admin = ["school_admin", "principal", "platform_admin"].some(r => rolesOf(me).has(r));
   const { data, error, reload } = useApi<Data>("/api/behaviour");
-  const [tab, setTab] = useState<"record" | "actions" | "houses" | "setup">("record");
+  const [tab, setTab] = useState<"record" | "incidents" | "detentions" | "actions" | "houses" | "setup">("record");
+  useEffect(() => { const t = new URLSearchParams(window.location.search).get("tab"); if (t === "detentions" || t === "incidents") setTab(t); }, []);
   return (
     <Page wide>
       <PageHeader eyebrow="Pastoral" title="Behaviour & houses"
         subtitle="Award points and log concerns in two taps. Rules trigger follow-up actions automatically (for example three concerns in two weeks), and parents hear about the things that matter." />
       {error && <Alert>{error}</Alert>}
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "record", label: "Record" }, { id: "actions", label: `Follow-ups${data?.actions.length ? ` (${data.actions.length})` : ""}` }, { id: "houses", label: "Houses" }, ...(admin ? [{ id: "setup" as const, label: "Setup" }] : [])]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "record", label: "Record" }, { id: "incidents", label: "Incidents" }, { id: "detentions", label: "Detentions" }, { id: "actions", label: `Follow-ups${data?.actions.length ? ` (${data.actions.length})` : ""}` }, { id: "houses", label: "Houses" }, ...(admin ? [{ id: "setup" as const, label: "Setup" }] : [])]} />
       {data && tab === "record" && <Record data={data} reload={reload} />}
+      {data && tab === "incidents" && <Incidents categories={data.categories} />}
+      {tab === "detentions" && <Detentions />}
       {data && tab === "actions" && <Actions data={data} reload={reload} />}
       {data && tab === "houses" && <Houses data={data} admin={admin} reload={reload} />}
       {data && tab === "setup" && <Setup data={data} reload={reload} />}

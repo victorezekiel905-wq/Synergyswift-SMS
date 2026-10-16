@@ -180,9 +180,19 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Staff appraisals, lesson observations, CPD tracking | ✅ appraisal cycles with weighted criteria; self-review, the line manager's (or chosen reviewer's) scores, strengths, areas to develop and recommendation, shared only at the discussion stage; goals; acknowledgement with the person's comment; observations and CPD in the cycle shown as evidence. Lesson observations (Quality assurance) acknowledged and answered by the teacher. CPD logged by staff with reflection, verified by HR, group training recorded at once, hours against a yearly target |
 | Staff onboarding and offboarding checklists | ✅ templates (starter ones included) with tasks owned by HR, admin, IT, bursary, the line manager or the person, due dates from the start date, ticked only by the owner, progress and overdue items on the HR overview; recording someone as left ends their contract and can disable their login |
 
-## 14–23
+## 14. Student welfare and pastoral care (phase 11a)
 
-Sections 14 (welfare), 15 (boarding), 16 (transport), 17 (library), 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
+| Feature | Status |
+|---|---|
+| Counselling records, confidential and role-restricted | ✅ referrals from any teacher (who sees only whether it was taken on); cases and session notes readable only by counsellors, or the safeguarding team when the counsellor shares the case; notes fixed after the day they are written; every opening of a case logged; kept out of the change history |
+| Safeguarding / child-protection incident logging and escalation | ✅ any staff member reports a concern (category, urgency, the child's words) and the whole safeguarding team is alerted at once; the report is never rewritten; a chronology that cannot be edited (acknowledged, assigned, notes, calls with parents, meetings, external referrals); concerns not acknowledged in time (1 hour if critical, configurable otherwise) escalate to the principal and admins; closing needs an outcome; earlier concerns for the same child shown; access log |
+| Behaviour management: incidents, detentions, interventions | ✅ points, rules and automatic follow-ups (before); incidents with everyone involved and their role, points for those responsible; detention, isolation and community-service sessions with a supervisor and capacity, parents told the date and time, served or missed; interventions (Early warning) |
+| Health / sick bay: medical records, allergies, clinic visits, medication log, immunisations | ✅ medical profile with allergy severity, EpiPen and emergency care plan; visits with temperature, pulse and blood pressure, follow-up date and who is resting now, parents told; medication plans (times or when needed, parental consent) with today's round and a dose log that cannot be edited; immunisations with next-due dates and a due list |
+| Wellbeing check-ins and mood surveys | ✅ daily student check-in (mood, feelings, a note, "I'd like to talk"), optionally without a name; check-ins that need a person go to the form teacher and counsellors at once; class and school mood with a daily trend and the feelings named most; followed up and recorded. Longer surveys use the survey tool (phase 3) |
+
+## 15–23
+
+Sections 15 (boarding), 16 (transport), 17 (library), 18 (inventory), 19 (co-curricular), 20 (portals and apps), 21 (analytics), 22 (integrations) and 23 (compliance) are partly built today. See `SCHOOL_OPERATIONS.md` and the README. Each one gets its own table here, with what is missing, when its phase starts.
 
 ## Database updates to run
 
@@ -209,3 +219,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101004000_accounts.sql` | 9b |
 | `20260101004100_hr_people.sql` | 10a |
 | `20260101004200_payroll_appraisals.sql` | 10b |
+| `20260101004300_welfare.sql` | 11a |
