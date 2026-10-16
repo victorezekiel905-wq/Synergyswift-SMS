@@ -189,6 +189,7 @@ function Contracts({ list, docs, staffId, hr, isSelf, onChange }: { list: Contra
             {c.accepted_at ? <span className="text-xs text-emerald-700">accepted {fmtDate(c.accepted_at)}</span> : c.status === "active" && <span className="text-xs text-amber-700">not yet accepted</span>}
             <span className="ml-auto flex gap-1">
               {isSelf && c.status === "active" && !c.accepted_at && <button className="btn btn-primary px-2 py-1 text-xs" onClick={async () => { if (confirm("I have read this contract and accept it.")) { await send("/api/hr/people", { action: "accept_contract", id: c.id }); onChange(); } }}>Accept</button>}
+              {hr && c.status === "active" && !c.accepted_at && <button className="btn btn-outline px-2 py-1 text-xs" onClick={async () => { const r = await send("/api/esign", { action: "from_contract", contract_id: c.id }); alert(r.ok ? "Sent for e-signature. It is marked accepted once signed." : r.error); }}>Send for e-signature</button>}
               {hr && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setEdit(c)}>Edit</button>}
             </span>
           </li>))}</ul>

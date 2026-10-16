@@ -107,6 +107,7 @@ const GROUPS: NavGroup[] = [
     { href: "/school/integrations", label: "Integrations & website", roles: [...ADMIN, "admissions_officer"] },
     { href: "/school/audit", label: "Change history", roles: ADMIN },
     { href: "/school/compliance", label: "Policies & compliance", roles: STAFF },
+    { href: "/school/signatures", label: "E-signatures", roles: STAFF },
     { href: "/account/security", label: "Account security", roles: [...STAFF, "parent", "student"] },
     { href: "/school/rollover", label: "Promote students", roles: ADMIN, module: "sims" },
     { href: "/teacher/admin", label: "Policies & audit", roles: [...ADMIN, "it_admin"] },
@@ -115,7 +116,7 @@ const GROUPS: NavGroup[] = [
 ];
 
 // Pages that render without the app chrome (public links, kiosk, exam lockdown).
-const BARE = [/^\/login$/, /^\/signup$/, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/pay\//, /^\/apply\//, /^\/careers\//, /^\/enquire\//, /^\/visit\//, /^\/entrance\//, /^\/t\//, /^\/s\//, /^\/unsubscribe\//, /^\/alumni\//, /^\/v\//, /^\/n\//, /\/print$/, /\/transcript$/];
+const BARE = [/^\/sign\//, /^\/login$/, /^\/signup$/, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/pay\//, /^\/apply\//, /^\/careers\//, /^\/enquire\//, /^\/visit\//, /^\/entrance\//, /^\/t\//, /^\/s\//, /^\/unsubscribe\//, /^\/alumni\//, /^\/v\//, /^\/n\//, /\/print$/, /\/transcript$/];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
