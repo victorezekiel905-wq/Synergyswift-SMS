@@ -70,6 +70,13 @@ services:
         sync: false
       - key: VAPID_SUBJECT            # e.g. mailto:ops@yourdomain.com
         sync: false
+      # ---- Native app notifications (Firebase service account; docs/MOBILE_APPS.md) ----
+      - key: FCM_PROJECT_ID
+        sync: false
+      - key: FCM_CLIENT_EMAIL
+        sync: false
+      - key: FCM_PRIVATE_KEY
+        sync: false
       # ---- Drafting and translation ----
       - key: ANTHROPIC_API_KEY
         sync: false

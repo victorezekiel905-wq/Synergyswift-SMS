@@ -1,5 +1,6 @@
 "use client";
-import { useApi, Badge, fmtDate, fmtTime, money } from "@/components/ui";
+import { Badge, fmtDate, fmtTime, money } from "@/components/ui";
+import { useOfflineApi, OfflineNote } from "@/components/offline";
 import DayPlan from "@/components/portal/DayPlan";
 import type { Slot, HomeworkItem, FeeSummary } from "@/lib/portal";
 
@@ -15,10 +16,12 @@ const HW_LABEL = { overdue: "overdue", due_today: "due today", due: "due", submi
 
 /** The top of the student portal: today's lessons, homework, books, fees and attendance in one place. */
 export default function MyDay() {
-  const { data } = useApi<Today>("/api/student/today");
+  const { data, offlineAt, reload } = useOfflineApi<Today>("/api/student/today");
   if (!data?.linked) return null;
   const a = data.attendance;
   return (
+    <>
+    <OfflineNote at={offlineAt} onRetry={reload} />
     <section className="mb-8 grid gap-4 lg:grid-cols-5">
       <div className="card p-4 lg:col-span-3">
         <div className="mb-2 flex items-baseline justify-between">
@@ -65,5 +68,6 @@ export default function MyDay() {
         )}
       </div>
     </section>
+    </>
   );
 }

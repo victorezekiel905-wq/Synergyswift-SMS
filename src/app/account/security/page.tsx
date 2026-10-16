@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Page, PageHeader, Alert, Field, Badge, fmtDate } from "@/components/ui";
 import { NotificationsToggle } from "@/components/parent/FamilyConnect";
+import NotificationChoices from "@/components/NotificationChoices";
+import InstallApp from "@/components/InstallApp";
 import { PasswordCard, SessionsCard } from "@/components/auth/AccountPassword";
 
 type Factor = { id: string; friendly_name?: string; factor_type: string; status: string; created_at: string };
@@ -151,7 +153,9 @@ export default function AccountSecurityPage() {
       <section className="card mt-4 space-y-2 p-5">
         <h2 className="font-semibold">Notifications</h2>
         <p className="text-sm text-slate-600">Get parent messages and cover duties on this phone or computer. Without it, they come by email.</p>
+        <InstallApp />
         <NotificationsToggle />
+        <div className="border-t border-slate-100 pt-3"><NotificationChoices /></div>
       </section>
 
       {sessionVerified && required && required !== "password" && (

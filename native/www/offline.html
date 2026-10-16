@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Offline</title>
+  <style>body{font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#f8fafc;color:#0f172a;text-align:center;padding:24px}button{padding:10px 18px;border-radius:8px;border:0;background:#1d5ddb;color:#fff;font-weight:600}</style>
+</head>
+<body>
+  <div>
+    <h1>No connection</h1>
+    <p>The school app needs the internet the first time it opens. Pages you have opened before work offline.</p>
+    <button onclick="history.length > 1 ? history.back() : location.reload()">Try again</button>
+  </div>
+</body>
+</html>

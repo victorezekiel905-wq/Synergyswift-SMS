@@ -265,6 +265,7 @@ Under **Students → Clubs, competitions & trips**:
 - **Students** open `/student` on **Today**: lessons (now and next), homework by urgency, attendance this term, library books and their fees. To hide fees from students, open **School overview → Targets & settings** and untick "Students can see their own fees". Parents always see fees.
 - **Parents** see every child on one page. With two or more children, a table at the top shows who is in school, attendance, homework and fees owed, with the family total. Each child's card shows attendance this term, homework due or overdue and fees.
 - **Teachers** open **Teaching → My teaching day** (`/teacher`; the same panel is on the dashboard). It shows today's lessons, cover included, with a button on each lesson whose register is not taken yet. The to-do list covers score sheets sent back or unfinished, homework to mark, lesson notes sent back and unread parent messages.
+- **Apps and notifications**: anyone can install the app from **Account security** (staff and students) or the parent portal. Under **Choose which messages you get**, each person turns groups off (attendance, results, fees, messages, bus, clubs and library, work) and sets quiet hours. Safety alerts always come at once and cannot be turned off: emergencies, safeguarding, pickup codes, sick bay and trips. The store apps for Android and iPhone are built from this code: see [MOBILE_APPS.md](MOBILE_APPS.md).
 - **Heads and the bursary**: **School overview** opens with the key numbers. Under **Targets & settings**, set targets (for example attendance 95%, fees collected 90%, at most 5 incidents a week); each figure then shows green, amber or red. The every-minute job keeps each school's figures once a day after 4pm local time, and the trend lines build up from then.
 
 ### Payroll (phase 10)
@@ -325,6 +326,7 @@ v47 adds what the market leaders sell as separate products (ParentSquare, Parent
    - For drafted lesson notes, report comments and notices, for translation, for homework feedback and quiz drafts, and for the students' study helper, set the service key `ANTHROPIC_API_KEY`. Everything else works without it, and the drafting buttons stay hidden.
    - For Zoom lessons created by the app, set `ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID` and `ZOOM_CLIENT_SECRET` (a Server-to-Server OAuth app), or let each school connect its own Zoom app. Without Zoom, teachers paste Meet, Teams or Zoom links.
    - For app notifications, run `npx web-push generate-vapid-keys` and set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT`.
+   - For the Android and iPhone store apps, set `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL` and `FCM_PRIVATE_KEY` from a Firebase service account, then build the apps as in [MOBILE_APPS.md](MOBILE_APPS.md).
    - Point an uptime monitor at `/api/status`.
    - For Google Workspace or Microsoft 365 sign-in, enable the Google and/or Azure providers in Supabase Auth (redirect URL `<app>/auth/callback`) and set `NEXT_PUBLIC_SSO_PROVIDERS=google,azure`.
    - Phone sign-in turns on by itself once an SMS provider is set.

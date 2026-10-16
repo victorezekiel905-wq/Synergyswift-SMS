@@ -1,13 +1,22 @@
 {
+  "id": "/dashboard",
   "name": "EduClass Fusion",
   "short_name": "EduClass",
   "description": "School management, results, fees, attendance and parent updates in one app.",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#f8fafc",
   "theme_color": "#1d5ddb",
+  "categories": ["education", "productivity"],
   "icons": [
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "My children", "short_name": "Children", "url": "/parent", "description": "Your children's day, results, fees and bus" },
+    { "name": "My teaching day", "short_name": "Teaching", "url": "/teacher", "description": "Today's lessons, registers and to-do list" },
+    { "name": "Class register", "short_name": "Register", "url": "/school/attendance", "description": "Take the register, even offline" },
+    { "name": "My school", "short_name": "My day", "url": "/student", "description": "Today's lessons, homework and results" }
   ]
 }

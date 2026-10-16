@@ -1,0 +1,21 @@
+{
+  "appId": "com.educlassfusion.app",
+  "appName": "EduClass Fusion",
+  "webDir": "native/www",
+  "server": {
+    "url": "https://REPLACE-WITH-YOUR-APP-URL",
+    "cleartext": false,
+    "errorPath": "offline.html"
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "automatic"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}

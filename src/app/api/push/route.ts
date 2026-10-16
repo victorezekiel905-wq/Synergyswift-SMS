@@ -4,12 +4,13 @@ import { readJson, jsonError, getCtx, sessionIdentity } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { identifyGuardian } from "@/lib/guardian";
 import { pushConfigured } from "@/lib/messaging/push";
+import { fcmConfigured } from "@/lib/messaging/fcm";
 
 export const dynamic = "force-dynamic";
 
 /** The public key the browser needs to subscribe. */
 export async function GET() {
-  return NextResponse.json({ configured: pushConfigured(), public_key: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null });
+  return NextResponse.json({ configured: pushConfigured(), public_key: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null, native_configured: fcmConfigured() });
 }
 
 const Subscription = z.object({
@@ -18,7 +19,9 @@ const Subscription = z.object({
 });
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("subscribe"), token: z.string().optional(), subscription: Subscription }),
-  z.object({ action: z.literal("unsubscribe"), endpoint: z.string().url().max(1000) })
+  // The Android or iPhone app, with its Firebase registration token.
+  z.object({ action: z.literal("subscribe_native"), token: z.string().optional(), device_token: z.string().min(20).max(4096).regex(/^[\w:.-]+$/), platform: z.enum(["android", "ios"]) }),
+  z.object({ action: z.literal("unsubscribe"), endpoint: z.string().min(20).max(4096) })
 ]);
 
 const MAX_DEVICES = 10;
@@ -50,9 +53,11 @@ export async function POST(req: NextRequest) {
     if (!("error" in who)) guardianId = who.guardianId;
   }
 
+  const device = b.action === "subscribe"
+    ? { endpoint: b.subscription.endpoint, p256dh: b.subscription.keys.p256dh, auth: b.subscription.keys.auth, kind: "web", platform: "web" }
+    : { endpoint: b.device_token, p256dh: null, auth: null, kind: "fcm", platform: b.platform };
   const { error } = await svc.from("push_subscriptions").upsert({
-    tenant_id: tenantId, user_id: userId, guardian_id: guardianId, endpoint: b.subscription.endpoint,
-    p256dh: b.subscription.keys.p256dh, auth: b.subscription.keys.auth, user_agent: req.headers.get("user-agent")?.slice(0, 200) ?? null
+    tenant_id: tenantId, user_id: userId, guardian_id: guardianId, ...device, user_agent: req.headers.get("user-agent")?.slice(0, 200) ?? null
   }, { onConflict: "endpoint" });
   if (error) return jsonError(error.message);
 

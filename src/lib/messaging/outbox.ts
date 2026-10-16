@@ -7,7 +7,9 @@
  * failed with a retryable error) is picked up by /api/cron/dispatch.
  */
 import { sendEmail, sendWhatsApp, sendSms, smsText, normalizePhone } from "./providers";
-import { sendPush, pushPayload } from "./push";
+import { sendPush, pushPayload, sitePath } from "./push";
+import { sendFcm } from "./fcm";
+import { isMuted, quietUntil, type Prefs } from "../notify-prefs";
 import type { Brand, Rendered } from "./templates";
 
 export type Guardian = {
@@ -20,6 +22,8 @@ export type OutboxRow = {
   tenant_id: string; channel: "email" | "whatsapp" | "sms" | "push"; to_address: string; to_name?: string | null;
   kind: string; subject?: string | null; body_text: string; body_html?: string | null;
   template_name?: string | null; template_params?: string[]; ref_id?: string | null; created_by?: string | null;
+  /** Who the message is for, so their notification choices apply when it is sent. */
+  recipient_user_id?: string | null; recipient_guardian_id?: string | null;
 };
 
 const MAX_ATTEMPTS = 5;
@@ -69,7 +73,7 @@ export function rowsForGuardian(tenantId: string, g: Guardian, kind: string, r: 
     rows.push({ tenant_id: tenantId, channel: "push", to_address: sub.id, to_name: g.full_name, kind,
       subject: r.subject, body_text: smsText(r.wa.text).slice(0, 240), template_params: [url], ref_id: refId, created_by: createdBy });
   }
-  return rows;
+  return rows.map(x => ({ ...x, recipient_guardian_id: g.id }));
 }
 
 /** Guardians of a set of students, keyed by student id. */
@@ -105,7 +109,12 @@ export async function enqueue(svc: any, input: OutboxRow[]): Promise<string[]> {
     }
   }
   for (let i = 0; i < rows.length; i += 500) {
-    const { data, error } = await svc.from("message_outbox").insert(rows.slice(i, i + 500)).select("id");
+    let { data, error } = await svc.from("message_outbox").insert(rows.slice(i, i + 500)).select("id");
+    // A database not yet updated for notification choices: send without the recipient reference rather than not at all.
+    if (error && /recipient_(user|guardian)_id/.test(error.message)) {
+      ({ data, error } = await svc.from("message_outbox")
+        .insert(rows.slice(i, i + 500).map(({ recipient_user_id: _u, recipient_guardian_id: _g, ...r }) => r)).select("id"));
+    }
     if (error) throw new Error(`outbox insert failed: ${error.message}`);
     ids.push(...(data ?? []).map((r: { id: string }) => r.id));
   }
@@ -146,12 +155,16 @@ async function deliver(svc: any, m: Claimed, brandCache: Map<string, Awaited<Ret
 }
 
 async function deliverPush(svc: any, m: Claimed) {
-  const { data: sub } = await svc.from("push_subscriptions").select("id,endpoint,p256dh,auth").eq("id", m.to_address).maybeSingle();
+  let { data: sub, error: subErr } = await svc.from("push_subscriptions").select("id,endpoint,p256dh,auth,kind").eq("id", m.to_address).maybeSingle();
+  // Before the database update that adds app devices, every device is a web one.
+  if (subErr) ({ data: sub } = await svc.from("push_subscriptions").select("id,endpoint,p256dh,auth").eq("id", m.to_address).maybeSingle());
   if (!sub) {
     await svc.from("message_outbox").update({ status: "skipped", last_error: "device unsubscribed" }).eq("id", m.id);
     return "skipped" as const;
   }
-  const res = await sendPush(sub, pushPayload({ title: m.subject ?? "School update", body: m.body_text, url: m.template_params?.[0], tag: m.kind }));
+  const res = sub.kind === "fcm"
+    ? await sendFcm(sub.endpoint, { title: m.subject ?? "School update", body: m.body_text, url: sitePath(m.template_params?.[0]), tag: m.kind })
+    : await sendPush(sub, pushPayload({ title: m.subject ?? "School update", body: m.body_text, url: m.template_params?.[0], tag: m.kind }));
   if (res.ok) {
     await svc.from("message_outbox").update({ status: "sent", sent_at: new Date().toISOString(), last_error: null }).eq("id", m.id);
     return "sent" as const;
@@ -186,11 +199,11 @@ export async function staffRows(svc: any, p: { tenantId: string; userIds: string
     const mine = (subs ?? []).filter((x: { user_id: string }) => x.user_id === u.id);
     for (const sub of mine) {
       rows.push({ tenant_id: p.tenantId, channel: "push", to_address: sub.id, to_name: u.full_name, kind: p.kind,
-        subject: p.subject, body_text: p.text.slice(0, 240), template_params: [p.url], ref_id: p.refId ?? null });
+        subject: p.subject, body_text: p.text.slice(0, 240), template_params: [p.url], ref_id: p.refId ?? null, recipient_user_id: u.id });
     }
     if (!mine.length && u.email) {
       rows.push({ tenant_id: p.tenantId, channel: "email", to_address: u.email, to_name: u.full_name, kind: p.kind,
-        subject: p.subject, body_text: `${p.text}\n\nOpen: ${p.url}`, ref_id: p.refId ?? null });
+        subject: p.subject, body_text: `${p.text}\n\nOpen: ${p.url}`, ref_id: p.refId ?? null, recipient_user_id: u.id });
     }
   }
   return rows;
@@ -220,13 +233,16 @@ async function smsFallback(svc: any, m: Claimed) {
 export async function dispatchDue(svc: any, opts: { limit?: number; budgetMs?: number; concurrency?: number } = {}) {
   const started = Date.now();
   const budget = opts.budgetMs ?? 20_000;
-  const stats = { sent: 0, failed: 0, retry: 0, skipped: 0 };
+  const stats = { sent: 0, failed: 0, retry: 0, skipped: 0, held: 0 };
   const brandCache = new Map<string, Awaited<ReturnType<typeof loadBrand>>>();
   while (Date.now() - started < budget) {
     const { data: batch, error } = await svc.rpc("claim_outbox", { p_limit: opts.limit ?? 50 });
     if (error) throw new Error(`claim_outbox failed: ${error.message}`);
-    const rows = (batch ?? []) as Claimed[];
-    if (!rows.length) break;
+    const claimed = (batch ?? []) as Claimed[];
+    if (!claimed.length) break;
+    const screened = await screenByPrefs(svc, claimed).catch(() => ({ send: claimed, held: 0, muted: 0 }));
+    stats.held += screened.held; stats.skipped += screened.muted;
+    const rows = screened.send;
     const conc = opts.concurrency ?? 8;
     for (let i = 0; i < rows.length; i += conc) {
       const results = await Promise.all(rows.slice(i, i + conc).map(m => deliver(svc, m, brandCache).catch(async (e) => {
@@ -235,9 +251,49 @@ export async function dispatchDue(svc: any, opts: { limit?: number; budgetMs?: n
       })));
       for (const r of results) stats[r]++;
     }
-    if (rows.length < (opts.limit ?? 50)) break;
+    if (claimed.length < (opts.limit ?? 50)) break;
   }
   return stats;
+}
+
+/**
+ * Applies each recipient's notification choices to a claimed batch: groups
+ * they turned off are skipped, and app, WhatsApp and SMS messages arriving in
+ * their quiet hours go back in the queue until the quiet hours end.
+ */
+async function screenByPrefs(svc: any, rows: Claimed[]): Promise<{ send: Claimed[]; held: number; muted: number }> {
+  const users = [...new Set(rows.map(r => r.recipient_user_id).filter(Boolean))] as string[];
+  const guardians = [...new Set(rows.map(r => r.recipient_guardian_id).filter(Boolean))] as string[];
+  if (!users.length && !guardians.length) return { send: rows, held: 0, muted: 0 };
+  const sel = "user_id,guardian_id,muted,quiet_from,quiet_to";
+  const [{ data: up }, { data: gp }] = await Promise.all([
+    users.length ? svc.from("notification_prefs").select(sel).in("user_id", users) : { data: [] },
+    guardians.length ? svc.from("notification_prefs").select(sel).in("guardian_id", guardians) : { data: [] }
+  ]);
+  const byUser = new Map<string, Prefs>((up ?? []).map((p: any) => [p.user_id, p]));
+  const byGuardian = new Map<string, Prefs>((gp ?? []).map((p: any) => [p.guardian_id, p]));
+  if (!byUser.size && !byGuardian.size) return { send: rows, held: 0, muted: 0 };
+  const tenantIds = [...new Set(rows.map(r => r.tenant_id))];
+  const { data: tz } = await svc.from("tenants").select("id,timezone").in("id", tenantIds);
+  const zone = new Map<string, string>((tz ?? []).map((t: any) => [t.id, t.timezone ?? "Africa/Lagos"]));
+  const send: Claimed[] = [];
+  let held = 0, muted = 0;
+  const now = new Date();
+  for (const r of rows) {
+    const prefs = (r.recipient_guardian_id && byGuardian.get(r.recipient_guardian_id)) || (r.recipient_user_id && byUser.get(r.recipient_user_id)) || null;
+    if (!prefs) { send.push(r); continue; }
+    if (isMuted(prefs, r.kind)) {
+      await svc.from("message_outbox").update({ status: "skipped", last_error: "turned off by the recipient" }).eq("id", r.id);
+      muted++; continue;
+    }
+    const until = quietUntil(prefs, r.kind, r.channel, now, zone.get(r.tenant_id) ?? "Africa/Lagos");
+    if (until) {
+      await svc.from("message_outbox").update({ status: "queued", attempts: Math.max(0, r.attempts - 1), next_attempt_at: until.toISOString(), last_error: "held for quiet hours" }).eq("id", r.id);
+      held++; continue;
+    }
+    send.push(r);
+  }
+  return { send, held, muted };
 }
 
 /** Messages stuck in "sending" (process crashed mid-send) go back to the queue. */

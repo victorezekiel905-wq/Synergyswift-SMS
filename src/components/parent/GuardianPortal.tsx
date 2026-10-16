@@ -1,9 +1,13 @@
 "use client";
 import { useState } from "react";
-import { useApi, send, Alert, Badge, Empty, fmtDate, fmtTime, Loading } from "@/components/ui";
+import { send, Alert, Badge, Empty, fmtDate, fmtTime, Loading } from "@/components/ui";
 import FamilyTabs, { type Extras } from "./FamilyTabs";
 import { NotificationsToggle, LanguagePicker } from "./FamilyConnect";
 import { GlanceStrip, FamilySummary, type GlanceData } from "./ChildGlance";
+import { useOfflineApi, OfflineNote } from "@/components/offline";
+import NativeBridge from "@/components/NativeBridge";
+import NotificationChoices from "@/components/NotificationChoices";
+import InstallApp from "@/components/InstallApp";
 
 type Overview = {
   guardian: { id: string; full_name: string; notify_email: boolean; notify_whatsapp: boolean; email: string | null; phone: string | null; language?: string | null };
@@ -25,7 +29,7 @@ type Overview = {
  * /api/g/<token> (passwordless link); `act` is where actions are POSTed.
  */
 export default function GuardianPortal({ api, act, mode, token }: { api: string; act: (body: Record<string, unknown>) => Promise<{ ok: boolean; data: any; error: string | null }>; mode: "token" | "session"; token?: string }) {
-  const { data, error, reload } = useApi<Overview>(api);
+  const { data, error, reload, offlineAt } = useOfflineApi<Overview>(api);
   const [code, setCode] = useState<{ student: string; code: string; expires: string; collector: string } | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [delegate, setDelegate] = useState<Record<string, { name: string; phone: string }>>({});
@@ -60,6 +64,8 @@ export default function GuardianPortal({ api, act, mode, token }: { api: string;
           <p className="text-sm opacity-90">Welcome, {data.guardian.full_name}</p>
         </div>
       </header>
+      <OfflineNote at={offlineAt} onRetry={reload} />
+      {mode === "token" && <NativeBridge enabled token={token} />}
       {msg && <div className="mb-4"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
       {code && (
         <div className="mb-5 rounded-xl border-2 border-emerald-500 bg-emerald-50 p-5 text-center" role="status">
@@ -140,7 +146,12 @@ export default function GuardianPortal({ api, act, mode, token }: { api: string;
       {data.extras && data.children.length > 0 && <FamilyTabs extras={data.extras} kids={data.children} token={token} onChange={reload} />}
       <section className="card mt-5 space-y-3 p-4 text-sm">
         <h3 className="font-semibold">Notifications and language</h3>
+        <InstallApp />
         <NotificationsToggle token={token} />
+        <details className="rounded-lg border border-slate-200 p-3">
+          <summary className="cursor-pointer font-medium">Choose which messages you get, and quiet hours</summary>
+          <div className="mt-3"><NotificationChoices token={token} /></div>
+        </details>
         <LanguagePicker token={token} value={data.guardian.language ?? null} />
       </section>
       {mode === "token" && (

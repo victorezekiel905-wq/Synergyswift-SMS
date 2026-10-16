@@ -10,9 +10,11 @@
  */
 const CACHE = "educlass-static-v3";
 // App pages that must open without a connection. They hold no school data:
-// the data is fetched by the page, and the register keeps its own offline copy.
+// the data is fetched by the page, and the register and the portals' "today"
+// views keep their own copy on the device (removed on sign-out).
 const PAGES = "educlass-pages-v1";
-const OFFLINE_PAGES = ["/school/attendance"];
+const OFFLINE_PAGES = ["/school/attendance", "/student", "/teacher", "/parent"];
+const offlinePage = (path) => OFFLINE_PAGES.includes(path) || /^\/g\/[^/]+$/.test(path);
 const OFFLINE_HTML = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title>
 <style>body{font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#f8fafc;color:#0f172a;text-align:center;padding:24px}</style></head>
 <body><div><h1>You are offline</h1><p>Check your connection and try again. Exam answers you typed are kept on this device and will be sent when you reconnect.</p>
@@ -50,7 +52,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Offline-capable pages: network first, then the last copy saved on this device.
-  if (req.mode === "navigate" && OFFLINE_PAGES.includes(url.pathname)) {
+  if (req.mode === "navigate" && offlinePage(url.pathname)) {
     event.respondWith(fetch(req).then((res) => {
       if (res.ok) { const copy = res.clone(); caches.open(PAGES).then((c) => c.put(url.pathname, copy)); }
       return res;

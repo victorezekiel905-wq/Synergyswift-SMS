@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Icon, rolesOf, type Me } from "@/components/ui";
 import SearchPalette from "@/components/SearchPalette";
 import { EmergencyBanner } from "@/components/comms/NoticeBoard";
+import NativeBridge, { forgetDevice } from "@/components/NativeBridge";
+import { claimDevice } from "@/components/offline";
 
 type NavLink = { href: string; label: string; roles: string[]; module?: string };
 type NavGroup = { title: string; links: NavLink[] };
@@ -124,6 +126,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (bare) return;
     fetch("/api/me").then(r => r.json()).then(async (j: Me) => {
       setMe(j);
+      if (j.user?.id) claimDevice(j.user.id);
       const state = j.account?.state;
       // A second factor is required before this account can see anything.
       if ((j.platform_mfa || state === "mfa_required") && !pathname.startsWith("/account/security")) {
@@ -183,8 +186,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     let unsent = 0;
     try { unsent = JSON.parse(localStorage.getItem("educlass:register-queue") ?? "[]").length; } catch { /* storage blocked */ }
     if (unsent && !confirm(`${unsent} register${unsent === 1 ? " has" : "s have"} not been sent yet. Signing out deletes ${unsent === 1 ? "it" : "them"} from this device. Sign out anyway?`)) return;
+    // This device stops getting the person's notifications.
+    await forgetDevice();
     await createClient().auth.signOut();
-    // Class lists and unsent registers kept for offline use belong to this user only.
+    // Class lists, unsent registers and saved copies kept for offline use belong to this user only.
     try { Object.keys(localStorage).filter(k => k.startsWith("educlass:")).forEach(k => localStorage.removeItem(k)); } catch { /* storage blocked */ }
     router.push("/login");
     router.refresh();
@@ -260,6 +265,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           )}
           {children}
+          <NativeBridge enabled={Boolean(me?.profile)} />
         </div>
       </div>
     </div>

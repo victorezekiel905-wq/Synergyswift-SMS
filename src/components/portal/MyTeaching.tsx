@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useApi, fmtDate } from "@/components/ui";
+import { fmtDate } from "@/components/ui";
+import { useOfflineApi, OfflineNote } from "@/components/offline";
 import DayPlan from "@/components/portal/DayPlan";
 import type { Slot, TeacherTask } from "@/lib/portal";
 
@@ -23,11 +24,13 @@ const TOOLS = [
 
 /** A teacher's day: what to do next, today's lessons with registers, and their classes. */
 export default function MyTeaching({ compact = false }: { compact?: boolean }) {
-  const { data } = useApi<Today>("/api/teacher/today");
+  const { data, offlineAt, reload } = useOfflineApi<Today>("/api/teacher/today");
   if (!data) return null;
   const hasTeaching = data.plan.some(s => s.lesson) || data.classes.length > 0 || data.form_classes.length > 0;
   if (compact && !hasTeaching && !data.tasks.length) return null;
   return (
+    <>
+    <OfflineNote at={offlineAt} onRetry={reload} />
     <section className="mb-8 grid gap-4 lg:grid-cols-5">
       <div className="card p-4 lg:col-span-3">
         <div className="mb-2 flex items-baseline justify-between">
@@ -70,5 +73,6 @@ export default function MyTeaching({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
     </section>
+    </>
   );
 }
