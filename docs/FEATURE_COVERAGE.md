@@ -373,6 +373,19 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | One-step enrolment | ✅ "Enrol accepted": every accepted child whose acceptance fee is paid becomes a student (admission number, class, guardian, first-term invoice); sign-ins for the child and parent follow automatically |
 | Entrance analytics | ✅ applicants, tested, absent, passed, offered, joined; score spread; feeder schools and sources (average, offered, joined); hardest questions |
 
+## 14f. Elections and voting (phase 14f, done)
+
+| Feature | Status |
+|---|---|
+| Elections | ✅ **Students & welfare → Elections & voting**: prefects, PTA, class reps, house captains, staff or other; voters are students, parents, staff or everyone, for the whole school or chosen classes; voting window; posts with one or more seats; candidates (picked from the school's students, with photo and promises, or any name) |
+| One vote, checked by the database | ✅ votes go only through the database's checks: on the voters' list, voting open, no more choices than seats, real candidates for that post, and one vote per person (or per family for PTA elections) |
+| Secret ballot | ✅ who voted and what was chosen are stored apart with nothing linking them (ballots have no voter and no time), so not even the head can see anyone's vote; ballots and votes can't be read by anyone directly, only counted; each voter gets a receipt code to check their ballot was counted |
+| Voting online | ✅ **Vote** in the student and parent menus: the ballot paper (choose one / up to N, read each candidate's promises, abstain by leaving a post blank), check your choices, cast; parents (and staff) are told by email/WhatsApp when voting opens and when results are out |
+| Teacher-run voting tablet | ✅ a teacher opens the tablet screen for a class they teach: pick the student whose turn it is, the student votes full-screen (no menus), "thank you" and back to the list; the teacher sees who has voted (online or on the tablet), never how |
+| Live turnout | ✅ can vote, voted (%), online, on a tablet, and by class; refreshes while voting is open |
+| Results | ✅ counts per candidate, the elected, abstentions, and ties on a seat flagged for the school to settle; live for officers if the election allows, otherwise once voting closes; published to voters when the school chooses |
+| Fixed ballot paper and audit | ✅ posts and candidates can't change once votes are cast; creating, opening, closing and publishing are recorded in the audit log |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -421,3 +434,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101006120_live_seb.sql` | 14d-2 |
 | `20260101006130_live_games.sql` | 14d-3 |
 | `20260101006200_entrance_automation.sql` | 14e |
+| `20260101006300_elections.sql` | 14f |

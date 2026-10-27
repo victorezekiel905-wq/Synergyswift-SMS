@@ -27,6 +27,7 @@ export const NAV: NavGroup[] = [
     { href: "/live/student/characters", label: "My characters", roles: ["student"], module: "live" },
     { href: "/student/practice", label: "Past-question practice", roles: ["student"], module: "exams" },
     { href: "/student/messages", label: "Messages with teachers", roles: ["student"] },
+    { href: "/vote", label: "Vote", roles: ["student", "parent"], module: "elections" },
     { href: "/school/library", label: "Library & e-books", roles: ["student"], module: "library" },
     { href: "/calendar", label: "Calendar", roles: [...STAFF, "student", "parent"] }
   ] },
@@ -67,6 +68,7 @@ export const NAV: NavGroup[] = [
     { href: "/school/pastoral", label: "Pastoral care", roles: NOT_TILL, module: "behaviour" },
     { href: "/school/behaviour", label: "Behaviour & houses", roles: [...PASTORAL, "hostel_warden"], module: "behaviour" },
     { href: "/school/activities", label: "Clubs, competitions & trips", roles: NOT_TILL, module: "events" },
+    { href: "/school/elections", label: "Elections & voting", roles: TEACH, module: "elections" },
     { href: "/school/health", label: "Health & sick bay", roles: ["nurse", "hostel_warden", ...PASTORAL], module: "health" },
     { href: "/school/certificates", label: "Certificates", roles: ADMIN, module: "sims" },
     { href: "/school/rollover", label: "Promote students", roles: ADMIN, module: "sims" }
