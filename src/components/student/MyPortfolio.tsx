@@ -1,13 +1,17 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useApi, send, Alert, Badge, Empty, fmtDate } from "@/components/ui";
+import { PortfolioView, Targets, ShareLinks, type Achievement, type TargetRow, type Share } from "@/components/portfolio/Portfolio";
 
 type Data = {
   items: { id: string; title: string; kind: string; description: string | null; link_url: string | null; has_file: boolean; status: string; feedback: string | null; created_at: string; subjects: { name: string } | null }[];
-  achievements: { id: string; title: string; award: string | null; level: string; achieved_on: string }[];
+  achievements: Achievement[];
   certificates: { id: string; title: string; issued_on: string; verify_token: string }[];
   subjects: { id: string; name: string }[];
+  targets?: TargetRow[]; shares?: Share[]; transcript_allowed?: boolean;
 };
+const ACH_KINDS = ["academic", "sports", "arts", "leadership", "service", "competition", "character", "other"];
 
 /** A student's own portfolio: add work (a teacher approves it), and see achievements and certificates. */
 export default function MyPortfolio() {
@@ -15,8 +19,11 @@ export default function MyPortfolio() {
   const [f, setF] = useState({ title: "", kind: "work", subject_id: "", link_url: "", description: "" });
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [ach, setAch] = useState({ title: "", kind: "competition", level: "school", award: "", achieved_on: new Date().toISOString().slice(0, 10) });
+  const [shared, setShared] = useState<string | null>(null);
   if (error) return null;
   if (!data) return null;
+  const shareOne = async (id: string) => { const r = await send<{ url: string }>("/api/student/portfolio", { action: "share", achievement_id: id, days: 90 }); if (r.ok) { setShared(r.data.url); reload(); } else setMsg({ ok: false, text: r.error ?? "failed" }); };
   return (
     <section className="mb-8 space-y-3">
       <h2 className="text-lg font-semibold">My portfolio</h2>
@@ -60,12 +67,33 @@ export default function MyPortfolio() {
           </li>
         ))}</ul>
       )}
-      {(data.achievements.length > 0 || data.certificates.length > 0) && (
-        <div className="card p-3 text-sm">
-          {data.achievements.length > 0 && <><p className="font-semibold">Achievements</p><ul>{data.achievements.map(a => <li key={a.id}>{a.title}{a.award ? `: ${a.award}` : ""} <span className="text-xs text-slate-500">{fmtDate(a.achieved_on)}</span></li>)}</ul></>}
-          {data.certificates.length > 0 && <><p className="mt-2 font-semibold">Certificates</p><ul>{data.certificates.map(c => <li key={c.id}><a className="text-brand-700 hover:underline" href={`/v/${c.verify_token}`} target="_blank" rel="noreferrer">{c.title}</a> <span className="text-xs text-slate-500">{fmtDate(c.issued_on)}</span></li>)}</ul></>}
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-2 pt-2"><h2 className="mr-auto text-lg font-semibold">My achievements</h2>
+        <Link className="btn btn-outline" href="/student/transcript">My transcript{data.transcript_allowed === false ? " (view only)" : ""}</Link></div>
+      <form className="card grid gap-2 p-3 text-sm sm:grid-cols-6" onSubmit={async e => {
+        e.preventDefault();
+        const fd = new FormData();
+        Object.entries(ach).forEach(([k, v]) => fd.set(k, v));
+        fd.set("what", "achievement");
+        const photo = (e.currentTarget.elements.namedItem("photo") as HTMLInputElement).files?.[0];
+        if (photo) fd.set("photo", photo);
+        const r = await fetch("/api/student/portfolio", { method: "POST", body: fd });
+        const j = await r.json().catch(() => ({}));
+        setMsg({ ok: r.ok, text: r.ok ? "Added. A teacher will verify it, then it shows on your shared portfolio." : j.error ?? "failed" });
+        if (r.ok) { (e.target as HTMLFormElement).reset(); setAch({ ...ach, title: "", award: "" }); reload(); }
+      }}>
+        <input className="input sm:col-span-2" value={ach.title} onChange={e => setAch({ ...ach, title: e.target.value })} placeholder="e.g. Maths Olympiad, state round" required aria-label="Achievement" />
+        <select className="input" value={ach.kind} onChange={e => setAch({ ...ach, kind: e.target.value })} aria-label="Kind">{ACH_KINDS.map(k => <option key={k}>{k}</option>)}</select>
+        <select className="input" value={ach.level} onChange={e => setAch({ ...ach, level: e.target.value })} aria-label="Level">{["class", "school", "local", "state", "national", "international"].map(k => <option key={k}>{k}</option>)}</select>
+        <input className="input" value={ach.award} onChange={e => setAch({ ...ach, award: e.target.value })} placeholder="Place / medal" aria-label="Award" />
+        <input className="input" type="date" value={ach.achieved_on} onChange={e => setAch({ ...ach, achieved_on: e.target.value })} aria-label="Date" />
+        <label className="sm:col-span-4 text-slate-600">Photo (optional) <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" className="ml-2" /></label>
+        <button className="btn btn-primary sm:col-span-2">Add achievement</button>
+      </form>
+      {shared && <Alert tone="green">Link made: <span className="break-all font-mono text-xs">{shared}</span></Alert>}
+      <PortfolioView achievements={data.achievements} certificates={data.certificates} onShare={shareOne} />
+      <Targets targets={data.targets ?? []} onAdd={async d => { const r = await send("/api/student/portfolio", { action: "target", description: d }); if (r.ok) reload(); else setMsg({ ok: false, text: r.error ?? "failed" }); return r.ok; }}
+        onStatus={async (id, status) => { await send("/api/student/portfolio", { action: "target_status", id, status }); reload(); }} />
+      <ShareLinks shares={data.shares ?? []} api="/api/student/portfolio" onChange={reload} />
     </section>
   );
 }

@@ -22,6 +22,9 @@ export async function GET(req: NextRequest) {
     .eq("tenant_id", tid).eq("id", studentId).maybeSingle();
   if (!student) return jsonError("student not found", 404);
   const publishedOnly = !staff || u.searchParams.get("published") === "1";
+  // Phase 14o: families can see the transcript, but download or print it only once the school releases it for this child.
+  const { data: release } = await createServiceClient().from("students").select("*").eq("tenant_id", tid).eq("id", studentId).maybeSingle();
+  const allowed = staff || Boolean(release?.transcript_allowed);
 
   const svc = createServiceClient();
   let q = svc.from("report_cards").select("term_id,status,total,average,position,class_size,data,terms(name,position,starts_on,session_id,academic_sessions(name,starts_on))")
@@ -62,6 +65,6 @@ export async function GET(req: NextRequest) {
     student: { name: studentName(student), admission_no: student.admission_no, date_of_birth: student.date_of_birth, gender: student.gender,
       photo_url: student.photo_url, class_name: (student as any).class_groups?.name ?? null },
     school, sessions: out, overall_average: all.length ? Math.round((all.reduce((a, b) => a + b, 0) / all.length) * 10) / 10 : null,
-    published_only: publishedOnly, generated_at: new Date().toISOString()
+    published_only: publishedOnly, generated_at: new Date().toISOString(), allowed
   });
 }

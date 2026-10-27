@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (done) · 14e entrance automation (done) · 14f elections (done) · 14g CRMs (done) · 14h SEN engagement (done) · 14i attendance, shifts and bus safety (done) · 14j exam extras (done) · 14k super admin centre (done) · 14l result PINs and group reports (done) · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (done) · 14e entrance automation (done) · 14f elections (done) · 14g CRMs (done) · 14h SEN engagement (done) · 14i attendance, shifts and bus safety (done) · 14j exam extras (done) · 14k super admin centre (done) · 14l result PINs and group reports (done) · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts (done).
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -489,6 +489,17 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Branch reports for proprietors | ✅ the group console now adds pass rate (term average 50+), staff on time (30 days), applications and offered places (90 days); every column ranks the branches when clicked; CSV download |
 | Performance budgets | ✅ one visit in five reports real page speed (main content, response to taps, layout shift, first paint, server time); every database call slower than 0.8 s is recorded; Platform → Overview shows the 75th percentile of each against its budget, the slowest pages and the slowest database calls over 7 days; budgets can be changed; samples are kept 14 days |
 
+## 14o. Portfolios, share links, transcripts and targets (phase 14o, done)
+
+| Feature | Status |
+|---|---|
+| Students add their achievements, with photos | ✅ on the student's home page: title, kind, level, place or medal, date and a photo; a teacher sees "Added by the student" on the student record with the photo and verifies it (or marks it not verified); only verified achievements leave the school |
+| Teachers' achievement portfolio | ✅ HR → My portfolio: awards, qualifications, training, certifications, publications and more, with a photo and a link; colleagues can see it |
+| Share as a link to the portfolio dashboard | ✅ students, parents and teachers make a private link to the whole portfolio or one achievement, for a week, a month, three months or a year; the page shows verified achievements with photos, approved work and certificates (checkable online), the school's name and logo, and the student's first name and initial only; views are counted; links can be stopped at any time |
+| Transcripts, released per child | ✅ students (My transcript) and parents (Portfolio & transcript) can read the transcript at any time, but it shows "Not released" and cannot be printed or downloaded until an admin, the bursar or the exams office releases it on the student's record (for example once fees are paid); releases and holds are in the change history |
+| Targets | ✅ staff set term-average, subject-score and attendance targets per student (with progress from published results and attendance, on target or not yet), students and parents add personal goals and tick them off; class targets (class average, attendance, pass rate, other) under Classroom → Class targets, seen by the class's students and families |
+| Clubs and boarding | ✅ already in place (phase 11): clubs and societies with membership and attendance, boarding houses, rooms, exeats and roll calls |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -547,3 +558,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101007000_exam_office.sql` | 14j |
 | `20260101007100_platform_centre.sql` | 14k |
 | `20260101007200_result_pins_perf.sql` | 14l |
+| `20260101007300_portfolios_transcripts.sql` | 14o |

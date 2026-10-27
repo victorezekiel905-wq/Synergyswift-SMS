@@ -15,7 +15,7 @@ const ICON_OK = new Set(["star", "hand", "flame", "people", "medal", "cap", "ale
 export default function ClassroomPage() {
   const { data: mine } = useApi<{ classes: Cls[] }>("/api/classroom");
   const [cls, setCls] = useState<string>("");
-  const [tab, setTab] = useState<"points" | "story" | "tools">("points");
+  const [tab, setTab] = useState<"points" | "story" | "tools" | "targets">("points");
   useEffect(() => { if (!cls && mine?.classes?.length) setCls(mine.classes[0].id); }, [mine, cls]);
   if (!mine) return <Page><Loading /></Page>;
   const current = mine.classes.find(c => c.id === cls);
@@ -32,10 +32,11 @@ export default function ClassroomPage() {
         )} />
       {!mine.classes.length ? <Empty>You have no classes yet. A school admin adds you to classes under Class teams &amp; accounts.</Empty> : (
         <>
-          <Tabs value={tab} onChange={setTab} tabs={[{ id: "points", label: "Points" }, { id: "story", label: "Class story" }, { id: "tools", label: "Class tools" }]} />
+          <Tabs value={tab} onChange={setTab} tabs={[{ id: "points", label: "Points" }, { id: "story", label: "Class story" }, { id: "tools", label: "Class tools" }, { id: "targets", label: "Class targets" }]} />
           {cls && tab === "points" && <PointsBoard key={cls} classId={cls} />}
           {cls && tab === "story" && <Story key={cls} classId={cls} className={current?.name ?? ""} />}
           {cls && tab === "tools" && <Tools key={cls} classId={cls} />}
+          {cls && tab === "targets" && <ClassTargets key={cls} classId={cls} />}
         </>
       )}
     </Page>
@@ -325,5 +326,35 @@ function NoiseMeter() {
       <label className="mt-2 flex items-center gap-2 text-sm">Limit <input type="range" min={20} max={95} value={limit} onChange={e => setLimit(Number(e.target.value))} className="flex-1" /></label>
       <p className="mt-1 text-xs text-slate-500">Sound is measured on this device only. Nothing is recorded or sent.</p>
     </section>
+  );
+}
+
+type ClassTarget = { id: string; kind: string; target: number | null; description: string | null; created_at: string; terms: { name: string } | null };
+const CLASS_KIND: Record<string, string> = { average: "Class average", attendance: "Attendance %", pass_rate: "Pass rate %", other: "Other goal" };
+
+/** Targets for the whole class (phase 14o): students and parents of the class see them too. */
+function ClassTargets({ classId }: { classId: string }) {
+  const { data, reload } = useApi<{ targets: ClassTarget[] }>(`/api/targets?class=${classId}`, [classId]);
+  const [t, setT] = useState({ kind: "average", target: "65", description: "" });
+  const [err, setErr] = useState<string | null>(null);
+  return (
+    <div className="space-y-3 text-sm">
+      <form className="card grid gap-2 p-3 sm:grid-cols-5" onSubmit={async e => {
+        e.preventDefault();
+        const r = await send("/api/targets", { action: "class", class_group_id: classId, kind: t.kind, target: t.kind === "other" ? null : Number(t.target), description: t.description || null });
+        setErr(r.ok ? null : r.error);
+        if (r.ok) { setT({ ...t, description: "" }); reload(); }
+      }}>
+        <select className="input" value={t.kind} onChange={e => setT({ ...t, kind: e.target.value })} aria-label="Target">{Object.entries(CLASS_KIND).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+        {t.kind !== "other" && <input className="input" type="number" min={0} max={100} value={t.target} onChange={e => setT({ ...t, target: e.target.value })} aria-label="Target figure" />}
+        <input className="input sm:col-span-2" value={t.description} onChange={e => setT({ ...t, description: e.target.value })} placeholder="e.g. Everyone reads for 20 minutes a day" maxLength={300} aria-label="Note" />
+        <button className="btn btn-primary">Set target</button>
+      </form>
+      {err && <Alert>{err}</Alert>}
+      {!data?.targets.length ? <Empty>No class targets yet.</Empty> : <ul className="space-y-2">{data.targets.map(x => (
+        <li key={x.id} className="card flex flex-wrap items-center gap-2 p-3"><b className="mr-auto">{CLASS_KIND[x.kind] ?? x.kind}{x.target !== null ? `: ${x.target}` : ""}{x.description ? <span className="font-normal text-slate-600"> · {x.description}</span> : null}</b>
+          <span className="text-xs text-slate-500">{fmtDate(x.created_at)}</span>
+          <button className="text-xs text-rose-600" onClick={async () => { await send("/api/targets", { action: "delete", id: x.id, class: true }); reload(); }}>Remove</button></li>))}</ul>}
+    </div>
   );
 }
