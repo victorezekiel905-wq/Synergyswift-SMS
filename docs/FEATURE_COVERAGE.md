@@ -340,6 +340,22 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Safe Exam Browser lock for classes and lessons | ✅ a **Locked / Unlocked** switch on each class (every new live lesson in it starts locked) and on each running lesson (under More in the control room); a locked lesson refuses students in a normal browser at the database; students download the lesson's Safe Exam Browser file, sign in inside it and join; locking during a lesson sends students who are not in Safe Exam Browser back to the join screen. The school can add its Safe Exam Browser config keys for the stronger check |
 | One name | ✅ every live-lesson screen says Synergy Swift |
 
+## 14d-3. Quiz games rework (phase 14d-3, done)
+
+| Feature | Status |
+|---|---|
+| Game modes | ✅ **Classic**; **Team battle** (teams scored by their average per player, so a bigger team never wins by size); **Survival** (1–5 lives; a wrong or missed answer costs one; survivors rank above anyone out); **Race** (each right answer is a step along a track shown to the class); **Self-paced** homework mode (no host: each student has their own question and clock until the closing time; the teacher can add a day or close it) |
+| Power-ups | ✅ earned, never bought: every 3 right answers in a row gives one (up to 3 held): **Double** (next right answer scores double), **Shield** (next wrong or missed answer keeps the streak and the life), **50:50** (hides half the wrong choices for that player only); all applied by the database |
+| Streaks and comebacks | ✅ streak bonus as before; a missed answer now ends a streak too; a right answer from the bottom half of the board gets +25% (up to +250) so nobody is out of it; new badges: 10-answer streak, survivor, comeback, winning team, finished every question |
+| Celebrations | ✅ full-screen moments for streaks (3, 5, 10), a power-up earned, a comeback and being knocked out; points count up; podium at the end |
+| Collectable characters linked to points | ✅ 16 characters (4 starters, then common, rare, epic, legendary) unlocked by XP; right answers in games now give XP (5 each plus podium bonus); the student is told when a character unlocks; **My characters** page to choose who to play as; locked characters can't be picked in the lesson lobby either |
+| More question types in games | ✅ gap fill, matching, ordering and sorting play in games as well as choice and true/false; question pictures now show on the player and host screens; read-aloud for students who have it |
+| Joining fixed | ✅ subject teachers can run games for the classes they teach (only the class teacher could before); students join from the game link without the code; guests of a live lesson can play the game launched from it |
+| Sync fixed | ✅ when time runs out, every screen fetches the reveal at once instead of waiting up to 10 seconds; the server closes the question after the same 1.5 s grace answers get |
+| Scores fixed | ✅ team totals no longer decided by team size; ending a game mid-question costs nobody a life or a streak |
+| Leaderboard for guests fixed | ✅ every board row has an opaque key, so "you" is found by key, not by name (two guests called Sam, or anonymous "Player 3", used to break it); guests appear on game boards |
+| Live module confirmations | ✅ the live screens' confirm dialogs and messages work (the provider was missing after the move, so "End game" and similar buttons did nothing); the easy-to-read font support works on live screens |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -386,3 +402,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101006100_live_engine.sql` | 14d-2 (generated from SwiftCipher; needs `live` in Supabase → Settings → API → Exposed schemas) |
 | `20260101006110_live_sync.sql` | 14d-2 |
 | `20260101006120_live_seb.sql` | 14d-2 |
+| `20260101006130_live_games.sql` | 14d-3 |

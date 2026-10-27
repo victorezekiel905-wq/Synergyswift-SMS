@@ -43,7 +43,16 @@ const RULES = [
   [/policy "lesson media /g, "policy \"live lesson media "],
   [/policy "submission /g, "policy \"live submission "],
   // Scheduled jobs.
-  [/'swiftcipher-/g, "'synergy-live-"]
+  [/'swiftcipher-/g, "'synergy-live-"],
+  // Links in notifications point at where the screens are in Synergy Swift.
+  [/'\/teacher\/live\//g, "'/live/teacher/live/"],
+  [/'\/student\/live\//g, "'/live/student/live/"],
+  [/'\/student\/game\//g, "'/live/student/game/"],
+  [/'\/student'/g, "'/live/student'"],
+  [/'\/teacher\/classes\/'/g, "'/school/classroom?class='"],
+  [/'\/teacher\/feedback'/g, "'/school/inbox'"],
+  [/'\/teacher\/assignments\/'/g, "'/live/teacher/homework?assignment='"],
+  [/'\/messages\?thread='/g, "'/school/inbox?thread='"]
 ];
 
 /**

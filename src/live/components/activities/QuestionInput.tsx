@@ -47,6 +47,8 @@ type AnswerProps = {
   disabled?: boolean;
   uploadPrefix?: string;
   reveal?: { correct_option_ids?: string[] };
+  /** false: just the answer, without "Explain your reasoning" (quiz games). */
+  reasoning?: boolean;
 };
 
 /**
@@ -62,7 +64,7 @@ export function QuestionInput(props: AnswerProps) {
   const extra = { ...(reasoning ? { reasoning } : {}), ...(confidence ? { confidence } : {}) };
   // Answer widgets replace the whole response; keep the student's reasoning and confidence.
   const widget = <AnswerWidget {...props} onChange={(next) => onChange({ ...next, ...extra })} />;
-  if (!REASONING_KINDS.has(q.kind)) return widget;
+  if (!REASONING_KINDS.has(q.kind) || props.reasoning === false) return widget;
   const required = requiresReasoning(q);
   const set = (p: Answer) => onChange({ ...v, ...p });
   return (
@@ -220,9 +222,9 @@ function AnswerWidget({ q, value, onChange, disabled, uploadPrefix, reveal }: An
 }
 
 /** Is the response complete enough to submit? */
-export function isAnswered(q: PublicQuestion, v: Answer | undefined): boolean {
+export function isAnswered(q: PublicQuestion, v: Answer | undefined, opts?: { reasoning?: boolean }): boolean {
   if (!v) return false;
-  if (requiresReasoning(q) && ((v.reasoning as string | undefined) ?? "").trim().length < MIN_REASONING) return false;
+  if (opts?.reasoning !== false && requiresReasoning(q) && ((v.reasoning as string | undefined) ?? "").trim().length < MIN_REASONING) return false;
   switch (q.kind) {
     case "mcq": case "true_false": case "poll": return !!v.option_id;
     case "multi_select": return ((v.option_ids as string[]) ?? []).length > 0;

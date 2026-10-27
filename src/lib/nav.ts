@@ -24,6 +24,7 @@ export const NAV: NavGroup[] = [
     { href: "/student/learn", label: "My learning", roles: ["student"], module: "lms" },
     { href: "/live/student", label: "Live lessons & games", roles: ["student"], module: "live" },
     { href: "/live/student/join", label: "Join with a code", roles: ["student"], module: "live" },
+    { href: "/live/student/characters", label: "My characters", roles: ["student"], module: "live" },
     { href: "/student/practice", label: "Past-question practice", roles: ["student"], module: "exams" },
     { href: "/student/messages", label: "Messages with teachers", roles: ["student"] },
     { href: "/school/library", label: "Library & e-books", roles: ["student"], module: "library" },

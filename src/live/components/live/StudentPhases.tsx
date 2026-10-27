@@ -5,9 +5,10 @@ import { useToast } from "@/live/components/ui";
 import { errorText, rpc } from "@/live/lib/rpc";
 import { useRpc } from "@/live/lib/hooks";
 import { cn, formatJoinCode, LOCALE } from "@/live/lib/utils";
-import { AVATARS, avatarFor } from "./avatars";
+import { Lock } from "lucide-react";
+import { AVATARS, CHARACTERS, avatarFor } from "./avatars";
 import { Critter } from "./Critter";
-import { Leaderboard, type BoardEntry } from "./Leaderboard";
+import { isMe, Leaderboard, type BoardEntry, type Viewer } from "./Leaderboard";
 import { Burst, GlyphField, Podium, RankBadge } from "@/live/components/game/Celebrate";
 
 /** Before the teacher starts: who you are, your avatar, and how many have joined. */
@@ -19,6 +20,9 @@ export function Lobby({ sessionId, title, teacher, name, avatar, participants, c
 }) {
   const toast = useToast();
   const [picked, setPicked] = useState<string | null>(avatar);
+  // Characters are collected with XP (migration 6130); guests and new students have the four starters.
+  const mine = useRpc<{ xp: number; characters: { key: string; unlocked: boolean; unlock_xp: number }[] }>("my_characters", {}, []);
+  const unlocked = new Set((mine.data?.characters ?? CHARACTERS.filter((c) => c.unlock_xp === 0)).filter((c) => !("unlocked" in c) || c.unlocked).map((c) => c.key));
   return (
     <div className="relative flex min-h-[calc(100dvh-3.5rem)] flex-col items-center justify-center overflow-hidden bg-ink-950 px-4 py-10 text-white">
       <GlyphField opacity={0.5} />
@@ -36,8 +40,14 @@ export function Lobby({ sessionId, title, teacher, name, avatar, participants, c
 
       <fieldset className="relative mt-6 w-full max-w-sm">
         <legend className="mb-2 text-center text-sm text-ink-300">Pick your avatar</legend>
-        <div className="grid grid-cols-6 gap-2">
-          {Object.entries(AVATARS).map(([key, label]) => (
+        <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
+          {CHARACTERS.map(({ key, unlock_xp }) => { const label = AVATARS[key]!; const locked = !unlocked.has(key); return locked ? (
+            <span key={key} title={`${label}: earn ${unlock_xp.toLocaleString(LOCALE)} XP to unlock`} aria-label={`${label}, locked`}
+              className="relative grid aspect-square place-items-center rounded-xl bg-white/5">
+              <Critter name={key} className="h-[70%] w-[70%] opacity-25 grayscale" />
+              <Lock className="absolute h-3.5 w-3.5 text-ink-300" aria-hidden />
+            </span>
+          ) : (
             <button key={key} type="button" aria-label={label} title={label} aria-pressed={picked === key}
               onClick={async () => {
                 setPicked(key);
@@ -47,8 +57,9 @@ export function Lobby({ sessionId, title, teacher, name, avatar, participants, c
               className={cn("grid aspect-square place-items-center rounded-xl text-2xl transition", picked === key ? "scale-110 bg-white/25 ring-4 ring-accent-400" : "bg-white/10 hover:scale-105 hover:bg-white/20")}>
               <Critter name={key} className="h-[78%] w-[78%]" />
             </button>
-          ))}
+          ); })}
         </div>
+        {mine.data && <p className="mt-2 text-center text-xs text-ink-400">Earn XP in lessons and games to unlock more characters.</p>}
       </fieldset>
 
       <LobbyPlayers sessionId={sessionId} participants={participants} given={players} />
@@ -130,11 +141,11 @@ export function EndScreen({ name, avatar, summary, guest, score = null, closedNo
 }
 
 /** The class leaderboard, while the teacher shows it: the whole class (1160), your own row highlighted. */
-export function BoardOverlay({ entries, me, my }: { entries: BoardEntry[]; me: string; my: { score: number; rank: number; of: number } | null }) {
+export function BoardOverlay({ entries, me, my }: { entries: BoardEntry[]; me: Viewer; my: { score: number; rank: number; of: number } | null }) {
   const [hidden, setHidden] = useState<string | null>(null);
   const key = JSON.stringify(entries);
   if (hidden === key) return null;
-  const inTop = entries.some((e) => e.name === me);
+  const inTop = entries.some((e) => isMe(e, me));
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="board-title" className="fixed inset-0 z-40 overflow-y-auto bg-ink-950/95 px-4 py-10 text-white backdrop-blur-sm">
       <div className="mx-auto max-w-md">

@@ -133,7 +133,19 @@ export type PublicQuestion = {
   points: number;
 };
 
+/** classic: class moves together · team_battle: teams by average · survival: lives · race: steps to a finish line · self_paced: homework. */
+export type GameMode = "classic" | "team_battle" | "survival" | "race" | "self_paced";
+
 export type GameSettings = {
+  mode?: GameMode;
+  /** Survival: lives each player starts with (1–5). */
+  lives?: number;
+  /** Earned every 3 right answers in a row: double, shield, 50:50. */
+  powerups?: boolean;
+  /** +25% for a right answer from the bottom half of the board. */
+  comeback?: boolean;
+  /** Self-paced only: when the game closes (ISO time). Not stored in settings. */
+  closes_at?: string;
   question_seconds: number;
   speed_bonus: boolean;
   streak_bonus: boolean;

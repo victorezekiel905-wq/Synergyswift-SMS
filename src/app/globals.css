@@ -116,3 +116,8 @@ html[data-high-contrast] .card { border-color: #0f172a; }
 }
 /* "Easy-to-read font" learning support set by a teacher in live lessons. */
 html.readable body { letter-spacing: 0.02em; line-height: 1.75; word-spacing: 0.08em; }
+/* The font itself is loaded by src/app/live/layout.tsx, which defines --font-readable on .live-root. */
+html.readable .live-root, html.readable .live-root .font-sans, html.readable .live-root .font-display,
+html.readable .live-root h1, html.readable .live-root h2, html.readable .live-root h3, html.readable .live-root h4 {
+  font-family: var(--font-readable), var(--font-sans), system-ui, sans-serif;
+}

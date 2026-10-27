@@ -1,5 +1,6 @@
 import { cn, LOCALE } from "@/live/lib/utils";
 import { Critter } from "@/live/components/live/Critter";
+import { isMe, type Viewer } from "@/live/components/live/Leaderboard";
 import { Crown } from "lucide-react";
 import { OptionShape } from "./Shape";
 
@@ -65,7 +66,7 @@ export function RankBadge({ rank, className }: { rank: number; className?: strin
   );
 }
 
-export type PodiumEntry = { name: string; avatar: string | null; score: number; rank: number };
+export type PodiumEntry = { key?: string; name: string; avatar: string | null; score: number; rank: number };
 
 const STEP = {
   1: { h: "h-44 sm:h-52", bg: "bg-tile-star text-ink-950", delay: "0.9s", label: "1st" },
@@ -77,7 +78,7 @@ const STEP = {
  * The top three on stepped blocks: third rises first, then second, then the winner
  * with a burst. Order on screen is 2nd, 1st, 3rd. Used on the projector and at the end.
  */
-export function Podium({ entries, size = "lg", highlight }: { entries: PodiumEntry[]; size?: "md" | "lg"; highlight?: string }) {
+export function Podium({ entries, size = "lg", highlight }: { entries: PodiumEntry[]; size?: "md" | "lg"; highlight?: Viewer }) {
   const top = [2, 1, 3].map((r) => entries.find((e) => e.rank === r)).filter(Boolean) as PodiumEntry[];
   if (!top.length) return null;
   const lg = size === "lg";
@@ -86,12 +87,12 @@ export function Podium({ entries, size = "lg", highlight }: { entries: PodiumEnt
       {top.map((e) => {
         const st = STEP[e.rank as 1 | 2 | 3];
         return (
-          <li key={`${e.rank}-${e.name}`} className="flex w-1/3 max-w-[13rem] flex-col items-center" aria-label={`${st.label}: ${e.name}, ${e.score.toLocaleString(LOCALE)} points`}>
+          <li key={e.key ?? `${e.rank}-${e.name}`} className="flex w-1/3 max-w-[13rem] flex-col items-center" aria-label={`${st.label}: ${e.name}, ${e.score.toLocaleString(LOCALE)} points`}>
             <div className="relative flex flex-col items-center animate-pop" style={{ animationDelay: `calc(${st.delay} + .35s)` }}>
               {e.rank === 1 && <Burst delay={1300} />}
               {e.rank === 1 && <Crown aria-hidden className={cn("absolute -top-7 animate-pop text-tile-star [animation-delay:1.25s]", lg ? "h-9 w-9" : "h-7 w-7")} fill="currentColor" strokeWidth={1.5} />}
               <span aria-hidden className={cn("relative grid place-items-center rounded-2xl bg-white/10", lg ? "h-20 w-20 text-5xl" : "h-14 w-14 text-3xl",
-                e.name === highlight && "ring-4 ring-accent-400")}><Critter name={e.avatar} className="h-[78%] w-[78%]" />
+                isMe(e, highlight) && "ring-4 ring-accent-400")}><Critter name={e.avatar} className="h-[78%] w-[78%]" />
                 {e.rank > 1 && <RankBadge rank={e.rank} className="absolute -right-2.5 -top-2.5" />}</span>
               <span className={cn("mt-2 max-w-full truncate font-display font-extrabold", lg ? "text-2xl" : "text-base")}>{e.name}</span>
               <span className={cn("font-display font-bold tabular-nums text-white/70", lg ? "text-lg" : "text-sm")}>{e.score.toLocaleString(LOCALE)}</span>

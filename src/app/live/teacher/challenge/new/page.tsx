@@ -2,7 +2,7 @@ import { requireRole, TEACHERS } from "@/live/lib/session";
 import { PageHeader } from "@/live/components/ui";
 import { NewGameForm } from "./NewGameForm";
 
-export const metadata = { title: "New challenge" };
+export const metadata = { title: "New game" };
 
 export default async function NewGame(
   props: { searchParams: Promise<{ class?: string; activity?: string; session?: string }> }
@@ -15,7 +15,7 @@ export default async function NewGame(
   ]);
   return (
     <div className="page max-w-3xl">
-      <PageHeader eyebrow="Synergy Swift Challenge" title="New challenge" subtitle="Only multiple-choice and true/false questions are played; other types are skipped." />
+      <PageHeader eyebrow="Quiz games" title="New game" subtitle="Choice, true/false, gap-fill, matching, ordering and sorting questions are played; questions a teacher marks by hand are skipped." />
       <NewGameForm classes={(classes as { id: string; name: string }[]) ?? []} activities={(activities ?? []) as never}
         defaults={{ classId: searchParams.class, activityId: searchParams.activity, sessionId: searchParams.session }} />
     </div>

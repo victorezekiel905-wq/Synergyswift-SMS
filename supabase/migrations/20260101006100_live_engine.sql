@@ -2341,7 +2341,7 @@ begin
     insert into live.class_members (class_id, user_id, tenant_id, role)
       values (v_class.id, v_uid, v_class.tenant_id, 'student');
     perform live_app.notify(v_class.teacher_id, 'student_joined', v_name || ' joined ' || v_class.name,
-                       null, '/teacher/classes/' || v_class.id, 'info',
+                       null, '/school/classroom?class=' || v_class.id, 'info',
                        jsonb_build_object('class_id', v_class.id, 'student_id', v_uid));
   end if;
 
@@ -3089,7 +3089,7 @@ begin
          status = 'reviewed', is_correct = (p_score >= v_q.points), reviewed_by = auth.uid(), reviewed_at = now()
    where id = p_answer;
   perform live_app.recompute_attempt(v_t.id);
-  perform live_app.notify(v_t.student_id, 'grade_updated', 'Your work was reviewed', null, '/student', 'info',
+  perform live_app.notify(v_t.student_id, 'grade_updated', 'Your work was reviewed', null, '/live/student', 'info',
                      jsonb_build_object('attempt_id', v_t.id));
 end$$;
 
@@ -3187,7 +3187,7 @@ begin
     returning * into v_sub;
   perform live_app.notify(v_a.created_by, 'submission', v_me.full_name || ' submitted ' || v_a.title,
                      case when v_sub.is_late then 'Late submission' end,
-                     '/teacher/assignments/' || v_a.id, 'info', jsonb_build_object('submission_id', v_sub.id));
+                     '/live/teacher/homework?assignment=' || v_a.id, 'info', jsonb_build_object('submission_id', v_sub.id));
   return to_jsonb(v_sub);
 end$$;
 
@@ -3213,7 +3213,7 @@ begin
       released_at = coalesce(live.grades.released_at, excluded.released_at);
   update live.submissions set status = case when p_return then 'returned' else 'graded' end where id = p_submission;
   if p_release then
-    perform live_app.notify(v_s.student_id, 'grade_released', 'Grade released: ' || v_a.title, null, '/student', 'info',
+    perform live_app.notify(v_s.student_id, 'grade_released', 'Grade released: ' || v_a.title, null, '/live/student', 'info',
                        jsonb_build_object('assignment_id', v_a.id));
   end if;
   perform live_app.audit('grade.saved', 'submission', p_submission::text, jsonb_build_object('score', p_score, 'released', p_release));
@@ -3231,7 +3231,7 @@ begin
              returning s.student_id)
            select distinct student_id from released loop
     v_n := v_n + 1;
-    perform live_app.notify(r.student_id, 'grade_released', 'Grade released: ' || v_a.title, null, '/student', 'info',
+    perform live_app.notify(r.student_id, 'grade_released', 'Grade released: ' || v_a.title, null, '/live/student', 'info',
                        jsonb_build_object('assignment_id', v_a.id));
   end loop;
   perform live_app.audit('grades.released', 'assignment', p_assignment::text);
@@ -3330,7 +3330,7 @@ begin
 
   perform live_app.audit('game.created', 'game', v_game.id::text, jsonb_build_object('class_id', p_class, 'activity_id', p_activity));
   perform live_app.notify(m.user_id, 'game_created', 'A Challenge is open: ' || v_game.title, 'Join code ' || v_game.join_code,
-                     '/student/game/' || v_game.id, 'info', jsonb_build_object('game_id', v_game.id))
+                     '/live/student/game/' || v_game.id, 'info', jsonb_build_object('game_id', v_game.id))
   from live.class_members m where m.class_id = p_class and m.role = 'student';
   return to_jsonb(v_game);
 end$$;
@@ -3926,7 +3926,7 @@ begin
                           when 'idle' then ' has been idle'
                           when 'connection_lost' then '''s device lost connection'
                           else ' triggered ' || p_kind end,
-    p_rule, '/teacher/live/' || p_session.id, p_severity,
+    p_rule, '/live/teacher/live/' || p_session.id, p_severity,
     jsonb_build_object('event_id', v_id, 'session_id', p_session.id, 'student_id', p_bs.student_id));
   return true;
 end$$;
@@ -4043,7 +4043,7 @@ begin
     if v_returned > 0 then
       perform live_app.notify(v_session.teacher_id, 'student_returned',
         (select full_name from live.users where id = p_device.student_id) || ' returned to the class environment',
-        null, '/teacher/live/' || v_session.id, 'info', jsonb_build_object('student_id', p_device.student_id));
+        null, '/live/teacher/live/' || v_session.id, 'info', jsonb_build_object('student_id', p_device.student_id));
     end if;
     if v_verdict = 'warning' then
       v_notice := 'Please stay on your class resources.';
@@ -4498,7 +4498,7 @@ begin
   perform live_app.audit('session.started', 'class_session', v_s.id::text,
                     jsonb_build_object('class_id', p_class, 'lesson_id', p_lesson, 'environment_id', p_environment));
   perform live_app.notify(m.user_id, 'session_started', 'Live class started: ' || v_s.title, 'Join code ' || v_s.join_code,
-                     '/student/live/' || v_s.id, 'info', jsonb_build_object('session_id', v_s.id))
+                     '/live/student/live/' || v_s.id, 'info', jsonb_build_object('session_id', v_s.id))
   from live.class_members m where m.class_id = p_class and m.role = 'student';
   return to_jsonb(v_s);
 end$$;
@@ -4789,7 +4789,7 @@ begin
     values (v_s.tenant_id, p_session, p_student, p_anonymized, p_show_to_class, auth.uid()) returning id into v_id;
   update live.browser_sessions set snapshot_requested_at = now() where class_session_id = p_session and student_id = p_student;
   perform live_app.notify(p_student, 'spotlight', 'Your teacher is sharing your screen with the class',
-                     case when p_anonymized then 'Your name is hidden.' end, '/student/live/' || p_session, 'info',
+                     case when p_anonymized then 'Your name is hidden.' end, '/live/student/live/' || p_session, 'info',
                      jsonb_build_object('session_id', p_session));
   perform live_app.audit('spotlight.started', 'user', p_student::text,
                     jsonb_build_object('session_id', p_session, 'anonymized', p_anonymized, 'show_to_class', p_show_to_class));
@@ -4907,7 +4907,7 @@ begin
     values (v_me.tenant_id, p_thread, v_me.id, btrim(p_body)) returning id into v_id;
   if v_to is not null then
     perform live_app.notify(v_to, 'chat_message', 'New message from ' || v_me.full_name, left(btrim(p_body), 140),
-                       case when v_me.role = 'student' then '/messages?thread=' else '/messages?thread=' end || p_thread,
+                       case when v_me.role = 'student' then '/school/inbox?thread=' else '/school/inbox?thread=' end || p_thread,
                        'info', jsonb_build_object('thread_id', p_thread));
   end if;
   return v_id;
@@ -6238,7 +6238,7 @@ begin
   if v_id is null then return false; end if;
   select full_name into v_name from live.users where id = p_student;
   perform live_app.notify(p_s.teacher_id, 'environment_left', v_name || ' left the class', p_rule,
-                     '/teacher/live/' || p_s.id, 'warning',
+                     '/live/teacher/live/' || p_s.id, 'warning',
                      jsonb_build_object('event_id', v_id, 'session_id', p_s.id, 'student_id', p_student));
   return true;
 end$$;
@@ -6342,7 +6342,7 @@ begin
     if v_returned > 0 then
       perform live_app.notify(v_s.teacher_id, 'student_returned',
         (select full_name from live.users where id = auth.uid()) || ' returned to the class', null,
-        '/teacher/live/' || p_session, 'info', jsonb_build_object('student_id', auth.uid()));
+        '/live/teacher/live/' || p_session, 'info', jsonb_build_object('student_id', auth.uid()));
     end if;
   else
     perform live_app.web_leave_check(v_s);
@@ -6471,7 +6471,7 @@ begin
   update live.browser_sessions set snapshot_requested_at = now() where class_session_id = p_session and student_id = p_student;
   update live.session_participants set hq_requested_at = now() where session_id = p_session and user_id = p_student;
   perform live_app.notify(p_student, 'spotlight', 'Your teacher is sharing your screen with the class',
-                     case when p_anonymized then 'Your name is hidden.' end, '/student/live/' || p_session, 'info',
+                     case when p_anonymized then 'Your name is hidden.' end, '/live/student/live/' || p_session, 'info',
                      jsonb_build_object('session_id', p_session));
   perform live_app.audit('spotlight.started', 'user', p_student::text,
                     jsonb_build_object('session_id', p_session, 'anonymized', p_anonymized, 'show_to_class', p_show_to_class));
@@ -7237,7 +7237,7 @@ begin
       if v_returned > 0 then
         perform live_app.notify(v_s.teacher_id, 'student_returned',
           (select full_name from live.users where id = auth.uid()) || ' returned to the class', null,
-          '/teacher/live/' || p_session, 'info', jsonb_build_object('student_id', auth.uid()));
+          '/live/teacher/live/' || p_session, 'info', jsonb_build_object('student_id', auth.uid()));
       end if;
     end if;
   else
@@ -7991,7 +7991,7 @@ begin
       if v_returned > 0 then
         perform live_app.notify(v_s.teacher_id, 'student_returned',
           (select full_name from live.users where id = auth.uid()) || ' returned to the class', null,
-          '/teacher/live/' || p_session, 'info', jsonb_build_object('student_id', auth.uid()));
+          '/live/teacher/live/' || p_session, 'info', jsonb_build_object('student_id', auth.uid()));
       end if;
     end if;
   else
@@ -8140,7 +8140,7 @@ begin
         when 'first_steps' then 'First steps' when 'rising_star' then 'Rising star' when 'scholar' then 'Scholar'
         when 'deep_thinker' then 'Deep thinker' when 'perfectionist' then 'Perfectionist' when 'challenger' then 'Challenger'
         when 'shout_out' then 'Teacher shout-out' when 'game_on' then 'Game on' else p_badge end,
-      null, '/student', 'info', jsonb_build_object('badge', p_badge));
+      null, '/live/student', 'info', jsonb_build_object('badge', p_badge));
   end if;
 end$$;
 
@@ -8364,7 +8364,7 @@ begin
   if coalesce(btrim(p_reason), '') = '' then raise exception 'Say what it is for (the student sees it).' using errcode = '22023'; end if;
   select tenant_id into v_tenant from live.users where id = p_student;
   perform live_app.give_xp(v_tenant, p_student, p_class, 'teacher', gen_random_uuid(), p_points, btrim(p_reason));
-  perform live_app.notify(p_student, 'xp', '+' || p_points || ' XP from your teacher', btrim(p_reason), '/student', 'info', '{}'::jsonb);
+  perform live_app.notify(p_student, 'xp', '+' || p_points || ' XP from your teacher', btrim(p_reason), '/live/student', 'info', '{}'::jsonb);
 end$$;
 
 -- Critical-thinking insight per question: confident-but-wrong (likely misconception),
@@ -8635,7 +8635,7 @@ begin
         when 'deep_thinker' then 'Deep thinker' when 'perfectionist' then 'Perfectionist' when 'challenger' then 'Challenger'
         when 'shout_out' then 'Teacher shout-out' when 'game_on' then 'Game on' when 'author' then 'Question author'
         else p_badge end,
-      null, '/student', 'info', jsonb_build_object('badge', p_badge));
+      null, '/live/student', 'info', jsonb_build_object('badge', p_badge));
   end if;
 end$$;
 
@@ -9005,7 +9005,7 @@ begin
   if p_open then
     perform live_app.notify(m.user_id, 'question_collab', 'Write a question for ' || v_title,
                        coalesce(v.prompt, 'Your teacher wants your best question. Include the right answer and why.'),
-                       '/student', 'info', jsonb_build_object('collab_id', v.id))
+                       '/live/student', 'info', jsonb_build_object('collab_id', v.id))
     from live.class_members m where m.class_id = p_class and m.role = 'student';
   end if;
   perform live_app.audit(case when p_open then 'collab.opened' else 'collab.closed' end, 'question_collab', v.id::text);
@@ -9105,7 +9105,7 @@ begin
     end if;
     update live.question_submissions set status = 'returned', feedback = btrim(p_feedback),
       reviewed_by = v_me.id, reviewed_at = now() where id = p_submission;
-    perform live_app.notify(v_s.student_id, 'question_returned', 'Your teacher sent your question back', btrim(p_feedback), '/student', 'info',
+    perform live_app.notify(v_s.student_id, 'question_returned', 'Your teacher sent your question back', btrim(p_feedback), '/live/student', 'info',
                        jsonb_build_object('submission_id', v_s.id));
   else
     raise exception 'Unknown action.' using errcode = '22023';
@@ -9304,7 +9304,7 @@ begin
     insert into live.class_members (class_id, user_id, tenant_id, role)
       values (v_class.id, v_uid, v_class.tenant_id, 'student');
     perform live_app.notify(v_class.teacher_id, 'student_joined', v_name || ' joined ' || v_class.name,
-                       null, '/teacher/classes/' || v_class.id, 'info',
+                       null, '/school/classroom?class=' || v_class.id, 'info',
                        jsonb_build_object('class_id', v_class.id, 'student_id', v_uid));
   end if;
 
@@ -9720,12 +9720,12 @@ begin
   if v_t.kind = 'direct' then
     if v_me.id not in (v_t.student_id, v_t.teacher_id) then raise exception 'Not your conversation.' using errcode = '42501'; end if;
     v_to := case when v_me.id = v_t.student_id then v_t.teacher_id else v_t.student_id end;
-    v_link := '/messages?thread=' || p_thread;
+    v_link := '/school/inbox?thread=' || p_thread;
   elsif v_t.kind = 'parent' then
     if v_me.id not in (v_t.parent_id, v_t.teacher_id) then raise exception 'Not your conversation.' using errcode = '42501'; end if;
     if v_me.id = v_t.parent_id and not live_app.is_parent_of(v_t.student_id) then raise exception 'Not your child.' using errcode = '42501'; end if;
     v_to := case when v_me.id = v_t.parent_id then v_t.teacher_id else v_t.parent_id end;
-    v_link := case when v_me.id = v_t.parent_id then '/messages?thread=' || p_thread
+    v_link := case when v_me.id = v_t.parent_id then '/school/inbox?thread=' || p_thread
                    else '/parent?child=' || v_t.student_id || '&thread=' || p_thread end;
   else
     if not (live_app.can_manage_class(v_t.class_id)
@@ -9905,7 +9905,7 @@ begin
   if v_id is null then return false; end if;
   select full_name into v_name from live.users where id = p_student;
   perform live_app.notify(p_s.teacher_id, 'environment_left', v_name || ' left the class', p_rule,
-                     '/teacher/live/' || p_s.id, 'warning',
+                     '/live/teacher/live/' || p_s.id, 'warning',
                      jsonb_build_object('event_id', v_id, 'session_id', p_s.id, 'student_id', p_student));
   return true;
 end$$;
@@ -10471,7 +10471,7 @@ begin
       if v_returned > 0 then
         perform live_app.notify(v_s.teacher_id, 'student_returned',
           (select full_name from live.users where id = auth.uid()) || ' returned to the class', null,
-          '/teacher/live/' || p_session, 'info', jsonb_build_object('student_id', auth.uid()));
+          '/live/teacher/live/' || p_session, 'info', jsonb_build_object('student_id', auth.uid()));
       end if;
     end if;
   else
@@ -10592,7 +10592,7 @@ begin
   if v_id is null then return false; end if;
   select full_name into v_name from live.users where id = p_student;
   perform live_app.notify(p_s.teacher_id, 'environment_left', v_name || ' left the class', p_rule,
-                     '/teacher/live/' || p_s.id, 'warning',
+                     '/live/teacher/live/' || p_s.id, 'warning',
                      jsonb_build_object('event_id', v_id, 'session_id', p_s.id, 'student_id', p_student));
   return true;
 end$$;
@@ -10799,7 +10799,7 @@ begin
   perform live_app.audit('session.started', 'class_session', v_s.id::text,
                     jsonb_build_object('class_id', p_class, 'lesson_id', p_lesson, 'environment_id', p_environment));
   perform live_app.notify(m.user_id, 'session_started', 'Live class started: ' || v_s.title, 'Join code ' || v_s.join_code,
-                     '/student/live/' || v_s.id, 'info', jsonb_build_object('session_id', v_s.id))
+                     '/live/student/live/' || v_s.id, 'info', jsonb_build_object('session_id', v_s.id))
   from live.class_members m where m.class_id = p_class and m.role = 'student';
   return to_jsonb(v_s);
 end$$;
@@ -10920,7 +10920,7 @@ begin
       if v_returned > 0 then
         perform live_app.notify(v_s.teacher_id, 'student_returned',
           (select full_name from live.users where id = auth.uid()) || ' returned to the class', null,
-          '/teacher/live/' || p_session, 'info', jsonb_build_object('student_id', auth.uid()));
+          '/live/teacher/live/' || p_session, 'info', jsonb_build_object('student_id', auth.uid()));
       end if;
     end if;
   else
@@ -11559,7 +11559,7 @@ begin
   perform live_app.audit('session.started', 'class_session', v_s.id::text,
                     jsonb_build_object('class_id', p_class, 'lesson_id', p_lesson, 'environment_id', p_environment));
   perform live_app.notify(m.user_id, 'session_started', 'Live class started: ' || v_s.title, 'Join code ' || v_s.join_code,
-                     '/student/live/' || v_s.id, 'info', jsonb_build_object('session_id', v_s.id))
+                     '/live/student/live/' || v_s.id, 'info', jsonb_build_object('session_id', v_s.id))
   from live.class_members m where m.class_id = p_class and m.role = 'student';
   return to_jsonb(v_s);
 end$$;
@@ -11763,7 +11763,7 @@ begin
       if v_returned > 0 then
         perform live_app.notify(v_s.teacher_id, 'student_returned',
           (select full_name from live.users where id = auth.uid()) || ' returned to the class', null,
-          '/teacher/live/' || p_session, 'info', jsonb_build_object('student_id', auth.uid()));
+          '/live/teacher/live/' || p_session, 'info', jsonb_build_object('student_id', auth.uid()));
       end if;
     end if;
   else
@@ -11813,7 +11813,7 @@ begin
   if v_id is null then return false; end if;
   select full_name into v_name from live.users where id = p_student;
   perform live_app.notify(p_s.teacher_id, 'environment_left', v_name || ' left the class', p_rule,
-                     '/teacher/live/' || p_s.id, 'warning',
+                     '/live/teacher/live/' || p_s.id, 'warning',
                      jsonb_build_object('event_id', v_id, 'session_id', p_s.id, 'student_id', p_student));
   return true;
 end$$;
@@ -13902,7 +13902,7 @@ begin
     insert into live.class_members (class_id, user_id, tenant_id, role)
       values (v_class.id, v_uid, v_class.tenant_id, 'student');
     perform live_app.notify(v_class.teacher_id, 'student_joined', v_name || ' joined ' || v_class.name,
-                       null, '/teacher/classes/' || v_class.id, 'info',
+                       null, '/school/classroom?class=' || v_class.id, 'info',
                        jsonb_build_object('class_id', v_class.id, 'student_id', v_uid));
   end if;
 
@@ -14226,7 +14226,7 @@ begin
     returning id into v_id;
   select full_name into v_child from live.users where id = p_student;
   perform live_app.notify(v_c.teacher_id, 'parent_feedback', 'Feedback from ' || v_me.full_name, 'About ' || v_child || ' in ' || v_c.name,
-                     '/teacher/feedback', 'info', jsonb_build_object('feedback_id', v_id));
+                     '/school/inbox', 'info', jsonb_build_object('feedback_id', v_id));
   return v_id;
 end$$;
 
@@ -14497,7 +14497,7 @@ begin
     insert into live.class_members (class_id, user_id, tenant_id, role)
       values (v_class.id, v_uid, v_class.tenant_id, 'student');
     perform live_app.notify(v_class.teacher_id, 'student_joined', v_name || ' joined ' || v_class.name,
-                       null, '/teacher/classes/' || v_class.id, 'info',
+                       null, '/school/classroom?class=' || v_class.id, 'info',
                        jsonb_build_object('class_id', v_class.id, 'student_id', v_uid));
   end if;
 
@@ -15324,7 +15324,7 @@ begin
   perform live_app.audit('session.started', 'class_session', v_s.id::text,
                     jsonb_build_object('class_id', p_class, 'lesson_id', p_lesson, 'environment_id', p_environment));
   perform live_app.notify(m.user_id, 'session_started', 'Live class started: ' || v_s.title, 'Join code ' || v_s.join_code,
-                     '/student/live/' || v_s.id, 'info', jsonb_build_object('session_id', v_s.id))
+                     '/live/student/live/' || v_s.id, 'info', jsonb_build_object('session_id', v_s.id))
   from live.class_members m where m.class_id = p_class and m.role = 'student';
   return to_jsonb(v_s);
 end$$;
@@ -15415,7 +15415,7 @@ begin
     returning id into v_id;
   select full_name into v_child from live.users where id = p_student;
   perform live_app.notify(v_teacher, 'parent_feedback', 'Feedback from ' || v_me.full_name, 'About ' || v_child || ' in ' || v_c.name,
-                     '/teacher/feedback', 'info', jsonb_build_object('feedback_id', v_id));
+                     '/school/inbox', 'info', jsonb_build_object('feedback_id', v_id));
   return v_id;
 end$$;
 
@@ -16057,7 +16057,7 @@ begin
   perform live_app.audit('session.started', 'class_session', v_s.id::text,
                     jsonb_build_object('class_id', p_class, 'lesson_id', p_lesson, 'environment_id', p_environment));
   perform live_app.notify(m.user_id, 'session_started', 'Live class started: ' || v_s.title, 'Join code ' || v_s.join_code,
-                     '/student/live/' || v_s.id, 'info', jsonb_build_object('session_id', v_s.id))
+                     '/live/student/live/' || v_s.id, 'info', jsonb_build_object('session_id', v_s.id))
   from live.class_members m where m.class_id = p_class and m.role = 'student';
   return to_jsonb(v_s);
 end$$;
@@ -16085,7 +16085,7 @@ begin
   perform live_app.audit('homework.set', 'class_session', v_s.id::text, jsonb_build_object('class_id', p_class, 'lesson_id', p_lesson, 'due_at', p_due));
   perform live_app.notify(m.user_id, 'homework_set', 'Homework: ' || v_s.title,
                      'Due ' || to_char(p_due at time zone coalesce((select timezone from live.tenants where id = v_me.tenant_id), 'UTC'), 'Dy DD Mon, HH24:MI'),
-                     '/student/live/' || v_s.id, 'info', jsonb_build_object('session_id', v_s.id))
+                     '/live/student/live/' || v_s.id, 'info', jsonb_build_object('session_id', v_s.id))
   from live.class_members m where m.class_id = p_class and m.role = 'student';
   return to_jsonb(v_s);
 end$$;
@@ -16806,7 +16806,7 @@ begin
   update live.browser_sessions set snapshot_requested_at = now() where class_session_id = p_session and student_id = p_student;
   update live.session_participants set hq_requested_at = now() where session_id = p_session and user_id = p_student;
   perform live_app.notify(p_student, 'spotlight', 'Your teacher is sharing your screen with the class',
-                     case when p_anonymized then 'Your name is hidden.' end, '/student/live/' || p_session, 'info',
+                     case when p_anonymized then 'Your name is hidden.' end, '/live/student/live/' || p_session, 'info',
                      jsonb_build_object('session_id', p_session));
   perform live_app.audit('spotlight.started', 'user', p_student::text,
                     jsonb_build_object('session_id', p_session, 'anonymized', p_anonymized, 'show_to_class', p_show_to_class));

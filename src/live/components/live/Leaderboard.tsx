@@ -1,20 +1,27 @@
 import { cn, LOCALE } from "@/live/lib/utils";
 import { Critter } from "./Critter";
 
-export type BoardEntry = { name: string; avatar: string | null; score: number; rank: number; delta?: number };
+/** key: an opaque per-player id from the server (migration 6130), so two people with the same name are never mixed up. */
+export type BoardEntry = { key?: string; name: string; avatar: string | null; score: number; rank: number; delta?: number };
+
+/** Who is viewing: by key when the board has keys, else (boards saved before 6130) by name. */
+export type Viewer = { key?: string | null; name?: string | null };
+const rowKey = (e: BoardEntry, i: number) => e.key ?? `${e.rank}-${e.name}-${i}`;
+export const isMe = (e: { key?: string; name: string }, me?: Viewer) =>
+  !!me && (e.key && me.key ? e.key === me.key : !!me.name && e.name === me.name);
 
 // The podium's colours: 1st lime star, 2nd cobalt bolt, 3rd magenta hexagon.
 const MEDAL = ["bg-tile-star text-ink-950", "bg-tile-bolt text-white", "bg-tile-hex text-white"];
 
 /** Top of the class, game-show style. Lower ranks are never shown to the class. */
-export function Leaderboard({ entries, size = "md", highlight }: { entries: BoardEntry[]; size?: "md" | "lg"; highlight?: string }) {
+export function Leaderboard({ entries, size = "md", highlight }: { entries: BoardEntry[]; size?: "md" | "lg"; highlight?: Viewer }) {
   const lg = size === "lg";
   if (!entries.length) return <p className={cn("text-center text-ink-300", lg ? "text-2xl" : "text-sm")}>No points yet.</p>;
   return (
     <ol className={cn("w-full space-y-2", lg && "space-y-3")}>
-      {entries.map((e) => (
-        <li key={`${e.rank}-${e.name}`}
-          className={cn("flex items-center gap-3 rounded-2xl bg-white/[0.07] px-4 text-white ring-1 ring-inset ring-white/10", lg ? "py-3 text-lg sm:py-4 sm:text-2xl" : "py-2.5", e.name === highlight && "ring-2 ring-accent-400")}>
+      {entries.map((e, i) => (
+        <li key={rowKey(e, i)} aria-current={isMe(e, highlight) ? "true" : undefined}
+          className={cn("flex items-center gap-3 rounded-2xl bg-white/[0.07] px-4 text-white ring-1 ring-inset ring-white/10", lg ? "py-3 text-lg sm:py-4 sm:text-2xl" : "py-2.5", isMe(e, highlight) && "ring-2 ring-accent-400")}>
           <span className={cn("grid shrink-0 place-items-center rounded-full font-display font-extrabold", lg ? "h-10 w-10 text-xl sm:h-12 sm:w-12 sm:text-2xl" : "h-8 w-8 text-sm",
             MEDAL[e.rank - 1] ?? "bg-white/15 text-white")}>{e.rank}</span>
           <Critter name={e.avatar} className={lg ? "h-8 w-8 sm:h-10 sm:w-10" : "h-7 w-7"} />
@@ -33,8 +40,8 @@ export function RankGrid({ entries }: { entries: BoardEntry[] }) {
   if (!entries.length) return null;
   return (
     <ol className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3" aria-label="Everyone else">
-      {entries.map((e) => (
-        <li key={`${e.rank}-${e.name}`} className="flex items-center gap-3 rounded-xl bg-white/[0.07] px-3 py-2 text-white ring-1 ring-inset ring-white/10">
+      {entries.map((e, i) => (
+        <li key={rowKey(e, i)} className="flex items-center gap-3 rounded-xl bg-white/[0.07] px-3 py-2 text-white ring-1 ring-inset ring-white/10">
           <span className="w-8 shrink-0 text-right font-display text-lg font-extrabold tabular-nums text-ink-300">{e.rank}</span>
           <Critter name={e.avatar} className="h-7 w-7 shrink-0" />
           <span className="min-w-0 flex-1 truncate text-base font-semibold sm:text-lg">{e.name}</span>

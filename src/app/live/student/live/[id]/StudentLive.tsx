@@ -72,6 +72,7 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
   // Lesson state is refetched when the teacher changes something (pushed signal,
   // or the version reported by the 10 s tick); the slow poll is only a safety net.
   const st = useRpc<StudentState>("session_student_state", { p_session: sessionId }, [sessionId], { intervalMs: quality === "slow" ? 120000 : 60000 });
+  const boardKey = useRpc<string | null>("my_board_key", { p_session: sessionId }, [sessionId]);
   const lesson = useLoader(() => rpc<{ slides: LearnerSlide[] }>("session_lesson", { p_session: sessionId }), [sessionId]);
   useSignal(`session:${sessionId}`, ["state"], () => void st.reload(), { debounceMs: 150 });
   // The broadcast carries the new slide, phase and activity: show them at once, and let
@@ -126,6 +127,7 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
     return <div className="page max-w-xl"><Alert title="This lesson hasn't started yet">Keep this page open. It starts as soon as {s.session.teacher} begins the lesson.</Alert></div>;
   }
   const myName = s.me?.name ?? me.name;
+  // Your row on the class board, by key: names can repeat (two guests called Sam) or be "Player 3".
   if (s.session.status !== "live" || s.session.phase === "ended") {
     return <EndScreen name={myName} avatar={s.me?.avatar ?? null} summary={s.summary ?? null} guest={guest} score={s.my ?? null} closedNote={s.session.mode === "student_paced" ? "This has closed. Your answers are saved." : undefined} />;
   }
@@ -152,7 +154,7 @@ export function StudentLive({ sessionId, me, notice, consented, guest = false }:
   return (
     <div className="page max-w-5xl space-y-4 bg-ink-50">
       {s.session.phase === "paused" && <PausedOverlay teacher={s.session.teacher} />}
-      {s.leaderboard && s.session.phase !== "paused" && <BoardOverlay entries={s.leaderboard} me={myName} my={s.my ?? null} />}
+      {s.leaderboard && s.session.phase !== "paused" && <BoardOverlay entries={s.leaderboard} me={{ key: boardKey.data, name: myName }} my={s.my ?? null} />}
       <StartLearning guard={guard} teacher={s.session.teacher} title={s.session.title} />
       <LockdownGate guard={guard} teacher={s.session.teacher} />
       <div className="flex flex-wrap items-center justify-between gap-3">

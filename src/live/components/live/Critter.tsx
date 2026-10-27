@@ -110,6 +110,39 @@ const ART: Record<string, React.ReactNode> = {
     <path d="M14 22 L22 10 L24 24 Z" fill="#EDE9FE" />
     <Face y={34} gap={9} mouthY={43} />
     <circle cx="16" cy="42" r="3" fill="#F9A8D4" /><circle cx="48" cy="42" r="3" fill="#F9A8D4" />
+  </>,
+  // Collected later with XP (see avatars.ts): cat, whale, dragon, phoenix.
+  cat: <>
+    <path d="M9 6 L24 18 L11 28 Z M55 6 L40 18 L53 28 Z" fill="#334155" />
+    <path d="M13 11 L21 18 L14 23 Z M51 11 L43 18 L50 23 Z" fill="#F9A8D4" />
+    <rect x="8" y="14" width="48" height="44" rx="21" fill="#475569" />
+    <path d="M8 40 h10 M8 45 h10 M56 40 h-10 M56 45 h-10" stroke="#CBD5E1" strokeWidth={2} strokeLinecap="round" />
+    <Face y={33} gap={11} mouth={false} />
+    <path d="M29.5 41 h5 l-2.5 3 z" fill="#F9A8D4" />
+    <path d="M27 46 q2.5 2.5 5 0 q2.5 2.5 5 0" stroke={INK} strokeWidth={2.2} strokeLinecap="round" fill="none" />
+  </>,
+  whale: <>
+    <path d="M30 4 q-3 6 2 9 q5 -3 2 -9 M24 6 q1 5 6 6 M40 6 q-1 5 -6 6" stroke="#38BDF8" strokeWidth={2.6} strokeLinecap="round" fill="none" />
+    <path d="M6 36 Q6 14 32 14 Q58 14 58 36 Q58 58 32 58 Q6 58 6 36 Z" fill="#0E7490" />
+    <path d="M12 44 Q32 62 52 44 Q46 54 32 54 Q18 54 12 44 Z" fill="#A5F3FC" />
+    <Face y={33} gap={12} mouthY={42} />
+  </>,
+  dragon: <>
+    <path d="M14 4 L22 20 L10 22 Z M50 4 L42 20 L54 22 Z" fill="#C6EE3A" />
+    <path d="M2 30 L12 24 L12 40 Z M62 30 L52 24 L52 40 Z" fill="#15803D" />
+    <rect x="10" y="14" width="44" height="44" rx="19" fill="#16A34A" />
+    <path d="M22 14 l4 -6 l4 6 M34 14 l4 -6 l4 6" fill="#C6EE3A" />
+    <ellipse cx="32" cy="46" rx="13" ry="9" fill="#BBF7D0" />
+    <circle cx="27" cy="45" r="1.8" fill={INK} /><circle cx="37" cy="45" r="1.8" fill={INK} />
+    <Face y={32} gap={10} mouth={false} eye={4.4} />
+  </>,
+  phoenix: <>
+    <path d="M32 0 q-6 8 0 14 q6 -6 0 -14 M22 4 q-2 8 6 11 M42 4 q2 8 -6 11" fill="#F59E0B" />
+    <path d="M2 40 Q8 22 18 30 Q10 34 12 46 Z M62 40 Q56 22 46 30 Q54 34 52 46 Z" fill="#EA580C" />
+    <circle cx="32" cy="36" r="22" fill="#DC2626" />
+    <path d="M20 50 Q32 62 44 50 Q38 56 32 56 Q26 56 20 50 Z" fill="#FDBA74" />
+    <Face y={33} gap={9} mouth={false} />
+    <path d="M28 40 L36 40 L32 47 Z" fill="#FACC15" />
   </>
 };
 

@@ -54,7 +54,14 @@ const SKIP = [/^src\/live\/components\/marketing\//, /^src\/live\/components\/pa
 
 /** Files Synergy Swift has edited by hand after porting (kept on re-run). */
 const KEEP = new Set(["src/live/lib/supabase/client.ts", "src/live/lib/supabase/server.ts", "src/live/lib/supabase/service.ts", "src/live/lib/session.ts",
-  "src/app/live/student/join/page.tsx", "src/app/live/teacher/live/[id]/ControlBar.tsx"]);
+  "src/app/live/student/join/page.tsx", "src/app/live/teacher/live/[id]/ControlBar.tsx",
+  // Phase 14d-3 games rework (modes, power-ups, lives, race, characters, board keys).
+  "src/live/lib/types.ts", "src/live/components/game/types.ts", "src/live/components/game/Countdown.tsx", "src/live/components/game/Celebrate.tsx",
+  "src/live/components/game/GameBits.tsx", "src/live/components/live/Leaderboard.tsx", "src/live/components/live/Critter.tsx",
+  "src/live/components/live/avatars.ts", "src/live/components/live/StudentPhases.tsx", "src/app/live/student/live/[id]/StudentLive.tsx",
+  "src/app/live/student/game/[id]/GamePlayer.tsx", "src/app/live/teacher/challenge/[id]/GameHost.tsx",
+  "src/app/live/teacher/challenge/new/NewGameForm.tsx", "src/app/live/teacher/challenge/new/page.tsx", "src/app/live/teacher/challenge/page.tsx",
+  "src/live/components/activities/QuestionInput.tsx", "src/app/live/student/characters/page.tsx", "src/app/live/student/characters/CharacterCollection.tsx"]);
 
 /** Old SwiftCipher routes → where they live in Synergy Swift. Longest first. */
 const ROUTES = [
