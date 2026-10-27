@@ -35,6 +35,9 @@ export async function GET(req: NextRequest) {
   const offersExpired = await expireOffers(svc).catch(() => 0);
   // Entrance-test camera photos go after 60 days.
   const entrancePhotos = await purgeEntrancePhotos(svc).catch(() => 0);
+  // Performance samples are kept for 14 days (phase 14l).
+  await svc.from("perf_samples").delete().lt("at", new Date(Date.now() - 14 * 86_400_000).toISOString()).then(() => null, () => null);
+  await svc.from("result_pin_tries").delete().lt("at", new Date(Date.now() - 86_400_000).toISOString()).then(() => null, () => null);
   // Promises to pay fees: kept, or broken (follow-up for the bursar, polite message to the parent).
   const promises = await runPromiseChecks(svc, appUrl(req)).catch(() => null);
   // Fee reminders before and after due dates, and late fees after the grace period.

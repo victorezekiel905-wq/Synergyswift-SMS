@@ -61,6 +61,7 @@ export const NAV: NavGroup[] = [
     { href: "/exams", label: "Secure exams (CBT)", roles: [...TEACH, "exam_officer"], module: "exams" },
     { href: "/exams/bank", label: "Question bank", roles: [...TEACH, "exam_officer"], module: "exams" },
     { href: "/school/exam-planner", label: "Exam timetable & halls", roles: [...TEACH, "exam_officer"], module: "exams" },
+    { href: "/school/result-pins", label: "Result checker PINs", roles: [...ADMIN, "bursar", "exam_officer"], module: "results", hint: "Scratch cards for checking results online" },
     { href: "/school/insights", label: "Results analysis & returns", roles: [...TEACH, "qa_officer", "bursar", "admissions_officer"], module: "analytics" },
     { href: "/school/reports", label: "Report builder", roles: STAFF.filter(r => !["gate_officer", "cashier", "transport_officer", "nurse", "hostel_warden"].includes(r)) }
   ] },

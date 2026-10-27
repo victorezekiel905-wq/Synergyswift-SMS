@@ -89,6 +89,7 @@ export default function CentrePage() {
         </section>
         <SupportAccess />
       </div>
+      <Performance />
     </Page>
   );
 }
@@ -132,6 +133,34 @@ function SupportAccess() {
           <button className="btn btn-primary" disabled={!f.tenant_id || f.reason.trim().length < 10} onClick={start}>Open support access</button>
         </div>)}
       </Modal>
+    </section>
+  );
+}
+
+type Perf = { budgets: Record<string, number>; total: number; ok: boolean;
+  vitals: { name: string; p75: number | null; samples: number; budget: number; within: boolean | null }[];
+  pages: { path: string; lcp_p75: number; samples: number; within: boolean }[]; calls: { name: string; count: number; p95: number; worst: number }[] };
+const VITAL_WORDS: Record<string, string> = { LCP: "Main content shown", INP: "Response to a tap or click", CLS: "Layout shifting (score)", FCP: "First thing on screen", TTFB: "Server first byte" };
+const fmtV = (name: string, v: number | null) => v === null ? "—" : name === "CLS" ? v.toFixed(2) : v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)} ms`;
+
+/** Performance budgets (phase 14l): real page speed (one visit in five) and slow database calls, last 7 days. */
+function Performance() {
+  const { data, error } = useApi<Perf>("/api/platform/performance");
+  if (error) return <section className="card mt-4 p-4"><Alert>{error}</Alert></section>;
+  if (!data) return null;
+  return (
+    <section className="card mt-4 p-4 text-sm">
+      <div className="flex items-center gap-2"><h2 className="mr-auto font-semibold">Performance budgets</h2><Badge tone={data.ok ? "green" : "amber"}>{data.total ? (data.ok ? "within budget" : "over budget") : "no data yet"}</Badge></div>
+      <p className="mt-1 text-slate-600">From real browsers (one visit in five) and the server, over the last 7 days. 75% of visits should be at or under each budget.</p>
+      <div className="mt-3 grid gap-4 lg:grid-cols-3">
+        <table className="w-full"><thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">Page speed</th><th>75% of visits</th><th>Budget</th></tr></thead>
+          <tbody>{data.vitals.map(v => <tr key={v.name} className="border-t border-slate-100"><td className="py-1">{VITAL_WORDS[v.name] ?? v.name}<span className="block text-xs text-slate-400">{v.name} · {v.samples} samples</span></td>
+            <td className={v.within === false ? "font-semibold text-red-700" : ""}>{fmtV(v.name, v.p75)}</td><td className="text-slate-500">{fmtV(v.name, v.budget)}</td></tr>)}</tbody></table>
+        <div><h3 className="mb-1 text-[13px] font-medium text-slate-500">Slowest pages (main content shown)</h3>
+          {!data.pages.length ? <p className="text-slate-500">Not enough visits yet.</p> : <ul>{data.pages.map(p => <li key={p.path} className="flex justify-between gap-2 py-0.5"><span className="truncate font-mono text-xs">{p.path}</span><span className={p.within ? "" : "font-semibold text-red-700"}>{fmtV("LCP", p.lcp_p75)}</span></li>)}</ul>}</div>
+        <div><h3 className="mb-1 text-[13px] font-medium text-slate-500">Slow database calls (over {fmtV("x", data.budgets.slow_call)})</h3>
+          {!data.calls.length ? <p className="text-slate-500">None. Good.</p> : <ul>{data.calls.map(c => <li key={c.name} className="flex justify-between gap-2 py-0.5"><span className="truncate font-mono text-xs">{c.name}</span><span>{c.count}× · worst {fmtV("x", c.worst)}</span></li>)}</ul>}</div>
+      </div>
     </section>
   );
 }

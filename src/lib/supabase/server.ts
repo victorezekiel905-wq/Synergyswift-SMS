@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { timedFetch } from "@/lib/perf-server";
 
 /** RLS-bound Supabase client for server components and route handlers (Next 15: cookies() is async). */
 export async function createClient(): Promise<any> {
@@ -8,6 +9,7 @@ export async function createClient(): Promise<any> {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: timedFetch() },
       cookies: {
         getAll() { return cookieStore.getAll(); },
         setAll(toSet: { name: string; value: string; options?: any }[]) {

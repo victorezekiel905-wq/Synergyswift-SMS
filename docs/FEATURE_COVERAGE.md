@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (done) · 14e entrance automation (done) · 14f elections (done) · 14g CRMs (done) · 14h SEN engagement (done) · 14i attendance, shifts and bus safety (done) · 14j exam extras (done) · 14k super admin centre (done) · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (done) · 14e entrance automation (done) · 14f elections (done) · 14g CRMs (done) · 14h SEN engagement (done) · 14i attendance, shifts and bus safety (done) · 14j exam extras (done) · 14k super admin centre (done) · 14l result PINs and group reports (done) · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -480,6 +480,15 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | School activity | ✅ students, staff and the share of staff who signed in this month; the most active schools and the quietest (possible churn), with last activity |
 | Support access instead of impersonation | ✅ a platform admin (admin or owner) opens one school for 15, 30 or 60 minutes, with a reason, as a separate account named "Synergy Swift support (their name)" acting as a school admin, teacher, bursar, HR manager or exam officer; a one-time link is opened in a private window; everything it does is in the school's change history under that name; the school's admins see every visit and its reason under Security & sign-in; the database stops honouring the account the moment the time is up (and the scheduler closes it and bans its sign-in); "End now" closes it early; both the platform and the school audit logs record it |
 
+## 14l. Result PINs, branch reports and performance budgets (phase 14l, done)
+
+| Feature | Status |
+|---|---|
+| Scratch-card result PINs | ✅ Exams & results → Result checker PINs: batches of up to 5,000 cards for a term (or any term), uses per PIN, price per card and expiry; serial numbers from the school's initials; PINs printed (cards with the checker address and a QR code) or downloaded as CSV when the batch is made, then kept only as hashes; look a card up by serial (uses, student, last check) and cancel lost or stolen cards; use per batch |
+| Public result checker | ✅ /results/check/&lt;school&gt;: admission number and PIN, no sign-in; a PIN belongs to the first student it is used for and works its set number of times; a use is only counted when a published result is shown; guessing is slowed (20 tries per address and 10 per student in 15 minutes); opens the signed report card |
+| Branch reports for proprietors | ✅ the group console now adds pass rate (term average 50+), staff on time (30 days), applications and offered places (90 days); every column ranks the branches when clicked; CSV download |
+| Performance budgets | ✅ one visit in five reports real page speed (main content, response to taps, layout shift, first paint, server time); every database call slower than 0.8 s is recorded; Platform → Overview shows the 75th percentile of each against its budget, the slowest pages and the slowest database calls over 7 days; budgets can be changed; samples are kept 14 days |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -537,3 +546,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101006900_bus_exam_safety.sql` | 14i-2 |
 | `20260101007000_exam_office.sql` | 14j |
 | `20260101007100_platform_centre.sql` | 14k |
+| `20260101007200_result_pins_perf.sql` | 14l |
