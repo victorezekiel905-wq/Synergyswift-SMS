@@ -1,6 +1,6 @@
 /**
  * Starter practice questions so a new school's bank and past-question
- * practice are not empty on day one. Written for EduClass: these are NOT
+ * practice are not empty on day one. Written for Synergy Swift: these are NOT
  * official WAEC, NECO or JAMB past questions (those are the exam bodies'
  * copyright). They are tagged exam_body "Sample" and open for practice.
  * Schools add their own past questions with the spreadsheet import.

@@ -94,7 +94,7 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[400px] flex-col px-5 py-10 sm:py-16">
-      <Link href="/" className="flex items-center gap-2.5 self-start"><Monogram /><span className="text-[15px] font-semibold tracking-tight">EduClass Fusion</span></Link>
+      <Link href="/" className="flex items-center gap-2.5 self-start"><Monogram /><span className="text-[15px] font-semibold tracking-tight">Synergy Swift</span></Link>
       <h1 className="mt-14 font-serif text-[30px] font-semibold leading-tight tracking-[-0.01em]">Sign in</h1>
       <p className="mt-2 text-[15px] text-slate-600 sm:text-sm">Use the account your school set up for you.</p>
       {notice && <p role="status" className="mt-5 rounded-md border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">{notice}</p>}

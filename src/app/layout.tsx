@@ -11,11 +11,11 @@ const serif = IBM_Plex_Serif({ subsets: ["latin"], weight: ["500", "600"], varia
 const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "EduClass Fusion",
+  title: "Synergy Swift",
   description: "School management: admissions, attendance, results, fees, learning and the parent app.",
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
-  appleWebApp: { capable: true, title: "EduClass", statusBarStyle: "default" }
+  appleWebApp: { capable: true, title: "Synergy Swift", statusBarStyle: "default" }
 };
 
 export const viewport: Viewport = {

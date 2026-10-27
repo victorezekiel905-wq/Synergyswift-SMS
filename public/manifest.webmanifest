@@ -1,7 +1,7 @@
 {
   "id": "/dashboard",
-  "name": "EduClass Fusion",
-  "short_name": "EduClass",
+  "name": "Synergy Swift",
+  "short_name": "Synergy Swift",
   "description": "School management, results, fees, attendance and parent updates in one app.",
   "start_url": "/dashboard",
   "scope": "/",

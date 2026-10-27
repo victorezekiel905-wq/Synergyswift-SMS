@@ -69,7 +69,7 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export function buildSebConfig(opts: { startUrl: string; quitUrl: string; title: string } & SebSettings): string {
   const bool = (b: boolean) => (b ? "<true/>" : "<false/>");
   const entries: [string, string][] = [
-    ["originatorVersion", `<string>EduClass Fusion</string>`],
+    ["originatorVersion", `<string>Synergy Swift</string>`],
     ["startURL", `<string>${esc(opts.startUrl)}</string>`],
     ["quitURL", `<string>${esc(opts.quitUrl)}</string>`],
     ["quitURLConfirm", bool(false)],

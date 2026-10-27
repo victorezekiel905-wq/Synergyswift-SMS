@@ -7,7 +7,7 @@ export default function EmbedResize() {
   const path = usePathname();
   useEffect(() => {
     if (window.self === window.top || !/^\/(apply|enquire)\//.test(path)) return;
-    const post = () => window.parent.postMessage({ type: "educlass:height", height: document.documentElement.scrollHeight, path }, "*");
+    const post = () => window.parent.postMessage({ type: "synergyswift:height", height: document.documentElement.scrollHeight, path }, "*");
     const ro = new ResizeObserver(post);
     ro.observe(document.body);
     post();

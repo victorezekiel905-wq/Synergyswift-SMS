@@ -1,6 +1,6 @@
 {
-  "appId": "com.educlassfusion.app",
-  "appName": "EduClass Fusion",
+  "appId": "com.synergyswift.app",
+  "appName": "Synergy Swift",
   "webDir": "native/www",
   "server": {
     "url": "https://REPLACE-WITH-YOUR-APP-URL",

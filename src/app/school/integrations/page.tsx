@@ -37,7 +37,7 @@ export default function IntegrationsPage() {
   }
   const tabs = [{ id: "website" as const, label: "School website" }, ...(data.admin ? [{ id: "keys" as const, label: "API keys" }, { id: "webhooks" as const, label: "Webhooks" }, { id: "services" as const, label: "Connected services" }] : [])];
   const s = data.slug;
-  const snippet = (kind: string) => `<div data-educlass="${kind}" data-school="${s}"></div>\n<script src="${data.base}/embed.js" async></script>`;
+  const snippet = (kind: string) => `<div data-synergyswift="${kind}" data-school="${s}"></div>\n<script src="${data.base}/embed.js" async></script>`;
 
   return (
     <Page wide>

@@ -71,7 +71,7 @@ export function fold(line: string): string {
 /** An iCalendar document. `uidDomain` makes event ids stable across refreshes. */
 export function toIcs(items: CalItem[], opts: { name: string; uidDomain: string; now?: Date }): string {
   const stamp = utc((opts.now ?? new Date()).toISOString());
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//EduClass Fusion//School calendar//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Synergy Swift//School calendar//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
     `X-WR-CALNAME:${esc(opts.name)}`, "REFRESH-INTERVAL;VALUE=DURATION:PT6H", "X-PUBLISHED-TTL:PT6H"];
   for (const i of items) {
     lines.push("BEGIN:VEVENT", `UID:${i.id.replace(/[^\w.-]/g, "")}@${opts.uidDomain}`, `DTSTAMP:${stamp}`);

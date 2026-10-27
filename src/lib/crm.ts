@@ -122,16 +122,19 @@ export const DEFAULT_TEMPLATES = {
 } as const;
 
 /** iCalendar file for a booking, so families can add the visit to their phone calendar. */
+const organiserEmail = () => (process.env.EMAIL_FROM ?? "").replace(/^.*<|>.*$/g, "").trim() || null;
+
 export function buildIcs(e: { uid: string; title: string; starts_at: string; ends_at?: string | null; location?: string | null; details?: string | null; organizer: string }): string {
   const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const start = new Date(e.starts_at);
   const end = e.ends_at ? new Date(e.ends_at) : new Date(start.getTime() + 60 * 60_000);
   const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/[,;]/g, m => `\\${m}`);
   return [
-    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//EduClass Fusion//Admissions//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
-    "BEGIN:VEVENT", `UID:${e.uid}@educlass`, `DTSTAMP:${fmt(new Date())}`, `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Synergy Swift//Admissions//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    "BEGIN:VEVENT", `UID:${e.uid}@synergyswift`, `DTSTAMP:${fmt(new Date())}`, `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
     `SUMMARY:${esc(e.title)}`, ...(e.location ? [`LOCATION:${esc(e.location)}`] : []), ...(e.details ? [`DESCRIPTION:${esc(e.details)}`] : []),
-    `ORGANIZER;CN=${esc(e.organizer)}:MAILTO:noreply@educlass.app`,
+    // The organiser's address is the school's sending address, when one is set up.
+    ...(organiserEmail() ? [`ORGANIZER;CN=${esc(e.organizer)}:MAILTO:${organiserEmail()}`] : []),
     "BEGIN:VALARM", "TRIGGER:-PT2H", "ACTION:DISPLAY", "DESCRIPTION:Reminder", "END:VALARM",
     "END:VEVENT", "END:VCALENDAR", ""
   ].join("\r\n");

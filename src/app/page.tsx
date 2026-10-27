@@ -28,7 +28,7 @@ export default function Home() {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
           <Link href="/" className="flex items-center gap-2.5">
             <Monogram />
-            <span className="whitespace-nowrap text-[15px] font-semibold tracking-tight">EduClass Fusion</span>
+            <span className="whitespace-nowrap text-[15px] font-semibold tracking-tight">Synergy Swift</span>
           </Link>
           <nav className="flex items-center gap-1 sm:gap-2">
             <Link href="/student/join" className="btn btn-ghost hidden text-[13px] sm:inline-flex">Join a class</Link>
@@ -106,7 +106,7 @@ export default function Home() {
 
       <footer className="border-t border-slate-200">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-8 text-[13px] text-slate-500 sm:px-8">
-          <span className="flex items-center gap-2"><Monogram size="h-6 w-6 text-[13px]" /> EduClass Fusion</span>
+          <span className="flex items-center gap-2"><Monogram size="h-6 w-6 text-[13px]" /> Synergy Swift</span>
           <span className="flex gap-5">
             <Link href="/login" className="hover:text-slate-800">Sign in</Link>
             <Link href="/student/join" className="hover:text-slate-800">Students: join a class</Link>

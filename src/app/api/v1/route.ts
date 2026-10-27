@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     openapi: "3.1.0",
     info: {
-      title: "EduClass Fusion school API", version: "1.0.0",
+      title: "Synergy Swift school API", version: "1.0.0",
       description: [
         "Read a school's data and send in admissions applications. A school admin creates keys under Integrations, choosing scopes; send the key as `Authorization: Bearer ssk_…`.",
         "GraphQL: POST /api/v1/graphql with { query, variables } — top-level fields are the resources below with the same filters.",

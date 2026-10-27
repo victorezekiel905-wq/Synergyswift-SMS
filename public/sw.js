@@ -1,5 +1,5 @@
 /*
- * EduClass Fusion service worker.
+ * Synergy Swift service worker.
  * - Makes the app installable on phones (Add to Home screen).
  * - Caches static build assets and the icon so the shell loads fast on slow networks.
  * - Never caches API responses or pages: school data is always live and private.

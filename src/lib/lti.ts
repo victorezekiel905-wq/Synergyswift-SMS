@@ -95,7 +95,7 @@ export function launchClaims(i: LaunchInput): Record<string, unknown> {
     [`${C}resource_link`]: { id: i.link.id, title: i.link.title },
     [`${C}roles`]: ltiRoles(i.user.roles),
     ...(i.context ? { [`${C}context`]: { id: i.context.id, label: i.context.label, title: i.context.title, type: ["http://purl.imsglobal.org/vocab/lis/v2/course#CourseOffering"] } } : {}),
-    [`${C}tool_platform`]: { guid: i.platform.guid, name: i.platform.name, product_family_code: "educlass-fusion", version: "1" },
+    [`${C}tool_platform`]: { guid: i.platform.guid, name: i.platform.name, product_family_code: "synergy-swift", version: "1" },
     [`${C}launch_presentation`]: { document_target: "window", return_url: i.returnUrl, locale: i.locale ?? "en" },
     [`${C}custom`]: i.link.custom,
     ...(i.ags ? { [AGS.claim]: { scope: [AGS.lineitem, AGS.score, AGS.result], lineitem: i.ags.lineitem, lineitems: i.ags.lineitems } } : {})

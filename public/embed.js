@@ -1,8 +1,10 @@
 /*
- * EduClass Fusion website widgets. Put this on any page of the school's site
+ * Synergy Swift website widgets. Put this on any page of the school's site
  * (WordPress, Wix, Squarespace, plain HTML):
  *
- *   <div data-educlass="news" data-school="your-school"></div>
+ *   <div data-synergyswift="news" data-school="your-school"></div>
+ *
+ * (Older snippets with data-educlass="…" keep working.)
  *   <script src="https://YOUR-APP/embed.js" async></script>
  *
  * Widgets: news (latest posts, click to read), events (upcoming), apply (the
@@ -33,7 +35,7 @@
     f.setAttribute("loading", "lazy");
     el.appendChild(f);
     window.addEventListener("message", function (e) {
-      if (e.origin !== base || !e.data || e.data.type !== "educlass:height" || e.source !== f.contentWindow) return;
+      if (e.origin !== base || !e.data || (e.data.type !== "synergyswift:height" && e.data.type !== "educlass:height") || e.source !== f.contentWindow) return;
       f.style.height = Math.max(300, Number(e.data.height) || 600) + 20 + "px";
     });
   }
@@ -68,9 +70,9 @@
   }
 
   function mount() {
-    document.querySelectorAll("[data-educlass]:not([data-educlass-ready])").forEach(function (el) {
-      el.setAttribute("data-educlass-ready", "1");
-      var kind = el.getAttribute("data-educlass"), school = el.getAttribute("data-school");
+    document.querySelectorAll("[data-synergyswift]:not([data-ss-ready]),[data-educlass]:not([data-ss-ready])").forEach(function (el) {
+      el.setAttribute("data-ss-ready", "1");
+      var kind = el.getAttribute("data-synergyswift") || el.getAttribute("data-educlass"), school = el.getAttribute("data-school");
       if (!school) return;
       var limit = Math.min(50, Math.max(1, Number(el.getAttribute("data-limit")) || 5));
       var color = /^#[0-9a-f]{3,8}$/i.test(el.getAttribute("data-color") || "") ? el.getAttribute("data-color") : "#2f4f8f";

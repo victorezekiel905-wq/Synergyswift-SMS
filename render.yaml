@@ -1,4 +1,4 @@
-# Render Blueprint for EduClass Fusion.
+# Render Blueprint for Synergy Swift. (Service names keep their original "educlass" ids so existing Render services are not replaced.)
 # In Render: New → Blueprint → pick this repository. Render reads this file,
 # creates the web app and the two scheduled jobs, and asks for every value
 # marked `sync: false`. See docs/DEPLOY_RENDER.md.

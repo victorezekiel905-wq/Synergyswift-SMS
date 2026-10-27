@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
       const { data: ep } = await ctx.sb.from("webhook_endpoints").select("id").eq("tenant_id", tid).eq("id", b.id).maybeSingle();
       if (!ep) return jsonError("not found", 404);
       return done(await svc.from("webhook_deliveries").insert({ tenant_id: tid, endpoint_id: ep.id, event: "test",
-        payload: { id: crypto.randomUUID(), event: "test", created_at: new Date().toISOString(), data: { message: "Test from EduClass Fusion" } } }), { note: "Sent within a minute." });
+        payload: { id: crypto.randomUUID(), event: "test", created_at: new Date().toISOString(), data: { message: "Test from Synergy Swift" } } }), { note: "Sent within a minute." });
     }
     case "retry_delivery": {
       const { data: d } = await ctx.sb.from("webhook_deliveries").select("id").eq("tenant_id", tid).eq("id", b.id).maybeSingle();

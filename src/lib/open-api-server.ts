@@ -168,7 +168,7 @@ export async function deliverWebhooks(svc: any, batch = 50, budgetMs = 15_000): 
     try {
       const r = await fetch(ep.url, {
         method: "POST", redirect: "manual", signal: AbortSignal.timeout(8000),
-        headers: { "Content-Type": "application/json", "User-Agent": "EduClass-Webhooks/1", "X-Webhook-Event": d.event, "X-Webhook-Id": d.payload?.id ?? d.id, "X-Webhook-Signature": signPayload(ep.secret, body) },
+        headers: { "Content-Type": "application/json", "User-Agent": "SynergySwift-Webhooks/1", "X-Webhook-Event": d.event, "X-Webhook-Id": d.payload?.id ?? d.id, "X-Webhook-Signature": signPayload(ep.secret, body) },
         body
       });
       code = r.status;

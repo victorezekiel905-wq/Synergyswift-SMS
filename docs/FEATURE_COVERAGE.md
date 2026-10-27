@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation · 14d SwiftCipher learning module, games and classroom management · 14e entrance automation · 14f elections · 14g CRMs · 14h SEN engagement · 14i attendance, shifts and bus safety · 14j exam extras · 14k super admin centre · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management · 14e entrance automation · 14f elections · 14g CRMs · 14h SEN engagement · 14i attendance, shifts and bus safety · 14j exam extras · 14k super admin centre · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -303,6 +303,18 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Privileges inside a school set by its admins | ✅ **Roles & privileges**: custom roles that add standard roles, hide modules, and take away actions (publish results, publish/release exams, approve discounts, void payments, run payroll, withdraw students, change staff roles, send broadcasts, send admission offers), checked on the server; nobody can change their own role |
 | Schools never know other schools exist | ✅ as before; the new tables are readable only inside each school (and by school admins), the platform tables not at all |
 | Old billing stubs | ✅ removed: schools could previously write their own invoice rows |
+
+## 14c. Synergy Swift name and easy navigation (phase 14c, done)
+
+| Feature | Status |
+|---|---|
+| One name everywhere | ✅ Synergy Swift in the app, sign-in pages, browser tab, installable app, emails' calendar files, the school API, Safe Exam Browser files, LTI and webhooks; README and docs. Old website embed codes (`data-educlass`) keep working next to the new `data-synergyswift`; Render service ids keep their old names so the live services are not replaced |
+| Eight areas in plain words instead of 80 links | ✅ Home, Teaching, Exams & results, Students & welfare, Safety & gate, Messages & families, Money, School office; only the area you are in is open, the rest show their name and how many pages they hold |
+| Only what applies to you | ✅ links show only for your roles (including a custom role) and only for modules your school has |
+| Plain labels | ✅ e.g. "Outside learning apps" (LTI), "Students who need help" (early warning), "Special needs (SEN)", "Cover for absent staff", "Requests to buy" |
+| Pinned favourites | ✅ star any page to keep it at the top of the menu (per person, per device) |
+| Quick search | ✅ Ctrl K (or the search button on phones) jumps to any page you can open |
+| Phone bar | ✅ four everyday places by role (teacher: Today, Register, Homework, Parents; student: Today, Learn, Practice, Messages; parent: Children, Calendar, Account; office staff: Home, Students, Calendar, Messages) plus Menu |
 
 ## Database updates to run
 

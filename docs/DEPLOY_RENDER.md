@@ -1,6 +1,6 @@
 # Hosting on Render
 
-This guide puts EduClass Fusion online on [Render](https://render.com), with the database on Supabase. Allow about two hours, plus a few days for WhatsApp template approval.
+This guide puts Synergy Swift online on [Render](https://render.com), with the database on Supabase. Allow about two hours, plus a few days for WhatsApp template approval.
 
 The repository already contains a Render Blueprint ([`render.yaml`](../render.yaml)). It creates three things:
 

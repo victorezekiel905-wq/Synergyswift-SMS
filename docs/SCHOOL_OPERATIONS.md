@@ -1,6 +1,6 @@
 # School operations platform (v45 to v47)
 
-This release turns EduClass Fusion from a classroom-engagement tool into a full school management system. It adds a hidden platform layer for the operator, and every school runs as a fully isolated tenant.
+This release turns Synergy Swift from a classroom-engagement tool into a full school management system. It adds a hidden platform layer for the operator, and every school runs as a fully isolated tenant.
 
 ## Who can do what
 

@@ -1,6 +1,6 @@
 # Competitive positioning
 
-This page compares EduClass Fusion with the leading school systems in each market. For each one, it gives the main selling point, the problems its users or the press have reported, and what we took or avoided. It ends with our selling points and the gaps that remain.
+This page compares Synergy Swift with the leading school systems in each market. For each one, it gives the main selling point, the problems its users or the press have reported, and what we took or avoided. It ends with our selling points and the gaps that remain.
 
 Research was done in September 2026 from vendor pages, review sites, school help pages and news reports (sources at the end). Review-site complaints are what some users reported, not verified faults. Vendor figures are the vendor's own claims.
 
@@ -12,7 +12,7 @@ Large US districts run **PowerSchool**, **Infinite Campus** or **Skyward**. Inde
 
 ### Student information systems
 
-| System | Known for | Reported problems | How EduClass Fusion answers |
+| System | Known for | Reported problems | How Synergy Swift answers |
 |---|---|---|---|
 | **PowerSchool** (US) | The largest K-12 SIS. Enrolment, grading, attendance, analytics; standards-based and traditional grading. | **December 2024 breach**: an attacker used one contractor's password on a support portal that did not require multi-factor authentication, and took data on about 62 million students and 9.5 million teachers. Reviewers also report a steep learning curve, gradebook and attendance in different places, hard setup, slow support and difficult year-end rollover. | Two-factor sign-in is **mandatory for super admins and enforced by the database**. Schools can require it for staff too. There is no support back door into school data: the super admin sees settings and usage, not records. Navigation is grouped by task, and year-end rollover is one checked step. |
 | **Infinite Campus** (US) | Early-warning risk scores from attendance, behaviour and grades, with intervention plans. | Reviewers describe paying separately for modules, and cluttered screens. | Early-warning scores with the reasons shown and an intervention log are built in. Every module is in one product, and the platform switches modules on per school. |
@@ -25,7 +25,7 @@ Large US districts run **PowerSchool**, **Infinite Campus** or **Skyward**. Inde
 
 ### Family engagement and payments
 
-| System | Known for | Reported problems | How EduClass Fusion answers |
+| System | Known for | Reported problems | How Synergy Swift answers |
 |---|---|---|---|
 | **ParentSquare** (US) | Two-way messaging translated into 100+ languages; text, email, app and voice. The vendor says it reaches 99.4% of families. | Separate product from the SIS. | Two-way messaging with translation both ways, email, WhatsApp, SMS and app push, all inside the same system as results and fees. |
 | **ClassDojo** | Much-loved classroom culture and behaviour points. | A classroom-level tool; a competitor reports that several family features sit behind a per-parent subscription. | Behaviour points, houses and parent messaging are included for every family at no extra cost. |
@@ -36,7 +36,7 @@ Large US districts run **PowerSchool**, **Infinite Campus** or **Skyward**. Inde
 
 ### Admissions and learning
 
-| System | Known for | Reported problems | How EduClass Fusion answers |
+| System | Known for | Reported problems | How Synergy Swift answers |
 |---|---|---|---|
 | **SchoolMint / Finalsite** | Online applications, fair lotteries, waitlists with sibling priority. | Separate products from the SIS. | Online applications with tracking and an enrolment pipeline. Lotteries and ranked waitlists are not yet offered (see gaps). |
 | **Toddle / ManageBac** (IB) | Curriculum planning, portfolios, automatically drafted report comments. | No significant problems found in this research. | Drafted report comments and lesson notes, always reviewed by the teacher. |
@@ -45,7 +45,7 @@ Large US districts run **PowerSchool**, **Infinite Campus** or **Skyward**. Inde
 
 ### Regional ERPs
 
-| System | Known for | Reported problems | How EduClass Fusion answers |
+| System | Known for | Reported problems | How Synergy Swift answers |
 |---|---|---|---|
 | **Fedena** (India) | 50+ modules including GPS transport and hostel. | Reviewers raise security concerns, a dated interface, fee carry-over problems and no offline sync. | 152 automated security and permission checks, a modern interface, unpaid invoices that stay open across terms until paid, and an offline register. |
 | **Teachmint** (India) | Classroom tools plus fees and parent contact; rated above Fedena for support. | A reviewer reports needing a support ticket for small issues. | Schools configure grading, fees, roles, modules and languages themselves. |
