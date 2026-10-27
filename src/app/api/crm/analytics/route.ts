@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const to = u.searchParams.get("to") ?? new Date().toISOString().slice(0, 10);
   const tid = ctx.tenant.id;
   const leads = await fetchAll<LeadRow & { utm: Record<string, string> | null }>(() => ctx.sb.from("admission_leads")
-    .select("id,stage,source,owner_id,created_at,first_response_at,utm,lost_reason").eq("tenant_id", tid)
+    .select("id,stage,source,owner_id,created_at,first_response_at,utm,lost_reason,application_id").eq("tenant_id", tid)
     .gte("created_at", `${from}T00:00:00Z`).lte("created_at", `${to}T23:59:59Z`).order("id"));
   const [{ data: costs }, { data: staff }] = await Promise.all([
     ctx.sb.from("admission_costs").select("source,campaign,amount,month").eq("tenant_id", tid).gte("month", from.slice(0, 7) + "-01").lte("month", to),
@@ -29,10 +29,22 @@ export async function GET(req: NextRequest) {
   }
   for (const c of costs ?? []) if (c.campaign) { const row = campaigns.get(c.campaign) ?? { campaign: c.campaign, leads: 0, enrolled: 0, spend: 0 }; row.spend += Number(c.amount); campaigns.set(c.campaign, row); }
   const spend = (costs ?? []).reduce((a: number, c: any) => a + Number(c.amount), 0);
+  // Channel return: fees billed to the children each enrolled lead brought in.
+  const appIds = leads.filter(l => l.stage === "enrolled" && (l as any).application_id).map(l => (l as any).application_id as string);
+  const revenue = new Map<string, number>();
+  if (appIds.length) {
+    const { data: apps } = await ctx.sb.from("applications").select("id,student_id").eq("tenant_id", tid).in("id", appIds.slice(0, 2000));
+    const sids = (apps ?? []).map((a: any) => a.student_id).filter(Boolean);
+    const { data: inv } = sids.length ? await ctx.sb.from("fee_invoices").select("student_id,total").eq("tenant_id", tid).in("student_id", sids).neq("status", "void").limit(20000) : { data: [] };
+    const byStudent = new Map<string, number>();
+    for (const i of inv ?? []) byStudent.set(i.student_id, (byStudent.get(i.student_id) ?? 0) + Number(i.total));
+    const byApp = new Map<string, number>((apps ?? []).map((a: any) => [a.id, byStudent.get(a.student_id) ?? 0]));
+    for (const l of leads) if ((l as any).application_id && byApp.has((l as any).application_id)) revenue.set(l.id, byApp.get((l as any).application_id)!);
+  }
   const enrolled = leads.filter(l => l.stage === "enrolled").length;
   return NextResponse.json({
     range: { from, to }, totals: { leads: leads.length, enrolled, conversion: leads.length ? Math.round((enrolled / leads.length) * 1000) / 10 : null, spend, cost_per_enrolment: enrolled && spend ? Math.round(spend / enrolled) : null },
-    funnel: funnel(leads), sources: bySource(leads, (costs ?? []).map((c: any) => ({ source: c.source, amount: Number(c.amount) }))),
+    funnel: funnel(leads), sources: bySource(leads, (costs ?? []).map((c: any) => ({ source: c.source, amount: Number(c.amount) })), revenue),
     staff: staffPerformance(leads, new Map((staff ?? []).map((s: any) => [s.id, s.full_name]))), monthly: monthlyTrend(leads), lost: lostReasons(leads),
     campaigns: [...campaigns.values()].map(c => ({ ...c, cost_per_enrolment: c.enrolled && c.spend ? Math.round(c.spend / c.enrolled) : null })).sort((a, b) => b.leads - a.leads)
   });

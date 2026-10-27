@@ -162,16 +162,23 @@ export function funnel(leads: LeadRow[]) {
   })() }));
 }
 
-export function bySource(leads: LeadRow[], costs: { source: string; amount: number }[]) {
+/**
+ * Per source: enquiries, applications, enrolments, conversion, spend and cost per enquiry and
+ * enrolment; with `revenue` (fees billed to the children each lead brought in), the return:
+ * fees billed for every naira of marketing spend.
+ */
+export function bySource(leads: LeadRow[], costs: { source: string; amount: number }[], revenue?: Map<string, number>) {
   return SOURCES.map(source => {
     const mine = leads.filter(l => l.source === source);
     const enrolled = mine.filter(l => l.stage === "enrolled").length;
     const applied = mine.filter(l => !["enquiry", "tour_booked", "lost"].includes(l.stage) || l.stage === "enrolled").length;
     const spend = costs.filter(c => c.source === source).reduce((a, c) => a + Number(c.amount), 0);
+    const billed = revenue ? Math.round(mine.reduce((a, l) => a + (revenue.get(l.id) ?? 0), 0)) : null;
     return {
       source, leads: mine.length, applied, enrolled,
       conversion: mine.length ? Math.round((enrolled / mine.length) * 1000) / 10 : null,
-      spend, cost_per_lead: mine.length && spend ? Math.round(spend / mine.length) : null, cost_per_enrolment: enrolled && spend ? Math.round(spend / enrolled) : null
+      spend, cost_per_lead: mine.length && spend ? Math.round(spend / mine.length) : null, cost_per_enrolment: enrolled && spend ? Math.round(spend / enrolled) : null,
+      revenue: billed, return_per_naira: billed !== null && spend ? Math.round((billed / spend) * 10) / 10 : null
     };
   }).filter(r => r.leads || r.spend);
 }

@@ -411,6 +411,17 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Gifts can't be faked | ✅ an online gift is marked paid only after the payment provider confirms the exact amount; staff can record only offline gifts |
 | Family timeline | ✅ the family's 360° record now also shows promises to pay (kept/broken) and gifts |
 
+## 14g-3. Two-way WhatsApp inbox and channel return (phase 14g-3, done)
+
+| Feature | Status |
+|---|---|
+| Parents' WhatsApp messages in the inbox | ✅ messages to the school's WhatsApp number arrive in the shared school-office inbox as a WhatsApp thread for that family (the family is found by phone however the number was typed; when a number belongs to families in two schools, the school that last messaged it gets it; unknown numbers are kept for the platform team); photos and voice notes are marked; each message is kept once even when WhatsApp retries 🔑 |
+| Replies go back on WhatsApp | ✅ a staff reply in a WhatsApp thread goes straight to the parent's WhatsApp within WhatsApp's 24-hour window (delivered / failed shown), otherwise the parent gets the usual notification; translation, safeguarding flags and the hourly limit work as for portal messages |
+| Signed webhooks only | ✅ Meta requests are checked with the app secret, Twilio requests with the auth token; anything else is refused. Needs `WHATSAPP_VERIFY_TOKEN` and `WHATSAPP_APP_SECRET` (🔑, set on the server) |
+| School switch | ✅ a school can turn the WhatsApp inbox off (`tenant_settings.whatsapp_inbox`) |
+| Lead scoring | ✅ (already in admissions) each enquiry's score with its reasons |
+| Channel return | ✅ admissions analytics now show, per source, the fees billed to the children it brought in and the return for every ₦1 of marketing spend, beside cost per enquiry and per enrolment |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -462,3 +473,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101006300_elections.sql` | 14f |
 | `20260101006400_sales_crm.sql` | 14g-1 |
 | `20260101006500_collections_fundraising.sql` | 14g-2 |
+| `20260101006600_whatsapp_inbox.sql` | 14g-3 |

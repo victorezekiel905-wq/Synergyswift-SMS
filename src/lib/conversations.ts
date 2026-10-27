@@ -15,6 +15,7 @@ import { assistConfigured, translateTexts } from "./assist";
 import { needsTranslation } from "./languages";
 import { enqueue, tryDispatch, loadBrand, rowsForGuardian, staffRows, type Guardian } from "./messaging/outbox";
 import { newMessage } from "./messaging/notices";
+import { sendWhatsApp } from "./messaging/providers";
 import { studentName } from "./school";
 
 export class MessagingError extends Error {
@@ -59,9 +60,15 @@ async function translateFor(body: string, from: string | null, to: string | null
 
 type Sender = { kind: "staff"; userId: string; name: string } | { kind: "guardian"; guardianId: string; name: string };
 
-/** Adds a message, translates it for the reader, bumps unread counts and notifies the other side. */
-export async function postMessage(svc: any, p: { tenantId: string; conversationId: string; sender: Sender; body: string; baseUrl: string }) {
-  const { data: c } = await svc.from("conversations").select("id,tenant_id,guardian_id,student_id,staff_user_id,subject,status,staff_unread,guardian_unread")
+/**
+ * Adds a message, translates it for the reader, bumps unread counts and notifies the other side.
+ * WhatsApp threads (phase 14g-3): a parent's message comes in with its WhatsApp id (kept once);
+ * a staff reply goes straight back to the parent's WhatsApp while WhatsApp's 24-hour window is
+ * open, otherwise the parent gets the usual notification.
+ */
+export async function postMessage(svc: any, p: { tenantId: string; conversationId: string; sender: Sender; body: string; baseUrl: string; channel?: "app" | "whatsapp"; providerId?: string | null }) {
+  // "*" so this still works on a database without the WhatsApp columns (migration 6600).
+  const { data: c } = await svc.from("conversations").select("*")
     .eq("tenant_id", p.tenantId).eq("id", p.conversationId).maybeSingle();
   if (!c) throw new MessagingError("conversation not found", 404);
   if (c.status === "closed") throw new MessagingError("this conversation is closed; please start a new one");
@@ -81,14 +88,19 @@ export async function postMessage(svc: any, p: { tenantId: string; conversationI
     : await translateFor(p.body, lang.guardian, lang.school);
   // Messages that mention contact details, secrets or risk are flagged for the safeguarding leads.
   const reasons = safeguardingFlags(p.body);
+  const whatsapp = c.channel === "whatsapp";
   const { data: msg, error } = await svc.from("conversation_messages").insert({
+    ...(whatsapp || p.channel === "whatsapp" ? { channel: "whatsapp", provider_id: p.providerId ?? null } : {}),
     flagged: reasons.length > 0, flag_reason: reasons.join("; ") || null,
     tenant_id: p.tenantId, conversation_id: c.id, sender_kind: p.sender.kind,
     sender_user_id: p.sender.kind === "staff" ? p.sender.userId : null, sender_name: p.sender.name, body: p.body,
     translated_body: translated, source_lang: translated ? (p.sender.kind === "staff" ? lang.school : lang.guardian) : null,
     target_lang: translated ? (p.sender.kind === "staff" ? lang.guardian : lang.school) : null
   }).select("id,created_at").single();
-  if (error) throw new MessagingError(error.message);
+  if (error) {
+    if (p.providerId && /duplicate|unique/i.test(error.message)) return { id: null, translated: false, duplicate: true };
+    throw new MessagingError(error.message);
+  }
   await svc.from("conversations").update(p.sender.kind === "staff"
     ? { guardian_unread: c.guardian_unread + 1, last_message_at: msg.created_at }
     : { staff_unread: c.staff_unread + 1, last_message_at: msg.created_at }).eq("tenant_id", p.tenantId).eq("id", c.id);
@@ -103,7 +115,22 @@ export async function postMessage(svc: any, p: { tenantId: string; conversationI
       const { data: g } = await svc.from("guardians")
         .select("id,user_id,full_name,email,phone,whatsapp_phone,notify_email,notify_whatsapp,notify_sms,portal_token,language,push_subscriptions(id)")
         .eq("id", c.guardian_id).maybeSingle();
-      if (g) {
+      // WhatsApp thread, parent wrote in the last 24 hours: reply on WhatsApp itself.
+      let delivered = false;
+      if (g && whatsapp && (g.whatsapp_phone || g.phone)) {
+        const { data: last } = await svc.from("conversation_messages").select("created_at").eq("conversation_id", c.id).eq("sender_kind", "guardian")
+          .order("created_at", { ascending: false }).limit(1);
+        const open = last?.[0] && Date.now() - new Date(last[0].created_at).getTime() < 23.5 * 3_600_000;
+        if (open) {
+          const brand = await loadBrand(svc, p.tenantId);
+          const r = await sendWhatsApp({ to: g.whatsapp_phone || g.phone, text: `${p.sender.name} (${brand.schoolName}): ${translated ?? p.body}` });
+          delivered = r.ok;
+          await svc.from("conversation_messages").update({ delivery: r.ok ? "sent" : "failed", ...(r.ok && r.providerId ? { provider_id: r.providerId } : {}) }).eq("id", msg.id);
+        } else {
+          await svc.from("conversation_messages").update({ delivery: "notified" }).eq("id", msg.id);
+        }
+      }
+      if (g && !delivered) {
         const brand = await loadBrand(svc, p.tenantId);
         const link = g.user_id ? `${p.baseUrl}/parent#messages` : `${p.baseUrl}/g/${g.portal_token}#messages`;
         await enqueue(svc, rowsForGuardian(p.tenantId, g as Guardian, "message", newMessage(brand, {

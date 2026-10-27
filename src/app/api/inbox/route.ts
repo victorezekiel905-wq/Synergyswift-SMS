@@ -27,28 +27,29 @@ export async function GET(req: NextRequest) {
   const cid = u.searchParams.get("c");
   if (cid) {
     const { data: c } = await ctx.sb.from("conversations")
-      .select("id,subject,status,staff_user_id,student_id,guardian_id,created_at,guardians(full_name,language),students(first_name,last_name,other_names)").eq("tenant_id", tid).eq("id", cid).maybeSingle();
+      .select("*,guardians(full_name,language),students(first_name,last_name,other_names)").eq("tenant_id", tid).eq("id", cid).maybeSingle();
     if (!c) return jsonError("conversation not found", 404);
-    const { data: msgs } = await ctx.sb.from("conversation_messages").select("id,sender_kind,sender_name,sender_user_id,body,translated_body,source_lang,created_at")
+    const { data: msgs } = await ctx.sb.from("conversation_messages").select("*")
       .eq("conversation_id", cid).order("created_at").limit(500);
     if (c.staff_user_id === ctx.userId || (!c.staff_user_id && isAdmin)) {
       await createServiceClient().from("conversations").update({ staff_unread: 0 }).eq("id", cid).eq("tenant_id", tid);
     }
     return NextResponse.json({
-      conversation: { ...c, student: studentName(c.students), guardian: c.guardians?.full_name, guardian_language: c.guardians?.language ?? null },
+      conversation: { ...c, channel: c.channel ?? "app", student: studentName(c.students), guardian: c.guardians?.full_name, guardian_language: c.guardians?.language ?? null },
       // Staff read parents' messages translated into the school language, with the original kept.
       messages: (msgs ?? []).map((m: any) => ({
         id: m.id, mine: m.sender_user_id === ctx.userId, from_parent: m.sender_kind === "guardian", sender: m.sender_name, at: m.created_at,
         text: m.sender_kind === "guardian" ? (m.translated_body ?? m.body) : m.body,
         original: m.sender_kind === "guardian" && m.translated_body ? m.body : null,
-        sent_as: m.sender_kind === "staff" && m.translated_body ? m.translated_body : null
+        sent_as: m.sender_kind === "staff" && m.translated_body ? m.translated_body : null,
+        delivery: m.delivery ?? null
       })),
       can_reply: c.status === "open" && (c.staff_user_id === ctx.userId || isAdmin)
     });
   }
 
   let q = ctx.sb.from("conversations")
-    .select("id,subject,status,staff_unread,last_message_at,staff_user_id,started_by,guardians(full_name),students(first_name,last_name,other_names),users!conversations_staff_user_id_fkey(full_name)")
+    .select("*,guardians(full_name),students(first_name,last_name,other_names),users!conversations_staff_user_id_fkey(full_name)")
     .eq("tenant_id", tid).order("last_message_at", { ascending: false }).limit(200);
   if (!(isAdmin && u.searchParams.get("scope") === "all")) {
     q = isAdmin ? q.or(`staff_user_id.eq.${ctx.userId},staff_user_id.is.null`) : q.eq("staff_user_id", ctx.userId);
@@ -59,7 +60,8 @@ export async function GET(req: NextRequest) {
     is_admin: isAdmin,
     threads: (data ?? []).map((c: any) => ({
       id: c.id, subject: c.subject, status: c.status, unread: c.staff_unread, last_message_at: c.last_message_at, started_by: c.started_by,
-      guardian: c.guardians?.full_name, student: studentName(c.students), staff: c.users?.full_name ?? "School office", mine: c.staff_user_id === ctx.userId
+      guardian: c.guardians?.full_name, student: studentName(c.students), staff: c.users?.full_name ?? "School office", mine: c.staff_user_id === ctx.userId,
+      channel: c.channel ?? "app"
     }))
   });
 }

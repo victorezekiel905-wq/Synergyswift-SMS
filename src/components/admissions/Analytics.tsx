@@ -7,7 +7,8 @@ type Data = {
   range: { from: string; to: string };
   totals: { leads: number; enrolled: number; conversion: number | null; spend: number; cost_per_enrolment: number | null };
   funnel: { stage: Stage; count: number; from_previous: number | null }[];
-  sources: { source: Source; leads: number; applied: number; enrolled: number; conversion: number | null; spend: number; cost_per_lead: number | null; cost_per_enrolment: number | null }[];
+  sources: { source: Source; leads: number; applied: number; enrolled: number; conversion: number | null; spend: number; cost_per_lead: number | null; cost_per_enrolment: number | null;
+    revenue?: number | null; return_per_naira?: number | null }[];
   staff: { owner_id: string; name: string; leads: number; enrolled: number; conversion: number | null; median_first_response_hours: number | null; not_contacted: number }[];
   monthly: { month: string; leads: number; enrolled: number }[];
   lost: { reason: string; count: number }[];
@@ -49,11 +50,13 @@ export default function Analytics({ currency }: { currency: string }) {
         <section className="card overflow-x-auto p-4">
           <h3 className="mb-2 font-semibold">Where families come from</h3>
           <table className="w-full text-sm">
-            <thead className="text-left text-[13px] text-slate-500"><tr><th className="p-1">Source</th><th className="p-1 text-right">Enquiries</th><th className="p-1 text-right">Applied</th><th className="p-1 text-right">Enrolled</th><th className="p-1 text-right">Conversion</th><th className="p-1 text-right">Spend</th><th className="p-1 text-right">Per enquiry</th><th className="p-1 text-right">Per enrolment</th></tr></thead>
+            <thead className="text-left text-[13px] text-slate-500"><tr><th className="p-1">Source</th><th className="p-1 text-right">Enquiries</th><th className="p-1 text-right">Applied</th><th className="p-1 text-right">Enrolled</th><th className="p-1 text-right">Conversion</th><th className="p-1 text-right">Spend</th><th className="p-1 text-right">Per enquiry</th><th className="p-1 text-right">Per enrolment</th><th className="p-1 text-right" title="Fees billed to the children this source brought in">Fees billed</th><th className="p-1 text-right" title="Fees billed for every naira spent">Return</th></tr></thead>
             <tbody>{data.sources.map(s => (
               <tr key={s.source} className="border-t border-slate-100"><td className="p-1">{SOURCE_LABEL[s.source]}</td><td className="p-1 text-right tabular-nums">{s.leads}</td><td className="p-1 text-right tabular-nums">{s.applied}</td>
                 <td className="p-1 text-right tabular-nums">{s.enrolled}</td><td className="p-1 text-right tabular-nums">{pct(s.conversion)}</td><td className="p-1 text-right tabular-nums">{s.spend ? m(s.spend) : "—"}</td>
-                <td className="p-1 text-right tabular-nums">{m(s.cost_per_lead)}</td><td className="p-1 text-right font-semibold tabular-nums">{m(s.cost_per_enrolment)}</td></tr>
+                <td className="p-1 text-right tabular-nums">{m(s.cost_per_lead)}</td><td className="p-1 text-right font-semibold tabular-nums">{m(s.cost_per_enrolment)}</td>
+                <td className="p-1 text-right tabular-nums">{s.revenue ? m(s.revenue) : "—"}</td>
+                <td className="p-1 text-right font-semibold tabular-nums">{s.return_per_naira !== null && s.return_per_naira !== undefined ? `₦${s.return_per_naira} per ₦1` : "—"}</td></tr>
             ))}</tbody>
           </table>
           {data.campaigns.length > 0 && (<>

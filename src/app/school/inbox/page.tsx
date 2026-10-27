@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { useApi, send, Page, PageHeader, Alert, Badge, Empty, Field, Modal, fmtDate, fmtTime, Loading } from "@/components/ui";
 import { languageName } from "@/lib/languages";
 
-type Thread = { id: string; subject: string; status: string; unread: number; last_message_at: string; started_by: string; guardian: string; student: string; staff: string; mine: boolean };
+type Thread = { id: string; subject: string; status: string; unread: number; last_message_at: string; started_by: string; guardian: string; student: string; staff: string; mine: boolean; channel?: "app" | "whatsapp" };
 type Msg = { id: string; mine: boolean; from_parent: boolean; sender: string; at: string; text: string; original: string | null; sent_as: string | null };
-type Detail = { conversation: { id: string; subject: string; status: string; student: string; guardian: string; guardian_language: string | null }; messages: Msg[]; can_reply: boolean };
+type Detail = { conversation: { id: string; subject: string; status: string; student: string; guardian: string; guardian_language: string | null; channel?: "app" | "whatsapp" }; messages: Msg[]; can_reply: boolean };
 type StudentHit = { id: string; first_name: string; last_name: string; admission_no: string; class_groups: { name: string } | null; student_guardians: { guardians: { id: string; full_name: string } | null }[] };
 
 export default function InboxPage() {
@@ -61,7 +61,7 @@ export default function InboxPage() {
             <ul className="max-h-[70vh] divide-y divide-slate-100 overflow-y-auto">{threads.map(t => (
               <li key={t.id}>
                 <button className={`w-full px-4 py-3 text-left text-sm hover:bg-slate-50 ${open === t.id ? "bg-brand-50" : ""}`} onClick={() => setOpen(t.id)}>
-                  <span className="flex items-center gap-2"><b className="mr-auto truncate">{t.guardian}</b>{t.unread > 0 && <Badge tone="blue">{t.unread}</Badge>}{t.status === "closed" && <Badge>closed</Badge>}</span>
+                  <span className="flex items-center gap-2"><b className="mr-auto truncate">{t.guardian}</b>{t.channel === "whatsapp" && <Badge tone="green">WhatsApp</Badge>}{t.unread > 0 && <Badge tone="blue">{t.unread}</Badge>}{t.status === "closed" && <Badge>closed</Badge>}</span>
                   <span className="block truncate text-slate-700">{t.subject}</span>
                   <span className="block text-xs text-slate-500">{t.student}{!t.mine ? ` · ${t.staff}` : ""} · {fmtDate(t.last_message_at)}</span>
                 </button>
@@ -95,6 +95,7 @@ export default function InboxPage() {
               </div>
               {d.can_reply ? (
                 <form onSubmit={sendReply} className="border-t border-slate-100 p-3">
+                  {d.conversation.channel === "whatsapp" && <p className="mb-2 text-xs text-slate-500">Your reply goes to the parent&apos;s WhatsApp (within 24 hours of their last message; after that they get a notification to read it in the portal).</p>}
                   {err && <div className="mb-2"><Alert>{err}</Alert></div>}
                   <div className="flex gap-2">
                     <textarea className="input min-h-[3rem] flex-1" value={reply} onChange={e => setReply(e.target.value)} placeholder="Write a reply" aria-label="Reply" maxLength={4000}
