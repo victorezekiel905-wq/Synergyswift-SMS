@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApi, send, Page, PageHeader, Alert, Field, Loading } from "@/components/ui";
 import PlatformNav from "@/components/platform/PlatformNav";
@@ -29,6 +29,22 @@ export default function NewSchool() {
   const [roles, setRoles] = useState<string[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // From the sales CRM: /platform/new?lead=<id> fills in the school, its contact and the quoted plan.
+  const [leadId, setLeadId] = useState<string | null>(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("lead");
+    if (!id) return;
+    setLeadId(id);
+    fetch(`/api/platform/sales?lead=${id}`).then(r => (r.ok ? r.json() : null)).then(d => {
+      if (!d?.lead) return;
+      const l = d.lead;
+      setF(cur => ({ ...cur, name: l.school_name ?? cur.name, admin_name: l.contact_name ?? cur.admin_name, admin_email: l.email ?? cur.admin_email,
+        student_limit: l.students_estimate ? String(l.students_estimate) : cur.student_limit }));
+      const q = (d.quotes ?? []).find((x: { status: string }) => x.status === "accepted") ?? (d.quotes ?? [])[0];
+      if (q) setPlan(cur => ({ ...cur, plan_code: q.plan_code, band: q.band, cycle: q.cycle, add_on_groups: q.add_on_groups ?? [], custom_annual: q.custom_annual ?? null,
+        discount_pct: Number(q.discount_pct ?? 0), notes: `From quote ${q.number}` }));
+    }).catch(() => {});
+  }, []);
   const chosen = catalog?.plans.find(p => p.code === plan.plan_code);
 
   const rows: ModuleRowView[] = useMemo(() => {
@@ -49,7 +65,7 @@ export default function NewSchool() {
     setBusy(true); setErr(null);
     const overrides = Object.entries(draft).filter(([, d]) => d.mode !== "inherit").map(([module, d]) => ({ module, mode: d.mode, expires_at: d.expires_at ? new Date(`${d.expires_at}T23:59:59`).toISOString() : null, note: d.note || null }));
     const r = await send<{ id: string; invoice: { number: string } | null }>("/api/platform/tenants", {
-      ...f, slug, student_limit: f.student_limit ? Number(f.student_limit) : null, overrides, allowed_roles: roles,
+      ...f, slug, student_limit: f.student_limit ? Number(f.student_limit) : null, overrides, allowed_roles: roles, ...(leadId ? { lead_id: leadId } : {}),
       subscription: usePlan ? { ...plan, notes: plan.notes || null, custom_annual: plan.custom_annual } : undefined
     });
     setBusy(false);

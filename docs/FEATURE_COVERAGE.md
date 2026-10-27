@@ -386,6 +386,19 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Results | ✅ counts per candidate, the elected, abstentions, and ties on a seat flagged for the school to settle; live for officers if the election allows, otherwise once voting closes; published to voters when the school chooses |
 | Fixed ballot paper and audit | ✅ posts and candidates can't change once votes are cast; creating, opening, closing and publishing are recorded in the audit log |
 
+## 14g-1. Synergy Swift's own sales CRM and customer health (phase 14g-1, done)
+
+| Feature | Status |
+|---|---|
+| Book a demo | ✅ `/demo` (linked from the home page): school, contact, size, needs; becomes a scored lead at once and the platform team is emailed; throttled per address, with a hidden spam trap |
+| Pipeline | ✅ **Platform → Sales & customers**: prospect schools by stage (new, contacted, demo booked, demo done, on trial, proposal sent, won, lost) with size, yearly value, lead score and next step (overdue in red); open deals, pipeline and weighted value, won this month, follow-ups due |
+| Lead score | ✅ size, stage, how recent the last contact was, source (referrals close best) and a planned next step |
+| Activity | ✅ calls, WhatsApp (one tap to chat), emails, meetings, demos and notes; stage changes logged; a lost school needs a reason |
+| Quotes | ✅ priced from the platform's own plans, size bands, add-on groups, termly or yearly and discount (the same prices billing uses); numbered; emailed to the contact; accepted moves the lead to won |
+| Won → school | ✅ "Create the school" opens the new-school wizard filled in from the lead and its quote; the lead is linked and marked won |
+| Customer health and churn risk | ✅ every school's health score with the reasons in plain words: staff signing in, use this month against last, school gone quiet, overdue invoices, subscription past due, renewal within 60 days, no parents or students yet; at risk / watch / healthy; renewals in the next 60 days |
+| Onboarding checklist | ✅ school created, data imported, staff trained, parents invited, live; ticks itself from what the school does, or by hand |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -435,3 +448,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101006130_live_games.sql` | 14d-3 |
 | `20260101006200_entrance_automation.sql` | 14e |
 | `20260101006300_elections.sql` | 14f |
+| `20260101006400_sales_crm.sql` | 14g-1 |

@@ -51,7 +51,7 @@ export default function Home() {
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <Link href="/signup" className="btn btn-primary px-5 py-2.5 text-[15px]">Set up your school</Link>
-              <Link href="/login" className="btn btn-outline px-5 py-2.5 text-[15px]">Sign in</Link>
+              <Link href="/demo" className="btn btn-outline px-5 py-2.5 text-[15px]">Book a demo</Link>
             </div>
           </div>
         </section>

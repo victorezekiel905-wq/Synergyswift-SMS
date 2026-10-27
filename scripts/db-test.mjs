@@ -28,7 +28,7 @@ alter default privileges in schema public grant all on sequences to anon, authen
 -- What the live-lesson engine (schema live, from SwiftCipher) also expects of Supabase.
 create schema extensions;
 alter table auth.users add column raw_user_meta_data jsonb not null default '{}'::jsonb, add column raw_app_meta_data jsonb not null default '{}'::jsonb,
-  add column is_anonymous boolean not null default false, add column created_at timestamptz not null default now();
+  add column is_anonymous boolean not null default false, add column created_at timestamptz not null default now(), add column last_sign_in_at timestamptz;
 create function auth.role() returns text language sql stable as $$ select nullif(current_setting('request.jwt.claim.role', true), '') $$;
 grant execute on function auth.role() to anon, authenticated, service_role;
 alter table storage.buckets add column file_size_limit bigint, add column allowed_mime_types text[];

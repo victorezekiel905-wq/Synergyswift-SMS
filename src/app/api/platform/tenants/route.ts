@@ -49,7 +49,9 @@ const CreateTenant = z.object({
   /** The plan the school has paid for; without it every module stays on (as for older schools). */
   subscription: SubscriptionBody.optional(),
   overrides: z.array(OverrideBody).max(60).default([]),
-  allowed_roles: z.array(z.enum(STAFF_ROLE_OPTIONS)).max(20).nullable().optional()
+  allowed_roles: z.array(z.enum(STAFF_ROLE_OPTIONS)).max(20).nullable().optional(),
+  /** The sales lead this school came from (marked won and linked). */
+  lead_id: z.string().uuid().optional()
 });
 
 /**
@@ -102,5 +104,12 @@ export async function POST(req: NextRequest) {
 
   await svc.from("platform_audit_logs").insert({ actor_id: gate.userId, action: "tenant.created", tenant_id: tenant.id,
     meta: { slug: b.slug, plan: b.subscription?.plan_code ?? null, overrides: b.overrides.length, invoice: invoice?.number ?? null } });
+  // Onboarding starts (sales CRM, migration 6400; skipped quietly before it is applied).
+  await svc.from("tenant_onboarding").upsert({ tenant_id: tenant.id, step: "school_created", done_by: gate.userId, auto: true }, { onConflict: "tenant_id,step" });
+  if (b.lead_id) {
+    const now = new Date().toISOString();
+    await svc.from("sales_leads").update({ tenant_id: tenant.id, stage: "won", score: 100, stage_changed_at: now, updated_at: now }).eq("id", b.lead_id);
+    await svc.from("sales_activities").insert({ lead_id: b.lead_id, kind: "system", body: `School created: ${b.name}.`, actor_id: gate.userId });
+  }
   return NextResponse.json({ ...tenant, invoice }, { status: 201 });
 }

@@ -123,6 +123,7 @@ export const NAV: NavGroup[] = [
 export const PLATFORM_NAV: NavGroup[] = [{ id: "platform", title: "Synergy Swift platform", links: [
   { href: "/platform", label: "Schools", roles: [] },
   { href: "/platform/new", label: "New school", roles: [] },
+  { href: "/platform/sales", label: "Sales & customers", roles: [] },
   { href: "/platform/billing", label: "Billing & requests", roles: [] },
   { href: "/platform/plans", label: "Plans & prices", roles: [] },
   { href: "/platform/team", label: "Platform team", roles: [] },
