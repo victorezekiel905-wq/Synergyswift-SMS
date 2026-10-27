@@ -44,32 +44,43 @@ export function AbsenceRequests() {
 
 // ---------------- staff ----------------
 
-type StaffRow = { id: string; name: string; staff_no: string; department: string | null; status: string; first_in: string | null; last_out: string | null; minutes: number; open: boolean; note: string | null; methods: string[] };
+type StaffRow = { id: string; name: string; staff_no: string; department: string | null; status: string; first_in: string | null; last_out: string | null; minutes: number; open: boolean; note: string | null; methods: string[];
+  shift?: string | null; campus?: string | null; late_minutes?: number; early_minutes?: number; excused?: boolean };
+type CampusRow = { campus: string; expected: number; in: number; late: number; missing: number };
+const STAFF_STATUS: Record<string, string> = { present: "on time", late: "late", absent: "absent", not_in_yet: "not in yet", upcoming: "shift not started", on_leave: "on leave", away: "away", holiday: "holiday", off_shift: "not on shift" };
 const tm = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
 
 export function StaffAttendance() {
   const [date, setDate] = useState(localDate());
-  const { data, error } = useApi<{ start: string; rows: StaffRow[]; summary: Record<string, number> }>(`/api/attendance/staff?date=${date}`, [date]);
+  const { data, error } = useApi<{ start: string; rows: StaffRow[]; summary: Record<string, number>; by_campus?: CampusRow[] }>(`/api/attendance/staff?date=${date}`, [date]);
   const [filter, setFilter] = useState("");
   return (
     <div className="space-y-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <input className="input w-auto" type="date" value={date} max={localDate()} onChange={e => setDate(e.target.value)} aria-label="Date" />
-        <select className="input w-auto" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Show"><option value="">Everyone</option><option value="late">Late</option><option value="absent">Absent</option><option value="on_leave">On leave or away</option></select>
+        <select className="input w-auto" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Show"><option value="">Everyone</option><option value="late">Late</option><option value="early">Left early</option><option value="absent">Absent or not in yet</option><option value="on_leave">On leave or away</option></select>
         <a className="btn btn-outline" href={`/api/attendance/staff?date=${date}&format=csv`}>Download CSV</a>
       </div>
       {error && <Alert>{error}</Alert>}
       {data && <>
-        <div className="grid gap-2 sm:grid-cols-4"><Stat label="Present" value={data.summary.present} /><Stat label={`Late (after ${data.start})`} value={data.summary.late} tone={data.summary.late ? "warn" : undefined} />
-          <Stat label="Absent" value={data.summary.absent} tone={data.summary.absent ? "bad" : undefined} /><Stat label="On leave or away" value={data.summary.on_leave} /></div>
+        <div className="grid gap-2 sm:grid-cols-4"><Stat label="Present" value={data.summary.present} /><Stat label="Late" value={data.summary.late} tone={data.summary.late ? "warn" : undefined} />
+          <Stat label="Absent or not in yet" value={data.summary.absent} tone={data.summary.absent ? "bad" : undefined} /><Stat label="On leave or away" value={data.summary.on_leave} /></div>
+        {(data.by_campus?.length ?? 0) > 1 && <div className="grid gap-2 sm:grid-cols-3">{data.by_campus!.map(c => (
+          <div key={c.campus} className="card p-3"><p className="font-medium">{c.campus}</p>
+            <p className="text-slate-600">{c.in} of {c.expected} in{c.late ? ` · ${c.late} late` : ""}{c.missing ? <b className="text-red-700"> · {c.missing} missing</b> : null}</p></div>))}</div>}
         <div className="card overflow-x-auto"><table className="w-full">
           <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Staff</th><th className="p-2">Status</th><th className="p-2">In</th><th className="p-2">Out</th><th className="p-2">Hours</th><th className="p-2">How</th></tr></thead>
-          <tbody>{data.rows.filter(r => !filter || (filter === "on_leave" ? ["on_leave", "away"].includes(r.status) : r.status === filter)).map(r => (
-            <tr key={r.id} className="border-t border-slate-100"><td className="p-2">{r.name} <span className="text-xs text-slate-500">{r.staff_no}{r.department ? ` · ${r.department}` : ""}</span></td>
-              <td className="p-2"><Badge tone={r.status === "present" ? "green" : r.status === "late" ? "amber" : r.status === "absent" ? "red" : "slate"}>{r.status.replace("_", " ")}</Badge>{r.note && <span className="block text-xs text-slate-500">{r.note}</span>}</td>
+          <tbody>{data.rows.filter(r => !filter || (filter === "on_leave" ? ["on_leave", "away"].includes(r.status) : filter === "early" ? (r.early_minutes ?? 0) > 0
+            : filter === "absent" ? ["absent", "not_in_yet"].includes(r.status) : r.status === filter)).map(r => (
+            <tr key={r.id} className="border-t border-slate-100"><td className="p-2">{r.name} <span className="text-xs text-slate-500">{r.staff_no}{r.department ? ` · ${r.department}` : ""}</span>
+                {r.shift && <span className="block text-xs text-slate-500">{r.shift}{r.campus ? ` · ${r.campus}` : ""}</span>}</td>
+              <td className="p-2"><Badge tone={r.status === "present" ? "green" : r.status === "late" ? "amber" : r.status === "absent" || r.status === "not_in_yet" ? "red" : "slate"}>{STAFF_STATUS[r.status] ?? r.status.replace("_", " ")}</Badge>
+                {(r.late_minutes ?? 0) > 0 && <span className="ml-1 text-xs text-slate-500">{r.late_minutes} min</span>}
+                {(r.early_minutes ?? 0) > 0 && <Badge tone="amber">left {r.early_minutes} min early</Badge>}{r.excused && <span className="ml-1 text-xs text-emerald-700">excused</span>}
+                {r.note && <span className="block text-xs text-slate-500">{r.note}</span>}</td>
               <td className="p-2">{tm(r.first_in)}</td><td className="p-2">{r.open ? "still in" : tm(r.last_out)}</td><td className="p-2">{r.minutes ? (r.minutes / 60).toFixed(1) : "—"}</td>
               <td className="p-2 text-xs text-slate-500">{r.methods.join(", ")}</td></tr>))}</tbody></table></div>
-        <p className="text-xs text-slate-500">Staff clock in at the gate kiosk (ID card or RFID card), on a fingerprint or face-recognition machine, or with self check-in on their phone at school. Set the start times under Machines &amp; cards → Attendance settings.</p>
+        <p className="text-xs text-slate-500">Staff clock in at the gate kiosk (ID card or RFID card), on a fingerprint or face-recognition machine, by scanning the entrance code with their phone, or with self check-in at school. Staff on a shift are judged against their shift (HR → Time &amp; shifts); everyone else against the start time under Machines &amp; cards → Attendance settings.</p>
       </>}
     </div>
   );

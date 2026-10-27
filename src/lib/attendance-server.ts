@@ -127,7 +127,7 @@ export async function staffAttendance(svc: any, tenantId: string, timezone: stri
   const from = zonedToUtc(`${date} 00:00`, timezone)!, to = new Date(from.getTime() + 86400_000);
   const [{ data: staff }, { data: events }, { data: settings }, { data: leave }, { data: absences }] = await Promise.all([
     svc.from("staff").select("id,full_name,staff_no,department,position,user_id,status").eq("tenant_id", tenantId).neq("status", "exited").order("full_name"),
-    svc.from("gate_events").select("staff_id,direction,at,method").eq("tenant_id", tenantId).eq("person_type", "staff").gte("at", from.toISOString()).lt("at", to.toISOString()).order("at"),
+    svc.from("gate_events").select("*").eq("tenant_id", tenantId).eq("person_type", "staff").gte("at", from.toISOString()).lt("at", to.toISOString()).order("at"),
     svc.from("tenant_settings").select("staff_start_time").eq("tenant_id", tenantId).maybeSingle(),
     svc.from("leave_requests").select("staff_id,leave_type").eq("tenant_id", tenantId).eq("status", "approved").lte("starts_on", date).gte("ends_on", date),
     svc.from("staff_absences").select("user_id,reason").eq("tenant_id", tenantId).lte("starts_on", date).gte("ends_on", date)
@@ -135,15 +135,30 @@ export async function staffAttendance(svc: any, tenantId: string, timezone: stri
   const start = settings?.staff_start_time ?? "08:00";
   const onLeave = new Map((leave ?? []).map((l: any) => [l.staff_id, l.leave_type]));
   const away = new Map((absences ?? []).map((a: any) => [a.user_id, a.reason]));
+  // Staff on a shift are judged against it (phase 14i): late after its grace, early, off-shift days.
+  const { staffDays } = await import("./staff-time-server");
+  const shifted = await staffDays(svc, tenantId, { from: date, to: date, timeZone: timezone }).catch(() => null);
+  const SHIFT_STATUS: Record<string, string> = { present: "present", late: "late", absent: "absent", not_in_yet: "not_in_yet", upcoming: "upcoming", leave: "on_leave", holiday: "holiday" };
   const rows = (staff ?? []).map((s: any) => {
     const ev = (events ?? []).filter((e: any) => e.staff_id === s.id);
     const day = staffDay(ev, start, timezone);
-    const status = ev.length ? (day.late ? "late" : "present") : onLeave.has(s.id) ? "on_leave" : away.has(s.user_id) ? "away" : "absent";
+    const rec = shifted?.records.get(s.id)?.[0];
+    const hasShifts = Boolean(shifted?.assignments.some(a => a.staff_id === s.id));
+    const status = rec ? SHIFT_STATUS[rec.status] ?? rec.status
+      : hasShifts ? (ev.length ? "present" : "off_shift")
+      : ev.length ? (day.late ? "late" : "present") : onLeave.has(s.id) ? "on_leave" : away.has(s.user_id) ? "away" : "absent";
     return { id: s.id, name: s.full_name, staff_no: s.staff_no, department: s.department, position: s.position, ...day, status,
+      late: rec ? rec.status === "late" : day.late, shift: rec?.shift ?? null, campus: rec?.campus ?? ev.find((e: any) => e.campus)?.campus ?? null,
+      late_minutes: rec?.late_minutes ?? 0, early_minutes: rec?.early_minutes ?? 0, excused: Boolean(rec?.late_excused || rec?.early_excused),
       note: onLeave.get(s.id) ? `Leave: ${onLeave.get(s.id)}` : away.get(s.user_id) ?? null, methods: [...new Set(ev.map((e: any) => e.method))] };
   });
   const count = (st: string) => rows.filter((r: any) => r.status === st).length;
-  return { date, start, rows, summary: { present: count("present"), late: count("late"), absent: count("absent"), on_leave: count("on_leave") + count("away"), total: rows.length } };
+  const campuses = [...new Set(rows.map((r: any) => r.campus).filter(Boolean))] as string[];
+  const by_campus = campuses.map(c => { const rs = rows.filter((r: any) => r.campus === c); return { campus: c, expected: rs.filter((r: any) => !["off_shift", "holiday"].includes(r.status)).length,
+    in: rs.filter((r: any) => r.status === "present" || r.status === "late").length, late: rs.filter((r: any) => r.status === "late").length,
+    missing: rs.filter((r: any) => r.status === "absent" || r.status === "not_in_yet").length }; });
+  return { date, start, rows, by_campus, summary: { present: count("present"), late: count("late"), absent: count("absent") + count("not_in_yet"), on_leave: count("on_leave") + count("away"),
+    early: rows.filter((r: any) => r.early_minutes > 0).length, total: rows.length } };
 }
 
 // ---------------- lesson registers ----------------

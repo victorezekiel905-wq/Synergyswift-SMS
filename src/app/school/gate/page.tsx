@@ -14,6 +14,7 @@ export default function GatePage() {
   const { data: me } = useApi<Me>("/api/me");
   const roles = rolesOf(me);
   const canKiosk = ["gate_officer", "school_admin", "principal", "platform_admin"].some(r => roles.has(r));
+  const canCode = canKiosk || roles.has("hr_manager");
   const canLog = canKiosk || ["hr_manager", "teacher", "qa_officer"].some(r => roles.has(r));
   const [day, setDay] = useState("");
   const [type, setType] = useState("");
@@ -23,7 +24,8 @@ export default function GatePage() {
     <Page wide>
       <PageHeader eyebrow="Attendance" title="Sign in / sign out"
         subtitle="Scan ID cards at the gate. Parents get a WhatsApp and email the moment their child signs in or out."
-        actions={canKiosk ? <Link className="btn btn-outline" href="/school/gate/kiosk">Open full-screen kiosk</Link> : undefined} />
+        actions={canCode ? <div className="flex flex-wrap gap-2">{canKiosk && <Link className="btn btn-outline" href="/school/gate/kiosk">Open full-screen kiosk</Link>}
+          <Link className="btn btn-outline" href="/school/gate/clock-code">Staff clock-in code</Link></div> : undefined} />
       <div className="grid gap-5 xl:grid-cols-3">
         <div className="space-y-5 xl:col-span-2">
           {canKiosk && <section className="card p-5"><h2 className="mb-3 font-semibold">Gate kiosk</h2><GateScanner onRecorded={log.reload} /></section>}
@@ -104,6 +106,8 @@ function SelfSignIn() {
         {data.events.map((e, i) => <li key={i} className="flex justify-between"><Badge tone={e.direction === "in" ? "green" : "slate"}>{e.direction}</Badge><span className="tabular-nums">{fmtTime(e.at)}{e.late ? " · late" : ""}</span></li>)}
       </ul>
       {Boolean(data.geofence) && <p className="mt-3 text-xs text-slate-500">Your location is checked against the school grounds when you sign in.</p>}
+      <p className="mt-3 text-xs text-slate-500">At school you can also scan the clock-in code on the screen at the entrance with your phone camera.</p>
+      <Link className="mt-2 inline-block text-sm text-brand-700 underline" href="/school/hr?tab=time">Running late or leaving early? Tell your manager</Link>
     </section>
   );
 }

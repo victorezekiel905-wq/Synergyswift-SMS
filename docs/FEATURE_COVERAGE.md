@@ -434,6 +434,19 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Handshake into live lessons | ✅ the SENCO's extra time (rounded to 25, 50 or 100%), read-aloud (also set by a "reader" exam arrangement), easy-to-read font (also set by "enlarged print") and calm mode (no rankings) reach SwiftCipher live lessons and games automatically, and are removed when the profile is closed |
 | Who sees what | ✅ enforced in the database: families only for their own child and only while shared; teachers only when the profile is shared with teachers; other schools see nothing (database tests cover each rule) |
 
+## 14i-1. Staff time: shifts, lateness requests, phone clock-in and payroll (phase 14i-1, done)
+
+| Feature | Status |
+|---|---|
+| Shifts | ✅ HR → Time & shifts: shift patterns with start and end, days, minutes of grace before "late", minutes before the end that count as "left early", campus, and whether the shift runs on school holidays; overnight shifts (security, boarding) run past midnight. One click gives everyone without a shift the standard school day |
+| Clash checks | ✅ nobody can be given two shifts whose hours overlap on the same weekday (checked in the database, with the clashing shift named); shifts can start and end on dates |
+| Late, early and absent per shift | ✅ the gate, clocking machines and phone sign-ins judge each person against their own shift (first sign-in of the shift only); the daily staff register shows the shift, campus, minutes late, early departures, "not in yet" and holidays, and counts by campus |
+| "I'll be late", "Leaving early", "I forgot to clock in" | ✅ staff tell their line manager (or HR, if they have none) from HR → Time & shifts or the sign-in page; the manager approves or declines with a reply; nobody decides their own request; an approved missed clock adds the sign-in record; approved lates and early departures never count against the person |
+| Phone clock-in with no machine | ✅ a screen at the entrance shows a code that changes every 30 seconds (Sign in / out → Staff clock-in code, one per campus); staff scan it with their phone camera and are signed in or out at once; a photo of it stops working within about 90 seconds; schools choose: the code, the school grounds (GPS), either, or both |
+| Multi-campus | ✅ campuses named in the rules; codes, shifts and sign-ins carry the campus; the staff register shows who is in at each campus |
+| Payroll link | ✅ optional: a fixed amount per late arrival or per minute late after a number of free lates each month (early departures can count too), and unexcused absent days unpaid like unpaid leave; shown on the payslip as their own lines; off by default |
+| Month report | ✅ everyone's month: days on shift, late (with minutes and excused), left early, absent, leave and the deduction, sortable, with CSV |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -487,3 +500,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101006500_collections_fundraising.sql` | 14g-2 |
 | `20260101006600_whatsapp_inbox.sql` | 14g-3 |
 | `20260101006700_sen_engagement.sql` | 14h |
+| `20260101006800_staff_time.sql` | 14i-1 |

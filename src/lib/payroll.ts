@@ -121,12 +121,19 @@ export function workedShare(period: string, hireDate: string | null, exitDate: s
  * NHF on basic, NHIS on basic; PAYE on annualised taxable pay less those contributions and rent relief.
  * The flat regime keeps the older per-person tax and pension percentages.
  */
-export function computePay(p: PayProfile, s: PaySettings, opts: { workingDays?: number; unpaidLeaveDays?: number; share?: number; loans?: Loan[] } = {}) {
+export function computePay(p: PayProfile, s: PaySettings, opts: {
+  workingDays?: number; unpaidLeaveDays?: number; share?: number; loans?: Loan[];
+  /** Unexcused absent days (phase 14i): unpaid, like unpaid leave. */
+  absentDays?: number;
+  /** Other fixed deductions for the month, e.g. lateness (phase 14i). */
+  extraDeductions?: { name: string; amount: number }[];
+} = {}) {
   const share = Math.min(1, Math.max(0, opts.share ?? 1));
   const wd = Math.max(1, opts.workingDays ?? 22);
   const basic = r2(Math.max(0, Number(p.basic) || 0) * share);
   const unpaid = Math.max(0, opts.unpaidLeaveDays ?? 0);
-  const leaveDeduction = r2(Math.min(basic, (Number(p.basic) / wd) * unpaid));
+  const absent = Math.max(0, opts.absentDays ?? 0);
+  const leaveDeduction = r2(Math.min(basic, (Number(p.basic) / wd) * (unpaid + absent)));
   const allowances = (p.allowances ?? []).filter(a => a.name && Number(a.amount) > 0)
     .map(a => ({ name: a.name, amount: r2(Number(a.amount) * share), pensionable: isPensionable(a), taxable: a.taxable !== false }));
   const basicPaid = r2(basic - leaveDeduction);
@@ -163,6 +170,7 @@ export function computePay(p: PayProfile, s: PaySettings, opts: { workingDays?: 
     if (!d.name) continue;
     add(deductions, d.percent ? `${d.name} (${d.percent}%)` : d.name, d.percent ? basicPaid * Number(d.percent) / 100 : Number(d.amount) || 0);
   }
+  for (const d of opts.extraDeductions ?? []) add(deductions, d.name, Number(d.amount) || 0);
   // Loans come last and never push pay below zero.
   const loanRepayments: { loan_id: string; amount: number }[] = [];
   let room = r2(gross - deductions.reduce((t, d) => t + d.amount, 0));
@@ -174,7 +182,9 @@ export function computePay(p: PayProfile, s: PaySettings, opts: { workingDays?: 
     room = r2(room - amt);
   }
   const totalDeductions = r2(deductions.reduce((t, d) => t + d.amount, 0));
-  if (leaveDeduction > 0) deductions.unshift({ name: `Unpaid leave (${unpaid} day${unpaid === 1 ? "" : "s"})`, amount: 0 });   // shown for information; already out of gross
+  // Shown for information; already out of gross.
+  if (leaveDeduction > 0 && absent > 0) deductions.unshift({ name: `Unexcused absence (${absent} day${absent === 1 ? "" : "s"})`, amount: 0 });
+  if (leaveDeduction > 0 && unpaid > 0) deductions.unshift({ name: `Unpaid leave (${unpaid} day${unpaid === 1 ? "" : "s"})`, amount: 0 });
   return {
     basic: basicPaid, leaveDeduction, allowances: allowances.map(a => ({ name: a.name, amount: a.amount })), gross,
     deductions, totalDeductions, net: r2(Math.max(0, gross - totalDeductions)),

@@ -5,6 +5,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { computePay, workingDaysInMonth, leaveDaysInMonth, workedShare, DEFAULT_PAY_SETTINGS, NTA2025_BANDS, type PaySettings, type Band } from "@/lib/payroll";
 import { toCsv, appUrl } from "@/lib/school";
 import { tellStaff } from "@/lib/hr-server";
+import { staffDays, lateRules } from "@/lib/staff-time-server";
+import { summarise, attendanceDeductions } from "@/lib/staff-time";
 
 export const dynamic = "force-dynamic";
 
@@ -141,9 +143,19 @@ const Body = z.discriminatedUnion("action", [
 ]);
 
 /** Payslips for everyone employed during the month: grade pay, proration, unpaid leave, statutory deductions, loans. */
-async function buildPayslips(sb: any, tenantId: string, runId: string, period: string) {
+/** Lateness and unexcused absence for the month, when the school deducts for them (phase 14i). */
+async function attendanceFor(tenantId: string, monthStart: string, monthEnd: string, timeZone: string) {
+  const svc = createServiceClient();
+  const rules = await lateRules(svc, tenantId);
+  if (rules.late_deduction_mode === "off" && !rules.absence_deduction) return new Map<string, ReturnType<typeof attendanceDeductions>>();
+  const { records } = await staffDays(svc, tenantId, { from: monthStart, to: monthEnd, timeZone });
+  return new Map([...records].map(([id, recs]) => [id, attendanceDeductions(summarise(recs, rules), rules)]));
+}
+
+async function buildPayslips(sb: any, tenantId: string, runId: string, period: string, timeZone = "Africa/Lagos") {
   const [py, pm] = period.split("-").map(Number);
   const monthStart = `${period}-01`, monthEnd = new Date(Date.UTC(py, pm, 0)).toISOString().slice(0, 10);
+  const attendance = await attendanceFor(tenantId, monthStart, monthEnd, timeZone).catch(() => new Map<string, ReturnType<typeof attendanceDeductions>>());
   const [{ data: staff }, { data: profiles }, { data: leave }, { data: grades }, { data: loans }, settings] = await Promise.all([
     sb.from("staff").select("id,status,hire_date,exit_date").eq("tenant_id", tenantId).or(`status.neq.exited,exit_date.gte.${monthStart}`),
     sb.from("salary_profiles").select("*").eq("tenant_id", tenantId),
@@ -171,9 +183,11 @@ async function buildPayslips(sb: any, tenantId: string, runId: string, period: s
     if (worked.share <= 0) continue;
     const unpaid = (leave ?? []).filter((l: any) => l.staff_id === s.id && unpaidTypes.has(l.leave_type))
       .reduce((a: number, l: any) => a + (l.half_day ? 0.5 : leaveDaysInMonth(period, l.starts_on, l.ends_on)), 0);
+    const att = attendance.get(s.id);
     const c = computePay({ basic, allowances, deductions: p.deductions ?? [], tax_percent: Number(p.tax_percent), pension_percent: Number(p.pension_percent),
       annual_rent: Number(p.annual_rent ?? 0), nhf: p.nhf, nhis: p.nhis, pension_exempt: p.pension_exempt }, settings,
-      { unpaidLeaveDays: unpaid, workingDays: wd, share: worked.share, loans: (loans ?? []).filter((l: any) => l.staff_id === s.id) });
+      { unpaidLeaveDays: unpaid, workingDays: wd, share: worked.share, loans: (loans ?? []).filter((l: any) => l.staff_id === s.id),
+        absentDays: att?.absentDays ?? 0, extraDeductions: att?.lines ?? [] });
     rows.push({ run_id: runId, tenant_id: tenantId, staff_id: s.id, basic: c.basic, allowances: c.allowances, deductions: c.deductions, gross: c.gross,
       total_deductions: c.totalDeductions, net: c.net, unpaid_leave_days: unpaid, bank_name: p.bank_name, account_no: p.account_no, account_name: p.account_name,
       paye: c.paye, taxable_income: c.taxable, pension_employee: c.pensionEmployee, pension_employer: c.pensionEmployer, nhf: c.nhf,
@@ -252,7 +266,7 @@ export async function POST(req: NextRequest) {
       case "create_run": {
         const { data: run, error } = await sb.from("payroll_runs").insert({ tenant_id: tid, period: b.period, created_by: ctx.userId }).select("id").single();
         if (error) return jsonError(error.message.includes("duplicate") ? `a payroll for ${b.period} already exists` : error.message);
-        const r = await buildPayslips(sb, tid, run.id, b.period);
+        const r = await buildPayslips(sb, tid, run.id, b.period, ctx.tenant.timezone);
         await audit("payroll.run_created", { period: b.period, ...r });
         return NextResponse.json({ id: run.id, ...r }, { status: 201 });
       }
@@ -260,7 +274,7 @@ export async function POST(req: NextRequest) {
         const { data: run } = await sb.from("payroll_runs").select("id,period,status").eq("tenant_id", tid).eq("id", b.run_id).maybeSingle();
         if (!run) return jsonError("not found", 404);
         if (run.status !== "draft") return jsonError("only draft payrolls can be recalculated");
-        return NextResponse.json(await buildPayslips(sb, tid, run.id, run.period));
+        return NextResponse.json(await buildPayslips(sb, tid, run.id, run.period, ctx.tenant.timezone));
       }
       case "approve": case "mark_paid": {
       { const denied = denyUnless(ctx, "payroll.run"); if (denied) return denied; }

@@ -59,6 +59,8 @@ export async function recordGateEvent(svc: any, p: {
   lat?: number | null; lng?: number | null; notify?: boolean; viaLabel?: string | null;
   /** When the person actually passed (clocking machines send their log later). */
   at?: Date;
+  /** The campus whose entrance code was scanned (phase 14i). */
+  campus?: string | null;
 }) {
   const col = p.person.type === "student" ? "student_id" : "staff_id";
   const now = p.at ?? new Date();
@@ -68,19 +70,31 @@ export async function recordGateEvent(svc: any, p: {
   const prev = last?.[0] as { direction: "in" | "out"; at: string } | undefined;
   const direction: "in" | "out" = p.direction === "auto" ? (prev?.direction === "in" ? "out" : "in") : p.direction;
 
-  // Double scans within 60s are ignored (no duplicate parent alerts).
+  // Double scans within 60s are ignored (no duplicate parent alerts). An "in or out?" scan within
+  // two minutes of the last one is a repeat too (a refreshed page, a second tap), not a sign-out.
   if (prev && prev.direction === direction && now.getTime() - new Date(prev.at).getTime() < 60_000) {
     return { duplicate: true, direction, late: false, at: prev.at, notified: 0 };
+  }
+  if (prev && p.direction === "auto" && now.getTime() - new Date(prev.at).getTime() < 120_000) {
+    return { duplicate: true, direction: prev.direction, late: false, at: prev.at, notified: 0 };
   }
 
   const { data: settings } = await svc.from("tenant_settings").select("staff_start_time,student_start_time,notify_gate_events")
     .eq("tenant_id", p.tenantId).maybeSingle();
   const firstInToday = direction === "in" && !(last ?? []).length;
-  const late = firstInToday && isLate(now, p.person.type === "student" ? settings?.student_start_time ?? "07:45" : settings?.staff_start_time ?? "08:00", p.timezone);
+  let late = firstInToday && isLate(now, p.person.type === "student" ? settings?.student_start_time ?? "07:45" : settings?.staff_start_time ?? "08:00", p.timezone);
+  // Staff on a shift: late and early are judged against their own shift (phase 14i).
+  let early = false, campus = p.campus ?? null;
+  if (p.person.type === "staff") {
+    const { shiftFlags } = await import("./staff-time-server");
+    const f = await shiftFlags(svc, p.tenantId, p.person.id, now, direction, p.timezone).catch(() => null);
+    if (f) { late = f.late; early = f.early; campus = campus ?? f.campus; }
+  }
 
   const { data: ev, error } = await svc.from("gate_events").insert({
     tenant_id: p.tenantId, person_type: p.person.type, [col]: p.person.id, direction, method: p.method, late,
-    recorded_by: p.recordedBy, note: p.note ?? null, lat: p.lat ?? null, lng: p.lng ?? null, at: now.toISOString()
+    recorded_by: p.recordedBy, note: p.note ?? null, lat: p.lat ?? null, lng: p.lng ?? null, at: now.toISOString(),
+    ...(early ? { early: true } : {}), ...(campus ? { campus } : {})
   }).select("id,at").single();
   if (error) throw new Error(error.message);
 
@@ -99,7 +113,7 @@ export async function recordGateEvent(svc: any, p: {
       notified = rows.length;
     }
   }
-  return { duplicate: false, direction, late, at: ev.at, notified, event_id: ev.id };
+  return { duplicate: false, direction, late, early, at: ev.at, notified, event_id: ev.id };
 }
 
 /** Creates a single-use pickup code for a guardian. Earlier active codes for the same child and guardian are revoked. */
