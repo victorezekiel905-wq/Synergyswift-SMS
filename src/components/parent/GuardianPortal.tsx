@@ -21,6 +21,8 @@ type Overview = {
     pickup_codes: { id: string; delegate_name: string | null; expires_at: string }[];
     loans: { title: string; due_at: string }[];
     glance?: GlanceData | null;
+    points?: { week: number; recent: { skill_name: string; points: number; note: string | null; created_at: string }[] };
+    story?: { id: string; body: string | null; photos: string[]; author: string; created_at: string }[];
   }[];
 };
 
@@ -93,6 +95,7 @@ export default function GuardianPortal({ api, act, mode, token }: { api: string;
               <Badge tone={c.on_site ? "green" : "slate"}>{c.on_site ? "In school now" : "Not in school"}</Badge>
             </div>
             {c.glance && <GlanceStrip g={c.glance} />}
+            {(c.points?.recent.length || c.story?.length) ? <ClassroomPanel points={c.points} story={c.story ?? []} /> : null}
             <div className="grid gap-4 p-4 sm:grid-cols-2">
               <div>
                 <h3 className="mb-2 text-sm font-semibold">Today</h3>
@@ -170,4 +173,40 @@ export default function GuardianPortal({ api, act, mode, token }: { api: string;
 
 export async function postTo(url: string, body: Record<string, unknown>) {
   return send(url, body);
+}
+
+/** Points this week and the class story, for one child. */
+function ClassroomPanel({ points, story }: { points?: { week: number; recent: { skill_name: string; points: number; note: string | null; created_at: string }[] }; story: { id: string; body: string | null; photos: string[]; author: string; created_at: string }[] }) {
+  return (
+    <div className="grid gap-4 border-t border-slate-100 p-4 sm:grid-cols-2">
+      <div>
+        <h3 className="mb-2 text-sm font-semibold">Class points this week <span className={"ml-1 tabular-nums " + ((points?.week ?? 0) >= 0 ? "text-emerald-700" : "text-rose-700")}>{(points?.week ?? 0) > 0 ? "+" : ""}{points?.week ?? 0}</span></h3>
+        {!points?.recent.length ? <p className="text-sm text-slate-500">No points yet this week.</p> : (
+          <ul className="space-y-1 text-sm">
+            {points.recent.map((p, i) => (
+              <li key={i} className="flex justify-between gap-2"><span>{p.skill_name}{p.note ? <span className="text-slate-500"> · {p.note}</span> : null}</span>
+                <span className={"tabular-nums " + (p.points > 0 ? "text-emerald-700" : "text-rose-700")}>{p.points > 0 ? "+" : ""}{p.points}</span></li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div>
+        <h3 className="mb-2 text-sm font-semibold">Class story</h3>
+        {!story.length ? <p className="text-sm text-slate-500">No posts yet.</p> : (
+          <ul className="space-y-3">
+            {story.map(p => (
+              <li key={p.id} className="rounded-lg border border-slate-200 p-2 text-sm">
+                <p className="text-xs text-slate-500">{p.author} · {new Date(p.created_at).toLocaleDateString()}</p>
+                {p.body && <p className="mt-1 whitespace-pre-wrap">{p.body}</p>}
+                {p.photos.length > 0 && <div className="mt-2 grid grid-cols-3 gap-1">{p.photos.map((u, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={i} src={u} alt="" className="aspect-square w-full rounded object-cover" />
+                ))}</div>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
 }

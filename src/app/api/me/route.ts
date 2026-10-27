@@ -47,11 +47,12 @@ export async function GET() {
   ]) : [{ data: null }, { data: null }];
   // School-wide preferences the app needs on every page.
   let prefs = null;
+  let mustChange = false;
   if (profile) {
     const svc = createServiceClient();
     const [{ data: s }, { data: u }] = await Promise.all([
       svc.from("tenant_settings").select("currency,session_idle_minutes,password_max_age_days,password_policy_scope").eq("tenant_id", profile.tenant_id).maybeSingle(),
-      svc.from("users").select("password_changed_at").eq("id", user.id).maybeSingle()
+      svc.from("users").select("password_changed_at,must_change_password").eq("id", user.id).maybeSingle()
     ]);
     const staffRole = !["student", "parent"].includes(profile.role);
     const applies = Boolean(s?.password_max_age_days) && (staffRole || s?.password_policy_scope === "all");
@@ -60,6 +61,8 @@ export async function GET() {
       idle_minutes: staffRole ? (s?.session_idle_minutes ?? 0) : 0,
       password_days_left: applies ? passwordDaysLeft(u?.password_changed_at ?? null, s!.password_max_age_days) : null
     };
+    // A starting password (sent to the parents) must be replaced at the first sign-in.
+    if (u?.must_change_password) mustChange = true;
   }
   return NextResponse.json({
     user: who,
@@ -69,6 +72,7 @@ export async function GET() {
     group,
     prefs,
     is_guardian: Boolean(guardian),
-    is_staff_record: Boolean(staff)
+    is_staff_record: Boolean(staff),
+    ...(mustChange ? { account: { state: "password_expired", message: "Choose your own password to continue." } } : {})
   });
 }

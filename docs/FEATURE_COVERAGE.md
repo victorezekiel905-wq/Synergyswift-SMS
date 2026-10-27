@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management · 14e entrance automation · 14f elections · 14g CRMs · 14h SEN engagement · 14i attendance, shifts and bus safety · 14j exam extras · 14k super admin centre · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (14d-1 classes, accounts and classroom points done) · 14e entrance automation · 14f elections · 14g CRMs · 14h SEN engagement · 14i attendance, shifts and bus safety · 14j exam extras · 14k super admin centre · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -316,6 +316,20 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Quick search | ✅ Ctrl K (or the search button on phones) jumps to any page you can open |
 | Phone bar | ✅ four everyday places by role (teacher: Today, Register, Homework, Parents; student: Today, Learn, Practice, Messages; parent: Children, Calendar, Account; office staff: Home, Students, Calendar, Messages) plus Menu |
 
+## 14d-1. Class teams, automatic accounts and classroom points (phase 14d-1, done)
+
+| Feature | Status |
+|---|---|
+| Admins add teachers to classes and set their privileges | ✅ **Class teams & accounts**: each class's form teacher and subject teachers, plus co-teachers, assistants and support staff (whole class or one subject) with switches for live lessons, points, class story, messaging parents and seeing results; checked by the database (`teaches_class`) |
+| Students added to classes | ✅ classes come straight from the school's classes and subjects: no separate rosters or join codes |
+| Student keys sent to parents automatically | ✅ every active student gets a username (admission number + school code) and a starting password; the details go to their parents by email, WhatsApp or SMS within minutes; the student must choose their own password at the first sign-in; admins can re-send a key (new starting password) |
+| Parents invited automatically | ✅ parents with an email get an invitation to set a password; parents with only a phone get their private portal link (and can sign in with a code to their phone) |
+| Sign in with a username | ✅ the sign-in box takes an email or a username |
+| Classroom points (classroom management) | ✅ **Classroom**: tap students (or Whole class, or Random student) and a skill; positive and "needs work" skills set by the school (needs-work can be switched off); notes for parents; undo within 15 minutes; this week's totals per student and class |
+| Class story for parents | ✅ text and up to 6 photos per post; children in photos must be ticked, and only those whose parents agreed to photos inside the school can be posted (the school can turn this rule off); parents see it in their portal and can like posts |
+| Class tools | ✅ random student picker, group maker, timer, noise meter (sound measured on the device only) |
+| Parents see points | ✅ each child's points this week and the latest class story in the parent portal (signed in or private link) |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -358,3 +372,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101005700_question_types_tools.sql` | 14a |
 | `20260101005800_saas_plans.sql` | 14b |
 | `20260101005900_function_hardening.sql` | security: who may call database functions |
+| `20260101006000_classroom.sql` | 14d-1 |

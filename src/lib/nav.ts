@@ -30,6 +30,7 @@ export const NAV: NavGroup[] = [
   { id: "teaching", title: "Teaching", links: [
     { href: "/teacher", label: "My teaching day", roles: TEACH },
     { href: "/school/attendance", label: "Class register", roles: TEACH, module: "attendance" },
+    { href: "/school/classroom", label: "Classroom points & story", roles: [...TEACH, "counsellor"], module: "classroom" },
     { href: "/school/homework", label: "Homework", roles: TEACH, module: "homework" },
     { href: "/school/lesson-notes", label: "Lesson notes", roles: [...TEACH, "qa_officer"], module: "lesson_notes" },
     { href: "/school/schemes", label: "Schemes of work", roles: [...TEACH, "qa_officer"], module: "lesson_notes" },
@@ -101,6 +102,7 @@ export const NAV: NavGroup[] = [
     { href: "/school/compliance", label: "Policies & compliance", roles: STAFF },
     { href: "/school/signatures", label: "E-signatures", roles: STAFF },
     { href: "/school/setup", label: "School setup", roles: ADMIN },
+    { href: "/school/class-teams", label: "Class teams & accounts", roles: ADMIN },
     { href: "/school/roles", label: "Roles & privileges", roles: ADMIN },
     { href: "/school/subscription", label: "Subscription & modules", roles: ADMIN },
     { href: "/school/security", label: "Security & sign-in", roles: ADMIN },

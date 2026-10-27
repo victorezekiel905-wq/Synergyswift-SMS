@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { signInEmail } from "@/lib/login-name";
 import SsoButtons, { ssoEnabled } from "@/components/auth/SsoButtons";
 import PhoneLogin from "@/components/auth/PhoneLogin";
 import { Monogram } from "@/components/AppShell";
@@ -72,7 +73,7 @@ export default function LoginPage() {
     e.preventDefault();
     setBusy(true); setErr(null);
     const sb = createClient();
-    const { error } = await sb.auth.signInWithPassword({ email, password });
+    const { error } = await sb.auth.signInWithPassword({ email: signInEmail(email), password });
     if (error) { setBusy(false); setErr(error.message); return; }
     const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
@@ -121,8 +122,8 @@ export default function LoginPage() {
             {mode === "phone" && phoneOk ? <PhoneLogin onSignedIn={afterPhone} /> : (
             <form onSubmit={onSubmit} className="space-y-4">
               <div>
-                <label className="label">Email</label>
-                <input className="input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                <label className="label">Email or username</label>
+                <input className="input" type="text" inputMode="email" autoCapitalize="none" spellCheck={false} autoComplete="username" required value={email} placeholder="Email or username" onChange={(e) => setEmail(e.target.value)} />
               </div>
               <div>
                 <label className="label">Password</label>

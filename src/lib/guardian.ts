@@ -41,6 +41,20 @@ export async function guardianOverview(svc: any, tenantId: string, guardianId: s
     svc.from("library_loans").select("student_id,due_at,library_books(title)").eq("tenant_id", tenantId).in("student_id", ids).is("returned_at", null)
   ]) : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
+  // Classroom points this week and the latest class story posts (photos as short-lived links).
+  const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const classIds = [...new Set(students.map((l: any) => l.students.class_group_id).filter(Boolean))] as string[];
+  const [{ data: pts }, { data: posts }] = ids.length ? await Promise.all([
+    svc.from("point_events").select("student_id,skill_name,points,note,created_at").eq("tenant_id", tenantId).in("student_id", ids).gte("created_at", weekAgo).order("created_at", { ascending: false }).limit(300),
+    classIds.length ? svc.from("class_story_posts").select("id,class_group_id,body,photos,created_at,users:author_id(full_name)").eq("tenant_id", tenantId).in("class_group_id", classIds).order("created_at", { ascending: false }).limit(12) : Promise.resolve({ data: [] })
+  ]) : [{ data: [] }, { data: [] }];
+  const story: { id: string; class_group_id: string; body: string | null; photos: string[]; author: string; created_at: string }[] = [];
+  for (const p of posts ?? []) {
+    const photos: string[] = [];
+    for (const path of p.photos ?? []) { const { data } = await svc.storage.from("class-story").createSignedUrl(path, 3600); if (data?.signedUrl) photos.push(data.signedUrl); }
+    story.push({ id: p.id, class_group_id: p.class_group_id, body: p.body, photos, author: p.users?.full_name ?? "Teacher", created_at: p.created_at });
+  }
+
   const [extras, glance] = await Promise.all([
     familyExtras(svc, tenantId, guardianId, ids, [...new Set(students.map((l: any) => l.students.class_group_id).filter(Boolean))] as string[]),
     familyGlance(svc, tenantId, timezone, students.map((l: any) => ({ id: l.students.id, class_group_id: l.students.class_group_id }))).catch(() => ({} as Record<string, any>))
@@ -65,7 +79,9 @@ export async function guardianOverview(svc: any, tenantId: string, guardianId: s
         })),
         pickup_codes: (codes.data ?? []).filter((c: any) => c.student_id === s.id),
         loans: (loans.data ?? []).filter((x: any) => x.student_id === s.id).map((x: any) => ({ title: x.library_books?.title, due_at: x.due_at })),
-        glance: glance[s.id] ?? null
+        glance: glance[s.id] ?? null,
+        points: (() => { const mine = (pts ?? []).filter((e: any) => e.student_id === s.id); return { week: mine.reduce((n: number, e: any) => n + e.points, 0), recent: mine.slice(0, 10) }; })(),
+        story: story.filter(p => p.class_group_id === s.class_group_id).slice(0, 6)
       };
     })
   };

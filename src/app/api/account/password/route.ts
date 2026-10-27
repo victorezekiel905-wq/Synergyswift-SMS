@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
   const { error } = await w.svc.auth.admin.updateUserById(w.user.id, { password: pw });
   if (error) return jsonError(error.message);
   if (w.profile) {
-    await w.svc.from("users").update({ password_changed_at: new Date().toISOString() }).eq("id", w.user.id);
+    await w.svc.from("users").update({ password_changed_at: new Date().toISOString(), must_change_password: false }).eq("id", w.user.id);
     await w.svc.from("audit_logs").insert({ tenant_id: w.profile.tenant_id, actor_id: w.user.id, action: "account.password_changed" });
   }
   if (b.sign_out_others) {
