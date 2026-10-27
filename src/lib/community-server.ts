@@ -158,7 +158,7 @@ export async function familyProfile(svc: any, tenantId: string, guardianId: stri
   const none = ["00000000-0000-0000-0000-000000000000"];
   const sids = ids.length ? ids : none;
   const contacts = [...new Set([g.email?.trim(), g.email?.trim().toLowerCase(), normalizePhone(g.whatsapp_phone || g.phone), normalizePhone(g.phone)].filter(Boolean))];
-  const [co, interactions, tickets, convos, responses, payments, invoices, events, meetings, reenrol, leads, rewards, outbox, cards] = await Promise.all([
+  const [co, interactions, tickets, convos, responses, payments, invoices, events, meetings, reenrol, leads, rewards, outbox, cards, promises, gifts] = await Promise.all([
     svc.from("student_guardians").select("relation,guardians(id,full_name,phone,email)").eq("tenant_id", tenantId).in("student_id", sids).neq("guardian_id", guardianId),
     svc.from("crm_interactions").select("id,kind,body,occurred_at,follow_up_at,student_id,users:actor_id(full_name)").eq("tenant_id", tenantId).eq("guardian_id", guardianId).order("occurred_at", { ascending: false }).limit(100),
     svc.from("tickets").select("id,ticket_no,kind,category,priority,subject,status,created_at,resolved_at,satisfaction,respond_due_at,resolve_due_at,first_response_at").eq("tenant_id", tenantId).eq("guardian_id", guardianId).order("created_at", { ascending: false }).limit(50),
@@ -172,7 +172,10 @@ export async function familyProfile(svc: any, tenantId: string, guardianId: stri
     svc.from("admission_leads").select("id,parent_name,child_name,stage,created_at").eq("tenant_id", tenantId).eq("referred_by", guardianId).order("created_at", { ascending: false }).limit(50),
     svc.from("referral_rewards").select("id,kind,amount,status,created_at,issued_at").eq("tenant_id", tenantId).eq("guardian_id", guardianId).order("created_at", { ascending: false }),
     contacts.length ? svc.from("message_outbox").select("id,channel,kind,subject,status,created_at").eq("tenant_id", tenantId).in("to_address", contacts).order("created_at", { ascending: false }).limit(60) : { data: [] },
-    svc.from("report_cards").select("student_id,average,published_at,terms(name)").eq("tenant_id", tenantId).in("student_id", sids).eq("kind", "term").eq("status", "published").order("published_at", { ascending: false }).limit(30)
+    svc.from("report_cards").select("student_id,average,published_at,terms(name)").eq("tenant_id", tenantId).in("student_id", sids).eq("kind", "term").eq("status", "published").order("published_at", { ascending: false }).limit(30),
+    // Phase 14g-2: promises to pay and gifts (empty before migration 6500).
+    svc.from("fee_promises").select("id,amount,promised_by,status,paid,created_at,settled_at").eq("tenant_id", tenantId).eq("guardian_id", guardianId).order("created_at", { ascending: false }).limit(30),
+    svc.from("donations").select("id,amount,currency,status,kind,paid_at,created_at,fundraising_campaigns(title)").eq("tenant_id", tenantId).eq("guardian_id", guardianId).order("created_at", { ascending: false }).limit(30)
   ]);
 
   type Item = { at: string; type: string; title: string; detail?: string | null; ref?: string | null; tone?: string };
@@ -192,6 +195,10 @@ export async function familyProfile(svc: any, tenantId: string, guardianId: stri
   for (const l of leads.data ?? []) tl.push({ at: l.created_at, type: "referral", title: `Referred ${l.parent_name}${l.child_name ? ` (${l.child_name})` : ""}`, detail: `now: ${l.stage.replace("_", " ")}`, tone: l.stage === "enrolled" ? "green" : undefined });
   for (const m of outbox.data ?? []) tl.push({ at: m.created_at, type: "sent", title: `${m.channel === "whatsapp" ? "WhatsApp" : m.channel === "sms" ? "SMS" : m.channel === "push" ? "Notification" : "Email"}: ${m.subject ?? m.kind}`, detail: m.status });
   for (const c of cards.data ?? []) tl.push({ at: c.published_at, type: "result", title: `${c.terms?.name ?? "Term"} result for ${kidName(c.student_id)}`, detail: c.average !== null ? `average ${c.average}%` : null });
+  for (const p of promises.data ?? []) tl.push({ at: p.created_at, type: "promise", title: `Promised to pay ${Number(p.amount).toLocaleString()} by ${p.promised_by}`,
+    detail: p.status === "open" ? "open" : `${p.status}${Number(p.paid) ? ` (${Number(p.paid).toLocaleString()} paid)` : ""}`, ref: p.id, tone: p.status === "kept" ? "green" : p.status === "broken" ? "red" : undefined });
+  for (const d of gifts.data ?? []) if (["paid", "pledged"].includes(d.status)) tl.push({ at: d.paid_at ?? d.created_at, type: "gift",
+    title: `${d.status === "pledged" ? "Pledged" : "Gave"} ${Number(d.amount).toLocaleString()} to ${d.fundraising_campaigns?.title ?? "an appeal"}`, ref: d.id, tone: "green" });
   tl.sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
 
   const coMap = new Map<string, any>();

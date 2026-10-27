@@ -4,6 +4,7 @@ import { confirmOnlinePayment } from "@/lib/fees";
 import { appUrl } from "@/lib/school";
 import { confirmWalletTopUp, safeReturnPath } from "@/lib/wallet";
 import { confirmAdmissionPayment } from "@/lib/admissions-crm";
+import { confirmDonation } from "@/lib/collections-server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,10 @@ export async function GET(req: NextRequest) {
     const w = await confirmWalletTopUp(createServiceClient(), reference);
     const back = safeReturnPath(u.searchParams.get("return"));
     return NextResponse.redirect(`${base}${back}${back.includes("?") ? "&" : "?"}wallet=${encodeURIComponent(w.status)}#wallet`);
+  }
+  if (reference.startsWith("DON-")) {
+    const d = await confirmDonation(createServiceClient(), reference, base);
+    return NextResponse.redirect(`${base}${d.path}?gift=${encodeURIComponent(d.status)}`);
   }
   if (reference.startsWith("ADM-")) {
     const a = await confirmAdmissionPayment(createServiceClient(), reference);

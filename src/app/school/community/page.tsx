@@ -10,8 +10,9 @@ import Retention from "@/components/community/Retention";
 import Referrals from "@/components/community/Referrals";
 import Alumni from "@/components/community/Alumni";
 import Partners from "@/components/community/Partners";
+import Fundraising from "@/components/community/Fundraising";
 
-type Tab = "families" | "tickets" | "surveys" | "campaigns" | "retention" | "referrals" | "alumni" | "partners";
+type Tab = "families" | "tickets" | "surveys" | "campaigns" | "retention" | "referrals" | "alumni" | "fundraising" | "partners";
 
 export default function CommunityPage() {
   return <Suspense fallback={<Loading />}><Community /></Suspense>;
@@ -29,8 +30,8 @@ function Community() {
   const all: { id: Tab; label: string }[] = [
     { id: "families", label: "Families" }, { id: "tickets", label: "Complaints & requests" }, { id: "surveys", label: "Surveys & NPS" },
     { id: "campaigns", label: "Campaigns" }, { id: "retention", label: "Re-enrolment & retention" }, { id: "referrals", label: "Referrals" },
-    { id: "alumni", label: "Alumni" }, { id: "partners", label: "Partners & vendors" }];
-  const tabs = me && !admin ? all.filter(t => t.id === "referrals" || t.id === "partners") : all;
+    { id: "alumni", label: "Alumni" }, { id: "fundraising", label: "Fundraising" }, { id: "partners", label: "Partners & vendors" }];
+  const tabs = me && !admin ? all.filter(t => t.id === "referrals" || t.id === "partners" || t.id === "fundraising") : all;
   const tab = tabs.some(t => t.id === picked) ? picked : tabs[0].id;
   if (!me) return <Loading />;
   return (
@@ -45,6 +46,7 @@ function Community() {
       {tab === "retention" && <Retention />}
       {tab === "referrals" && <Referrals admin={admin} />}
       {tab === "alumni" && <Alumni />}
+      {tab === "fundraising" && <Fundraising />}
       {tab === "partners" && <Partners />}
     </Page>
   );

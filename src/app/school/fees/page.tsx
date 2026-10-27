@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, Stat, statusTone, money, fmtDate, Loading } from "@/components/ui";
 import { Discounts, Instalments, Transfers, Debtors, ExtrasAndCategories, PaymentKeys, type PlusData } from "@/components/fees/FeesMore";
+import Collections from "@/components/fees/Collections";
 
 type Term = { id: string; name: string; is_current: boolean };
 type Session = { id: string; name: string; terms: Term[] };
@@ -22,7 +23,7 @@ export default function FeesPage() {
   const [termId, setTermId] = useState("");
   useEffect(() => { if (!termId && sessions) { const t = sessions.flatMap(s => s.terms).find(t => t.is_current) ?? sessions[0]?.terms[0]; if (t) setTermId(t.id); } }, [sessions, termId]);
   const ov = useApi<Overview>(termId ? `/api/fees?term_id=${termId}` : null, [termId]);
-  const [tab, setTab] = useState<"overview" | "setup" | "invoices" | "settings" | "discounts" | "instalments" | "transfers" | "debtors" | "extras">("overview");
+  const [tab, setTab] = useState<"overview" | "setup" | "invoices" | "settings" | "discounts" | "instalments" | "transfers" | "debtors" | "collections" | "extras">("overview");
   const plus = useApi<PlusData>("/api/fees/plus");
   const cur = ov.data?.settings.currency ?? "NGN";
   const s = ov.data?.summary;
@@ -38,7 +39,7 @@ export default function FeesPage() {
       {ov.error && <Alert>{ov.error}</Alert>}
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "overview", label: "Overview" }, { id: "setup", label: "Fee setup" }, { id: "extras", label: "Categories & extras" }, { id: "discounts", label: "Discounts & scholarships" },
         { id: "invoices", label: "Invoices & payments" }, { id: "instalments", label: "Instalments & reminders" }, { id: "transfers", label: `Transfers to confirm${plus.data?.claims.length ? ` (${plus.data.claims.length})` : ""}` },
-        { id: "debtors", label: "Debtors & statements" }, { id: "settings", label: "Online payments" }]} />
+        { id: "debtors", label: "Debtors & statements" }, { id: "collections", label: "Collections" }, { id: "settings", label: "Online payments" }]} />
       {tab === "overview" && s && (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
@@ -80,6 +81,7 @@ export default function FeesPage() {
       {plus.data && tab === "instalments" && <Instalments data={plus.data} reload={plus.reload} currency={cur} />}
       {plus.data && tab === "transfers" && <Transfers data={plus.data} reload={plus.reload} currency={cur} />}
       {tab === "debtors" && <Debtors groups={groups} currency={cur} />}
+      {tab === "collections" && <Collections />}
       {plus.data && tab === "extras" && termId && <ExtrasAndCategories data={plus.data} reload={plus.reload} groups={groups} termId={termId} />}
     </Page>
   );

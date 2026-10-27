@@ -399,6 +399,18 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Customer health and churn risk | ✅ every school's health score with the reasons in plain words: staff signing in, use this month against last, school gone quiet, overdue invoices, subscription past due, renewal within 60 days, no parents or students yet; at risk / watch / healthy; renewals in the next 60 days |
 | Onboarding checklist | ✅ school created, data imported, staff trained, parents invited, live; ticks itself from what the school does, or by hand |
 
+## 14g-2. Fee collections, fundraising and the family timeline (phase 14g-2, done)
+
+| Feature | Status |
+|---|---|
+| Collections worklist | ✅ **Fees → Collections**: every family that owes (siblings together), balance, days overdue, escalation level, open or broken promise, last contact and the suggested next step; filters for "need action now", "promised to pay" and "broke a promise" |
+| Promises to pay | ✅ record an amount and a date; checked every day against payments since: kept (closes itself, even early) or broken (the family's case goes to "call", a follow-up for today is left on the family's record, and the parent gets a polite message with the payment link) |
+| Escalation | ✅ reminded → bursar has called → principal's letter → final notice; the next step rises with how long the money is overdue and what has already been tried |
+| One-tap contact | ✅ call, WhatsApp, payment page, send a reminder with the pay link, log the contact (shared with the family's record) |
+| Fundraising | ✅ **Families & community → Fundraising**: appeals with a goal and dates; public giving page (`/give/<school>/<appeal>`) with progress and recent supporters (as the school allows; anonymous gifts never named) and online giving through the school's payment provider (card, transfer, USSD); gifts and pledges taken at the school (cash, transfer, cheque, POS); receipts numbered; thank-you messages; pledges marked paid later |
+| Gifts can't be faked | ✅ an online gift is marked paid only after the payment provider confirms the exact amount; staff can record only offline gifts |
+| Family timeline | ✅ the family's 360° record now also shows promises to pay (kept/broken) and gifts |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -449,3 +461,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101006200_entrance_automation.sql` | 14e |
 | `20260101006300_elections.sql` | 14f |
 | `20260101006400_sales_crm.sql` | 14g-1 |
+| `20260101006500_collections_fundraising.sql` | 14g-2 |
