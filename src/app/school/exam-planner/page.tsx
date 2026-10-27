@@ -7,7 +7,7 @@ import { buildSlots } from "@/lib/exams/schedule";
 type Hall = { id: string; name: string; capacity: number; rows: number; cols: number; notes: string | null; active: boolean };
 type SeriesRow = { id: string; name: string; starts_on: string; ends_on: string; status: string; term_id: string | null };
 type SessionDef = { label: string; start: string; minutes: number };
-type Series = SeriesRow & { sessions: SessionDef[]; skip_dates: string[]; max_per_day: number; invigilator_ratio: number; spacing: "every_seat" | "alternate" };
+type Series = SeriesRow & { sessions: SessionDef[]; skip_dates: string[]; max_per_day: number; invigilator_ratio: number; spacing: "every_seat" | "alternate"; require_checkin?: boolean };
 type Paper = { id: string; title: string; subject_id: string | null; class_group_ids: string[]; duration_minutes: number; slot_date: string | null; slot_session: number | null; locked: boolean; exam_id: string | null };
 type SeatRow = { paper_id: string; hall_id: string; student_id: string; row: number; col: number; label: string; name: string; admission_no: string | null; class_group_id: string | null };
 type Duty = { slot_date: string; slot_session: number; hall_id: string; staff_user_id: string; chief: boolean; name: string };
@@ -107,7 +107,8 @@ function SeriesForm({ series, onSaved }: { series?: Series; onSaved: (id: string
   const [f, setF] = useState({
     name: series?.name ?? "", term_id: series?.term_id ?? "", starts_on: series?.starts_on ?? "", ends_on: series?.ends_on ?? "",
     sessions: series?.sessions ?? DEFAULT_SESSIONS, skip: (series?.skip_dates ?? []).join(", "),
-    max_per_day: String(series?.max_per_day ?? 2), ratio: String(series?.invigilator_ratio ?? 30), spacing: series?.spacing ?? "every_seat"
+    max_per_day: String(series?.max_per_day ?? 2), ratio: String(series?.invigilator_ratio ?? 30), spacing: series?.spacing ?? "every_seat",
+    require_checkin: Boolean(series?.require_checkin)
   });
   const [err, setErr] = useState<string | null>(null);
   async function save(e: React.FormEvent) {
@@ -115,7 +116,7 @@ function SeriesForm({ series, onSaved }: { series?: Series; onSaved: (id: string
     const r = await send<{ id: string }>("/api/exam-planner", {
       action: "series_save", id: series?.id, name: f.name, term_id: f.term_id || null, starts_on: f.starts_on, ends_on: f.ends_on,
       sessions: f.sessions.map(s => ({ ...s, minutes: Number(s.minutes) })), skip_dates: f.skip.split(/[\s,]+/).filter(Boolean),
-      max_per_day: Number(f.max_per_day), invigilator_ratio: Number(f.ratio), spacing: f.spacing
+      max_per_day: Number(f.max_per_day), invigilator_ratio: Number(f.ratio), spacing: f.spacing, require_checkin: f.require_checkin
     });
     if (!r.ok) return setErr(r.error);
     onSaved(r.data.id);
@@ -147,6 +148,8 @@ function SeriesForm({ series, onSaved }: { series?: Series; onSaved: (id: string
         <Field label="Students per invigilator"><input className="input" type="number" min={5} value={f.ratio} onChange={e => setF({ ...f, ratio: e.target.value })} /></Field>
         <Field label="Seating"><select className="input" value={f.spacing} onChange={e => setF({ ...f, spacing: e.target.value as Series["spacing"] })}><option value="every_seat">Use every seat (mixed classes)</option><option value="alternate">Leave every other seat empty when there is room</option></select></Field>
       </div>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.require_checkin} onChange={e => setF({ ...f, require_checkin: e.target.checked })} />
+        Candidates must be checked in at their hall (ID card or admission number) before an online paper opens</label>
       {err && <Alert>{err}</Alert>}
       <div className="flex justify-end"><button className="btn btn-primary">{series ? "Save" : "Create exam period"}</button></div>
     </form>
@@ -178,6 +181,7 @@ function SeriesWorkspace({ id, onBack }: { id: string; onBack: () => void }) {
         actions={<>
           <Badge tone={s.status === "published" ? "green" : "slate"}>{s.status}</Badge>
           <Link className="btn btn-ghost" href={`/school/exam-planner/print?series=${id}`} target="_blank">Print</Link>
+          {s.status === "published" && <Link className="btn btn-outline" href={`/school/exam-planner/hall?series=${id}`}>Check-in &amp; live board</Link>}
           {data.can_edit && <button className={"btn " + (s.status === "published" ? "btn-ghost" : "btn-success")} onClick={() => act("publish", { publish: s.status !== "published" }, () => s.status === "published" ? "Unpublished." : "Published. Students now see their timetable and seats.")}>{s.status === "published" ? "Unpublish" : "Publish to students"}</button>}
         </>} />
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}

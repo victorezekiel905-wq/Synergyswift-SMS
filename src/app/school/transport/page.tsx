@@ -10,14 +10,18 @@ export default function TransportPage() {
   const { data: me } = useApi<Me>("/api/me");
   const manager = ["transport_officer", "school_admin", "principal", "platform_admin"].some(r => rolesOf(me).has(r));
   const { data, reload } = useApi<{ routes: Route[] }>("/api/transport");
-  const [tab, setTab] = useState<"bus" | "routes" | "fleet">("bus");
+  const [tab, setTab] = useState<"bus" | "checks" | "routes" | "fleet">("bus");
+  // Bus-check alerts link here with ?tab=checks.
+  useEffect(() => { if (new URLSearchParams(window.location.search).get("tab") === "checks") setTab("checks"); }, []);
+  const attendant = Boolean(me?.profile && data?.routes.some(r => r.attendant_id === me.profile!.id));
   const [routeId, setRouteId] = useState("");
   useEffect(() => { if (!routeId && data?.routes[0]) setRouteId(data.routes[0].id); }, [data, routeId]);
   return (
     <Page wide>
       <PageHeader eyebrow="Transport" title="School buses" subtitle="Routes, stops and riders, buses and drivers. The attendant scans each child on and off and parents are told every time; the bus fee follows each rider onto their invoices." />
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "bus", label: "On the bus" }, ...(manager ? [{ id: "routes" as const, label: "Routes & riders" }, { id: "fleet" as const, label: "Buses & drivers" }] : [])]} />
-      {tab === "fleet" ? <Fleet /> : !data?.routes.length ? <Empty>No routes yet.{manager ? " Add one under Routes & riders." : ""}</Empty> : tab === "bus" ? (
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "bus", label: "On the bus" }, ...(manager || attendant ? [{ id: "checks" as const, label: "Bus checks" }] : []),
+        ...(manager ? [{ id: "routes" as const, label: "Routes & riders" }, { id: "fleet" as const, label: "Buses & drivers" }] : [])]} />
+      {tab === "fleet" ? <Fleet /> : tab === "checks" ? <BusChecks /> : !data?.routes.length ? <Empty>No routes yet.{manager ? " Add one under Routes & riders." : ""}</Empty> : tab === "bus" ? (
         <>
           <select className="input mb-3 w-auto" value={routeId} onChange={e => setRouteId(e.target.value)} aria-label="Route">{data.routes.map(r => <option key={r.id} value={r.id}>{r.name}{r.vehicle ? ` (${r.vehicle})` : ""}</option>)}</select>
           {routeId && <LiveTrip key={routeId} routeId={routeId} />}
@@ -191,6 +195,50 @@ function AssignRiders({ route, onDone }: { route: Route; onDone: () => void }) {
       {err && <Alert>{err}</Alert>}
       <button className="btn btn-primary" disabled={!picked.length} onClick={async () => { const r = await send("/api/transport", { action: "assign", route_id: route.id, student_ids: picked, stop_name: stop || null }); if (!r.ok) return setErr(r.error); onDone(); }}>Assign {picked.length} to {route.name}</button>
       <p className="text-xs text-slate-500">Assigning a student already on another bus moves them to this one.</p>
+    </div>
+  );
+}
+
+type Check = { id: string; kind: "boarded_not_in_school" | "not_dropped_off"; boarded_at: string | null; detected_at: string; resolved_at: string | null; resolution_note: string | null;
+  student: string; admission_no: string | null; class_name: string | null; route: string | null; driver_phone: string | null; guardians: { name: string; phone: string | null }[] };
+
+/** Bus checks (phase 14i-2): raised automatically, closed by a person with a note or by themselves when the child turns up. */
+function BusChecks() {
+  const [date, setDate] = useState(() => new Date().toLocaleDateString("en-CA"));
+  const { data, error, reload } = useApi<{ date: string; ready: boolean; checks: Check[] }>(`/api/transport?view=checks&date=${date}`, [date]);
+  const [closing, setClosing] = useState<Check | null>(null);
+  const [note, setNote] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => { const t = setInterval(reload, 60_000); return () => clearInterval(t); }, [reload]);
+  if (error) return <Alert>{error}</Alert>;
+  if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
+  const open = data.checks.filter(c => !c.resolved_at), done = data.checks.filter(c => c.resolved_at);
+  return (
+    <div className="space-y-4 text-sm">
+      <div className="flex flex-wrap items-center gap-2"><input className="input w-auto" type="date" value={date} onChange={e => setDate(e.target.value)} aria-label="Day" />
+        <p className="text-slate-600">Checked every five minutes: a child who boarded in the morning but is not in school after an hour, and a child who boarded in the afternoon and was not scanned off.</p></div>
+      {!data.ready && <Alert tone="amber">Bus checks need this month&apos;s database update.</Alert>}
+      {msg && <Alert>{msg}</Alert>}
+      {!open.length ? <Empty>No open bus checks{done.length ? " — all settled" : ""}.</Empty> : open.map(c => (
+        <div key={c.id} className="card border-red-200 p-4">
+          <div className="flex flex-wrap items-center gap-2"><b className="text-base">{c.student}</b><span className="text-slate-500">{c.class_name ?? ""}{c.admission_no ? ` · ${c.admission_no}` : ""}</span>
+            <Badge tone="red">{c.kind === "not_dropped_off" ? "not dropped off" : "boarded, not in school"}</Badge></div>
+          <p className="mt-1 text-slate-700">Boarded {c.route ?? "a bus"}{c.boarded_at ? ` at ${fmtTime(c.boarded_at)}` : ""}. {c.kind === "not_dropped_off" ? "Check the bus now, then call the family." : "Find the child and check the register."}</p>
+          <ul className="mt-2 flex flex-wrap gap-3">{c.guardians.map((g, i) => <li key={i}>{g.name}{g.phone ? <> · <a className="text-brand-700 underline" href={`tel:${g.phone}`}>{g.phone}</a></> : null}</li>)}
+            {c.driver_phone && <li>Driver · <a className="text-brand-700 underline" href={`tel:${c.driver_phone}`}>{c.driver_phone}</a></li>}</ul>
+          <button className="btn btn-primary mt-3" onClick={() => { setClosing(c); setNote(""); }}>Settled…</button>
+        </div>))}
+      {done.length > 0 && <details className="card p-4"><summary className="cursor-pointer font-medium">Settled today ({done.length})</summary>
+        <ul className="mt-2 space-y-1">{done.map(c => <li key={c.id}>{c.student}: {c.resolution_note} · {fmtTime(c.resolved_at)}</li>)}</ul></details>}
+      <Modal open={Boolean(closing)} onClose={() => setClosing(null)} title={`Close the check for ${closing?.student ?? ""}`}>
+        <div className="space-y-3">
+          <Field label="What happened"><textarea className="input" rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. In class, card not scanned at the gate / Dropped at the stop, scan missed" maxLength={500} /></Field>
+          <button className="btn btn-primary" disabled={note.trim().length < 3} onClick={async () => {
+            const r = await send("/api/transport", { action: "resolve_check", id: closing!.id, note });
+            if (r.ok) { setClosing(null); setMsg(null); reload(); } else setMsg(r.error ?? "failed");
+          }}>Close it</button>
+        </div>
+      </Modal>
     </div>
   );
 }

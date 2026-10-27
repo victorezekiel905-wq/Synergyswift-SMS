@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (done) · 14e entrance automation (done) · 14f elections (done) · 14g CRMs (done) · 14h SEN engagement (done) · 14i attendance, shifts and bus safety · 14j exam extras · 14k super admin centre · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (done) · 14e entrance automation (done) · 14f elections (done) · 14g CRMs (done) · 14h SEN engagement (done) · 14i attendance, shifts and bus safety (done) · 14j exam extras · 14k super admin centre · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -447,6 +447,18 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Payroll link | ✅ optional: a fixed amount per late arrival or per minute late after a number of free lates each month (early departures can count too), and unexcused absent days unpaid like unpaid leave; shown on the payslip as their own lines; off by default |
 | Month report | ✅ everyone's month: days on shift, late (with minutes and excused), left early, absent, leave and the deduction, sortable, with CSV |
 
+## 14i-2. Bus exceptions, exam-hall check-in and invigilator cover (phase 14i-2, done)
+
+| Feature | Status |
+|---|---|
+| "Boarded but not in school" | ✅ every five minutes the system looks for children scanned onto a bus in the morning who, an hour later, are not signed in at the gate or marked present, when the school has evidence for the day (the register was taken, or the gate is in use); transport staff, the heads and the bus attendant are told at once |
+| "Not dropped off" | ✅ a child scanned onto the afternoon bus and never scanned off when the trip ends (or after three hours) raises an urgent check to the same people |
+| Bus checks screen | ✅ Transport → Bus checks: each open check with the child, class, route, time boarded and one-tap calls to the parents and the driver; closed with a note by a person, or by itself when the child is signed in, marked present or scanned off; history by day |
+| Exam-hall check-in | ✅ Exam planner → Check-in & live board: invigilators scan the candidate's ID card (or type the admission number) at the hall door; wrong-hall candidates are sent to the right hall and seat; check-in by hand from the list; only the session's invigilators and admins can check candidates in |
+| Online papers wait for check-in | ✅ an exam period can require candidates to be checked in at their hall before an online paper opens |
+| Live board | ✅ per session: candidates, checked in, started and submitted online papers, per hall with a progress bar, the candidates not yet in (by seat), refreshing every 20 seconds |
+| Invigilators: present, late, absent, cover | ✅ invigilators tap "I'm here"; those on leave or recorded absence show as absent, those not in the hall ten minutes before the start as late; admins find cover from staff free in that session (those signed in at the gate first), and the new invigilator is told at once; cover is recorded |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -501,3 +513,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101006600_whatsapp_inbox.sql` | 14g-3 |
 | `20260101006700_sen_engagement.sql` | 14h |
 | `20260101006800_staff_time.sql` | 14i-1 |
+| `20260101006900_bus_exam_safety.sql` | 14i-2 |

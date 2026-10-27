@@ -15,6 +15,7 @@ import { appUrl } from "@/lib/school";
 import { runBilling } from "@/lib/saas-server";
 import { runAccountAutomation } from "@/lib/accounts-server";
 import { runEntranceAutomation } from "@/lib/entrance-server";
+import { runBusChecks } from "@/lib/bus-checks-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -59,8 +60,10 @@ async function run(req: NextRequest) {
   const accounts = await runAccountAutomation(svc, base).catch(() => null);
   // Entrance tests: seats, PINs, reminders, absences and decisions (queued, then sent below).
   const entrance = await runEntranceAutomation(svc, base).catch(() => null);
+  // Every five minutes: children who boarded a bus but are not in school, or were never dropped off.
+  const busChecks = await runBusChecks(svc, base).catch(() => null);
   const stats = await dispatchDue(svc, { budgetMs: 40_000, limit: 100, concurrency: 10 });
-  return NextResponse.json({ ok: true, ...stats, admissions_follow_ups: followUps, visit_reminders: reminders, tickets_escalated: escalated, campaigns_sent: campaigns, notices_sent: notices, safeguarding_escalated: safeguarding, late_exeat_returns: lateReturns, library_holds_ready: holds, late_trips: lateTrips, kpi_snapshots: kpiSnapshots, scheduled_reports: scheduledReports, webhooks, billing, accounts, entrance });
+  return NextResponse.json({ ok: true, ...stats, admissions_follow_ups: followUps, visit_reminders: reminders, tickets_escalated: escalated, campaigns_sent: campaigns, notices_sent: notices, safeguarding_escalated: safeguarding, late_exeat_returns: lateReturns, library_holds_ready: holds, late_trips: lateTrips, kpi_snapshots: kpiSnapshots, scheduled_reports: scheduledReports, webhooks, billing, accounts, entrance, bus_checks: busChecks });
 }
 
 export const GET = run;

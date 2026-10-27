@@ -42,7 +42,8 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("hall_delete"), id: z.string().uuid() }),
   z.object({ action: z.literal("series_save"), id: z.string().uuid().optional(), name: z.string().trim().min(2).max(120), term_id: z.string().uuid().nullish().or(z.literal("")),
     starts_on: z.string().date(), ends_on: z.string().date(), sessions: z.array(Session).min(1).max(6), skip_dates: z.array(z.string().date()).max(60).default([]),
-    max_per_day: z.number().int().min(1).max(6).default(2), invigilator_ratio: z.number().int().min(5).max(200).default(30), spacing: z.enum(["every_seat", "alternate"]).default("every_seat") }),
+    max_per_day: z.number().int().min(1).max(6).default(2), invigilator_ratio: z.number().int().min(5).max(200).default(30), spacing: z.enum(["every_seat", "alternate"]).default("every_seat"),
+    require_checkin: z.boolean().default(false) }),
   z.object({ action: z.literal("series_delete"), id: z.string().uuid() }),
   z.object({ action: z.literal("paper_save"), id: z.string().uuid().optional(), series_id: z.string().uuid(), title: z.string().trim().min(1).max(160),
     subject_id: z.string().uuid().nullish().or(z.literal("")), class_group_ids: z.array(z.string().uuid()).min(1).max(60), duration_minutes: z.number().int().min(5).max(600),
@@ -80,9 +81,14 @@ export async function POST(req: NextRequest) {
   }
   if (b.action === "series_save") {
     if (b.ends_on < b.starts_on) return jsonError("the end date is before the start date");
-    const { id, action: _a, ...row } = b;
-    const data = { ...row, term_id: row.term_id || null };
-    if (id) { const { error } = await sb.from("exam_series").update(data).eq("tenant_id", tid).eq("id", id); return fail(error) ?? ok({ id }); }
+    const { id, action: _a, require_checkin, ...row } = b;
+    // Hall check-in (phase 14i) is only written when switched on, or on an update once the column exists, so saving works before migration 6900.
+    const data = { ...row, term_id: row.term_id || null, ...(require_checkin ? { require_checkin } : {}) };
+    if (id) {
+      let { error } = await sb.from("exam_series").update({ ...data, require_checkin }).eq("tenant_id", tid).eq("id", id);
+      if (error && !require_checkin && /require_checkin/.test(error.message)) ({ error } = await sb.from("exam_series").update(data).eq("tenant_id", tid).eq("id", id));
+      return fail(error) ?? ok({ id });
+    }
     const { data: created, error } = await sb.from("exam_series").insert({ ...data, tenant_id: tid, created_by: ctx.userId }).select("id").single();
     return fail(error) ?? ok({ id: created.id });
   }

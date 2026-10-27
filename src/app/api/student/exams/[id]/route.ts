@@ -111,6 +111,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     const now = new Date();
     // Access arrangements: a student on the SEN register with extra time gets it automatically.
     const { data: me } = await svc.from("students").select("id,sen_profiles(extra_time_pct,status)").eq("tenant_id", ctx.tenant.id).eq("user_id", ctx.userId).maybeSingle();
+    // Hall check-in (phase 14i): an exam period can require the candidate to be checked in at the hall first.
+    const { data: papers } = await svc.from("exam_papers").select("id,exam_series(require_checkin)").eq("tenant_id", ctx.tenant.id).eq("exam_id", exam.id);
+    const gated = (papers ?? []).filter((p: any) => p.exam_series?.require_checkin === true).map((p: any) => p.id);
+    if (gated.length && me) {
+      const { data: inHall } = await svc.from("exam_checkins").select("id").eq("student_id", me.id).in("paper_id", gated).limit(1);
+      if (!inHall?.length) return jsonError("Check in at your exam hall first: show your ID card to the invigilator, then start.", 403);
+    }
     const sen = (me as any)?.sen_profiles;
     const extra = sen && sen.status !== "closed" ? extraMinutes(exam.duration_minutes, sen.extra_time_pct) : 0;
     const { data: attempt, error } = await svc.from("exam_attempts").insert({

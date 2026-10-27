@@ -37,7 +37,7 @@ export default function ClockCodePage() {
       <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
         <p className="text-sm uppercase tracking-[0.18em] text-slate-400">{code?.school ?? ""}{code?.campus ? ` · ${code.campus}` : ""}</p>
         <h1 className="mt-2 font-serif text-[34px] font-semibold tracking-[-0.015em]">Staff: scan to sign in or out</h1>
-        <p className="mt-1 text-5xl font-light tabular-nums">{now?.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</p>
+        <p className="mt-4 text-5xl font-light tabular-nums">{now?.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</p>
         <div className="mt-8 rounded-2xl bg-white p-5">
           {code ? <QrCode value={code.url} size={340} /> : <div className="grid h-[340px] w-[340px] place-items-center text-slate-500">{error ?? "Loading…"}</div>}
         </div>

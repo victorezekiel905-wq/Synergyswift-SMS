@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
   if (ctx instanceof NextResponse) return ctx;
   const tid = ctx.tenant.id;
   const routeId = new URL(req.url).searchParams.get("route_id");
+  if (new URL(req.url).searchParams.get("view") === "checks") return busChecks(ctx, new URL(req.url).searchParams.get("date"));
   const { data: routes } = await ctx.sb.from("transport_routes").select("*,users!transport_routes_attendant_id_fkey(full_name),transport_assignments(count)").eq("tenant_id", tid).order("name");
   if (!routeId) return NextResponse.json({ routes: routes ?? [] });
   const [{ data: riders }, { data: events }] = await Promise.all([
@@ -30,7 +31,31 @@ export async function GET(req: NextRequest) {
   });
 }
 
+/** Bus checks (phase 14i-2): children who boarded but are not in school, or were never dropped off. Transport staff and each bus's attendant. */
+async function busChecks(ctx: any, day: string | null) {
+  const tid = ctx.tenant.id;
+  const svc = createServiceClient();
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(day ?? "") ? day! : new Date().toLocaleDateString("en-CA", { timeZone: ctx.tenant.timezone });
+  const { data: mine } = await svc.from("transport_routes").select("id").eq("tenant_id", tid).eq("attendant_id", ctx.userId);
+  const manager = hasAny(ctx, ROLES.transport);
+  if (!manager && !mine?.length) return jsonError("only transport staff and bus attendants see bus checks", 403);
+  let q = svc.from("bus_exceptions").select("*,students(first_name,last_name,other_names,admission_no,photo_url,class_groups(name)),transport_routes(name,driver_phone)")
+    .eq("tenant_id", tid).eq("date", date).order("detected_at", { ascending: false });
+  if (!manager) q = q.in("route_id", (mine ?? []).map((r: any) => r.id));
+  const { data, error } = await q;
+  if (error) return NextResponse.json({ date, checks: [], ready: false });
+  const ids = [...new Set((data ?? []).map((x: any) => x.student_id))];
+  const { data: links } = ids.length ? await svc.from("student_guardians").select("student_id,guardians(full_name,phone,whatsapp_phone)").eq("tenant_id", tid).in("student_id", ids) : { data: [] };
+  return NextResponse.json({ date, ready: true, checks: (data ?? []).map((x: any) => ({
+    id: x.id, kind: x.kind, boarded_at: x.boarded_at, detected_at: x.detected_at, resolved_at: x.resolved_at, resolution_note: x.resolution_note,
+    student: studentName(x.students), admission_no: x.students?.admission_no ?? null, class_name: x.students?.class_groups?.name ?? null, photo_url: x.students?.photo_url ?? null,
+    route: x.transport_routes?.name ?? null, driver_phone: x.transport_routes?.driver_phone ?? null,
+    guardians: (links ?? []).filter((l: any) => l.student_id === x.student_id && l.guardians).map((l: any) => ({ name: l.guardians.full_name, phone: l.guardians.phone ?? l.guardians.whatsapp_phone ?? null }))
+  })) });
+}
+
 const Body = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("resolve_check"), id: z.string().uuid(), note: z.string().trim().min(3).max(500) }),
   z.object({ action: z.literal("save_route"), id: z.string().uuid().optional(), name: z.string().trim().min(1).max(60), vehicle: z.string().trim().max(40).nullish(),
     driver_name: z.string().trim().max(80).nullish(), driver_phone: z.string().trim().max(30).nullish(), attendant_id: z.string().uuid().nullish(),
     capacity: z.number().int().positive().max(200).nullish(), stops: z.array(z.object({ name: z.string().trim().min(1).max(80), am: z.string().max(5).nullish(), pm: z.string().max(5).nullish(),
@@ -51,6 +76,21 @@ export async function POST(req: NextRequest) {
   const b = parsed.data;
   const tid = ctx.tenant.id;
   const sb = ctx.sb;
+
+  if (b.action === "resolve_check") {
+    const svc = createServiceClient();
+    const { data: x } = await svc.from("bus_exceptions").select("id,route_id,resolved_at").eq("tenant_id", tid).eq("id", b.id).maybeSingle();
+    if (!x) return jsonError("not found", 404);
+    if (!hasAny(ctx, ROLES.transport)) {
+      const { data: r } = await svc.from("transport_routes").select("attendant_id").eq("tenant_id", tid).eq("id", x.route_id).maybeSingle();
+      if (r?.attendant_id !== ctx.userId) return jsonError("only transport staff or this bus's attendant can close it", 403);
+    }
+    if (x.resolved_at) return jsonError("already closed");
+    const { error } = await svc.from("bus_exceptions").update({ resolved_at: new Date().toISOString(), resolved_by: ctx.userId, resolution_note: b.note }).eq("id", x.id);
+    if (error) return jsonError(error.message);
+    await svc.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "transport.check_closed", meta: { id: x.id, note: b.note } });
+    return NextResponse.json({ ok: true });
+  }
 
   if (b.action === "scan") {
     const svc = createServiceClient();
