@@ -3,9 +3,10 @@ import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, denyUnless } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { notifyApplicant, enrollApplication } from "@/lib/admissions";
-import { syncLeadFromApplication, brandAndPrincipal } from "@/lib/admissions-crm";
-import { renderTemplate, DEFAULT_TEMPLATES, seatsLeft } from "@/lib/crm";
-import { notifyContact, money } from "@/lib/notify";
+import { syncLeadFromApplication } from "@/lib/admissions-crm";
+import { issueOffer, sendDecisionLetter } from "@/lib/admissions-decisions";
+import { seatsLeft } from "@/lib/crm";
+import { notifyContact } from "@/lib/notify";
 import { admissionNote } from "@/lib/messaging/notices";
 import { appUrl, toCsv } from "@/lib/school";
 
@@ -70,17 +71,6 @@ const Body = z.discriminatedUnion("action", [
     public_slug: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,48}$/, "use lowercase letters, numbers and dashes").nullish() })
 ]);
 
-/** Sends a waitlist or regret letter from the school's template. */
-async function sendLetter(svc: any, app: any, kind: "waitlist" | "regret", base: string) {
-  const { data: t } = await svc.from("admission_templates").select("subject,body").eq("tenant_id", app.tenant_id).eq("kind", kind).maybeSingle();
-  const tpl = t ?? DEFAULT_TEMPLATES[kind];
-  const { brand } = await brandAndPrincipal(svc, app.tenant_id);
-  const vars = { parent: app.guardian_name, child: app.first_name, school: brand.schoolName, level: app.applying_for, application_no: app.application_no };
-  return notifyContact(svc, { tenantId: app.tenant_id, name: app.guardian_name, email: app.guardian_email, phone: app.guardian_phone, kind: "admission", refId: app.id,
-    build: b => admissionNote(b, { name: app.guardian_name, subject: renderTemplate(tpl.subject, vars), lines: renderTemplate(tpl.body, vars).split(/\n+/).filter(Boolean).slice(1),
-      link: `${base}/apply/track/${app.tracking_token}`, linkLabel: "View application" }) });
-}
-
 export async function POST(req: NextRequest) {
   const ctx = await requireCtx(ROLES.admissions, "admissions");
   if (ctx instanceof NextResponse) return ctx;
@@ -109,7 +99,7 @@ export async function POST(req: NextRequest) {
         if (error) return jsonError(error.message);
         await syncLeadFromApplication(svc, app);
         let sent = 0;
-        if (b.notify) sent = ["waitlisted", "rejected"].includes(b.status) ? await sendLetter(svc, app, b.status === "waitlisted" ? "waitlist" : "regret", base) : await notifyApplicant(svc, app, base, b.note);
+        if (b.notify) sent = ["waitlisted", "rejected"].includes(b.status) ? await sendDecisionLetter(svc, app, b.status === "waitlisted" ? "waitlist" : "regret", base) : await notifyApplicant(svc, app, base, b.note);
         return NextResponse.json({ ok: true, messages_queued: sent });
       }
       case "score": case "fee": case "acceptance_paid": {
@@ -139,27 +129,7 @@ export async function POST(req: NextRequest) {
           const left = seatsLeft(cap.map((c: any) => ({ level: c.level, seats: c.seats })), (others ?? []) as any).get(app.applying_for) ?? 0;
           if (left <= 0) return jsonError(`${app.applying_for} is full. Put the child on the waiting list, raise the number of seats, or offer anyway.`, 409);
         }
-        const [{ data: s }, { data: t }, { brand, principal }] = await Promise.all([
-          svc.from("tenant_settings").select("acceptance_fee,offer_valid_days,currency").eq("tenant_id", tid).maybeSingle(),
-          ctx.sb.from("admission_templates").select("subject,body").eq("tenant_id", tid).eq("kind", "offer").maybeSingle(),
-          brandAndPrincipal(svc, tid)
-        ]);
-        const fee = b.acceptance_fee ?? Number(s?.acceptance_fee ?? 0);
-        const expires = b.expires_on ?? new Date(Date.now() + (s?.offer_valid_days ?? 14) * 86_400_000).toISOString().slice(0, 10);
-        const tpl = t ?? DEFAULT_TEMPLATES.offer;
-        const vars = { parent: app.guardian_name, child: `${app.first_name} ${app.last_name}`, school: brand.schoolName, level: app.applying_for, application_no: app.application_no,
-          principal, fee: fee ? money(fee, s?.currency ?? "NGN") : "", expires: new Date(`${expires}T12:00:00Z`).toLocaleDateString("en-GB", { dateStyle: "long" }),
-          fee_line: fee ? ` and pay the acceptance fee of ${money(fee, s?.currency ?? "NGN")}` : "" };
-        const letter = { subject: renderTemplate(tpl.subject, vars), body: renderTemplate(tpl.body, vars), issued_at: now(), acceptance_fee: fee, expires_on: expires, note: b.note ?? null };
-        const { data: updated, error } = await ctx.sb.from("applications").update({ status: "offered", offer_letter: letter, offer_issued_at: letter.issued_at, offer_expires_on: expires,
-          acceptance_fee: fee, offer_accepted_at: null, offer_signature: null, offer_signer_name: null, offer_sign_meta: null, waitlist_position: null, updated_at: now() })
-          .eq("tenant_id", tid).eq("id", app.id).select("*").single();
-        if (error) return jsonError(error.message);
-        await syncLeadFromApplication(svc, updated);
-        const link = `${base}/apply/track/${app.tracking_token}/offer`;
-        const sent = await notifyContact(svc, { tenantId: tid, name: app.guardian_name, email: app.guardian_email, phone: app.guardian_phone, kind: "admission", refId: app.id,
-          build: br => admissionNote(br, { name: app.guardian_name, subject: letter.subject, lines: [`${app.first_name} has been offered a place in ${app.applying_for} at ${br.schoolName}.`,
-            `Please read and sign the offer letter by ${vars.expires}.`, ...(b.note ? [b.note] : [])], link, linkLabel: "Read and accept the offer" }) });
+        const { link, sent } = await issueOffer(svc, app, base, { acceptanceFee: b.acceptance_fee ?? null, expiresOn: b.expires_on ?? null, note: b.note ?? null });
         return NextResponse.json({ ok: true, offer_link: link, messages_queued: sent });
       }
       case "waitlist": {

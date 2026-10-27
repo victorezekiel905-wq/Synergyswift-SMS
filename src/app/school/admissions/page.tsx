@@ -5,13 +5,14 @@ import { useApi, Page, PageHeader, Tabs, Modal, Loading, rolesOf, type Me } from
 import Pipeline, { type LeadsData } from "@/components/admissions/Pipeline";
 import LeadDrawer from "@/components/admissions/LeadDrawer";
 import Applications from "@/components/admissions/Applications";
+import Entrance from "@/components/admissions/Entrance";
 import Visits from "@/components/admissions/Visits";
 import FollowUps from "@/components/admissions/FollowUps";
 import Tasks from "@/components/admissions/Tasks";
 import Analytics from "@/components/admissions/Analytics";
 import Setup from "@/components/admissions/Setup";
 
-type Tab = "pipeline" | "applications" | "visits" | "tasks" | "followups" | "analytics" | "setup";
+type Tab = "pipeline" | "applications" | "entrance" | "visits" | "tasks" | "followups" | "analytics" | "setup";
 
 export default function AdmissionsPage() {
   return <Suspense fallback={<Loading />}><Admissions /></Suspense>;
@@ -38,11 +39,12 @@ function Admissions() {
       <PageHeader eyebrow="Growth" title="Admissions"
         subtitle="Every family from first enquiry to enrolment: capture from your website, WhatsApp, ads, walk-ins and open days; automatic follow-ups; tours, entrance tests, offers signed online, and the numbers that show what works." />
       <Tabs value={tab} onChange={t => { setTab(t); router.replace(`/school/admissions?tab=${t}`); }} tabs={[
-        { id: "pipeline", label: "Pipeline" }, { id: "applications", label: "Applications" }, { id: "visits", label: "Tours & open days" },
+        { id: "pipeline", label: "Pipeline" }, { id: "applications", label: "Applications" }, { id: "entrance", label: "Entrance exams" }, { id: "visits", label: "Tours & open days" },
         { id: "tasks", label: `My tasks${myOpenTasks ? ` (${myOpenTasks})` : ""}` }, { id: "followups", label: "Follow-ups" }, { id: "analytics", label: "Analytics" }, { id: "setup", label: "Setup" }]} />
       <div key={version}>
         {tab === "pipeline" && <Pipeline onOpen={openLead} />}
         {tab === "applications" && <Applications admin={admin} openId={app} onOpenLead={openLead} />}
+        {tab === "entrance" && <Entrance onOpenLead={openLead} />}
         {tab === "visits" && <Visits onOpenLead={openLead} />}
         {tab === "tasks" && <Tasks onOpenLead={openLead} mineOnly />}
         {tab === "followups" && <FollowUps />}

@@ -356,6 +356,23 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Leaderboard for guests fixed | ✅ every board row has an opaque key, so "you" is found by key, not by name (two guests called Sam, or anonymous "Player 3", used to break it); guests appear on game boards |
 | Live module confirmations | ✅ the live screens' confirm dialogs and messages work (the provider was missing after the move, so "End game" and similar buttons did nothing); the easy-to-read font support works on live screens |
 
+## 14e. Entrance exam automation (phase 14e, done)
+
+| Feature | Status |
+|---|---|
+| Rules per intake | ✅ **Admissions → Entrance exams**: one intake per class (and intake label): the test, when it is sent, where it is taken, camera check at home, Safe Exam Browser at centres, weights for test, interview and previous report, overall and per-section pass marks, borderline band, who is interviewed, automatic or approve-first decisions, waiting-list size, results release date, scores shown or not, offer validity, acceptance fee, class to enrol into |
+| Automatic assignment | ✅ the moment an application arrives, or its form fee is paid (online or marked paid), the test is assigned by the database and seated in the earliest sitting with room; "Assign waiting applicants" catches up older applications |
+| Sittings and centres | ✅ online windows and centre sessions with seats; seats are booked with a lock, so a centre is never overbooked; adding a sitting seats everyone waiting; families can choose a date when the school allows; staff can move a candidate; multi-centre board (booked, checked in, writing, handed in, absent) |
+| Messages | ✅ families are told the link and window, or the centre, time and a one-time **PIN** (or asked to choose a date); a reminder the day before; candidates who miss their sitting are marked absent and told |
+| On-site test (CBT) | ✅ the centre computer shows the PIN screen (`/entrance/pin`); the PIN only works during that sitting; wrong PINs are limited per computer; Safe Exam Browser file per sitting; centre tests cannot be started from home; staff can issue a new PIN |
+| Camera check at home | ✅ a photo every minute; no face / two faces / camera off are flagged for staff to review (never marked down automatically); photos deleted after 60 days |
+| Scores | ✅ weighted score from the test, interview and report; percent per question section; section pass marks |
+| Merit list and decisions | ✅ ranked against the seats left: offers to the top, then the waiting list, regret below the pass mark or once the list is full; borderline candidates are **booked into an interview** automatically (next interview session with room) and decided after it; decisions sent automatically or by "Send decisions" after approval; offers use the school's offer letter (e-sign, acceptance fee) |
+| Waiting list moves up | ✅ a declined or expired offer frees a seat and the best candidate still waiting is offered it |
+| Results checker | ✅ `/apply/results/<school>`: application number + surname; only after release; score shown if the school chooses; the family's tracking page shows the result, the test details and date choice |
+| One-step enrolment | ✅ "Enrol accepted": every accepted child whose acceptance fee is paid becomes a student (admission number, class, guardian, first-term invoice); sign-ins for the child and parent follow automatically |
+| Entrance analytics | ✅ applicants, tested, absent, passed, offered, joined; score spread; feeder schools and sources (average, offered, joined); hardest questions |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -403,3 +420,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101006110_live_sync.sql` | 14d-2 |
 | `20260101006120_live_seb.sql` | 14d-2 |
 | `20260101006130_live_games.sql` | 14d-3 |
+| `20260101006200_entrance_automation.sql` | 14e |

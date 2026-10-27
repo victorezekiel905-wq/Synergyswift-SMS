@@ -11,7 +11,12 @@ type Data = {
   application: { application_no: string; status: string; first_name: string; last_name: string; applying_for: string; assessment_at: string | null; interview_at: string | null; offer_expires_on: string | null;
     decision_note: string | null; fee_paid: boolean; acceptance_fee: number; acceptance_paid: boolean; offer_accepted_at: string | null; waitlist_position: number | null; created_at: string; has_offer: boolean };
   documents: { id: string; kind: string; name: string; size: number; uploaded_at: string }[];
-  entrance: { token: string | null; status: string; opens_at: string | null; closes_at: string | null; title: string; minutes: number }[];
+  entrance: { token: string | null; status: string; opens_at: string | null; closes_at: string | null; title: string; minutes: number; absent?: boolean;
+    centre?: { name: string; address: string | null; starts_at: string; ends_at: string } | null }[];
+  /** Sittings the family can choose from (when the school lets them), and the released result. */
+  sittings?: { id: string; kind: "online" | "centre"; centre: string | null; address: string | null; starts_at: string; ends_at: string; chosen: boolean }[];
+  book_attempt?: boolean;
+  result?: { decision: string; score: number | null } | null;
   school: { name: string; logo_url: string | null; brand_color: string | null; phone: string | null; email: string | null };
   application_fee: number; currency: string; pay_online: boolean; bank_details: string | null;
 };
@@ -77,13 +82,45 @@ export default function TrackPage(props: { params: Promise<{ token: string }> })
         </section>
       )}
 
-      {data.entrance.filter(e => e.token).map(e => (
-        <section key={e.token} className="mt-5 rounded-lg border border-slate-200 p-4">
+      {data.result && (
+        <section className="mt-5 rounded-lg border-2 p-4" style={{ borderColor: color }}>
+          <h2 className="font-semibold">Entrance result</h2>
+          <p className="mt-1 text-lg">{data.result.decision}</p>
+          {data.result.score !== null && <p className="text-sm text-slate-600">Entrance score: <b>{data.result.score}</b> out of 100</p>}
+        </section>
+      )}
+
+      {data.entrance.filter(e => e.token || e.centre).map((e, i) => (
+        <section key={e.token ?? `centre-${i}`} className="mt-5 rounded-lg border border-slate-200 p-4">
           <h2 className="font-semibold">Entrance test: {e.title}</h2>
-          <p className="text-sm text-slate-600">{e.minutes} minutes, in one sitting.{e.opens_at ? ` Opens ${fmtDate(e.opens_at, true)}.` : ""}{e.closes_at ? ` Closes ${fmtDate(e.closes_at, true)}.` : ""}</p>
-          <a className="btn mt-2 text-white" style={{ background: color }} href={`/entrance/${e.token}`}>{e.status === "in_progress" ? "Continue the test" : "Start the test"}</a>
+          {e.centre ? (
+            <p className="text-sm text-slate-700">At <b>{e.centre.name}</b>{e.centre.address ? `, ${e.centre.address}` : ""}, {fmtDate(e.centre.starts_at, true)}. {e.minutes} minutes. {a.first_name} types the test PIN we sent on the school&apos;s computer there. Please arrive 20 minutes early.</p>
+          ) : (<>
+            <p className="text-sm text-slate-600">{e.minutes} minutes, in one sitting.{e.opens_at ? ` Opens ${fmtDate(e.opens_at, true)}.` : ""}{e.closes_at ? ` Closes ${fmtDate(e.closes_at, true)}.` : ""}</p>
+            <a className="btn mt-2 text-white" style={{ background: color }} href={`/entrance/${e.token}`}>{e.status === "in_progress" ? "Continue the test" : "Start the test"}</a>
+          </>)}
+          {e.absent && <p className="mt-2 text-sm text-amber-800">{a.first_name} missed this sitting.{data.book_attempt ? " Choose another date below." : " Please contact the school."}</p>}
         </section>
       ))}
+
+      {data.book_attempt && (data.sittings ?? []).length > 0 && (
+        <section className="mt-5 rounded-lg border border-slate-200 p-4">
+          <h2 className="font-semibold">Choose a date for the entrance test</h2>
+          <ul className="mt-2 space-y-2">{(data.sittings ?? []).map(st => (
+            <li key={st.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-2 text-sm">
+              <span className="flex-1">{st.kind === "online" ? "Online, from home" : `${st.centre}${st.address ? `, ${st.address}` : ""}`} · {fmtDate(st.starts_at, true)}{st.kind === "online" ? ` to ${fmtDate(st.ends_at, true)}` : ""}</span>
+              {st.chosen ? <b className="text-emerald-700">Booked</b> : (
+                <button className="btn btn-outline px-3 py-1 text-xs" disabled={busy !== null} onClick={async () => {
+                  setBusy(st.id);
+                  const r = await send(`/api/apply/track/${token}`, { action: "choose_sitting", sitting_id: st.id });
+                  setBusy(null);
+                  setMsg({ ok: r.ok, text: r.ok ? "Booked. We will send the details in a minute." : r.error ?? "failed" });
+                  reload();
+                }}>{busy === st.id ? "Booking…" : "Choose"}</button>
+              )}
+            </li>))}</ul>
+        </section>
+      )}
 
       {data.application_fee > 0 && !closed && (
         <section className="mt-5 rounded-lg border border-slate-200 p-4">

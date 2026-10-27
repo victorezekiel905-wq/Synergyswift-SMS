@@ -15,9 +15,11 @@ export async function requestCamera(): Promise<MediaStream> {
  * Each photo is checked for faces (in every modern browser); photos with no
  * face or several faces are flagged for the teacher, never locked automatically.
  */
-export default function WebcamProctor({ examId, intervalSec, initialStream, onEvent }: {
+export default function WebcamProctor({ examId, intervalSec, initialStream, onEvent, uploadUrl }: {
   examId: string; intervalSec: number; initialStream?: MediaStream | null;
   onEvent: (kind: string, meta?: Record<string, unknown>) => void;
+  /** Where photos go (default: the student's exam); entrance tests post to their private link. */
+  uploadUrl?: string;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(initialStream ?? null);
@@ -62,12 +64,12 @@ export default function WebcamProctor({ examId, intervalSec, initialStream, onEv
       const blob: Blob | null = await new Promise(res => c.toBlob(res, "image/jpeg", 0.6));
       if (!blob) return;
       const fd = new FormData(); fd.set("photo", blob, "snap.jpg"); fd.set("faces", String(faces));
-      await fetch(`/api/student/exams/${examId}/snapshot`, { method: "POST", body: fd }).catch(() => {});
+      await fetch(uploadUrl ?? `/api/student/exams/${examId}/snapshot`, { method: "POST", body: fd }).catch(() => {});
     };
     const first = setTimeout(snap, 3000);
     const t = setInterval(snap, Math.max(15, intervalSec) * 1000);
     return () => { clearTimeout(first); clearInterval(t); };
-  }, [stream, examId, intervalSec, onEvent]);
+  }, [stream, examId, intervalSec, onEvent, uploadUrl]);
 
   // Stop the camera when the exam ends.
   useEffect(() => () => { stream?.getTracks().forEach(t => t.stop()); }, [stream]);

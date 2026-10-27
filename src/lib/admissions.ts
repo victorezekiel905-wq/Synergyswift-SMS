@@ -14,9 +14,9 @@ export async function tenantBySlug(svc: any, slug: string) {
   return { tenant: t, settings: s };
 }
 
-export async function notifyApplicant(svc: any, app: any, baseUrl: string, note?: string | null) {
+export async function notifyApplicant(svc: any, app: any, baseUrl: string, note?: string | null, defer = false) {
   return notifyContact(svc, {
-    tenantId: app.tenant_id, name: app.guardian_name, email: app.guardian_email, phone: app.guardian_phone, kind: "admission", refId: app.id,
+    tenantId: app.tenant_id, name: app.guardian_name, email: app.guardian_email, phone: app.guardian_phone, kind: "admission", refId: app.id, defer,
     build: brand => admissionUpdate(brand, { guardianName: app.guardian_name, childName: `${app.first_name} ${app.last_name}`, applicationNo: app.application_no,
       status: app.status, note, link: `${baseUrl}/apply/track/${app.tracking_token}` })
   });

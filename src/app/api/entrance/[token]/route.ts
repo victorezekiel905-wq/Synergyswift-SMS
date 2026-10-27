@@ -6,6 +6,8 @@ import { buildAttemptLayout, toPublicQuestion, markAttempt, questionsForAttempt,
 import { loadQuestions, markCodeQuestions, GRACE_MS, VIOLATION_KINDS } from "@/lib/exams/server";
 import { refreshScore } from "@/lib/admissions-crm";
 import { examTools } from "@/lib/exams/tools";
+import { absoluteRequestUrl, verifySeb } from "@/lib/exams/seb";
+import { sectionScores } from "@/lib/entrance";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +24,26 @@ async function load(token: string) {
   return { svc, at: at as any };
 }
 
-function windowState(at: any): "not_open" | "open" | "closed" {
+/**
+ * The sitting and intake (phase 14e). Read separately so tests keep working on a database
+ * without migration 20260101006200 (the columns are then simply missing).
+ */
+async function setting(svc: any, at: any): Promise<{ sitting: any | null; plan: any | null }> {
+  const [{ data: sitting }, { data: app }] = await Promise.all([
+    at.sitting_id ? svc.from("entrance_sittings").select("*").eq("id", at.sitting_id).maybeSingle() : Promise.resolve({ data: null }),
+    svc.from("applications").select("entrance_plan_id").eq("id", at.application_id).maybeSingle()
+  ]);
+  const { data: plan } = app?.entrance_plan_id ? await svc.from("entrance_plans").select("*").eq("id", app.entrance_plan_id).maybeSingle() : { data: null };
+  return { sitting: sitting ?? null, plan: plan ?? null };
+}
+
+/** At a centre, the test can be started from 30 minutes before the sitting until it ends. */
+function windowState(at: any, sitting: any | null = null): "not_open" | "open" | "closed" {
   const now = Date.now();
-  if (at.opens_at && now < new Date(at.opens_at).getTime()) return "not_open";
-  if (at.closes_at && now > new Date(at.closes_at).getTime()) return "closed";
+  const opens = sitting?.kind === "centre" ? new Date(sitting.starts_at).getTime() - 30 * 60_000 : at.opens_at ? new Date(at.opens_at).getTime() : null;
+  const closes = sitting?.kind === "centre" ? new Date(sitting.ends_at).getTime() : at.closes_at ? new Date(at.closes_at).getTime() : null;
+  if (opens && now < opens) return "not_open";
+  if (closes && now > closes) return "closed";
   return "open";
 }
 
@@ -41,6 +59,7 @@ async function finish(svc: any, at: any, questions: Question[]) {
   const svcProxy = { from: (t: string) => svc.from(t === "exam_attempts" ? "entrance_attempts" : t) };
   done = await markCodeQuestions(svcProxy, fake, questions);
   const pct = done.max_score ? Math.round((Number(done.total_score) / Number(done.max_score)) * 1000) / 10 : null;
+  if ("section_scores" in done) await svc.from("entrance_attempts").update({ section_scores: sectionScores(given, (done.marks ?? {}) as Record<string, Mark>) }).eq("id", at.id);
   await svc.from("applications").update({ assessment_score: pct, updated_at: new Date().toISOString() }).eq("id", at.application_id);
   const app = at.applications;
   if (app?.lead_id) {
@@ -59,8 +78,11 @@ export async function GET(_req: NextRequest, props: { params: Promise<{ token: s
   const questions = await loadQuestions(svc, at.exam_id);
   if (at.status === "in_progress" && Date.now() > new Date(at.deadline_at).getTime() + GRACE_MS) at = await finish(svc, at, questions);
   const { data: s } = await svc.from("tenant_settings").select("school_name,logo_url,brand_color").eq("tenant_id", at.tenant_id).maybeSingle();
+  const { sitting, plan } = await setting(svc, at);
+  const centre = sitting?.kind === "centre" ? { name: sitting.centre, address: sitting.address, starts_at: sitting.starts_at, ends_at: sitting.ends_at, checked_in: Boolean(at.checked_in_at) } : null;
   const info = { title: at.exams?.title, instructions: at.exams?.instructions, duration_minutes: at.exams?.duration_minutes, child: at.applications?.first_name,
-    window: windowState(at), opens_at: at.opens_at, closes_at: at.closes_at, status: at.status, school: { name: s?.school_name ?? at.applications?.tenants?.name, logo_url: s?.logo_url, brand_color: s?.brand_color },
+    window: windowState(at, sitting), opens_at: centre ? centre.starts_at : at.opens_at, closes_at: centre ? centre.ends_at : at.closes_at, status: at.status,
+    centre, face_check: Boolean(plan?.face_check) && !centre, school: { name: s?.school_name ?? at.applications?.tenants?.name, logo_url: s?.logo_url, brand_color: s?.brand_color },
     tools: examTools(at.exams?.settings), reference_text: examTools(at.exams?.settings).includes("reference_sheet") ? (at.exams?.settings?.reference_text ?? null) : null };
   if (at.status !== "in_progress") return NextResponse.json({ info });
   const byId = new Map(questions.map(q => [q.id, q]));
@@ -72,7 +94,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start") }),
   z.object({ action: z.literal("save"), answers: z.record(z.any()) }),
   z.object({ action: z.literal("submit"), answers: z.record(z.any()).optional() }),
-  z.object({ action: z.literal("event"), kind: z.string().max(40) })
+  z.object({ action: z.literal("event"), kind: z.string().max(40), meta: z.record(z.union([z.string().max(80), z.number()])).nullish() })
 ]);
 
 export async function POST(req: NextRequest, props: { params: Promise<{ token: string }> }) {
@@ -87,19 +109,38 @@ export async function POST(req: NextRequest, props: { params: Promise<{ token: s
   if (b.action === "start") {
     if (at.status === "in_progress") return NextResponse.json({ ok: true });
     if (at.status !== "assigned") return jsonError("this entrance test has already been taken", 409);
-    if (windowState(at) !== "open") return jsonError(windowState(at) === "not_open" ? "this test has not opened yet" : "this test has closed", 403);
+    const { sitting, plan } = await setting(svc, at);
+    const state = windowState(at, sitting);
+    if (state !== "open") return jsonError(state === "not_open" ? "this test has not opened yet" : "this test has closed", 403);
+    if (sitting?.kind === "centre") {
+      if (!at.checked_in_at) return jsonError(`This test is taken at ${sitting.centre}. Type the test PIN on the school's computer there.`, 403);
+      if (plan?.seb_at_centre !== false) {
+        const settings = at.exams?.settings ?? {};
+        const check = verifySeb(absoluteRequestUrl(req), req.headers, { require_seb: true, seb_config_keys: settings.seb_config_keys, seb_browser_keys: settings.seb_browser_keys });
+        if (!check.ok) {
+          await svc.from("entrance_events").insert({ tenant_id: at.tenant_id, attempt_id: at.id, kind: "seb_refused", meta: { reason: check.reason } });
+          return jsonError(check.reason ?? "This test must be taken in Safe Exam Browser.", 403);
+        }
+      }
+    }
     if (!questions.length) return jsonError("the school has not finished setting this test", 409);
     const s = at.exams?.settings ?? {};
     const layout = buildAttemptLayout(questions, { shuffleQuestions: Boolean(s.shuffle_questions), shuffleOptions: s.shuffle_options !== false, draw: s.draw });
     let deadline = new Date(Date.now() + Number(at.exams?.duration_minutes ?? 60) * 60_000);
-    if (at.closes_at && deadline > new Date(at.closes_at)) deadline = new Date(at.closes_at);
+    const closes = sitting?.kind === "centre" ? sitting.ends_at : at.closes_at;
+    if (closes && deadline > new Date(closes)) deadline = new Date(closes);
     await svc.from("entrance_attempts").update({ status: "in_progress", started_at: new Date().toISOString(), deadline_at: deadline.toISOString(),
       question_order: layout.question_order, option_orders: layout.option_orders }).eq("id", at.id).eq("status", "assigned");
     return NextResponse.json({ ok: true }, { status: 201 });
   }
   if (at.status !== "in_progress") return jsonError("this entrance test is not in progress", 409);
   if (b.action === "event") {
-    if (VIOLATION_KINDS.has(b.kind.replace(/[^a-z_]/g, ""))) await svc.from("entrance_attempts").update({ violations: Number(at.violations ?? 0) + 1 }).eq("id", at.id);
+    const kind = b.kind.replace(/[^a-z_]/g, "");
+    if (VIOLATION_KINDS.has(kind)) await svc.from("entrance_attempts").update({ violations: Number(at.violations ?? 0) + 1 }).eq("id", at.id);
+    if (["no_face", "multiple_faces", "camera_off"].includes(kind) && "face_flags" in at) {
+      await svc.from("entrance_attempts").update({ face_flags: Number(at.face_flags ?? 0) + 1 }).eq("id", at.id);
+      await svc.from("entrance_events").insert({ tenant_id: at.tenant_id, attempt_id: at.id, kind, meta: b.meta ?? {} });
+    }
     return NextResponse.json({ ok: true });
   }
   const late = Date.now() > new Date(at.deadline_at).getTime() + GRACE_MS;

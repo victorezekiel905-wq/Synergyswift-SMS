@@ -39,7 +39,8 @@ export function applicableCharges(schedules: { fee_item_id: string; class_group_
  * and any approved scholarships or waivers. An instalment plan splits the
  * total into dated parts.
  */
-export async function generateInvoices(svc: any, p: { tenantId: string; termId: string; classGroupIds: string[]; createdBy: string; dueDate?: string | null; title?: string; planId?: string | null }) {
+export async function generateInvoices(svc: any, p: { tenantId: string; termId: string; classGroupIds: string[]; createdBy: string; dueDate?: string | null; title?: string; planId?: string | null;
+  /** Only these students (e.g. children just enrolled from admissions). */ studentIds?: string[] }) {
   const title = p.title?.trim() || "School fees";
   const today = new Date().toISOString().slice(0, 10);
   const [{ data: schedules }, { data: rules }, { data: plan }] = await Promise.all([
@@ -53,7 +54,7 @@ export async function generateInvoices(svc: any, p: { tenantId: string; termId: 
 
   // Every active student (sibling order counts the whole family, not only the classes chosen).
   const { data: all } = await svc.from("students").select("id,class_group_id,fee_category,date_of_birth,admitted_on").eq("tenant_id", p.tenantId).eq("status", "active").limit(20000);
-  const students = (all ?? []).filter((s: any) => !p.classGroupIds.length || p.classGroupIds.includes(s.class_group_id));
+  const students = (all ?? []).filter((s: any) => (!p.classGroupIds.length || p.classGroupIds.includes(s.class_group_id)) && (!p.studentIds || p.studentIds.includes(s.id)));
   const ids = (all ?? []).map((s: any) => s.id);
   const [{ data: links }, { data: existing }, { data: choices }, { data: awards }] = await Promise.all([
     svc.from("student_guardians").select("student_id,guardian_id,guardians(user_id)").eq("tenant_id", p.tenantId).limit(40000),

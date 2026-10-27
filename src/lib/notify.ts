@@ -41,12 +41,14 @@ export async function notifyGuardians(svc: any, p: {
 export async function notifyContact(svc: any, p: {
   tenantId: string; name: string; email?: string | null; phone?: string | null; kind: string;
   build: (brand: Brand) => Rendered; refId?: string | null;
+  /** Queue only; the dispatch run sends it (for batch jobs, so each message does not wait to send). */
+  defer?: boolean;
 }) {
   const brand = await loadBrand(svc, p.tenantId);
   const g: Guardian = { id: "contact", full_name: p.name, email: p.email ?? null, phone: p.phone ?? null, whatsapp_phone: null,
     notify_email: true, notify_whatsapp: true };
   const rows = rowsForGuardian(p.tenantId, g, p.kind, p.build(brand), p.refId ?? null, null);
-  if (rows.length) { await enqueue(svc, rows); await tryDispatch(svc, { budgetMs: 6000 }); }
+  if (rows.length) { await enqueue(svc, rows); if (!p.defer) await tryDispatch(svc, { budgetMs: 6000 }); }
   return rows.length;
 }
 

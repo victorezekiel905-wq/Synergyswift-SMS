@@ -2,10 +2,15 @@
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import QuestionView, { type PublicQuestion } from "@/components/exams/QuestionView";
 import ExamTools from "@/components/exams/tools/ExamTools";
+import WebcamProctor, { requestCamera } from "@/components/exams/WebcamProctor";
 import type { ToolId } from "@/lib/exams/tools";
 
 type Info = { title: string; instructions: string | null; duration_minutes: number; child: string; window: "not_open" | "open" | "closed"; opens_at: string | null; closes_at: string | null;
-  status: string; school: { name: string; logo_url: string | null; brand_color: string | null }; tools: ToolId[]; reference_text: string | null };
+  status: string; school: { name: string; logo_url: string | null; brand_color: string | null }; tools: ToolId[]; reference_text: string | null;
+  /** Taken at a centre (with a PIN on the school's computer), and whether the candidate has checked in there. */
+  centre?: { name: string; address: string | null; starts_at: string; ends_at: string; checked_in: boolean } | null;
+  /** The camera checks the right person is taking the test at home. */
+  face_check?: boolean };
 type Attempt = { deadline_at: string; server_now: string; answers: Record<string, unknown>; questions: PublicQuestion[] };
 
 async function api(token: string, body?: unknown) {
@@ -25,6 +30,11 @@ export default function EntrancePage(props: { params: Promise<{ token: string }>
   const dirty = useRef<Record<string, unknown>>({});
   const offset = useRef(0);
   const submitting = useRef(false);
+  const [camera, setCamera] = useState<MediaStream | null>(null);
+  const [consent, setConsent] = useState(false);
+  // On a test-centre computer the page goes back to the PIN screen for the next candidate.
+  const [kiosk, setKiosk] = useState(false);
+  useEffect(() => { setKiosk(new URLSearchParams(window.location.search).get("kiosk") === "1"); }, []);
 
   const load = useCallback(async () => {
     const r = await api(token);
@@ -49,8 +59,10 @@ export default function EntrancePage(props: { params: Promise<{ token: string }>
     const r = await api(token, { action: "submit", answers: dirty.current });
     submitting.current = false;
     dirty.current = {};
-    if (r.ok) { setAttempt(null); load(); } else setErr(r.data.error ?? "Could not submit; check your connection and try again.");
-  }, [token, load]);
+    if (r.ok) { setAttempt(null); load(); if (kiosk) setTimeout(() => { window.location.href = "/entrance/pin?done=1"; }, 6000); }
+    else setErr(r.data.error ?? "Could not submit; check your connection and try again.");
+  }, [token, load, kiosk]);
+  const report = useCallback((kind: string, meta?: Record<string, unknown>) => { void api(token, { action: "event", kind, meta: meta ?? null }); }, [token]);
 
   useEffect(() => {
     if (!attempt) return;
@@ -76,12 +88,28 @@ export default function EntrancePage(props: { params: Promise<{ token: string }>
       <main className="mx-auto max-w-xl p-6">
         <p className="text-sm font-semibold" style={{ color }}>{info.school.name}</p>
         <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">{info.title}</h1>
-        {finished ? <p className="mt-4 rounded-lg bg-emerald-50 p-4">Thank you, {info.child}. Your test has been submitted. The school will be in touch.</p> : (<>
+        {finished ? <p className="mt-4 rounded-lg bg-emerald-50 p-4">Thank you, {info.child}. Your test has been submitted. The school will be in touch.{kiosk ? " This computer is getting ready for the next candidate." : ""}</p> : (<>
           <p className="mt-2">Hello {info.child}. This test takes {info.duration_minutes} minutes and must be done in one sitting.</p>
           {info.instructions && <div className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm">{info.instructions}</div>}
           <ul className="mt-3 list-disc pl-5 text-sm text-slate-600"><li>The timer keeps running if you close the page.</li><li>Answers save as you go.</li><li>Work on your own, without help.</li></ul>
-          {info.window !== "open" ? <p className="mt-4 rounded-lg bg-amber-50 p-3">{info.window === "not_open" ? `This test opens ${info.opens_at ? new Date(info.opens_at).toLocaleString() : "later"}.` : "This test has closed."}</p>
-            : <button className="btn mt-4 px-6 py-3 text-white" style={{ background: color }} onClick={async () => { const r = await api(token, { action: "start" }); if (!r.ok) setErr(r.data.error); else load(); }}>Start the test</button>}
+          {info.centre && !info.centre.checked_in ? (
+            <p className="mt-4 rounded-lg bg-slate-50 p-3">This test is taken at <b>{info.centre.name}</b>{info.centre.address ? `, ${info.centre.address}` : ""}, {new Date(info.centre.starts_at).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" })}. {info.child} types the test PIN on the school&apos;s computer there.</p>
+          ) : info.window !== "open" ? <p className="mt-4 rounded-lg bg-amber-50 p-3">{info.window === "not_open" ? `This test opens ${info.opens_at ? new Date(info.opens_at).toLocaleString() : "later"}.` : "This test has closed."}</p>
+            : (<>
+              {info.face_check && (
+                <label className="mt-4 flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm">
+                  <input type="checkbox" className="mt-0.5" checked={consent} onChange={e => setConsent(e.target.checked)} />
+                  <span>This test uses the camera to check that {info.child} is taking it alone: a photo every minute, seen only by the school&apos;s admissions team and deleted after 60 days. Sit facing the camera in a well-lit place.</span>
+                </label>
+              )}
+              <button className="btn mt-4 px-6 py-3 text-white" style={{ background: color }} disabled={info.face_check && !consent} onClick={async () => {
+                if (info.face_check) {
+                  try { setCamera(await requestCamera()); }
+                  catch { setErr("This test needs the camera. Allow camera access in your browser and press Start again."); return; }
+                }
+                const r = await api(token, { action: "start" }); if (!r.ok) setErr(r.data.error); else load();
+              }}>Start the test</button>
+            </>)}
           {err && <p role="alert" className="mt-3 text-sm text-rose-600">{err}</p>}
         </>)}
       </main>
@@ -92,6 +120,7 @@ export default function EntrancePage(props: { params: Promise<{ token: string }>
   const answered = attempt.questions.filter(x => { const v = answers[x.id]; return v !== undefined && v !== null && v !== ""; }).length;
   return (
     <div className="min-h-screen bg-slate-100">
+      {info.face_check && <WebcamProctor examId={token} intervalSec={60} initialStream={camera} onEvent={report} uploadUrl={`/api/entrance/${token}/snapshot`} />}
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-2">
         <p className="truncate font-semibold">{info.title}</p><span className="text-xs text-slate-500">{answered}/{attempt.questions.length} answered</span>
         <span className="ml-auto flex items-center gap-2">

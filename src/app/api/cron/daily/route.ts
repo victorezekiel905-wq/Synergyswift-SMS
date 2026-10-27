@@ -4,6 +4,7 @@ import { guardiansByStudent, rowsForGuardian, enqueue, loadBrand, dispatchDue, f
 import { libraryOverdue } from "@/lib/messaging/templates";
 import { studentName } from "@/lib/school";
 import { expireOffers } from "@/lib/admissions-crm";
+import { purgeEntrancePhotos } from "@/lib/entrance-server";
 import { runFeeAutomation } from "@/lib/fees-plus";
 import { sendOverdueReminders } from "@/lib/library-server";
 import { remindDocuments } from "@/lib/compliance-server";
@@ -31,6 +32,8 @@ export async function GET(req: NextRequest) {
   const { data: closed } = await svc.from("exams").update({ status: "closed" }).eq("status", "published").lt("closes_at", now).select("id");
 
   const offersExpired = await expireOffers(svc).catch(() => 0);
+  // Entrance-test camera photos go after 60 days.
+  const entrancePhotos = await purgeEntrancePhotos(svc).catch(() => 0);
   // Fee reminders before and after due dates, and late fees after the grace period.
   const fees = await runFeeAutomation(svc, appUrl(req)).catch(() => null);
   // Readers hear about overdue books; holds not collected in time pass to the next reader.
@@ -82,5 +85,5 @@ export async function GET(req: NextRequest) {
   }
   if (rows.length) await enqueue(svc, rows);
   const delivery = rows.length ? await dispatchDue(svc, { budgetMs: 40_000 }) : null;
-  return NextResponse.json({ document_reminders: documentReminders, expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, reader_reminders: readerReminders, webcam_photos_deleted: snapPaths.length, admission_offers_expired: offersExpired, change_history_purged: historyPurged, fees, delivery });
+  return NextResponse.json({ document_reminders: documentReminders, expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, reader_reminders: readerReminders, webcam_photos_deleted: snapPaths.length, admission_offers_expired: offersExpired, entrance_photos_deleted: entrancePhotos, change_history_purged: historyPurged, fees, delivery });
 }
