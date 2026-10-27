@@ -1,0 +1,9 @@
+# Kept out of the image: local builds and dependencies are rebuilt inside it,
+# and .env files would bake secrets into a layer.
+.git
+node_modules
+.next
+tsconfig.tsbuildinfo
+.env
+.env.*
+!.env.example
