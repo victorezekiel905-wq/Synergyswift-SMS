@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (done) · 14e entrance automation (done) · 14f elections (done) · 14g CRMs (done) · 14h SEN engagement (done) · 14i attendance, shifts and bus safety (done) · 14j exam extras (done) · 14k super admin centre (done) · 14l result PINs and group reports (done) · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts (done).
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (done) · 14e entrance automation (done) · 14f elections (done) · 14g CRMs (done) · 14h SEN engagement (done) · 14i attendance, shifts and bus safety (done) · 14j exam extras (done) · 14k super admin centre (done) · 14l result PINs and group reports (done) · 14m 20,000-user test (done, see docs/LOAD_TEST_REPORT.md) · 14n proposal and MoU · 14o portfolios and transcripts (done).
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -500,6 +500,16 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Targets | ✅ staff set term-average, subject-score and attendance targets per student (with progress from published results and attendance, on target or not yet), students and parents add personal goals and tick them off; class targets (class average, attendance, pass rate, other) under Classroom → Class targets, seen by the class's students and families |
 | Clubs and boarding | ✅ already in place (phase 11): clubs and societies with membership and attendance, boarding houses, rooms, exeats and roll calls |
 
+## 14m. The 20,000-user test (phase 14m, done)
+
+| Item | Status |
+|---|---|
+| Database at 20,000 accounts | ✅ `scripts/load/scale-bench.mjs`: 10 schools x 2,000 accounts with a month of data, timed as each role with row-level security on |
+| Fix: permission checks once per query | ✅ migration 7400: parent attendance 33 s → 38 ms, admin 30-day dashboard 26 s → 17 ms, report cards 1.4 s → 6 ms; permission suite unchanged |
+| Staging kit | ✅ `seed-staging.mjs` (refuses the live project), `k6-school-day.js` (register rush, results day, CBT paper, browsing), runbook |
+| Report and recommendations | ✅ `docs/LOAD_TEST_REPORT.md`: verdict, findings by severity, actions in order |
+| Real-traffic run and Playwright journeys | ⏳ need a staging Supabase project and Render service |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -559,3 +569,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101007100_platform_centre.sql` | 14k |
 | `20260101007200_result_pins_perf.sql` | 14l |
 | `20260101007300_portfolios_transcripts.sql` | 14o |
+| `20260101007400_rls_performance.sql` | 14m |

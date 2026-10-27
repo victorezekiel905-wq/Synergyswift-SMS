@@ -11,3 +11,6 @@ dist
 *.tsbuildinfo
 coverage
 public/mediapipe
+
+# load-test output (test accounts, results)
+scripts/load/out/
