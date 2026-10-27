@@ -21,10 +21,16 @@ export async function GET(_req: NextRequest, props: { params: Promise<{ id: stri
     ctx.sb.rpc("can_manage_sen", { p_student: id })
   ]);
   const { data: staff } = manage ? await createServiceClient().from("users").select("id,full_name").eq("tenant_id", tid).eq("active", true).not("role", "in", "(student,parent,alumni)").order("full_name") : { data: [] };
+  // Phase 14h: the home–school book and what the family and the child say about each target (empty before migration 6700).
+  const targetIds = (ieps ?? []).flatMap((i: any) => (i.iep_targets ?? []).map((t: any) => t.id));
+  const [{ data: notes }, { data: feedback }] = await Promise.all([
+    ctx.sb.from("sen_home_notes").select("*").eq("tenant_id", tid).eq("student_id", id).order("created_at", { ascending: false }).limit(100),
+    targetIds.length ? ctx.sb.from("iep_target_feedback").select("*").in("target_id", targetIds).order("created_at", { ascending: false }).limit(300) : Promise.resolve({ data: [] })
+  ]);
   return NextResponse.json({
     profile: profile ?? null, ieps: (ieps ?? []).map((i: any) => ({ ...i, iep_targets: [...(i.iep_targets ?? [])].sort((a: any, b: any) => a.position - b.position),
       iep_reviews: [...(i.iep_reviews ?? [])].sort((a: any, b: any) => b.reviewed_on.localeCompare(a.reviewed_on)) })),
-    can_manage: Boolean(manage), staff: staff ?? [], me: ctx.userId,
+    can_manage: Boolean(manage), staff: staff ?? [], me: ctx.userId, notes: notes ?? [], feedback: feedback ?? [],
     vocab: { status: SEN_STATUS, areas: SEN_AREAS, needs: SEN_NEEDS, arrangements: ARRANGEMENTS, progress: PROGRESS }
   });
 }
@@ -34,7 +40,11 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("profile"), status: z.enum(["monitoring", "sen_support", "ehcp", "closed"]), areas: z.array(z.string().max(40)).max(10), needs: z.array(z.string().max(40)).max(20),
     summary: z.string().trim().max(4000).nullish(), strengths: z.string().trim().max(2000).nullish(), strategies: z.string().trim().max(4000).nullish(),
     extra_time_pct: z.number().int().min(0).max(100), arrangements: z.array(z.string().max(40)).max(15), agencies: z.string().trim().max(1000).nullish(),
-    coordinator_id: z.string().uuid().nullish(), share_with_teachers: z.boolean() }),
+    coordinator_id: z.string().uuid().nullish(), share_with_teachers: z.boolean(),
+    // Phase 14h: shared with the family's portal; supports that follow the child into live lessons.
+    share_with_parents: z.boolean().optional(), live_read_aloud: z.boolean().optional(), live_readable_font: z.boolean().optional(), live_calm_mode: z.boolean().optional() }),
+  z.object({ action: z.literal("note"), body: z.string().trim().min(1).max(4000), kind: z.enum(["note", "praise"]).default("note"), notify_family: z.boolean().default(true) }),
+  z.object({ action: z.literal("notes_read") }),
   z.object({ action: z.literal("iep"), id: z.string().uuid().nullish(), title: z.string().trim().min(2).max(120), starts_on: d, review_on: d.nullish(),
     status: z.enum(["draft", "active", "closed"]), student_voice: z.string().trim().max(2000).nullish(), parent_views: z.string().trim().max(2000).nullish(), notify_family: z.boolean().default(true) }),
   z.object({ action: z.literal("target"), id: z.string().uuid().nullish(), iep_id: z.string().uuid(), area: z.string().trim().max(60).nullish(), target: z.string().trim().min(2).max(1000),
@@ -59,6 +69,21 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const refuse = (e: any) => jsonError(/row-level security|violates/.test(e?.message ?? "") ? "only the SEN team can change this" : e?.message ?? "not found", e ? 403 : 404);
 
   switch (b.action) {
+    case "note": {
+      const { error } = await sb.from("sen_home_notes").insert({ tenant_id: tid, student_id: id, author_kind: "staff", author_user_id: ctx.userId, author_name: ctx.profile.full_name, kind: b.kind, body: b.body });
+      if (error) return refuse(error);
+      if (b.notify_family) {
+        const { data: p } = await sb.from("sen_profiles").select("share_with_parents").eq("student_id", id).maybeSingle();
+        if (p?.share_with_parents) await notifyGuardians(createServiceClient(), { tenantId: tid, studentIds: [id], kind: "sen", refId: id,
+          build: (br: any, g: any) => communityNote(br, { name: g.full_name, subject: b.kind === "praise" ? "Good news from school" : "A note from school", lines: [b.body],
+            link: `${appUrl(req)}/parent/support?student=${id}`, linkLabel: "Open the home–school book" }) }).catch(() => null);
+      }
+      return NextResponse.json({ ok: true });
+    }
+    case "notes_read": {
+      await createServiceClient().from("sen_home_notes").update({ read_by_staff_at: now }).eq("tenant_id", tid).eq("student_id", id).neq("author_kind", "staff").is("read_by_staff_at", null);
+      return NextResponse.json({ ok: true });
+    }
     case "profile": {
       const { action: _a, ...row } = b;
       const { error } = await sb.from("sen_profiles").upsert({ ...row, student_id: id, tenant_id: tid, updated_by: ctx.userId, updated_at: now }, { onConflict: "student_id" });

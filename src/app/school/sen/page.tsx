@@ -5,7 +5,7 @@ import { useApi, Page, PageHeader, Alert, Badge, Empty, Loading, Stat, fmtDate }
 import { SEN_NEEDS, ARRANGEMENTS } from "@/lib/sis";
 
 type Item = { student_id: string; name: string; admission_no: string; class_name: string | null; status: string; areas: string[]; needs: string[]; extra_time_pct: number; arrangements: string[]; coordinator: string | null;
-  plan: { id: string; title: string; review_on: string | null; review: string; total: number; on_track: number } | null };
+  plan: { id: string; title: string; review_on: string | null; review: string; total: number; on_track: number; agreed?: boolean } | null; family?: { unread: number; meeting_requested: boolean } };
 type Data = { items: Item[]; summary: { total: number; monitoring: number; sen_support: number; ehcp: number; with_plan: number; reviews_due: number; by_area: { key: string; label: string; count: number }[] }; status_label: Record<string, string> };
 
 /** Everyone on the SEN register, their plan and when it is reviewed, and exam arrangements to set up. */
@@ -36,7 +36,7 @@ export default function SenRegister() {
       </div>
       {!items.length ? <Empty>No children match.</Empty> : (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Status</th><th className="p-2">Needs</th><th className="p-2">Exams</th><th className="p-2">Plan</th></tr></thead>
+          <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Status</th><th className="p-2">Needs</th><th className="p-2">Exams</th><th className="p-2">Plan</th><th className="p-2">Family</th></tr></thead>
           <tbody className="divide-y divide-slate-100">{items.map(i => (
             <tr key={i.student_id}>
               <td className="p-2"><Link className="font-medium text-brand-700 hover:underline" href={`/school/students/${i.student_id}#sen`}>{i.name}</Link><span className="block text-xs text-slate-500">{i.admission_no} · {i.class_name ?? "no class"}</span></td>
@@ -45,6 +45,8 @@ export default function SenRegister() {
               <td className="p-2 text-xs">{[i.extra_time_pct ? `${i.extra_time_pct}% extra time` : null, ...i.arrangements.map(a => ARRANGEMENTS[a] ?? a)].filter(Boolean).join(", ") || "—"}</td>
               <td className="p-2 text-xs">{i.plan ? <>{i.plan.title}<span className="block">{i.plan.on_track}/{i.plan.total} targets on track{i.plan.review_on ? ` · review ${fmtDate(i.plan.review_on)}` : ""}</span>
                 {i.plan.review === "overdue" && <Badge tone="red">overdue</Badge>}{i.plan.review === "due_soon" && <Badge tone="amber">due soon</Badge>}</> : <span className="text-slate-400">No live plan</span>}</td>
+              <td className="p-2 text-xs">{i.family?.meeting_requested && <Badge tone="amber">meeting asked</Badge>}{i.family?.unread ? <Link className="ml-1 text-brand-700 underline" href={`/school/students/${i.student_id}#sen`}>{i.family.unread} new note{i.family.unread === 1 ? "" : "s"}</Link> : null}
+                {i.plan && <span className="block text-slate-500">{i.plan.agreed ? "plan agreed" : "plan not yet agreed"}</span>}</td>
             </tr>
           ))}</tbody></table></div>
       )}

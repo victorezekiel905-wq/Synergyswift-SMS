@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (14d-1 classes, accounts and classroom points done) · 14e entrance automation · 14f elections · 14g CRMs · 14h SEN engagement · 14i attendance, shifts and bus safety · 14j exam extras · 14k super admin centre · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (done) · 14e entrance automation (done) · 14f elections (done) · 14g CRMs (done) · 14h SEN engagement (done) · 14i attendance, shifts and bus safety · 14j exam extras · 14k super admin centre · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -422,6 +422,18 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Lead scoring | ✅ (already in admissions) each enquiry's score with its reasons |
 | Channel return | ✅ admissions analytics now show, per source, the fees billed to the children it brought in and the return for every ₦1 of marketing spend, beside cost per enquiry and per enrolment |
 
+## 14h. SEN engagement: parents, students and the school (phase 14h, done)
+
+| Feature | Status |
+|---|---|
+| Parents see the support plan | ✅ a parent of a child on the SEN register sees, in their portal (Support plans), how the school supports the child, the active plan's targets with progress, success criteria and the next review date; the SENCO decides per child whether the profile is shared with the family (on by default); staff-only notes such as agencies never leave the school |
+| Parents agree the plan and add their views | ✅ "I agree with this plan" with their name and views, shown on the plan for staff; the coordinator is told |
+| How each target is going at home | ✅ parents (and the child) rate each target from "Hard" to "Great" with a comment; staff see it under the target |
+| Two-way home–school book | ✅ notes from home with how the day went, notes and "good news" from staff (the family gets a notification with a link), read receipts both ways, and "Ask for a review meeting"; the SEN register shows new notes, meeting requests and whether each plan is agreed |
+| The child's own plan | ✅ students see "My support plan" in plain words ("I can do this", "Things that help me in class"), say how each target is going and tell their teachers what helps. What the child writes reaches school staff only, never the family, so a child can raise something about home safely |
+| Handshake into live lessons | ✅ the SENCO's extra time (rounded to 25, 50 or 100%), read-aloud (also set by a "reader" exam arrangement), easy-to-read font (also set by "enlarged print") and calm mode (no rankings) reach SwiftCipher live lessons and games automatically, and are removed when the profile is closed |
+| Who sees what | ✅ enforced in the database: families only for their own child and only while shared; teachers only when the profile is shared with teachers; other schools see nothing (database tests cover each rule) |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -474,3 +486,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101006400_sales_crm.sql` | 14g-1 |
 | `20260101006500_collections_fundraising.sql` | 14g-2 |
 | `20260101006600_whatsapp_inbox.sql` | 14g-3 |
+| `20260101006700_sen_engagement.sql` | 14h |

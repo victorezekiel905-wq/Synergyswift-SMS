@@ -7,11 +7,17 @@ type Target = { id: string; iep_id: string; area: string | null; target: string;
 type Review = { id: string; reviewed_on: string; summary: string; attendees: string | null; next_review: string | null; users: { full_name: string } | null };
 type Iep = { id: string; title: string; starts_on: string; review_on: string | null; status: "draft" | "active" | "closed"; student_voice: string | null; parent_views: string | null; parent_agreed_at: string | null; iep_targets: Target[]; iep_reviews: Review[] };
 type Profile = { status: string; areas: string[]; needs: string[]; summary: string | null; strengths: string | null; strategies: string | null; extra_time_pct: number; arrangements: string[];
-  agencies: string | null; coordinator_id: string | null; share_with_teachers: boolean; updated_at: string; coordinator: { full_name: string } | null };
-type Data = { profile: Profile | null; ieps: Iep[]; can_manage: boolean; staff: { id: string; full_name: string }[]; me: string;
+  agencies: string | null; coordinator_id: string | null; share_with_teachers: boolean; updated_at: string; coordinator: { full_name: string } | null;
+  share_with_parents?: boolean; live_read_aloud?: boolean; live_readable_font?: boolean; live_calm_mode?: boolean };
+type Note = { id: string; author_kind: string; author_name: string; kind: string; body: string; mood: number | null; created_at: string; read_by_staff_at: string | null; read_by_family_at: string | null };
+type Feedback = { id: string; target_id: string; author_kind: string; author_name: string; rating: number; comment: string | null; created_at: string };
+const RATING = ["", "Hard", "Getting there", "OK", "Good", "Great"];
+const MOOD = ["", "A hard day", "Not great", "OK", "Good", "A great day"];
+type Data = { profile: Profile | null; ieps: Iep[]; can_manage: boolean; staff: { id: string; full_name: string }[]; me: string; notes?: Note[]; feedback?: Feedback[];
   vocab: { status: Record<string, string>; areas: Record<string, string>; needs: Record<string, string>; arrangements: Record<string, string>; progress: Record<string, string> } };
 
-const blank = { status: "monitoring", areas: [] as string[], needs: [] as string[], summary: "", strengths: "", strategies: "", extra_time_pct: 0, arrangements: [] as string[], agencies: "", coordinator_id: "", share_with_teachers: true };
+const blank = { status: "monitoring", areas: [] as string[], needs: [] as string[], summary: "", strengths: "", strategies: "", extra_time_pct: 0, arrangements: [] as string[], agencies: "", coordinator_id: "", share_with_teachers: true,
+  share_with_parents: true, live_read_aloud: false, live_readable_font: false, live_calm_mode: false };
 
 /** Special educational needs: the profile teachers work from, access arrangements, and support plans with targets and reviews. */
 export default function Sen({ studentId }: { studentId: string }) {
@@ -48,7 +54,8 @@ export default function Sen({ studentId }: { studentId: string }) {
           {p.strategies && <div className="rounded-lg bg-emerald-50 p-3"><p className="font-medium text-emerald-900">What helps in class</p><p className="whitespace-pre-wrap">{p.strategies}</p></div>}
           {(p.extra_time_pct > 0 || p.arrangements.length > 0) && <p><b>Exam arrangements:</b> {[p.extra_time_pct ? `${p.extra_time_pct}% extra time (applied automatically to online exams)` : null, ...p.arrangements.map(a => v.arrangements[a] ?? a)].filter(Boolean).join(", ")}</p>}
           {p.agencies && <p><b>Other professionals:</b> {p.agencies}</p>}
-          <p className="text-xs text-slate-500">{p.coordinator ? `Coordinator: ${p.coordinator.full_name} · ` : ""}{p.share_with_teachers ? "Shared with the child's teachers" : "Not shared with teachers"} · updated {fmtDate(p.updated_at)}</p>
+          {(p.live_read_aloud || p.live_readable_font || p.live_calm_mode) && <p><b>In live lessons:</b> {[p.live_read_aloud && "read aloud", p.live_readable_font && "easy-to-read font", p.live_calm_mode && "calm mode (no rankings)"].filter(Boolean).join(", ")}</p>}
+          <p className="text-xs text-slate-500">{p.coordinator ? `Coordinator: ${p.coordinator.full_name} · ` : ""}{p.share_with_teachers ? "Shared with the child's teachers" : "Not shared with teachers"}{p.share_with_parents === false ? " · not shared with the family" : " · the family sees the plan in their portal"} · updated {fmtDate(p.updated_at)}</p>
         </section>
       )}
       <section className="space-y-3">
@@ -56,6 +63,7 @@ export default function Sen({ studentId }: { studentId: string }) {
           {data.can_manage && p && <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => act({ action: "iep", title: "Individual education plan", starts_on: new Date().toISOString().slice(0, 10), status: "draft" }, "Draft plan started.")}>New plan</button>}</div>
         {!data.ieps.length ? <Empty>No plans yet.</Empty> : data.ieps.map(i => <Plan key={i.id} iep={i} data={data} act={act} />)}
       </section>
+      {p && <HomeSchool notes={data.notes ?? []} act={act} />}
     </div>
   );
 }
@@ -81,6 +89,14 @@ function ProfileForm({ initial, vocab, staff, onSave, onCancel }: { initial: Pro
       <Field label="Other professionals involved"><input className="input" value={f.agencies} onChange={e => setF({ ...f, agencies: e.target.value })} maxLength={1000} placeholder="e.g. speech therapist, paediatrician" /></Field>
       <div className="sm:col-span-2"><span className="label">Exam access arrangements</span>{chips("arrangements", vocab.arrangements)}</div>
       <label className="flex items-center gap-2 sm:col-span-2"><input type="checkbox" checked={f.share_with_teachers} onChange={e => setF({ ...f, share_with_teachers: e.target.checked })} /> Share this profile and live plans with the child&apos;s teachers</label>
+      <label className="flex items-center gap-2 sm:col-span-2"><input type="checkbox" checked={f.share_with_parents !== false} onChange={e => setF({ ...f, share_with_parents: e.target.checked })} /> Share the plan with the family (their portal and the home–school book)</label>
+      <fieldset className="sm:col-span-2"><legend className="label">In live lessons and games (set automatically for the child)</legend>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(f.live_read_aloud)} onChange={e => setF({ ...f, live_read_aloud: e.target.checked })} /> Read questions aloud</label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(f.live_readable_font)} onChange={e => setF({ ...f, live_readable_font: e.target.checked })} /> Easy-to-read font</label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(f.live_calm_mode)} onChange={e => setF({ ...f, live_calm_mode: e.target.checked })} /> Calm mode (no rankings)</label>
+        </div>
+        <p className="hint">Extra time above also applies to timed live questions (rounded to 25, 50 or 100%).</p></fieldset>
       <div className="flex gap-2 sm:col-span-2"><button className="btn btn-primary">Save</button>{onCancel && <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancel</button>}</div>
     </form>
   );
@@ -127,7 +143,8 @@ function Plan({ iep, data, act }: { iep: Iep; data: Data; act: (b: Record<string
       <div className="overflow-x-auto">
         <table className="w-full text-xs"><thead className="text-left text-slate-500"><tr><th className="p-1">Target</th><th className="p-1">How</th><th className="p-1">Who</th><th className="p-1">Progress</th><th /></tr></thead>
           <tbody className="divide-y divide-slate-100">{iep.iep_targets.map(x => (
-            <tr key={x.id}><td className="p-1 align-top"><b>{x.target}</b>{x.area && <span className="block text-slate-500">{x.area}</span>}{x.success_criteria && <span className="block text-slate-500">Success: {x.success_criteria}</span>}</td>
+            <tr key={x.id}><td className="p-1 align-top"><b>{x.target}</b>{x.area && <span className="block text-slate-500">{x.area}</span>}{x.success_criteria && <span className="block text-slate-500">Success: {x.success_criteria}</span>}
+              {(["parent", "student"] as const).map(k => { const f = (data.feedback ?? []).find(y => y.target_id === x.id && y.author_kind === k); return f ? <span key={k} className="block text-xs text-brand-800">{k === "parent" ? "Family" : "The child"}: {RATING[f.rating]}{f.comment ? `, ${f.comment}` : ""} ({fmtDate(f.created_at)})</span> : null; })}</td>
               <td className="p-1 align-top">{x.strategies}</td><td className="p-1 align-top">{x.owner?.full_name ?? "—"}</td>
               <td className="p-1 align-top">{m || x.owner_id === data.me ? (
                 <select className="input py-0.5 text-xs" value={x.progress} onChange={e => act({ action: "progress", id: x.id, progress: e.target.value }, "Progress saved.")} aria-label="Progress">{Object.entries(data.vocab.progress).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
@@ -164,5 +181,31 @@ function Plan({ iep, data, act }: { iep: Iep; data: Data; act: (b: Record<string
         )}
       </div>
     </article>
+  );
+}
+
+/** The two-way home–school book (phase 14h): notes from the family, the child and staff. */
+function HomeSchool({ notes, act }: { notes: Note[]; act: (b: Record<string, unknown>, ok: string) => Promise<boolean> }) {
+  const [body, setBody] = useState("");
+  const [praise, setPraise] = useState(false);
+  const unread = notes.filter(n => n.author_kind !== "staff" && !n.read_by_staff_at).length;
+  useEffect(() => { if (unread) void act({ action: "notes_read" }, "Notes marked as read."); }, [unread]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <section className="card space-y-3 p-4">
+      <div className="flex items-center"><h3 className="mr-auto font-semibold">Home–school book</h3>{unread > 0 && <Badge tone="blue">{unread} new</Badge>}</div>
+      <textarea className="input min-h-16" value={body} onChange={e => setBody(e.target.value)} placeholder="A note for the family: what went well, what to try at home" maxLength={4000} />
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2"><input type="checkbox" checked={praise} onChange={e => setPraise(e.target.checked)} /> Good news (the child sees it too)</label>
+        <button className="btn btn-primary ml-auto" disabled={!body.trim()} onClick={async () => { if (await act({ action: "note", body, kind: praise ? "praise" : "note" }, "Sent to the family.")) { setBody(""); setPraise(false); } }}>Send to the family</button>
+      </div>
+      {!notes.length ? <p className="text-slate-500">No notes yet.</p> : <ul className="space-y-2">{notes.map(n => (
+        <li key={n.id} className={"rounded-lg p-3 " + (n.author_kind === "staff" ? "bg-slate-50" : "bg-brand-50")}>
+          <p className="text-xs text-slate-500">{n.author_name} ({n.author_kind === "parent" ? "parent" : n.author_kind === "student" ? "the child" : "staff"}) · {fmtDate(n.created_at, true)}
+            {n.kind === "meeting_request" && <b className="text-amber-800"> · asked for a meeting</b>}{n.mood ? ` · ${MOOD[n.mood]}` : ""}
+            {n.author_kind === "staff" && (n.read_by_family_at ? " · read by the family" : " · not yet read")}</p>
+          <p className="whitespace-pre-wrap">{n.body}</p>
+        </li>))}</ul>}
+      <p className="hint">The family sees the school&apos;s notes and their own. What the child writes stays with staff.</p>
+    </section>
   );
 }
