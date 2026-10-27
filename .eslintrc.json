@@ -1,4 +1,13 @@
 {
   "extends": "next/core-web-vitals",
-  "ignorePatterns": ["extension/**", "scripts/**"]
+  "ignorePatterns": ["extension/**", "scripts/**"],
+  "overrides": [
+    {
+      "files": ["src/live/**", "src/app/live/**", "src/app/api/swift/**"],
+      "rules": {
+        "react/no-unescaped-entities": "off",
+        "@next/next/no-img-element": "off"
+      }
+    }
+  ]
 }

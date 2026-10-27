@@ -13,7 +13,9 @@ import { NAV, PLATFORM_NAV, visibleNav, bottomBar, type NavGroup } from "@/lib/n
 import SideNav, { BottomBar } from "@/components/SideNav";
 
 // Pages that render without the app chrome (public links, kiosk, exam lockdown).
-const BARE = [/^\/sign\//, /^\/login$/, /^\/signup$/, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/pay\//, /^\/apply\//, /^\/careers\//, /^\/enquire\//, /^\/visit\//, /^\/entrance\//, /^\/t\//, /^\/s\//, /^\/unsubscribe\//, /^\/alumni\//, /^\/v\//, /^\/n\//, /\/print$/, /\/transcript$/];
+const BARE = [/^\/sign\//, /^\/login$/, /^\/signup$/, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/pay\//, /^\/apply\//, /^\/careers\//, /^\/enquire\//, /^\/visit\//, /^\/entrance\//, /^\/t\//, /^\/s\//, /^\/unsubscribe\//, /^\/alumni\//, /^\/v\//, /^\/n\//, /\/print$/, /\/transcript$/,
+  // Live lessons: the projector view, students in a lesson or game, and guests joining by code are full screen.
+  /^\/live\/present\//, /^\/live\/student\/(live|game)\//, /^\/live\/guest\//, /^\/live\/join/];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

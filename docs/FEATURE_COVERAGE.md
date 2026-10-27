@@ -330,6 +330,16 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Class tools | ✅ random student picker, group maker, timer, noise meter (sound measured on the device only) |
 | Parents see points | ✅ each child's points this week and the latest class story in the parent portal (signed in or private link) |
 
+## 14d-2. SwiftCipher's live lessons inside Synergy Swift (phase 14d-2, done)
+
+| Feature | Status |
+|---|---|
+| SwiftCipher moved into Synergy Swift as the Live lessons module | ✅ its whole engine (lesson builder with slides and activities, live control room, Present view on the projector, student and guest join, Challenge games, question bank, media library, reports, lesson library, AI slides and questions 🔑) runs inside the app under **Teaching → Live lessons**; its database lives in its own `live` schema, generated from SwiftCipher by `scripts/port-swiftcipher.mjs` and its screens by `scripts/port-swiftcipher-ui.mjs` |
+| One set of accounts and classes | ✅ schools, students, teachers, admins, classes, subject teachers, class members and co-teachers are copied into the engine automatically (triggers): no join codes for classes, no separate rosters, no second sign-in |
+| Module switch enforced in the database | ✅ turning **Live lessons** off for a school (or closing the school) blocks it inside the engine itself |
+| Safe Exam Browser lock for classes and lessons | ✅ a **Locked / Unlocked** switch on each class (every new live lesson in it starts locked) and on each running lesson (under More in the control room); a locked lesson refuses students in a normal browser at the database; students download the lesson's Safe Exam Browser file, sign in inside it and join; locking during a lesson sends students who are not in Safe Exam Browser back to the join screen. The school can add its Safe Exam Browser config keys for the stronger check |
+| One name | ✅ every live-lesson screen says Synergy Swift |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -373,3 +383,6 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101005800_saas_plans.sql` | 14b |
 | `20260101005900_function_hardening.sql` | security: who may call database functions |
 | `20260101006000_classroom.sql` | 14d-1 |
+| `20260101006100_live_engine.sql` | 14d-2 (generated from SwiftCipher; needs `live` in Supabase → Settings → API → Exposed schemas) |
+| `20260101006110_live_sync.sql` | 14d-2 |
+| `20260101006120_live_seb.sql` | 14d-2 |

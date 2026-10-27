@@ -23,9 +23,12 @@ export default function ClassroomPage() {
     <Page wide>
       <PageHeader eyebrow="Teaching" title="Classroom" subtitle="Give points for skills, share the class story with parents, and run the class with simple tools."
         actions={mine.classes.length > 0 && (
-          <select className="input w-auto" value={cls} onChange={e => setCls(e.target.value)} aria-label="Class">
-            {mine.classes.map(c => <option key={c.id} value={c.id}>{c.name}{c.form ? " (form class)" : ""}</option>)}
-          </select>
+          <div className="flex flex-wrap items-center gap-2">
+            {cls && <SebLock key={cls} classId={cls} />}
+            <select className="input w-auto" value={cls} onChange={e => setCls(e.target.value)} aria-label="Class">
+              {mine.classes.map(c => <option key={c.id} value={c.id}>{c.name}{c.form ? " (form class)" : ""}</option>)}
+            </select>
+          </div>
         )} />
       {!mine.classes.length ? <Empty>You have no classes yet. A school admin adds you to classes under Class teams &amp; accounts.</Empty> : (
         <>
@@ -36,6 +39,23 @@ export default function ClassroomPage() {
         </>
       )}
     </Page>
+  );
+}
+
+/** Class-wide Safe Exam Browser lock for live lessons: every new lesson in the class starts locked. */
+function SebLock({ classId }: { classId: string }) {
+  const { data, reload } = useApi<{ available: boolean; require_seb: boolean }>(`/api/swift/seb/class?class_id=${classId}`, [classId]);
+  const [err, setErr] = useState<string | null>(null);
+  if (!data?.available) return null;
+  const on = data.require_seb;
+  return (
+    <span className="flex items-center gap-2 text-sm" title={err ?? "When locked, students can only join this class's live lessons in Safe Exam Browser."}>
+      <span className="text-slate-600">Live lessons</span>
+      <button type="button" role="switch" aria-checked={on} onClick={async () => { const r = await send("/api/swift/seb/class", { class_id: classId, on: !on }); setErr(r.ok ? null : r.error); reload(); }}
+        className={"rounded-full border px-3 py-1 text-xs font-semibold " + (on ? "border-brand-700 bg-brand-700 text-white" : "border-slate-300 bg-white text-slate-700")}>
+        {on ? "Locked to Safe Exam Browser" : "Unlocked"}
+      </button>
+    </span>
   );
 }
 

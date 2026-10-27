@@ -1,0 +1,207 @@
+import type { CanvasBackground, CanvasElement } from "@/live/slides/canvas";
+export type Role = "student" | "teacher" | "school_admin" | "it_admin" | "parent" | "platform_admin" | "guest";
+
+export type Profile = {
+  id: string;
+  tenant_id: string;
+  email: string;
+  full_name: string;
+  nickname: string | null;
+  role: Role;
+  status: "active" | "suspended";
+  /** The platform's support account inside this school (0960). */
+  is_support?: boolean;
+  /** Must choose their own password before going on (school-made logins, 0970). */
+  must_change_password?: boolean;
+};
+
+export type TenantSettings = {
+  /** Classroom monitoring add-on (0870). */
+  monitoring_enabled?: boolean;
+  allow_spotlight: boolean;
+  allow_group_chat: boolean;
+  allow_screen_capture: boolean;
+  store_event_screenshots: boolean;
+  require_monitoring_consent: boolean;
+  parent_portal_enabled: boolean;
+  /** Parents see leave details, not just counts (migration 0820). */
+  parent_focus_details?: boolean;
+  email_alerts_enabled: boolean;
+  nickname_mode: "first_name_initial" | "approved_nickname" | "anonymous";
+  learning_retention_days: number;
+  telemetry_retention_days: number;
+  default_grace_seconds: number;
+  default_idle_seconds: number;
+  thumbnail_interval_seconds: number;
+  monitoring_notice: string;
+  monitoring_notice_version: number;
+  support_access_until: string | null;
+  brand_name: string | null;
+  brand_logo_path: string | null;
+  brand_primary: string | null;
+  brand_accent: string | null;
+  welcome_message: string | null;
+};
+
+export type Me = {
+  profile: Profile | null;
+  email?: string;
+  tenant?: { id: string; name: string; slug: string; plan_code: string; timezone: string; status?: "active" | "suspended" };
+  super_admin?: boolean;
+  plan?: { code: string; name: string; limits: Record<string, number | null>; features: Record<string, boolean> };
+  settings?: TenantSettings;
+  monitoring_consent?: boolean;
+  unread_notifications?: number;
+};
+
+export type DeliveryMode = "live_participation" | "student_paced" | "front_of_class";
+
+export type SlideKind =
+  | "title" | "text" | "image" | "video" | "audio" | "embed" | "link" | "attachment" | "shapes" | "whiteboard" | "activity" | "canvas";
+
+export type Shape = { id: string; type: "rect" | "ellipse" | "arrow" | "text"; x: number; y: number; w: number; h: number; color: string; text?: string };
+export type Stroke = { color: string; width: number; points: [number, number][] };
+
+export type SlideContent = {
+  heading?: string;
+  body?: string;
+  url?: string;
+  media_path?: string;
+  alt?: string;
+  captions_path?: string;
+  caption?: string;
+  shapes?: Shape[];
+  strokes?: Stroke[];
+  label?: string;
+  /** Imported deck page: shown edge to edge, like the original slide. */
+  full?: boolean;
+  /** Designed ("canvas") slides: see src/slides/canvas.ts. */
+  background?: CanvasBackground;
+  elements?: CanvasElement[];
+};
+
+export type ActivityKind =
+  | "multiple_choice" | "poll" | "open_ended" | "quiz" | "draw" | "fill_blank" | "matching"
+  | "drag_drop" | "collab_board" | "file_upload" | "short_answer" | "code";
+
+export type QuestionKind =
+  | "mcq" | "multi_select" | "true_false" | "poll" | "open" | "short" | "fill_blank"
+  | "matching" | "ordering" | "categorize" | "draw" | "file" | "code" | "word_cloud" | "label_diagram";
+
+export type ActivitySettings = {
+  time_limit_seconds?: number;
+  attempts_allowed?: number;
+  shuffle_questions?: boolean;
+  shuffle_options?: boolean;
+  /** One more try at a wrong answer for half the points; the answer is shown after it (migration 0800). */
+  redemption?: boolean;
+  /** Give each student the questions for their challenge level (migration 0790). */
+  differentiate?: boolean;
+  show_feedback?: "immediately" | "after_submit" | "never";
+  rubric_id?: string;
+};
+
+export type Item = { id: string; label: string };
+
+/** A question as students receive it (no answer key). */
+export type PublicQuestion = {
+  id: string;
+  kind: QuestionKind;
+  prompt: string;
+  media: { url?: string; media_path?: string; alt?: string };
+  config: {
+    blanks?: number;
+    left?: Item[];
+    right?: Item[];
+    items?: Item[];
+    categories?: Item[];
+    language?: "javascript" | "python" | "html";
+    starter?: string;
+    tests?: { name: string; input?: string; expected?: string }[];
+    partial_credit?: boolean;
+    /** label_diagram (1090): the picture (storage path or web address), its spots (x/y in percent) and the labels to choose from. */
+    image_path?: string;
+    image_url?: string;
+    spots?: { id: string; x: number; y: number }[];
+    labels?: Item[];
+    case_sensitive?: boolean;
+    max_chars?: number;
+    /** A student wrote this question and the teacher approved it (migration 0800). */
+    authored_by?: string;
+  };
+  options: Item[];
+  points: number;
+};
+
+export type GameSettings = {
+  question_seconds: number;
+  speed_bonus: boolean;
+  streak_bonus: boolean;
+  rank_visibility: "after_each" | "end_only" | "hidden";
+  display_mode: "first_name_initial" | "nickname" | "anonymous";
+  team_mode: boolean;
+  team_count: number;
+  shuffle_questions: boolean;
+  shuffle_options: boolean;
+  podium_size: number;
+  certificates: boolean;
+  /** Whole class works towards one target; rankings hidden (migration 0800). */
+  class_goal?: boolean;
+  goal_percent?: number;
+  /** No one new can join (the teacher locked the lobby). */
+  locked?: boolean;
+};
+
+export type EnvironmentPolicy = {
+  id: string;
+  name: string;
+  description: string | null;
+  allowed_domains: string[];
+  blocked_domains: string[];
+  blocked_categories: string[];
+  required_urls: string[];
+  lesson_url: string | null;
+  focus_mode: boolean;
+  lock_screen: boolean;
+  tab_limit: number | null;
+  grace_seconds: number;
+  idle_seconds: number;
+  subject: string | null;
+  notify: { banner: boolean; sound: boolean; browser: boolean; email: boolean };
+  is_template: boolean;
+  owner_id: string;
+};
+
+export const ROLE_LABEL: Record<Role, string> = {
+  student: "Student",
+  teacher: "Teacher",
+  school_admin: "School admin",
+  it_admin: "IT admin",
+  parent: "Parent",
+  platform_admin: "Platform admin",
+  guest: "Guest"
+};
+
+export const CATEGORIES = [
+  "games", "social", "video", "streaming", "shopping", "chat", "gambling", "adult"
+] as const;
+
+/** How site categories are named to people. */
+export const CATEGORY_LABEL: Record<(typeof CATEGORIES)[number], string> = {
+  games: "Games", social: "Social media", video: "Video sites", streaming: "Streaming", shopping: "Shopping",
+  chat: "Chat apps", gambling: "Gambling", adult: "Adult content"
+};
+
+/** What each notification is about, in words (the database stores a machine "kind"). */
+const NOTIFICATION_LABEL: Record<string, string> = {
+  student_joined: "Class", submission: "Assignment", grade_updated: "Grades", grade_released: "Grades",
+  child_low_score: "Grades", game_created: "Challenge", session_started: "Live class", spotlight: "Live class",
+  chat_message: "Message", environment_left: "Left the class", child_left_lesson: "Left the class",
+  student_returned: "Back in class", badge: "Badge", xp: "XP", question_collab: "Questions",
+  question_returned: "Questions", weekly_report: "Weekly report"
+};
+
+export function notificationLabel(kind: string): string {
+  const s = NOTIFICATION_LABEL[kind] ?? kind.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}

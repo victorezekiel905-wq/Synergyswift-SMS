@@ -1,0 +1,143 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { Countdown } from "@/live/components/game/Countdown";
+import { GoalBar } from "@/live/components/game/GoalBar";
+import { AnswerResult } from "@/live/components/game/LiveGame";
+import { OptionShape } from "@/live/components/game/Shape";
+import { Icon } from "@/live/components/Icon";
+import { useSupports } from "@/live/lib/supports";
+import { BADGE, OPTION_COLORS, type GameState, type Leaderboard } from "@/live/components/game/types";
+import { RichText } from "@/live/components/RichText";
+import { Alert, Button, Card, Field, Input, useToast } from "@/live/components/ui";
+import { createClient } from "@/live/lib/supabase/client";
+import { useRpc } from "@/live/lib/hooks";
+import { useSignal } from "@/live/lib/realtime";
+import { ActionError, errorText, rpc } from "@/live/lib/rpc";
+import { cn } from "@/live/lib/utils";
+
+export function GamePlayer({ gameId }: { gameId: string }) {
+  const toast = useToast();
+  const state = useRpc<GameState>("game_state", { p_game: gameId }, [gameId], { intervalMs: 10000 });
+  const board = useRpc<Leaderboard>("game_leaderboard", { p_game: gameId, p_limit: 10 }, [gameId, state.data?.status, state.data?.current_index]);
+  // Phase changes are pushed; the slow poll is only a safety net.
+  useSignal(`game:${gameId}`, ["state"], () => { void state.reload(); void board.reload(); }, { debounceMs: 50 });
+  const [fetchedAt, setFetchedAt] = useState(Date.now());
+  const [picked, setPicked] = useState<string[]>([]);
+  const [sent, setSent] = useState<number | null>(null);
+  const [nickname, setNickname] = useState("");
+  const [joinErr, setJoinErr] = useState<string | null>(null);
+  const shownAt = useRef<number>(Date.now());
+  const g = state.data;
+  // Calm mode (a private learning support): no rankings, just the student's own progress.
+  const calm = useSupports().calm_mode;
+
+  useEffect(() => setFetchedAt(Date.now()), [g?.server_now]);
+  useEffect(() => { shownAt.current = Date.now(); setPicked([]); }, [g?.current_index]);
+
+  async function join() {
+    setJoinErr(null);
+    const { data } = await createClient().from("game_sessions").select("join_code").eq("id", gameId).single();
+    try { await rpc("join_game", { p_code: data?.join_code, p_nickname: nickname || null }); void state.reload(); }
+    catch (e) { setJoinErr(errorText(e)); }
+  }
+
+  async function answer(choice: Record<string, unknown>) {
+    if (!g) return;
+    try {
+      await rpc("game_answer", { p_game: gameId, p_index: g.current_index, p_choice: choice, p_client_elapsed_ms: Date.now() - shownAt.current });
+      setSent(g.current_index);
+      void state.reload();
+    } catch (e) {
+      if (e instanceof ActionError && /already answered/.test(e.message)) setSent(g.current_index);
+      else toast(errorText(e), "error");
+    }
+  }
+
+  if (state.error && !g) return <div className="page max-w-lg"><Alert tone="error">{state.error}</Alert></div>;
+  if (!g) return <div className="page text-sm text-ink-500">Loading…</div>;
+
+  if (!g.me && g.status !== "ended") {
+    return (
+      <div className="page max-w-md">
+        <Card title={`Join "${g.title}"`}>
+          <div className="space-y-3">
+            {g.settings.display_mode === "nickname" && <Field label="Nickname" hint="2-20 letters or numbers. Your teacher can see your real name."><Input value={nickname} onChange={(e) => setNickname(e.target.value)} /></Field>}
+            {joinErr && <Alert tone="error">{joinErr}</Alert>}
+            <Button className="w-full" size="lg" onClick={join}>Join game</Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  const q = g.question;
+  const rightIndex = q && g.review ? q.options.findIndex((o) => g.review!.correct_option_ids.includes(o.id)) : -1;
+  const rightAnswer = q && rightIndex >= 0 ? { label: q.options[rightIndex]!.label, index: rightIndex } : null;
+  const answered = g.me?.answered || sent === g.current_index;
+  const multi = q?.kind === "multi_select";
+
+  return (
+    <div className="page max-w-2xl space-y-4">
+      <div className="flex items-center justify-between">
+        <div><p className="text-[13px] font-semibold text-ink-500">Challenge</p><h1 className="text-lg font-bold">{g.title}</h1></div>
+        {g.me && <div className="text-right"><p className="text-xs text-ink-500">{g.me.name}</p><p className="font-display text-2xl font-extrabold tabular-nums">{g.me.score}</p>{g.me.streak > 1 && <p className="flex items-center justify-end gap-1 text-xs font-semibold text-orange-700"><Icon name="flame" className="h-3.5 w-3.5" />{g.me.streak} in a row</p>}</div>}
+      </div>
+
+      {g.settings.class_goal && g.status !== "lobby" && <GoalBar gameId={gameId} refreshKey={`${g.status}-${g.current_index}`} />}
+
+      {g.status === "lobby" && <Card><p className="py-10 text-center text-lg">You're in! Waiting for your teacher to start…</p></Card>}
+
+      {g.status === "question" && q && (
+        <Card>
+          <p className="mb-1 text-sm text-ink-500">Question {g.current_index + 1} of {g.total}</p>
+          <RichText text={q.prompt} className="text-xl font-bold" />
+          <Countdown className="my-4" endsAt={g.question_ends_at} serverNow={g.server_now} fetchedAt={fetchedAt} total={g.settings.question_seconds} />
+          {answered ? <p className="py-8 text-center text-lg font-semibold text-ink-800">Answer locked in. Waiting for the others…</p> : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {q.options.map((o, i) => (
+                  <button key={o.id} onClick={() => multi ? setPicked((p) => p.includes(o.id) ? p.filter((x) => x !== o.id) : [...p, o.id]) : answer({ option_id: o.id })}
+                    className={cn("flex items-center gap-3 rounded-xl px-5 py-6 text-left text-lg font-semibold text-white transition active:scale-[.98]", OPTION_COLORS[i % OPTION_COLORS.length], multi && picked.includes(o.id) && "ring-4 ring-ink-900 ring-offset-2")}>
+                    <OptionShape i={i} />{o.label}
+                  </button>
+                ))}
+              </div>
+              {multi && <Button className="mt-3 w-full" size="lg" disabled={!picked.length} onClick={() => answer({ option_ids: picked })}>Submit</Button>}
+            </>
+          )}
+        </Card>
+      )}
+
+      {g.status === "review" && (
+        <Card>
+          {g.me?.last ? (
+            <AnswerResult key={g.current_index} correct={g.me.last.is_correct} title={g.me.last.is_correct ? "Correct!" : "Not this time"}
+              points={g.me.last.points} streak={g.me.streak} answer={rightAnswer} />
+          ) : <p className="text-center text-ink-500">No answer this round.</p>}
+          {g.review?.explanation && <p className="mt-4 rounded-xl bg-ink-50 p-4 text-[15px] leading-relaxed text-ink-800"><span className="font-semibold">Why: </span>{g.review.explanation}</p>}
+        </Card>
+      )}
+
+      {board.data?.me && g.status === "ended" && (g.settings.class_goal || calm) && (
+        <Card title="Your game">
+          <p className="text-lg">You got <strong>{board.data.me.correct}</strong> of {g.total} right and scored <strong>{board.data.me.score}</strong> points.</p>
+        </Card>
+      )}
+
+      {board.data && (g.status === "review" || g.status === "ended") && !g.settings.class_goal && !calm && (
+        <Card title={g.status === "ended" ? "Final results" : "Standings"}>
+          {board.data.me && <p className="mb-3 text-lg">You are <strong>#{board.data.me.rank}</strong> of {board.data.players} with <strong>{board.data.me.score}</strong> points.</p>}
+          {board.data.visible ? (
+            <ol className="space-y-1">{board.data.top.map((p) => (
+              <li key={p.player_id} className={cn("flex justify-between rounded-lg px-3 py-1.5", p.player_id === board.data!.me?.player_id ? "bg-brand-50 font-semibold" : "")}>
+                <span>{p.rank}. {p.name}</span><span className="tabular-nums">{p.score}</span></li>
+            ))}</ol>
+          ) : <p className="text-sm text-ink-500">Your teacher has hidden the full leaderboard. Only you can see your position.</p>}
+          {g.status === "ended" && !!board.data.me?.badges.length && (
+            <div className="mt-4 flex flex-wrap gap-2">{board.data.me.badges.map((b) => <span key={b} className="badge bg-amber-100 text-amber-900">{BADGE[b] ?? b}</span>)}</div>
+          )}
+        </Card>
+      )}
+    </div>
+  );
+}

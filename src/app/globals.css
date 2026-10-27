@@ -87,3 +87,32 @@ html[data-lite="1"] .lite-hide { display: none !important; }
 /* Exam tool: high contrast (Tools → Larger text and contrast). */
 html[data-high-contrast] body { filter: contrast(1.35); }
 html[data-high-contrast] .card { border-color: #0f172a; }
+
+/* ---------- Live lessons module (src/live, from SwiftCipher): the extra classes its screens use ---------- */
+@layer components {
+  .btn-secondary { @apply border border-slate-300 bg-white text-slate-800 hover:bg-slate-50; }
+  .btn-accent { @apply bg-accent-500 text-accent-ink hover:bg-accent-400; }
+  .btn-ink { @apply bg-slate-900 text-white hover:bg-slate-800; }
+  .btn-sm { @apply px-2.5 py-1 text-[13px]; }
+  .btn-lg { @apply px-5 py-2.5 text-base; }
+  .card-pad { @apply p-5 sm:p-6; }
+  .hint { @apply mt-1.5 text-[13px] leading-snug text-slate-500; }
+  .badge { @apply inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset; }
+  .table { @apply w-full text-left text-sm; }
+  .table th { @apply border-b border-slate-200 px-4 pb-2.5 pt-3 text-[12px] font-medium text-slate-500; }
+  .table td { @apply border-b border-slate-100 px-4 py-3 align-middle; }
+  .table tbody tr:last-child td { @apply border-b-0; }
+  .page { @apply mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8; }
+  .page-title { @apply font-serif text-[26px] font-semibold leading-[1.15] tracking-[-0.01em] text-slate-900 sm:text-[30px]; }
+  .page-sub { @apply mt-2 max-w-2xl text-[15px] text-slate-600; }
+  .section-title { @apply text-[17px] font-semibold tracking-tight text-slate-900; }
+  .mark { @apply relative whitespace-nowrap; background: linear-gradient(transparent 58%, #d4f55a 58%, #d4f55a 92%, transparent 92%); }
+  .slide-surface { @apply relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-200 bg-white; }
+}
+.pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem); }
+@media (max-width: 767px) {
+  .table { position: relative; display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table th, .table td { white-space: nowrap; }
+}
+/* "Easy-to-read font" learning support set by a teacher in live lessons. */
+html.readable body { letter-spacing: 0.02em; line-height: 1.75; word-spacing: 0.08em; }

@@ -1,0 +1,502 @@
+"use client";
+import {
+  createContext, forwardRef, useCallback, useContext, useEffect, useId, useMemo, useRef, useState,
+  type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes,
+  type TextareaHTMLAttributes
+} from "react";
+import { AlertTriangle, CheckCircle2, Info, MoreHorizontal, X, XCircle } from "lucide-react";
+import { cn, nameParts } from "@/live/lib/utils";
+
+// ---------------------------------------------------------------------------
+// Button
+// ---------------------------------------------------------------------------
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "accent" | "ink";
+  size?: "sm" | "md" | "lg";
+  loading?: boolean;
+};
+
+/**
+ * When `onClick` returns a promise, the button shows a spinner and is disabled
+ * until it settles (no double submits), and a rejection is shown as a toast
+ * instead of failing silently.
+ */
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { variant = "primary", size = "md", loading, className, children, disabled, type = "button", onClick, ...rest }, ref
+) {
+  const toast = useContext(ToastCtx);
+  const [running, setRunning] = useState(false);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  const busy = !!loading || running;
+  return (
+    <button
+      ref={ref}
+      type={type}
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
+      className={cn("btn", `btn-${variant}`, size === "sm" && "btn-sm", size === "lg" && "btn-lg", className)}
+      onClick={onClick && ((e) => {
+        const result: unknown = (onClick as (ev: typeof e) => unknown)(e);
+        if (result && typeof (result as Promise<unknown>).then === "function") {
+          setRunning(true);
+          (result as Promise<unknown>)
+            .catch((err: unknown) => toast(err instanceof Error ? err.message : "Something went wrong.", "error"))
+            .finally(() => { if (alive.current) setRunning(false); });
+        }
+      })}
+      {...rest}
+    >
+      {busy && <Spinner className="h-3.5 w-3.5" />}
+      {children}
+    </button>
+  );
+});
+
+export function Spinner({ className }: { className?: string }) {
+  return (
+    <svg className={cn("h-4 w-4 animate-spin", className)} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity=".25" strokeWidth="4" />
+      <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Form fields
+// ---------------------------------------------------------------------------
+export function Field({ label, hint, error, children, className, htmlFor }: {
+  label?: ReactNode; hint?: ReactNode; error?: string | null; children: ReactNode; className?: string; htmlFor?: string;
+}) {
+  if (htmlFor || !label) {
+    return (
+      <div className={className}>
+        {label && <label className="label" htmlFor={htmlFor}>{label}</label>}
+        {children}
+        {hint && !error && <p className="hint">{hint}</p>}
+        {error && <p className="mt-1.5 text-[13px] font-medium text-rose-700" role="alert">{error}</p>}
+      </div>
+    );
+  }
+  // No explicit id: the whole field is the <label>, so its text names the control
+  // inside it (screen readers, voice control; clicking the text focuses the input).
+  return (
+    <label className={cn("block", className)}>
+      <span className="label">{label}</span>
+      {children}
+      {hint && !error && <span className="hint block">{hint}</span>}
+      {error && <span className="mt-1.5 block text-[13px] font-medium text-rose-700" role="alert">{error}</span>}
+    </label>
+  );
+}
+
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
+  return <input ref={ref} className={cn("input", className)} {...rest} />;
+});
+
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, ...rest }, ref) {
+  return <textarea ref={ref} className={cn("input min-h-[88px]", className)} {...rest} />;
+});
+
+export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, ...rest }, ref) {
+  return <select ref={ref} className={cn("input", className)} {...rest}>{children}</select>;
+});
+
+export function Toggle({ checked, onChange, label, description, disabled }: {
+  checked: boolean; onChange: (v: boolean) => void; label: ReactNode; description?: ReactNode; disabled?: boolean;
+}) {
+  const id = useId();
+  return (
+    <label htmlFor={id} className={cn("flex cursor-pointer items-start gap-3", disabled && "cursor-not-allowed opacity-60")}>
+      <span className="relative mt-0.5 inline-flex shrink-0">
+        <input id={id} type="checkbox" className="peer sr-only" checked={checked} disabled={disabled}
+               onChange={(e) => onChange(e.target.checked)} />
+        <span className="h-6 w-10 rounded-full bg-ink-300 transition-colors peer-checked:bg-brand-600 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-600 peer-focus-visible:ring-offset-2" />
+        <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-lift transition-transform peer-checked:translate-x-4" />
+      </span>
+      <span>
+        <span className="block text-sm font-semibold text-ink-900">{label}</span>
+        {description && <span className="mt-0.5 block text-[13px] leading-snug text-ink-500">{description}</span>}
+      </span>
+    </label>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Layout primitives
+// ---------------------------------------------------------------------------
+export function Card({ className, children, title, actions, pad = true }: {
+  className?: string; children?: ReactNode; title?: ReactNode; actions?: ReactNode; pad?: boolean;
+}) {
+  return (
+    <section className={cn("card", className)}>
+      {(title || actions) && (
+        <header className={cn("flex flex-wrap items-center justify-between gap-3 px-5 pt-4 sm:px-6 sm:pt-5", !pad && "pb-3")}>
+          <h2 className="font-display text-[15px] font-semibold tracking-tight text-ink-900">{title}</h2>
+          {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+        </header>
+      )}
+      <div className={cn(pad && "card-pad", pad && (title || actions) && "!pt-3")}>{children}</div>
+    </section>
+  );
+}
+
+export function PageHeader({ title, subtitle, actions, eyebrow }: {
+  title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; eyebrow?: ReactNode;
+}) {
+  return (
+    <div className="mb-7 flex flex-wrap items-end justify-between gap-x-6 gap-y-4 sm:mb-9">
+      <div className="min-w-0">
+        {eyebrow && <p className="mb-1.5 text-[13px] font-medium text-ink-500">{eyebrow}</p>}
+        <h1 className="page-title">{title}</h1>
+        {subtitle && <p className="page-sub">{subtitle}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  );
+}
+
+const BADGE_TONES = {
+  gray: "bg-ink-100 text-ink-700 ring-ink-200",
+  brand: "bg-brand-50 text-brand-800 ring-brand-200",
+  green: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  amber: "bg-amber-50 text-amber-900 ring-amber-200",
+  red: "bg-rose-50 text-rose-800 ring-rose-200",
+  // the signature highlight: accent fill with its own readable text colour
+  cyan: "bg-accent-400 text-accent-ink ring-accent-500",
+  ink: "bg-ink-900 text-white ring-ink-900"
+} as const;
+
+export function Badge({ tone = "gray", children, className, dot }: {
+  tone?: keyof typeof BADGE_TONES; children: ReactNode; className?: string; dot?: boolean;
+}) {
+  return (
+    <span className={cn("badge", BADGE_TONES[tone], className)}>
+      {dot && <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />}
+      {children}
+    </span>
+  );
+}
+
+export function Stat({ label, value, sub, tone }: { label: ReactNode; value: ReactNode; sub?: ReactNode; tone?: "red" | "green" }) {
+  return (
+    <div className="card card-pad">
+      <p className="text-[13px] font-medium text-ink-500">{label}</p>
+      <p className={cn("mt-2 font-display text-[28px] font-bold leading-none tracking-[-0.02em] tabular-nums text-ink-900",
+        tone === "red" && "text-rose-700", tone === "green" && "text-emerald-700")}>{value}</p>
+      {sub && <p className="mt-2 text-[13px] text-ink-500">{sub}</p>}
+    </div>
+  );
+}
+
+export function Empty({ title, children, action, icon }: { title: ReactNode; children?: ReactNode; action?: ReactNode; icon?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-[14px] border border-dashed border-ink-300 bg-white/50 px-6 py-12 text-center">
+      {icon && <div className="mb-4 grid h-10 w-10 place-items-center rounded-full bg-ink-100 text-ink-600 [&_svg]:h-[18px] [&_svg]:w-[18px]">{icon}</div>}
+      <p className="font-display text-[15px] font-semibold text-ink-900">{title}</p>
+      {children && <div className="mt-1.5 max-w-md text-sm text-ink-600">{children}</div>}
+      {action && <div className="mt-5">{action}</div>}
+    </div>
+  );
+}
+
+export function Alert({ tone = "info", children, title }: { tone?: "info" | "warn" | "error" | "success"; children: ReactNode; title?: ReactNode }) {
+  const styles = {
+    info: "border-brand-200 bg-brand-50 text-brand-950",
+    warn: "border-amber-300 bg-amber-50 text-amber-950",
+    error: "border-rose-300 bg-rose-50 text-rose-950",
+    success: "border-emerald-300 bg-emerald-50 text-emerald-950"
+  }[tone];
+  const Icon = { info: Info, warn: AlertTriangle, error: XCircle, success: CheckCircle2 }[tone];
+  return (
+    <div className={cn("flex gap-3 rounded-xl border px-4 py-3 text-sm leading-relaxed", styles)} role={tone === "error" ? "alert" : "status"}>
+      <Icon aria-hidden className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.2} />
+      <div className="min-w-0 flex-1">
+        {title && <p className="font-semibold">{title}</p>}
+        <div className={cn(title && "mt-0.5")}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tabs (keyboard accessible)
+// ---------------------------------------------------------------------------
+export function Tabs<T extends string>({ tabs, value, onChange, className }: {
+  tabs: { id: T; label: ReactNode; count?: number }[]; value: T; onChange: (id: T) => void; className?: string;
+}) {
+  return (
+    <div role="tablist" className={cn("flex gap-6 overflow-x-auto border-b border-ink-200 [scrollbar-width:none]", className)}
+         onKeyDown={(e) => {
+           const i = tabs.findIndex((t) => t.id === value);
+           if (e.key === "ArrowRight") onChange(tabs[(i + 1) % tabs.length]!.id);
+           if (e.key === "ArrowLeft") onChange(tabs[(i - 1 + tabs.length) % tabs.length]!.id);
+         }}>
+      {tabs.map((t) => (
+        <button key={t.id} role="tab" type="button" aria-selected={t.id === value} tabIndex={t.id === value ? 0 : -1}
+          onClick={() => onChange(t.id)}
+          className={cn("-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-3 pt-2 text-sm font-semibold transition-colors",
+            t.id === value ? "border-ink-900 text-ink-900" : "border-transparent text-ink-500 hover:text-ink-900")}>
+          {t.label}
+          {t.count !== undefined && t.count > 0 && (
+            <span className="min-w-[18px] rounded-full bg-rose-700 px-1.5 text-center text-[11px] font-bold leading-[18px] text-white">{t.count}</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Modal (native <dialog>: focus trap + Esc for free).
+// Phones get a sheet anchored to the bottom edge; larger screens a centred dialog.
+// ---------------------------------------------------------------------------
+export function Modal({ open, onClose, title, children, footer, wide }: {
+  open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode; wide?: boolean;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    if (open && !d.open) d.showModal();
+    if (!open && d.open) d.close();
+  }, [open]);
+  return (
+    <dialog ref={ref} onClose={onClose} onCancel={onClose} aria-labelledby={titleId}
+      className={cn("mb-0 mt-auto w-full max-w-none rounded-t-2xl p-0 text-ink-900 shadow-overlay backdrop:bg-ink-950/50",
+        "sm:m-auto sm:w-[calc(100%-2rem)] sm:rounded-2xl", wide ? "sm:max-w-3xl" : "sm:max-w-lg")}>
+      {open && (
+        <div className="animate-sheet-up sm:animate-fade-in">
+          <header className="flex items-center justify-between gap-3 border-b border-ink-100 px-5 py-4 sm:px-6">
+            <h2 id={titleId} className="font-display text-lg font-bold tracking-tight">{title}</h2>
+            <button type="button" onClick={onClose} className="btn btn-ghost -mr-2 h-9 w-9 px-0" aria-label="Close"><X className="h-4 w-4" aria-hidden /></button>
+          </header>
+          <div className="max-h-[70vh] overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
+          {footer && <footer className="pb-safe flex flex-wrap justify-end gap-2 border-t border-ink-100 bg-ink-50/70 px-5 pt-3 sm:px-6 sm:pb-3">{footer}</footer>}
+        </div>
+      )}
+    </dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Toasts
+// ---------------------------------------------------------------------------
+type Toast = { id: number; tone: "info" | "success" | "error"; text: string };
+const ToastCtx = createContext<(text: string, tone?: Toast["tone"]) => void>(() => {});
+
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [dialog, setDialog] = useState<PendingDialog | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const push = useCallback((text: string, tone: Toast["tone"] = "info") => {
+    const id = Date.now() + Math.random();
+    setToasts((t) => [...t.slice(-3), { id, tone, text }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tone === "error" ? 7000 : 4000);
+  }, []);
+  // Open modals live in the browser's top layer, above any z-index. Toasts are a
+  // popover so they join the top layer too (re-shown so the newest is on top);
+  // otherwise an error raised inside a modal would be hidden behind it.
+  useEffect(() => {
+    const el = box.current as (HTMLDivElement & { showPopover?: () => void; hidePopover?: () => void }) | null;
+    if (!el?.showPopover) return;
+    try {
+      if (el.matches(":popover-open")) el.hidePopover!();
+      if (toasts.length) el.showPopover();
+    } catch { /* not supported: falls back to z-index */ }
+  }, [toasts]);
+  const dialogs = useMemo<DialogApi>(() => ({
+    confirm: (opts) => new Promise<boolean>((resolve) => setDialog((prev) => { prev?.cancel(); return { id: ++dialogSeq, kind: "confirm", opts, resolve, cancel: () => resolve(false) }; })),
+    ask: (opts) => new Promise<string | null>((resolve) => setDialog((prev) => { prev?.cancel(); return { id: ++dialogSeq, kind: "ask", opts, resolve, cancel: () => resolve(null) }; }))
+  }), []);
+  return (
+    <ToastCtx.Provider value={push}>
+      <DialogCtx.Provider value={dialogs}>
+      {children}
+      {dialog && <DialogHost key={dialog.id} pending={dialog} done={() => setDialog(null)} />}
+      </DialogCtx.Provider>
+      {/* Phones and tablets: centred above the bottom tab bar. Desktop: bottom-right. */}
+      <div ref={box} {...{ popover: "manual" }}
+        className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] top-auto z-[60] m-0 flex h-auto w-auto flex-col items-center gap-2 overflow-visible border-0 bg-transparent p-0 lg:inset-x-auto lg:bottom-6 lg:right-6 lg:w-96 lg:items-stretch"
+        aria-live="polite">
+        {toasts.map((t) => {
+          const Icon = t.tone === "error" ? XCircle : t.tone === "success" ? CheckCircle2 : Info;
+          return (
+            <div key={t.id} className="pointer-events-auto flex w-full max-w-md animate-sheet-up items-start gap-3 rounded-xl bg-ink-900 px-4 py-3 text-sm text-white shadow-overlay">
+              <Icon aria-hidden strokeWidth={2.4}
+                className={cn("mt-0.5 h-4 w-4 shrink-0", t.tone === "error" ? "text-rose-300" : t.tone === "success" ? "text-accent-400" : "text-ink-300")} />
+              <span className="min-w-0">{t.text}</span>
+            </div>
+          );
+        })}
+      </div>
+    </ToastCtx.Provider>
+  );
+}
+
+export function useToast() {
+  return useContext(ToastCtx);
+}
+
+// ---------------------------------------------------------------------------
+// Dialogs: branded replacements for window.confirm / window.prompt, which look
+// out of place, can't be styled and are blocked in some embedded/installed apps.
+//   const { confirm, ask } = useDialog();
+//   if (!(await confirm({ title: "Delete this slide?", tone: "danger", confirmLabel: "Delete" }))) return;
+//   const name = await ask({ title: "New folder", label: "Folder name" });
+// ---------------------------------------------------------------------------
+type ConfirmOpts = { title: string; body?: ReactNode; confirmLabel?: string; tone?: "danger" | "primary" };
+type AskOpts = ConfirmOpts & {
+  label: string; placeholder?: string; defaultValue?: string; multiline?: boolean; maxLength?: number;
+  /** Empty answers are allowed (returns ""). */
+  optional?: boolean;
+  /** Type-to-confirm for irreversible actions, e.g. "DELETE". */
+  requireText?: string;
+};
+type PendingDialog =
+  | { id: number; kind: "confirm"; opts: ConfirmOpts; resolve: (v: boolean) => void; cancel: () => void }
+  | { id: number; kind: "ask"; opts: AskOpts; resolve: (v: string | null) => void; cancel: () => void };
+type DialogApi = { confirm: (o: ConfirmOpts) => Promise<boolean>; ask: (o: AskOpts) => Promise<string | null> };
+let dialogSeq = 0;
+const DialogCtx = createContext<DialogApi>({ confirm: async () => false, ask: async () => null });
+
+export function useDialog() {
+  return useContext(DialogCtx);
+}
+
+function DialogHost({ pending, done }: { pending: PendingDialog; done: () => void }) {
+  const ask = pending.kind === "ask" ? pending.opts : null;
+  const [value, setValue] = useState(ask?.defaultValue ?? "");
+  const o = pending.opts;
+  const valid = !ask ? true : ask.requireText ? value.trim() === ask.requireText : ask.optional || value.trim().length > 0;
+  const close = (ok: boolean) => {
+    if (pending.kind === "confirm") pending.resolve(ok);
+    else pending.resolve(ok ? value.trim() : null);
+    done();
+  };
+  return (
+    <Modal open onClose={() => close(false)} title={o.title}
+      footer={<>
+        <Button variant="secondary" onClick={() => close(false)}>Cancel</Button>
+        <Button variant={o.tone === "danger" ? "danger" : "primary"} disabled={!valid} onClick={() => close(true)}>{o.confirmLabel ?? (ask ? "Save" : "Confirm")}</Button>
+      </>}>
+      {o.body && <div className="text-[15px] leading-relaxed text-ink-700">{o.body}</div>}
+      {ask && (
+        <form className={cn(o.body && "mt-4")} onSubmit={(e) => { e.preventDefault(); if (valid) close(true); }}>
+          <Field label={ask.requireText ? <>Type <strong className="font-mono">{ask.requireText}</strong> to confirm</> : ask.label}>
+            {ask.multiline
+              ? <Textarea autoFocus rows={3} maxLength={ask.maxLength ?? 2000} placeholder={ask.placeholder} value={value} onChange={(e) => setValue(e.target.value)} />
+              : <Input autoFocus maxLength={ask.maxLength ?? 200} placeholder={ask.placeholder} value={value} onChange={(e) => setValue(e.target.value)} />}
+          </Field>
+        </form>
+      )}
+    </Modal>
+  );
+}
+
+export function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <Button variant="secondary" size="sm" onClick={async () => {
+      await navigator.clipboard.writeText(value).catch(() => {});
+      setDone(true);
+      setTimeout(() => setDone(false), 1500);
+    }}>{done ? "Copied" : label}</Button>
+  );
+}
+
+// A small, deliberate set of muted avatar colours (each pair passes 4.5:1).
+const AVATAR_TONES: [string, string][] = [
+  ["#E4E9FB", "#1C33AB"], ["#E6F4D7", "#34520F"], ["#FBE7DA", "#8A3410"], ["#EDE4F7", "#5B2A8F"],
+  ["#DCF1EE", "#115E54"], ["#F7E3E7", "#8F1D3A"], ["#EEECE6", "#27261F"], ["#FDF1CC", "#6B4E05"]
+];
+
+export function Avatar({ name, className }: { name: string; className?: string }) {
+  const letters = nameParts(name).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("");
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const [bg, fg] = AVATAR_TONES[h % AVATAR_TONES.length]!;
+  return (
+    <span aria-hidden className={cn("inline-grid h-8 w-8 shrink-0 place-items-center rounded-full font-display text-xs font-bold", className)}
+          style={{ backgroundColor: bg, color: fg }}>{letters || "?"}</span>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// "More actions" menu. Floats above the page (position: fixed), so a table that
+// scrolls sideways on phones can't clip it. Closes on Escape, outside click, scroll.
+// ---------------------------------------------------------------------------
+export type MenuItem = { label: string; onSelect: () => unknown; tone?: "danger"; icon?: ReactNode };
+
+export function Menu({ items, label = "More actions", trigger, triggerClassName }: {
+  items: MenuItem[]; label?: string;
+  /** Visible content of the button (default: a "…" icon), and its classes (e.g. on a dark bar). */
+  trigger?: ReactNode; triggerClassName?: string;
+}) {
+  const toast = useContext(ToastCtx);
+  const btn = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+
+  useEffect(() => {
+    if (!pos) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.key !== "Escape") return;
+      if (e.type === "mousedown" && (list.current?.contains(e.target as Node) || btn.current?.contains(e.target as Node))) return;
+      setPos(null);
+      if (e instanceof KeyboardEvent) btn.current?.focus();
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    list.current?.querySelector<HTMLButtonElement>("[role=menuitem]")?.focus();
+    return () => {
+      document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close);
+      window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close);
+    };
+  }, [pos]);
+
+  function toggle() {
+    if (pos) { setPos(null); return; }
+    const r = btn.current!.getBoundingClientRect();
+    setPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+  }
+
+  return (
+    <>
+      <button ref={btn} type="button" onClick={toggle} aria-label={trigger ? undefined : label} aria-haspopup="menu" aria-expanded={!!pos}
+        className={triggerClassName ?? "btn btn-ghost btn-sm h-8 w-8 px-0"}>
+        {trigger ?? <MoreHorizontal className="h-4 w-4" aria-hidden />}
+      </button>
+      {pos && (
+        <div ref={list} role="menu" aria-label={label} style={{ top: pos.top, right: pos.right }}
+          className="fixed z-50 min-w-[13rem] animate-fade-in overflow-hidden rounded-xl border border-ink-200 bg-white py-1 shadow-overlay"
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+            e.preventDefault();
+            const all = [...(list.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]") ?? [])];
+            const i = all.indexOf(document.activeElement as HTMLButtonElement);
+            all[(i + (e.key === "ArrowDown" ? 1 : all.length - 1)) % all.length]?.focus();
+          }}>
+          {items.map((it) => (
+            <button key={it.label} type="button" role="menuitem"
+              className={cn("flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm font-medium outline-none transition-colors hover:bg-ink-50 focus-visible:bg-ink-100",
+                it.tone === "danger" ? "text-rose-700" : "text-ink-800")}
+              onClick={() => {
+                setPos(null);
+                const r = it.onSelect();
+                if (r && typeof (r as Promise<unknown>).then === "function") {
+                  (r as Promise<unknown>).catch((err: unknown) => toast(err instanceof Error ? err.message : "Something went wrong.", "error"));
+                }
+              }}>
+              {it.icon}{it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}

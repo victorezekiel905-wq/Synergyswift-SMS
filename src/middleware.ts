@@ -31,7 +31,8 @@ export async function middleware(request: NextRequest) {
 }
 
 // Content packages (/pkg/…), their record store (/api/xapi/…), clocking machines (/iclock/…), the open API (/api/v1/…)
-// and the public website feeds (/api/public/…) do not use the session.
+// and the public website feeds (/api/public/…) do not use the session. Live lessons' code workers (/sandbox/…)
+// keep the strict policy next.config.mjs gives them.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|pkg/|api/xapi/|api/v1/|api/v1$|api/public/|iclock/|embed\\.js|.*\\.svg$).*)"]
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|pkg/|api/xapi/|api/v1/|api/v1$|api/public/|iclock/|sandbox/|embed\\.js|.*\\.svg$).*)"]
 };

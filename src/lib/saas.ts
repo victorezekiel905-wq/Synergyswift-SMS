@@ -34,7 +34,7 @@ export const MODULE_CATALOGUE = [
   { key: "lms", label: "Online learning (lessons, live class)", group: "learning" },
   { key: "homework", label: "Homework", group: "learning" },
   { key: "lesson_notes", label: "Lesson notes", group: "learning" },
-  { key: "live", label: "SwiftCipher live lessons & games", group: "learning" },
+  { key: "live", label: "Live lessons & games", group: "learning" },
   { key: "classroom", label: "Classroom management (points)", group: "learning" },
   { key: "library", label: "Library", group: "learning" },
   { key: "analytics", label: "Early warning & analytics", group: "learning" },
