@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
+import { requireCtx, ROLES, readJson, jsonError, denyUnless } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { guardiansByStudent, rowsForGuardian, enqueue, tryDispatch, loadBrand, type OutboxRow } from "@/lib/messaging/outbox";
 import { resultPublished } from "@/lib/messaging/templates";
@@ -25,6 +25,7 @@ const Body = z.object({
 export async function POST(req: NextRequest) {
   const ctx = await requireCtx(ROLES.admin, "results");
   if (ctx instanceof NextResponse) return ctx;
+  { const denied = denyUnless(ctx, "results.publish"); if (denied) return denied; }
   const parsed = Body.safeParse(await readJson(req));
   if (!parsed.success) return jsonError(parsed.error.issues.map(i => i.message).join("; "));
   const b = parsed.data;

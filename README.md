@@ -1,6 +1,6 @@
 # EduClass Fusion — v0.1
 
-Multi-tenant SaaS platform that fuses **interactive learning** with **classroom device control**, built strictly from the `EduClass_Fusion_SaaS_Blueprint.docx` spec (Aug 2026). Stack: **Next.js 15 (App Router) + React 19 + TypeScript + Tailwind + Supabase** against your live project `ysvqcrhkmaajsqujekzr.supabase.co`.
+Multi-tenant SaaS platform that fuses **interactive learning** with **classroom device control**, built strictly from the `EduClass_Fusion_SaaS_Blueprint.docx` spec (Aug 2026). Stack: **Next.js 15 (App Router) + React 19 + TypeScript + Tailwind + Supabase** against your live project `zltofhayjsvtktmmlqmh.supabase.co`.
 
 > No mocks. Every UI hits real Supabase tables; every screen writes real rows; every leaderboard is live; every device event is persisted.
 
@@ -244,11 +244,11 @@ Load in Chrome: `chrome://extensions → Developer mode → Load unpacked → se
 ## 9. Verification I performed against your live project
 
 ```text
-GET https://ysvqcrhkmaajsqujekzr.supabase.co/rest/v1/users?select=id&limit=1     → 200 OK []
-GET https://ysvqcrhkmaajsqujekzr.supabase.co/rest/v1/tenants?select=id&limit=1   → 200 OK []
-GET https://ysvqcrhkmaajsqujekzr.supabase.co/rest/v1/lessons?select=id&limit=1   → 200 OK []
-GET https://ysvqcrhkmaajsqujekzr.supabase.co/rest/v1/classes?select=id&limit=1   → 200 OK []
-GET https://ysvqcrhkmaajsqujekzr.supabase.co/rest/v1/                              → 401 (anon key, service-role only — expected)
+GET https://zltofhayjsvtktmmlqmh.supabase.co/rest/v1/users?select=id&limit=1     → 200 OK []
+GET https://zltofhayjsvtktmmlqmh.supabase.co/rest/v1/tenants?select=id&limit=1   → 200 OK []
+GET https://zltofhayjsvtktmmlqmh.supabase.co/rest/v1/lessons?select=id&limit=1   → 200 OK []
+GET https://zltofhayjsvtktmmlqmh.supabase.co/rest/v1/classes?select=id&limit=1   → 200 OK []
+GET https://zltofhayjsvtktmmlqmh.supabase.co/rest/v1/                              → 401 (anon key, service-role only — expected)
 ```
 
 The anon key you supplied has `role: anon` (verified by JWT decode). That means client code runs **strictly under RLS**. Migration execution therefore needs you to paste `supabase/migrations/*.sql` into the **Supabase SQL Editor** (or attach a service-role key locally + run `supabase db push`). I did **not** fabricate a service-role key.

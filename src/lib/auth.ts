@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { beginRequest } from "@/lib/request-actor";
 import { checkAccess } from "@/lib/access";
+import { effectiveRoles, permitted, moduleBlockedForUser, platformAtLeast, type CustomRole, type Permission, type PlatformRole, type ModuleKey } from "@/lib/saas";
+export type { ModuleKey } from "@/lib/saas";
 
 export type Profile = {
   id: string;
@@ -10,9 +12,10 @@ export type Profile = {
   full_name: string;
   role: string;
   extra_roles: string[];
+  custom_role_id?: string | null;
 };
 
-export type Tenant = { id: string; name: string; status: string; modules: Record<string, boolean>; timezone: string };
+export type Tenant = { id: string; name: string; status: string; modules: Record<string, boolean>; timezone: string; allowed_roles?: string[] | null };
 
 export type Ctx = {
   sb: any;
@@ -20,6 +23,8 @@ export type Ctx = {
   profile: Profile;
   tenant: Tenant;
   roles: Set<string>;
+  /** The school's own custom role for this user, if any (extra roles, modules and actions taken away). */
+  customRole: CustomRole | null;
 };
 
 /** Role groups used across the school-operations modules. */
@@ -49,11 +54,6 @@ export const ROLES = {
 /** Every assignable staff role, in the order shown in HR. */
 export const STAFF_ROLE_OPTIONS = ["teacher", "school_admin", "principal", "it_admin", "bursar", "librarian",
   "hr_manager", "qa_officer", "gate_officer", "transport_officer", "hostel_warden", "nurse", "admissions_officer", "cashier", "counsellor"] as const;
-
-export type ModuleKey = "lms" | "sims" | "results" | "exams" | "gate" | "pickup" | "library"
-  | "requisitions" | "hr" | "qa" | "messaging" | "fees" | "payroll" | "inventory" | "admissions"
-  | "attendance" | "behaviour" | "homework" | "health" | "events" | "meetings" | "timetable"
-  | "transport" | "hostel" | "visitors" | "lesson_notes" | "analytics" | "wallet" | "inbox" | "cover" | "community";
 
 export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -89,17 +89,23 @@ export async function resolveCtx(): Promise<Ctx | CtxError> {
   const access = await checkAccess(user.id, session?.access_token ?? null);
   if (!access.ok) return { error: access.message, status: 403, code: "access_restricted" };
   const { data: profile } = await sb.from("users")
-    .select("id,tenant_id,email,full_name,role,extra_roles").eq("id", user.id).maybeSingle();
+    .select("id,tenant_id,email,full_name,role,extra_roles,custom_role_id").eq("id", user.id).maybeSingle();
   if (!profile) {
     const { data: st } = await sb.rpc("my_account_state");
     const e = STATE_ERRORS[st?.state as string];
     return e ? { ...e, code: st.state } : { error: "unauthenticated", status: 401 };
   }
   const { data: tenant } = await sb.from("tenants")
-    .select("id,name,status,modules,timezone").eq("id", profile.tenant_id).maybeSingle();
+    .select("id,name,status,modules,timezone,allowed_roles").eq("id", profile.tenant_id).maybeSingle();
   if (!tenant) return { error: "unauthenticated", status: 401 };
-  const roles = new Set<string>([profile.role, ...(profile.extra_roles ?? [])]);
-  return { sb, userId: user.id, profile: { ...profile, extra_roles: profile.extra_roles ?? [] }, tenant, roles };
+  let customRole: CustomRole | null = null;
+  if (profile.custom_role_id) {
+    const { data: r } = await sb.from("tenant_roles").select("id,name,grants,deny_modules,deny_permissions").eq("id", profile.custom_role_id).maybeSingle();
+    customRole = r ?? null;
+  }
+  // Own role and extra roles, plus a custom role's grants, within the roles the platform allows this school.
+  const roles = effectiveRoles([profile.role, ...(profile.extra_roles ?? [])], customRole, tenant.allowed_roles ?? null);
+  return { sb, userId: user.id, profile: { ...profile, extra_roles: profile.extra_roles ?? [] }, tenant, roles, customRole };
 }
 
 /** The signed-in user's context, or null when signed out, not provisioned or blocked. */
@@ -121,20 +127,35 @@ export async function requireCtx(roles?: readonly string[], module?: ModuleKey):
   if ("error" in ctx) return NextResponse.json({ error: ctx.error, code: ctx.code }, { status: ctx.status });
   if (ctx.tenant.status !== "active") return jsonError(ctx.tenant.status === "paused" ? "this school is closed for now" : "this school account is suspended", 403);
   if (module && ctx.tenant.modules?.[module] === false) return jsonError(`the ${module} module is not enabled for this school`, 403);
+  if (module && moduleBlockedForUser(ctx.customRole, module)) return jsonError("your role in this school does not include this area", 403);
   if (roles && !hasAny(ctx, roles)) return jsonError("forbidden", 403);
   return ctx;
 }
 
-/** Platform (super) admins live outside every tenant; checked via a security-definer RPC. */
-export async function requirePlatformAdmin(): Promise<{ sb: any; userId: string } | NextResponse> {
+/** Whether the school has not taken this action away from the user's custom role. */
+export function can(ctx: Ctx, perm: Permission): boolean {
+  return permitted(ctx.customRole, perm);
+}
+
+/** For routes: a 403 response when the user's custom role does not allow the action, otherwise null. */
+export function denyUnless(ctx: Ctx, perm: Permission): NextResponse | null {
+  return can(ctx, perm) ? null : jsonError("your role in this school does not allow this action", 403);
+}
+
+/**
+ * Platform (super) admins live outside every tenant; checked via a security-definer RPC.
+ * `need`: support can look, admin can change, owner can also delete schools and manage platform admins.
+ */
+export async function requirePlatformAdmin(need: PlatformRole = "support"): Promise<{ sb: any; userId: string; role: PlatformRole } | NextResponse> {
   const store = beginRequest();
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return jsonError("unauthenticated", 401);
   store.actor = `user:${user.id}`;
-  const { data: ok } = await sb.rpc("is_platform_admin");
-  if (ok !== true) return jsonError("not found", 404); // don't reveal the console exists
-  return { sb, userId: user.id };
+  const { data: role } = await sb.rpc("platform_role");
+  if (!role) return jsonError("not found", 404); // don't reveal the console exists
+  if (!platformAtLeast(role, need)) return jsonError(need === "owner" ? "only the platform owner can do this" : "your platform role can only view", 403);
+  return { sb, userId: user.id, role };
 }
 
 export async function readJson<T = Record<string, unknown>>(req: Request): Promise<T> {

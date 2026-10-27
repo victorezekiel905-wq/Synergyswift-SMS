@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
+import { requireCtx, ROLES, readJson, jsonError, hasAny, denyUnless } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { computePay, workingDaysInMonth, leaveDaysInMonth, workedShare, DEFAULT_PAY_SETTINGS, NTA2025_BANDS, type PaySettings, type Band } from "@/lib/payroll";
 import { toCsv, appUrl } from "@/lib/school";
@@ -263,6 +263,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(await buildPayslips(sb, tid, run.id, run.period));
       }
       case "approve": case "mark_paid": {
+      { const denied = denyUnless(ctx, "payroll.run"); if (denied) return denied; }
         const next = b.action === "approve" ? { status: "approved", approved_by: ctx.userId, approved_at: new Date().toISOString() } : { status: "paid", paid_at: new Date().toISOString() };
         const { error } = await sb.from("payroll_runs").update(next).eq("tenant_id", tid).eq("id", b.run_id);
         if (error) return jsonError(error.message.replace(/^.*?: /, ""), 403);

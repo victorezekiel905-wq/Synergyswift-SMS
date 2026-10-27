@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
+import { requireCtx, ROLES, readJson, jsonError, denyUnless } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { generateInvoices, recordManualPayment, sendFeeReminders, financeSettings } from "@/lib/fees";
 import { appUrl, currentTerm, toCsv, studentName } from "@/lib/school";
@@ -132,6 +132,7 @@ export async function POST(req: NextRequest) {
         return error ? jsonError(error.message) : NextResponse.json({ ok: true });
       }
       case "void_invoice": {
+      { const denied = denyUnless(ctx, "fees.void"); if (denied) return denied; }
         const { count } = await sb.from("fee_payments").select("id", { count: "exact", head: true }).eq("invoice_id", b.invoice_id).eq("status", "success");
         if ((count ?? 0) > 0) return jsonError("reverse the payments on this invoice before voiding it");
         const { error } = await sb.from("fee_invoices").update({ status: "void", voided_at: new Date().toISOString(), notes: `Voided: ${b.reason}` }).eq("tenant_id", tid).eq("id", b.invoice_id);

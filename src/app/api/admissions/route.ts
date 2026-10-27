@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
+import { requireCtx, ROLES, readJson, jsonError, denyUnless } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { notifyApplicant, enrollApplication } from "@/lib/admissions";
 import { syncLeadFromApplication, brandAndPrincipal } from "@/lib/admissions-crm";
@@ -129,6 +129,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
       }
       case "offer": {
+      { const denied = denyUnless(ctx, "admissions.offer"); if (denied) return denied; }
         const { data: app } = await ctx.sb.from("applications").select("*").eq("tenant_id", tid).eq("id", b.id).maybeSingle();
         if (!app) return jsonError("application not found", 404);
         if (["enrolled", "accepted"].includes(app.status)) return jsonError(`this application is already ${app.status}`);

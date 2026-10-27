@@ -38,11 +38,12 @@ export async function GET(_req: NextRequest, props: { params: Promise<{ id: stri
 }
 
 const StaffRole = z.enum(STAFF_ROLE_OPTIONS);
+
 const Patch = z.object({
   name: z.string().trim().min(2).max(120).optional(),
   status: z.enum(["active", "paused", "suspended"]).optional(),
   status_message: z.string().trim().max(300).nullish(),
-  modules: z.record(z.boolean()).optional(),
+  allowed_roles: z.array(StaffRole).max(20).nullable().optional(),
   student_limit: z.number().int().positive().nullable().optional(),
   timezone: z.string().trim().max(60).optional(),
   country: z.string().trim().max(60).nullish(),
@@ -55,7 +56,7 @@ const Patch = z.object({
 
 export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const gate = await requirePlatformAdmin();
+  const gate = await requirePlatformAdmin("admin");
   if (gate instanceof NextResponse) return gate;
   const parsed = Patch.safeParse(await readJson(req));
   if (!parsed.success) return jsonError(parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "));
@@ -67,8 +68,8 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
   if (Object.keys(fields).length) {
     const row: Record<string, unknown> = { ...fields };
     if (row.contact_email === "") row.contact_email = null;
-    // A message only makes sense while the school is closed.
-    if (fields.status === "active") row.status_message = null;
+    // A message only makes sense while the school is closed; reopening by hand also lifts a billing hold.
+    if (fields.status === "active") { row.status_message = null; row.billing_hold = false; }
     const { error } = await svc.from("tenants").update(row).eq("id", params.id);
     if (error) return jsonError(error.message.includes("duplicate") ? "that web address is already used by another school" : error.message);
   }
@@ -120,7 +121,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
  */
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const gate = await requirePlatformAdmin();
+  const gate = await requirePlatformAdmin("owner");
   if (gate instanceof NextResponse) return gate;
   const body = await readJson<{ confirm_name?: string }>(req);
   const svc = createServiceClient();

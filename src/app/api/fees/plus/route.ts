@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
+import { requireCtx, ROLES, readJson, jsonError, hasAny, denyUnless } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { decideClaim, debtAging, studentStatement, paymentMethods } from "@/lib/fees-plus";
 import { splitInstallments, type Part } from "@/lib/fee-rules";
@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
       return error ? fail(error) : NextResponse.json({ ok: true, needs_approval: true });
     }
     case "approve_award": {
+    { const denied = denyUnless(ctx, "fees.discount"); if (denied) return denied; }
       const { data, error } = await sb.from("fee_awards").update({ approved_by: ctx.userId }).eq("tenant_id", tid).eq("id", b.id).select("id").maybeSingle();
       if (!error && data) await audit("fees.award_approved", { id: b.id });
       return error ? fail(error) : data ? NextResponse.json({ ok: true }) : jsonError("not found", 404);

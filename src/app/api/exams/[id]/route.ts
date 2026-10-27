@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
+import { requireCtx, ROLES, readJson, jsonError, denyUnless } from "@/lib/auth";
 import { validateQuestion, countBlanks, QUESTION_TYPES, type QuestionType } from "@/lib/exams/engine";
 import { TOOL_IDS } from "@/lib/exams/tools";
 import { randomToken } from "@/lib/crypto";
@@ -56,6 +56,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
   if (regenerate_code) fields.access_code = randomToken(3).toUpperCase();
 
   if (rest.status === "published") {
+    { const denied = denyUnless(ctx, "exams.publish"); if (denied) return denied; }
     const { data: qs } = await ctx.sb.from("exam_questions").select("type,prompt,points,data,answer").eq("exam_id", params.id);
     if (!qs?.length) return jsonError("add at least one question before publishing");
     const bad = qs.map((q: any, i: number) => ({ i, p: validateQuestion(q) })).filter((x: any) => x.p.length);

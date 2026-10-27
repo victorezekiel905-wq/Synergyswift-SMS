@@ -12,6 +12,7 @@ import { snapshotKpis } from "@/lib/portal-server";
 import { sendDueReports } from "@/lib/report-builder-server";
 import { deliverWebhooks } from "@/lib/open-api-server";
 import { appUrl } from "@/lib/school";
+import { runBilling } from "@/lib/saas-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -50,8 +51,10 @@ async function run(req: NextRequest) {
   const scheduledReports = await sendDueReports(svc, base).catch(() => 0);
   // Signed webhooks to other systems, with retries.
   const webhooks = await deliverWebhooks(svc).catch(() => null);
+  // Synergy Swift billing: renewals, overdue and paused schools, cancellations, module end dates.
+  const billing = await runBilling(svc).catch(() => null);
   const stats = await dispatchDue(svc, { budgetMs: 40_000, limit: 100, concurrency: 10 });
-  return NextResponse.json({ ok: true, ...stats, admissions_follow_ups: followUps, visit_reminders: reminders, tickets_escalated: escalated, campaigns_sent: campaigns, notices_sent: notices, safeguarding_escalated: safeguarding, late_exeat_returns: lateReturns, library_holds_ready: holds, late_trips: lateTrips, kpi_snapshots: kpiSnapshots, scheduled_reports: scheduledReports, webhooks });
+  return NextResponse.json({ ok: true, ...stats, admissions_follow_ups: followUps, visit_reminders: reminders, tickets_escalated: escalated, campaigns_sent: campaigns, notices_sent: notices, safeguarding_escalated: safeguarding, late_exeat_returns: lateReturns, library_holds_ready: holds, late_trips: lateTrips, kpi_snapshots: kpiSnapshots, scheduled_reports: scheduledReports, webhooks, billing });
 }
 
 export const GET = run;

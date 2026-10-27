@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requirePlatformAdmin, readJson, jsonError } from "@/lib/auth";
+import { requirePlatformAdmin, readJson, jsonError, STAFF_ROLE_OPTIONS } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DEFAULT_SCHEME } from "@/lib/grading";
 import { provisionUser } from "@/lib/provision";
 import { appUrl } from "@/lib/school";
+import { SubscriptionBody, OverrideBody } from "@/lib/saas-schemas";
+import { saveSubscription, refreshTenantModules } from "@/lib/saas-server";
 
 /** Super-admin: list every tenant with usage counts. Tenants never see this. */
 export async function GET() {
@@ -12,7 +14,7 @@ export async function GET() {
   if (gate instanceof NextResponse) return gate;
   const svc = createServiceClient();
   const { data: tenants, error } = await svc.from("tenants")
-    .select("id,name,slug,status,modules,contact_email,country,timezone,student_limit,created_at")
+    .select("id,name,slug,status,billing_hold,modules,contact_email,country,timezone,student_limit,created_at,subscriptions(status,period_end,cycle,plans(name,code))")
     .order("created_at", { ascending: false });
   if (error) return jsonError(error.message);
 
@@ -44,22 +46,29 @@ const CreateTenant = z.object({
   student_limit: z.number().int().positive().nullable().optional(),
   admin_name: z.string().trim().min(2).max(120),
   admin_email: z.string().trim().email(),
-  modules: z.record(z.boolean()).optional()
+  /** The plan the school has paid for; without it every module stays on (as for older schools). */
+  subscription: SubscriptionBody.optional(),
+  overrides: z.array(OverrideBody).max(60).default([]),
+  allowed_roles: z.array(z.enum(STAFF_ROLE_OPTIONS)).max(20).nullable().optional()
 });
 
-/** Super-admin: provision a school, its settings, a default grading scheme and its first admin. */
+/**
+ * Super-admin onboarding: the school, its settings, a default grading scheme,
+ * its first admin (invited by email), its plan and paid modules, any module
+ * overrides, and (optionally) its first invoice, in one step.
+ */
 export async function POST(req: NextRequest) {
-  const gate = await requirePlatformAdmin();
+  const gate = await requirePlatformAdmin("admin");
   if (gate instanceof NextResponse) return gate;
   const parsed = CreateTenant.safeParse(await readJson(req));
   if (!parsed.success) return jsonError(parsed.error.issues.map(i => i.message).join("; "));
   const b = parsed.data;
   const svc = createServiceClient();
+  let invoice: { number: string } | null = null;
 
   const { data: tenant, error } = await svc.from("tenants").insert({
     name: b.name, slug: b.slug, country: b.country ?? null, timezone: b.timezone,
-    contact_email: b.admin_email, student_limit: b.student_limit ?? null,
-    ...(b.modules ? { modules: b.modules } : {})
+    contact_email: b.admin_email, student_limit: b.student_limit ?? null, allowed_roles: b.allowed_roles ?? null
   }).select("id,name,slug").single();
   if (error) return jsonError(error.message.includes("duplicate") ? "that slug is already taken" : error.message);
 
@@ -77,12 +86,21 @@ export async function POST(req: NextRequest) {
       redirectTo: `${appUrl(req)}/auth/welcome?next=/school`, createdBy: gate.userId
     });
     await svc.from("staff").insert({ tenant_id: tenant.id, user_id: userId, staff_no: "ADMIN-001", full_name: b.admin_name, email: b.admin_email, position: "School administrator" });
+
+    const overrides = b.overrides.filter(o => o.mode !== "inherit");
+    if (overrides.length) {
+      const { error: oErr } = await svc.from("tenant_module_overrides").insert(overrides.map(o => ({ tenant_id: tenant.id, module: o.module, mode: o.mode, expires_at: o.expires_at ?? null, note: o.note ?? null, set_by: gate.userId })));
+      if (oErr) throw new Error(oErr.message);
+    }
+    if (b.subscription) invoice = (await saveSubscription(svc, tenant.id, b.subscription, gate.userId)).invoice;
+    else await refreshTenantModules(svc, tenant.id);
   } catch (e) {
     // Roll back the half-created tenant so the slug can be reused.
     await svc.from("tenants").delete().eq("id", tenant.id);
     return jsonError(`tenant not created: ${(e as Error).message}`);
   }
 
-  await svc.from("platform_audit_logs").insert({ actor_id: gate.userId, action: "tenant.created", tenant_id: tenant.id, meta: { slug: b.slug } });
-  return NextResponse.json(tenant, { status: 201 });
+  await svc.from("platform_audit_logs").insert({ actor_id: gate.userId, action: "tenant.created", tenant_id: tenant.id,
+    meta: { slug: b.slug, plan: b.subscription?.plan_code ?? null, overrides: b.overrides.length, invoice: invoice?.number ?? null } });
+  return NextResponse.json({ ...tenant, invoice }, { status: 201 });
 }

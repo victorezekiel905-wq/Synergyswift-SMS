@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useApi, send, Page, PageHeader, Alert, Empty, Field } from "@/components/ui";
+import PlatformNav from "@/components/platform/PlatformNav";
 
 type Data = { groups: { id: string; name: string; admins: { user_id: string; email: string }[]; schools: { id: string; name: string }[] }[]; tenants: { id: string; name: string; group_id: string | null }[] };
 
@@ -13,6 +14,7 @@ export default function PlatformGroups() {
   const act = async (body: Record<string, unknown>, ok: string) => { const r = await send("/api/platform/groups", body); setMsg({ ok: r.ok, text: r.ok ? ok + (r.data?.action_link ? ` Sign-in link: ${r.data.action_link}` : "") : r.error ?? "failed" }); if (r.ok) reload(); };
   return (
     <Page wide>
+      <PlatformNav />
       <Link href="/platform" className="text-sm text-brand-700 hover:underline">← Schools</Link>
       <PageHeader title="School groups" subtitle="Group branches owned by one proprietor. Group admins see their own schools side by side and nothing else; schools still cannot see each other." />
       {error && <Alert>{error}</Alert>}

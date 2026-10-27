@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCtx, ROLES, readJson, jsonError, STAFF_ROLE_OPTIONS } from "@/lib/auth";
+import { requireCtx, ROLES, readJson, jsonError, STAFF_ROLE_OPTIONS, denyUnless } from "@/lib/auth";
+import { ALWAYS_ALLOWED_ROLES } from "@/lib/saas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { provisionUser } from "@/lib/provision";
 import { appUrl } from "@/lib/school";
@@ -78,7 +79,12 @@ export async function POST(req: NextRequest) {
     return error ? jsonError(error.message) : NextResponse.json({ ok: true });
   }
 
+  { const denied = denyUnless(ctx, "staff.roles"); if (denied) return denied; }
   const extra = b.extra_roles.filter(r => r !== b.role);
+  // Only roles Synergy Swift allows this school.
+  const ceiling = ctx.tenant.allowed_roles;
+  const outside = ceiling ? [b.role, ...extra].filter(r => !ALWAYS_ALLOWED_ROLES.includes(r) && !ceiling.includes(r)) : [];
+  if (outside.length) return jsonError(`your school's plan does not include: ${outside.join(", ")}`);
   if (s.user_id) {
     if (s.user_id === ctx.userId) return jsonError("you cannot change your own roles");
     const { error } = await ctx.sb.from("users").update({ role: b.role, extra_roles: extra }).eq("tenant_id", tid).eq("id", s.user_id);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
+import { requireCtx, ROLES, readJson, jsonError, denyUnless } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { guardiansByStudent, rowsForGuardian, enqueue, tryDispatch, loadBrand, type OutboxRow, type Guardian } from "@/lib/messaging/outbox";
 import { broadcast } from "@/lib/messaging/templates";
@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
   const tid = ctx.tenant.id;
   const svc = createServiceClient();
 
+  if (b.action === "broadcast") { const denied = denyUnless(ctx, "messaging.broadcast"); if (denied) return denied; }
   if (b.action === "draft") {
     try { return NextResponse.json(await draftNotice({ instruction: b.instruction, schoolName: ctx.tenant.name, tone: b.tone })); }
     catch (e) { const m = assistErrorMessage(e); return jsonError(m.message, m.status); }

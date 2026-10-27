@@ -34,7 +34,7 @@ const Body = z.discriminatedUnion("action", [
 ]);
 
 export async function POST(req: NextRequest) {
-  const gate = await requirePlatformAdmin();
+  const gate = await requirePlatformAdmin("admin");
   if (gate instanceof NextResponse) return gate;
   const parsed = Body.safeParse(await readJson(req));
   if (!parsed.success) return jsonError(parsed.error.issues.map(i => i.message).join("; "));

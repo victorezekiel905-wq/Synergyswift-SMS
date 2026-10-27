@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
+import { requireCtx, ROLES, readJson, jsonError, denyUnless } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadQuestions, autoSubmitIfExpired } from "@/lib/exams/server";
 import { schemeFor } from "@/lib/school";
@@ -13,6 +13,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const params = await props.params;
   const ctx = await requireCtx(ROLES.staff, "exams");
   if (ctx instanceof NextResponse) return ctx;
+  { const denied = denyUnless(ctx, "exams.publish"); if (denied) return denied; }
   const { push_to_results = false, release = true } = await readJson<{ push_to_results?: boolean; release?: boolean }>(req);
   const { data: exam } = await ctx.sb.from("exams").select("*").eq("tenant_id", ctx.tenant.id).eq("id", params.id).maybeSingle();
   if (!exam) return jsonError("not found", 404);

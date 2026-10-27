@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules and super admin · 14c Synergy Swift name and navigation · 14d SwiftCipher learning module, games and classroom management · 14e entrance automation · 14f elections · 14g CRMs · 14h SEN engagement · 14i attendance, shifts and bus safety · 14j exam extras · 14k super admin centre · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation · 14d SwiftCipher learning module, games and classroom management · 14e entrance automation · 14f elections · 14g CRMs · 14h SEN engagement · 14i attendance, shifts and bus safety · 14j exam extras · 14k super admin centre · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -287,6 +287,23 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Tools in entrance tests | ✅ the same tools as the exam they use |
 | Speed | ✅ each tool loads only when opened, so the exam page stays small |
 
+## 14b. Plans, modules, super admin, privileges and billing (phase 14b, done)
+
+| Feature | Status |
+|---|---|
+| Module catalogue in six groups (Core, Learning, Exams, Money, Safety, Engagement) | ✅ 36 modules, including the coming SwiftCipher live lessons, classroom management, elections, SEN and AI |
+| Plans with module bundles and prices by school size | ✅ Essentials, Growth, Complete and Custom; yearly prices in naira for up to 100, 250, 500, 1,000 and 2,000 students; agreed prices above that; termly billing = a third of the year + 10%; add-on groups priced per size; discounts; all editable on **Plans & prices** |
+| Super admin module switches: PLAN / ON / OFF per school, with end dates | ✅ effective state shown and checked ("Saving will switch ON … / OFF …") before saving; expired switches fall back to the plan automatically (hourly job) and are recorded; enforced by every API through `requireCtx`, not just the menus |
+| Onboarding a school | ✅ five-step wizard: school and first admin (invited by email), plan and paid add-ons with the live price, module switches, staff roles the school may use, then one check before creating; the first invoice can go out at once |
+| Adding and removing modules after a school starts | ✅ by changing the plan or add-ons, by switches, or by answering the school's own request (schools ask from **Subscription & modules**; the platform team is emailed, accepts or declines on **Billing & requests**, and the school is emailed back) |
+| Create, suspend, pause, restart and delete schools | ✅ (delete is for the owner only; schools must be closed first and the name typed) |
+| Billing | ✅ numbered invoices (SS-2026-00001), renewal invoice and email 14 days before a period ends, overdue after the end, the school paused with a clear message after the grace period, reopened the moment payment is recorded, end-at-period-end cancellation, one-off invoices, cancelling unpaid invoices; schools see and print their invoices and the bank details. Card payment through Paystack for platform invoices 🔑 later |
+| Platform team: owner, admin, support | ✅ ekwuemevictor39@gmail.com is the owner automatically (now, or the moment that account is created) and cannot be removed or demoted; the owner adds admins (change and bill schools) and support (look only) by email |
+| Privileges per school set by the platform | ✅ the staff roles each school may use; roles outside it stop working and cannot be given |
+| Privileges inside a school set by its admins | ✅ **Roles & privileges**: custom roles that add standard roles, hide modules, and take away actions (publish results, publish/release exams, approve discounts, void payments, run payroll, withdraw students, change staff roles, send broadcasts, send admission offers), checked on the server; nobody can change their own role |
+| Schools never know other schools exist | ✅ as before; the new tables are readable only inside each school (and by school admins), the platform tables not at all |
+| Old billing stubs | ✅ removed: schools could previously write their own invoice rows |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -327,3 +344,5 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101005500_compliance_docs.sql` | 13f |
 | `20260101005600_esign.sql` | 13g |
 | `20260101005700_question_types_tools.sql` | 14a |
+| `20260101005800_saas_plans.sql` | 14b |
+| `20260101005900_function_hardening.sql` | security: who may call database functions |

@@ -4,18 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApi, send, Page, PageHeader, Badge, statusTone, Alert, Field, Tabs, Stat, Empty, fmtDate, Loading } from "@/components/ui";
 import { LANGUAGES } from "@/lib/languages";
-
-const MODULES: [string, string][] = [
-  ["lms", "LMS (lessons, live class, challenges)"], ["sims", "Student information"], ["results", "Results & report cards"],
-  ["exams", "Secure exams"], ["gate", "Sign in / out"], ["pickup", "Pickup codes"], ["library", "Library"],
-  ["requisitions", "Requisitions"], ["hr", "HR & leave"], ["qa", "Quality assurance"], ["messaging", "Email, WhatsApp & SMS broadcasts"],
-  ["inbox", "Parent-staff messaging"], ["fees", "Fees & online payments"], ["wallet", "Cashless wallet & tuck shop"],
-  ["payroll", "Payroll"], ["inventory", "Accounts, stock & assets"], ["admissions", "Admissions"],
-  ["attendance", "Class register"], ["behaviour", "Behaviour & houses"], ["homework", "Homework"], ["health", "Health & sick bay"],
-  ["events", "Events & consent"], ["meetings", "Parent meetings"], ["timetable", "Timetable"], ["cover", "Staff cover"], ["community", "Families & community"],
-  ["transport", "School buses & live tracking"], ["hostel", "Boarding & exeat"], ["visitors", "Visitors"],
-  ["lesson_notes", "Lesson notes"], ["analytics", "Early warning"]
-];
+import PlatformNav from "@/components/platform/PlatformNav";
+import { PlanTab, ModulesTab, RolesCeiling } from "@/components/platform/TenantPlan";
 
 const ROLE_LABELS: Record<string, string> = {
   school_admin: "School admin", principal: "Principal", teacher: "Teacher", it_admin: "IT admin", bursar: "Bursar", librarian: "Librarian",
@@ -24,7 +14,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 type Account = { id: string; email: string; full_name: string; role: string; extra_roles: string[] | null; active: boolean; created_at: string };
-type Tenant = { id: string; name: string; slug: string; status: string; status_message: string | null; modules: Record<string, boolean>; student_limit: number | null;
+type Tenant = { id: string; name: string; slug: string; status: string; status_message: string | null; billing_hold?: boolean; allowed_roles: string[] | null; modules: Record<string, boolean>; student_limit: number | null;
   timezone: string; country: string | null; contact_email: string | null; public_slug: string | null; created_at: string };
 type Detail = {
   tenant: Tenant; settings: Record<string, any>; admins: Account[]; staff: Account[];
@@ -32,12 +22,12 @@ type Detail = {
   delivery_7d: Record<string, number>;
   audit: { id: string; action: string; ts: string; meta: Record<string, unknown> }[];
 };
-type Tab = "overview" | "settings" | "staff" | "modules" | "history";
+type Tab = "overview" | "plan" | "modules" | "settings" | "staff" | "history";
 
 export default function TenantDetail(props: { params: Promise<{ id: string }> }) {
   const params = use(props.params);
   const { data, error, reload } = useApi<Detail>(`/api/platform/tenants/${params.id}`);
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>(() => (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("created") ? "plan" : "overview"));
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function patch(body: Record<string, unknown>, okText: string) {
@@ -46,24 +36,26 @@ export default function TenantDetail(props: { params: Promise<{ id: string }> })
     if (r.ok) reload();
     return r.ok;
   }
-  if (error) return <Page><Alert>{error}</Alert></Page>;
-  if (!data) return <Page><Loading /></Page>;
+  if (error) return <Page wide><PlatformNav /><Alert>{error}</Alert></Page>;
+  if (!data) return <Page wide><PlatformNav /><Loading /></Page>;
   const t = data.tenant;
 
   return (
     <Page wide>
+      <PlatformNav />
       <Link href="/platform" className="text-sm text-brand-700 hover:underline">← All schools</Link>
       <PageHeader title={t.name} subtitle={`${t.slug} · created ${fmtDate(t.created_at)} · ${t.timezone}`}
-        actions={<Badge tone={statusTone(t.status)}>{t.status === "active" ? "Active" : t.status === "paused" ? "Paused" : "Suspended"}</Badge>} />
+        actions={<Badge tone={statusTone(t.status)}>{t.status === "active" ? "Active" : t.billing_hold ? "Paused: unpaid bill" : t.status === "paused" ? "Paused" : "Suspended"}</Badge>} />
       {msg && <div className="mb-4"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
       <Tabs value={tab} onChange={setTab} tabs={[
-        { id: "overview", label: "Overview" }, { id: "settings", label: "Settings" },
-        { id: "staff", label: `Staff & admins (${data.staff.length})` }, { id: "modules", label: "Modules" }, { id: "history", label: "History" }
+        { id: "overview", label: "Overview" }, { id: "plan", label: "Plan & billing" }, { id: "modules", label: "Modules & roles" }, { id: "settings", label: "Settings" },
+        { id: "staff", label: `Staff & admins (${data.staff.length})` }, { id: "history", label: "History" }
       ]} />
       {tab === "overview" && <Overview data={data} patch={patch} />}
       {tab === "settings" && <Settings data={data} patch={patch} />}
       {tab === "staff" && <Staff data={data} patch={patch} />}
-      {tab === "modules" && <Modules t={t} patch={patch} />}
+      {tab === "plan" && <PlanTab tenantId={t.id} />}
+      {tab === "modules" && <div className="space-y-5"><ModulesTab tenantId={t.id} /><RolesCeiling allowed={t.allowed_roles ?? null} save={v => patch({ allowed_roles: v }, "Roles saved")} /></div>}
       {tab === "history" && <History data={data} />}
     </Page>
   );
@@ -296,23 +288,6 @@ function Staff({ data, patch }: { data: Detail; patch: Patch }) {
         <p className="mt-3 text-xs text-slate-500">Students and parents are managed by the school. A school always keeps at least one active admin.</p>
       </section>
     </div>
-  );
-}
-
-function Modules({ t, patch }: { t: Tenant; patch: Patch }) {
-  return (
-    <section className="card p-5">
-      <p className="mb-3 text-sm text-slate-600">Turned-off modules disappear from the school&apos;s menus and their features refuse requests.</p>
-      <div className="grid gap-2 md:grid-cols-2">
-        {MODULES.map(([k, label]) => (
-          <label key={k} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm">
-            <span>{label}</span>
-            <input type="checkbox" className="h-4 w-4" checked={t.modules?.[k] !== false}
-              onChange={e => patch({ modules: { ...t.modules, [k]: e.target.checked } }, `${label} ${e.target.checked ? "turned on" : "turned off"}`)} />
-          </label>
-        ))}
-      </div>
-    </section>
   );
 }
 

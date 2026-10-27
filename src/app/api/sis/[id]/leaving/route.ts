@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
+import { requireCtx, ROLES, readJson, jsonError, hasAny, denyUnless } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { clearanceFor, leaveSchool, recordMovement, reinstate } from "@/lib/sis-server";
 import { LEAVING_KINDS } from "@/lib/sis";
@@ -43,6 +43,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   try {
     switch (b.action) {
       case "leave": {
+        { const denied = denyUnless(ctx, "students.remove"); if (denied) return denied; }
         const r = await leaveSchool(ctx.sb, svc, { tenantId: tid, studentId: id, kind: b.kind, leftOn: b.left_on, reason: b.reason, destination: b.destination, notes: b.notes, actorId: ctx.userId, addToAlumni: b.add_to_alumni });
         await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "student.left", target: id, meta: { kind: b.kind } });
         return NextResponse.json(r);
