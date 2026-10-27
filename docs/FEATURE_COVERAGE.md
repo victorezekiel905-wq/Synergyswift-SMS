@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (done) · 14e entrance automation (done) · 14f elections (done) · 14g CRMs (done) · 14h SEN engagement (done) · 14i attendance, shifts and bus safety (done) · 14j exam extras · 14k super admin centre · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (done) · 14e entrance automation (done) · 14f elections (done) · 14g CRMs (done) · 14h SEN engagement (done) · 14i attendance, shifts and bus safety (done) · 14j exam extras (done) · 14k super admin centre · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -459,6 +459,17 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Live board | ✅ per session: candidates, checked in, started and submitted online papers, per hall with a progress bar, the candidates not yet in (by seat), refreshing every 20 seconds |
 | Invigilators: present, late, absent, cover | ✅ invigilators tap "I'm here"; those on leave or recorded absence show as absent, those not in the hall ten minutes before the start as late; admins find cover from staff free in that session (those signed in at the gate first), and the new invigilator is told at once; cover is recorded |
 
+## 14j. Exam extras: paper import, the exams office and exam requests (phase 14j, done)
+
+| Feature | Status |
+|---|---|
+| Import an existing paper | ✅ in an exam's Questions: "Import a paper (PDF, Word)" or paste the text; numbered questions, options on their own lines or inline (A. … B. …), "Answer: B" lines or an answer key at the end, Section B / Theory questions as essays, marks in brackets, True/False; every question is shown to check (missing answers and "see the diagram" flagged) before it is added; scanned papers have no text and must be typed |
+| Spoken answers, drawing, rating scales, read-aloud | ✅ already in place (14a): spoken-answer recording, drawing and constructions, rating scale, and the read-aloud tool |
+| Exam officer | ✅ a new staff role: runs the exam planner (halls, timetable, seating, invigilators), the check-in desk and live board, and decides exam requests; school admins can do the same |
+| Exams office page | ✅ papers being written now (writing, finished, locked, flagged for 3+ integrity warnings), papers in the next 14 days, scripts waiting to be marked, marked papers with results not released, today's check-in progress for a running exam period with a link to the live board, SEN access arrangements, waiting requests; refreshes every 30 seconds |
+| Exam requests | ✅ extra time, a late sitting (a window after the class has written it), a resit, or a special arrangement (reader, scribe, separate room…) for one candidate and one paper; asked for by staff (and, through the same rules, by a parent for their child or a student for themself); the exams office approves or declines with a reply and both sides are told |
+| Requests apply themselves | ✅ approved extra time is added when the candidate starts (or straight away if they are already writing); a late sitting lets them start inside its window and run the full time; a resit keeps the first attempt word for word in an archive and lets them start again |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -514,3 +525,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101006700_sen_engagement.sql` | 14h |
 | `20260101006800_staff_time.sql` | 14i-1 |
 | `20260101006900_bus_exam_safety.sql` | 14i-2 |
+| `20260101007000_exam_office.sql` | 14j |

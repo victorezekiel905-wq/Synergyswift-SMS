@@ -18,7 +18,7 @@ type Staff = {
 };
 type Tab = "overview" | "me" | "leave" | "time" | "development" | "staff" | "recruitment" | "checklists";
 
-const ROLE_OPTIONS = ["teacher", "school_admin", "principal", "it_admin", "bursar", "librarian", "hr_manager", "qa_officer", "gate_officer", "transport_officer", "hostel_warden", "nurse", "admissions_officer", "cashier", "counsellor"];
+const ROLE_OPTIONS = ["teacher", "school_admin", "principal", "it_admin", "bursar", "librarian", "hr_manager", "qa_officer", "gate_officer", "transport_officer", "hostel_warden", "nurse", "admissions_officer", "cashier", "counsellor", "exam_officer"];
 
 export default function HrPage() {
   const { data: me } = useApi<Me>("/api/me");

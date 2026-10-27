@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const { data: halls } = await ctx.sb.from("exam_halls").select("*").eq("tenant_id", tid).order("name");
   if (!seriesId) {
     const { data: series } = await ctx.sb.from("exam_series").select("id,name,starts_on,ends_on,status,term_id,created_at").eq("tenant_id", tid).order("starts_on", { ascending: false });
-    return NextResponse.json({ halls: halls ?? [], series: series ?? [], can_edit: hasAny(ctx, ROLES.admin) });
+    return NextResponse.json({ halls: halls ?? [], series: series ?? [], can_edit: hasAny(ctx, ROLES.examOffice) });
   }
   const { data: series } = await ctx.sb.from("exam_series").select("*").eq("tenant_id", tid).eq("id", seriesId).maybeSingle();
   if (!series) return jsonError("exam series not found", 404);
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     seats: (seats ?? []).map((s: any) => ({ paper_id: s.paper_id, hall_id: s.hall_id, student_id: s.student_id, row: s.row, col: s.col, label: s.label,
       name: s.students ? studentName(s.students) : "", admission_no: s.students?.admission_no ?? null, class_group_id: s.students?.class_group_id ?? null })),
     duties: (duties ?? []).map((d: any) => ({ ...d, name: d.users?.full_name ?? "", users: undefined })),
-    can_edit: hasAny(ctx, ROLES.admin)
+    can_edit: hasAny(ctx, ROLES.examOffice)
   });
 }
 
@@ -59,7 +59,7 @@ const Body = z.discriminatedUnion("action", [
 ]);
 
 export async function POST(req: NextRequest) {
-  const ctx = await requireCtx(ROLES.admin, "exams");
+  const ctx = await requireCtx(ROLES.examOffice, "exams");
   if (ctx instanceof NextResponse) return ctx;
   const parsed = Body.safeParse(await readJson(req));
   if (!parsed.success) return jsonError(parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "));

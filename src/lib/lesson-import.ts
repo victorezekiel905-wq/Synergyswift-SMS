@@ -281,3 +281,12 @@ function normalizeImportedSlides(slides: ImportedSlide[], fallbackTitle: string)
   }
   return normalized.slice(0, 80);
 }
+
+/** Plain text of an uploaded PDF, Word or text file (used by the exam paper import, phase 14j). */
+export async function extractDocumentText(bytes: Uint8Array, filename: string): Promise<string> {
+  const ext = filename.toLowerCase().split(".").pop() ?? "";
+  if (ext === "pdf") return parsePdf(bytes);
+  if (ext === "docx") return parseDocx(bytes);
+  if (ext === "txt" || ext === "md") return normalizeText(new TextDecoder().decode(bytes));
+  throw new Error("Upload a PDF, Word (.docx) or text file.");
+}

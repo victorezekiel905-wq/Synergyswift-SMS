@@ -25,7 +25,7 @@ async function slotData(svc: any, tid: string, seriesId: string, date: string, s
 }
 
 /** May this person run check-in for the slot? Admins, and the slot's invigilators. */
-const mayRun = (ctx: any, duties: any[]) => hasAny(ctx, ROLES.admin) || duties.some((d: any) => d.staff_user_id === ctx.userId);
+const mayRun = (ctx: any, duties: any[]) => hasAny(ctx, ROLES.examOffice) || duties.some((d: any) => d.staff_user_id === ctx.userId);
 
 /** GET ?series=&date=&session= : the live board for one session (any staff). */
 export async function GET(req: NextRequest) {
@@ -66,11 +66,11 @@ export async function GET(req: NextRequest) {
   });
   const busy = new Set<string>(d.duties.map((x: any) => x.staff_user_id));
   const staffRoles = new Set<string>(ROLES.staff);
-  const candidates = hasAny(ctx, ROLES.admin) ? coverCandidates((staffUsers ?? []).filter((x: any) => staffRoles.has(x.role)).map((x: any) => ({ id: x.id, name: x.full_name })), busy, away, atSchool).slice(0, 40) : [];
+  const candidates = hasAny(ctx, ROLES.examOffice) ? coverCandidates((staffUsers ?? []).filter((x: any) => staffRoles.has(x.role)).map((x: any) => ({ id: x.id, name: x.full_name })), busy, away, atSchool).slice(0, 40) : [];
   return NextResponse.json({
     series: { id: d.series.id, name: d.series.name, sessions, require_checkin: Boolean(d.series.require_checkin), starts_on: d.series.starts_on, ends_on: d.series.ends_on },
     date, session, times, papers: d.papers, halls, candidates,
-    can_run: mayRun(ctx, d.duties), is_admin: hasAny(ctx, ROLES.admin), me: ctx.userId,
+    can_run: mayRun(ctx, d.duties), is_admin: hasAny(ctx, ROLES.examOffice), me: ctx.userId,
     totals: { expected: halls.reduce((t, h) => t + h.expected, 0), checked_in: halls.reduce((t, h) => t + h.checked_in, 0), started: halls.reduce((t, h) => t + h.started, 0), submitted: halls.reduce((t, h) => t + h.submitted, 0) }
   });
 }
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
   const svc = createServiceClient();
   const d = await slotData(svc, tid, b.series_id, b.date, b.session);
   if (!d) return jsonError("not found", 404);
-  const admin = hasAny(ctx, ROLES.admin);
+  const admin = hasAny(ctx, ROLES.examOffice);
 
   if (b.action === "here") {
     const duty = d.duties.find((x: any) => x.id === b.invigilation_id);

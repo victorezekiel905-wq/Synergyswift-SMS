@@ -12,6 +12,7 @@ import {
 import { appUrl } from "@/lib/school";
 import { clientIp, ipAllowed } from "@/lib/net";
 import { extraMinutes } from "@/lib/sis";
+import { allowancesFor, archiveForResit } from "@/lib/exams/requests-server";
 import { examTools } from "@/lib/exams/tools";
 
 export const dynamic = "force-dynamic";
@@ -99,18 +100,24 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const { data: existing } = await svc.from("exam_attempts").select("*").eq("exam_id", exam.id).eq("student_user_id", ctx.userId).maybeSingle();
 
   if (b.action === "start") {
+    // Access arrangements: a student on the SEN register with extra time gets it automatically,
+    // and the exams office's approved requests (extra time, a late sitting, a resit) apply (phase 14j).
+    const { data: me } = await svc.from("students").select("id,sen_profiles(extra_time_pct,status)").eq("tenant_id", ctx.tenant.id).eq("user_id", ctx.userId).maybeSingle();
+    const allow = await allowancesFor(svc, ctx.tenant.id, exam.id, me?.id);
     if (existing) {
       const fresh = await autoSubmitIfExpired(svc, existing, questions);
-      if (fresh.status === "submitted" || fresh.status === "graded") return jsonError("you have already submitted this exam", 409);
-      await svc.from("exam_events").insert({ attempt_id: fresh.id, kind: "resumed", meta: { ua: req.headers.get("user-agent")?.slice(0, 200) } });
-      return NextResponse.json({ attempt: attemptPayload(exam, fresh, questions) });
+      if ((fresh.status === "submitted" || fresh.status === "graded") && !allow.resit) return jsonError("you have already submitted this exam", 409);
+      if (fresh.status === "submitted" || fresh.status === "graded") await archiveForResit(svc, fresh, allow.resit!.id);
+      else {
+        await svc.from("exam_events").insert({ attempt_id: fresh.id, kind: "resumed", meta: { ua: req.headers.get("user-agent")?.slice(0, 200) } });
+        return NextResponse.json({ attempt: attemptPayload(exam, fresh, questions) });
+      }
     }
-    if (windowState(exam) !== "open") return jsonError("this exam is not open right now", 403);
+    const lateSitting = windowState(exam) !== "open" && exam.status !== "draft" && allow.late;
+    if (windowState(exam) !== "open" && !lateSitting && !allow.resit) return jsonError("this exam is not open right now", 403);
     if (b.access_code.toUpperCase() !== String(exam.access_code).toUpperCase()) return jsonError("wrong exam code", 403);
     const layout = buildAttemptLayout(questions, { shuffleQuestions: Boolean(settings.shuffle_questions), shuffleOptions: settings.shuffle_options !== false, draw: settings.draw });
     const now = new Date();
-    // Access arrangements: a student on the SEN register with extra time gets it automatically.
-    const { data: me } = await svc.from("students").select("id,sen_profiles(extra_time_pct,status)").eq("tenant_id", ctx.tenant.id).eq("user_id", ctx.userId).maybeSingle();
     // Hall check-in (phase 14i): an exam period can require the candidate to be checked in at the hall first.
     const { data: papers } = await svc.from("exam_papers").select("id,exam_series(require_checkin)").eq("tenant_id", ctx.tenant.id).eq("exam_id", exam.id);
     const gated = (papers ?? []).filter((p: any) => p.exam_series?.require_checkin === true).map((p: any) => p.id);
@@ -119,15 +126,20 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       if (!inHall?.length) return jsonError("Check in at your exam hall first: show your ID card to the invigilator, then start.", 403);
     }
     const sen = (me as any)?.sen_profiles;
-    const extra = sen && sen.status !== "closed" ? extraMinutes(exam.duration_minutes, sen.extra_time_pct) : 0;
+    const extra = (sen && sen.status !== "closed" ? extraMinutes(exam.duration_minutes, sen.extra_time_pct) : 0) + allow.extra;
+    // A late sitting or a resit runs its full time, after the class window has closed.
+    const ownTime = Boolean(lateSitting || (allow.resit && windowState(exam) !== "open"));
+    const deadline = ownTime ? new Date(now.getTime() + (exam.duration_minutes + extra) * 60_000) : computeDeadline(exam, now, extra);
     const { data: attempt, error } = await svc.from("exam_attempts").insert({
       tenant_id: ctx.tenant.id, exam_id: exam.id, student_user_id: ctx.userId, started_at: now.toISOString(),
-      deadline_at: computeDeadline(exam, now, extra).toISOString(), question_order: layout.question_order, option_orders: layout.option_orders,
+      deadline_at: deadline.toISOString(), extra_minutes: extra, question_order: layout.question_order, option_orders: layout.option_orders,
       seb_verified: seb.ok && seb.level !== "none", client_ip: ip,
       user_agent: req.headers.get("user-agent")?.slice(0, 300) ?? null
     }).select("*").single();
     if (error) return jsonError(error.message.includes("duplicate") ? "exam already started on another device" : error.message, 409);
-    await svc.from("exam_events").insert({ attempt_id: attempt.id, kind: "started", meta: { seb: seb.level } });
+    await svc.from("exam_events").insert({ attempt_id: attempt.id, kind: "started", meta: { seb: seb.level, ...(allow.extra ? { extra_minutes: allow.extra } : {}), ...(lateSitting ? { late_sitting: true } : {}), ...(allow.resit ? { resit: true } : {}) } });
+    if (lateSitting) await svc.from("exam_requests").update({ used_at: now.toISOString() }).eq("id", allow.late!.id);
+    if (allow.resit && !existing) await svc.from("exam_requests").update({ used_at: now.toISOString() }).eq("id", allow.resit.id);
     return NextResponse.json({ attempt: attemptPayload(exam, attempt, questions) }, { status: 201 });
   }
 

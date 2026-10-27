@@ -7,7 +7,7 @@ export type NavLink = { href: string; label: string; roles: string[]; module?: s
 export type NavGroup = { id: string; title: string; links: NavLink[] };
 
 const STAFF = ["teacher", "school_admin", "it_admin", "platform_admin", "principal", "bursar", "librarian", "hr_manager", "qa_officer", "gate_officer",
-  "transport_officer", "hostel_warden", "nurse", "admissions_officer", "cashier", "counsellor"];
+  "transport_officer", "hostel_warden", "nurse", "admissions_officer", "cashier", "counsellor", "exam_officer"];
 const ADMIN = ["school_admin", "principal", "platform_admin"];
 const TEACH = ["teacher", "school_admin", "principal"];
 const FINANCE = ["bursar", ...ADMIN];
@@ -57,9 +57,10 @@ export const NAV: NavGroup[] = [
   ] },
   { id: "exams", title: "Exams & results", links: [
     { href: "/school/results", label: "Results & report cards", roles: ACADEMIC, module: "results" },
-    { href: "/exams", label: "Secure exams (CBT)", roles: TEACH, module: "exams" },
-    { href: "/exams/bank", label: "Question bank", roles: TEACH, module: "exams" },
-    { href: "/school/exam-planner", label: "Exam timetable & halls", roles: TEACH, module: "exams" },
+    { href: "/school/exams-office", label: "Exams office", roles: ["exam_officer", ...ADMIN], module: "exams", hint: "Live papers, marking, requests, arrangements" },
+    { href: "/exams", label: "Secure exams (CBT)", roles: [...TEACH, "exam_officer"], module: "exams" },
+    { href: "/exams/bank", label: "Question bank", roles: [...TEACH, "exam_officer"], module: "exams" },
+    { href: "/school/exam-planner", label: "Exam timetable & halls", roles: [...TEACH, "exam_officer"], module: "exams" },
     { href: "/school/insights", label: "Results analysis & returns", roles: [...TEACH, "qa_officer", "bursar", "admissions_officer"], module: "analytics" },
     { href: "/school/reports", label: "Report builder", roles: STAFF.filter(r => !["gate_officer", "cashier", "transport_officer", "nurse", "hostel_warden"].includes(r)) }
   ] },

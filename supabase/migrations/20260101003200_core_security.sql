@@ -24,7 +24,7 @@ alter table public.users add constraint users_role_check check (role in (
   'student','teacher','school_admin','it_admin','parent','platform_admin',
   'principal','bursar','librarian','hr_manager','qa_officer','gate_officer',
   'transport_officer','hostel_warden','nurse','admissions_officer','cashier',
-  'counsellor','alumni'
+  'counsellor','alumni','exam_officer'   -- exam_officer: phase 14j (kept here so the update file can be run again)
 ));
 create or replace function public.is_staff()
 returns boolean language sql stable security definer set search_path = public as $$

@@ -32,7 +32,7 @@ export const ROLES = {
   admin: ["school_admin", "principal", "platform_admin"],
   staff: ["teacher", "school_admin", "it_admin", "platform_admin", "principal", "bursar",
           "librarian", "hr_manager", "qa_officer", "gate_officer", "transport_officer",
-          "hostel_warden", "nurse", "admissions_officer", "cashier", "counsellor"],
+          "hostel_warden", "nurse", "admissions_officer", "cashier", "counsellor", "exam_officer"],
   sims: ["school_admin", "principal", "platform_admin", "it_admin"],
   gate: ["gate_officer", "school_admin", "principal", "platform_admin"],
   library: ["librarian", "school_admin", "principal", "platform_admin"],
@@ -48,12 +48,14 @@ export const ROLES = {
   admissions: ["admissions_officer", "school_admin", "principal", "platform_admin"],
   reviewer: ["school_admin", "principal", "qa_officer", "platform_admin"],
   till: ["cashier", "bursar", "school_admin", "principal", "platform_admin"],
-  cover: ["school_admin", "principal", "platform_admin"]
+  cover: ["school_admin", "principal", "platform_admin"],
+  /** The exams office: runs the planner, the hall board and exam requests (phase 14j). */
+  examOffice: ["exam_officer", "school_admin", "principal", "platform_admin"]
 } as const;
 
 /** Every assignable staff role, in the order shown in HR. */
 export const STAFF_ROLE_OPTIONS = ["teacher", "school_admin", "principal", "it_admin", "bursar", "librarian",
-  "hr_manager", "qa_officer", "gate_officer", "transport_officer", "hostel_warden", "nurse", "admissions_officer", "cashier", "counsellor"] as const;
+  "hr_manager", "qa_officer", "gate_officer", "transport_officer", "hostel_warden", "nurse", "admissions_officer", "cashier", "counsellor", "exam_officer"] as const;
 
 export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });

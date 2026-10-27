@@ -10,7 +10,7 @@ type Data = { roles: Role[]; staff: Staff[]; assignable_roles: string[]; modules
 const ROLE_LABELS: Record<string, string> = {
   school_admin: "School admin", principal: "Principal", teacher: "Teacher", it_admin: "IT admin", bursar: "Bursar", librarian: "Librarian",
   hr_manager: "HR manager", qa_officer: "QA officer", gate_officer: "Gate officer", transport_officer: "Transport officer",
-  hostel_warden: "Hostel warden", nurse: "Nurse", admissions_officer: "Admissions officer", cashier: "Cashier", counsellor: "Counsellor"
+  hostel_warden: "Hostel warden", nurse: "Nurse", admissions_officer: "Admissions officer", cashier: "Cashier", counsellor: "Counsellor", exam_officer: "Exam officer"
 };
 const blank: Omit<Role, "id"> & { id?: string } = { name: "", description: "", grants: [], deny_modules: [], deny_permissions: [] };
 

@@ -10,7 +10,7 @@ import { PlanTab, ModulesTab, RolesCeiling } from "@/components/platform/TenantP
 const ROLE_LABELS: Record<string, string> = {
   school_admin: "School admin", principal: "Principal", teacher: "Teacher", it_admin: "IT admin", bursar: "Bursar", librarian: "Librarian",
   hr_manager: "HR manager", qa_officer: "QA officer", gate_officer: "Gate officer", transport_officer: "Transport officer",
-  hostel_warden: "Hostel warden", nurse: "Nurse", admissions_officer: "Admissions officer", cashier: "Cashier", counsellor: "Counsellor"
+  hostel_warden: "Hostel warden", nurse: "Nurse", admissions_officer: "Admissions officer", cashier: "Cashier", counsellor: "Counsellor", exam_officer: "Exam officer"
 };
 
 type Account = { id: string; email: string; full_name: string; role: string; extra_roles: string[] | null; active: boolean; created_at: string };
