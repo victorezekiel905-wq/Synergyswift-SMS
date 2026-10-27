@@ -53,8 +53,20 @@ export default function SecurityPage() {
         <Section title="Change history" hint="How long the record of every create, edit and delete is kept.">
           <Retention days={s.audit_retention_days ?? 730} act={act} />
         </Section>
+        <SupportVisits />
       </div>
     </Page>
+  );
+}
+
+/** Every time Synergy Swift support opened your school (phase 14k): who, why and for how long. */
+function SupportVisits() {
+  const { data } = useApi<{ sessions: { id: string; started_by_name: string; reason: string; starts_at: string; expires_at: string; ended_at: string | null }[] }>("/api/school/support-sessions");
+  return (
+    <Section title="Synergy Swift support visits" hint="Our support team can only open your school for up to an hour at a time, with a reason, as a separate account named Synergy Swift support. Every visit is listed here and everything done is in the change history.">
+      {!data?.sessions.length ? <p className="text-sm text-slate-500">No support visits.</p> : <ul className="space-y-2 text-sm">{data.sessions.map(v => (
+        <li key={v.id}><b>{v.started_by_name}</b> · {fmtDate(v.starts_at, true)} to {fmtDate(v.ended_at ?? v.expires_at, true)}<span className="block text-slate-600">{v.reason}</span></li>))}</ul>}
+    </Section>
   );
 }
 

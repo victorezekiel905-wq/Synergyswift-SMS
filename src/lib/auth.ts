@@ -87,6 +87,9 @@ export async function resolveCtx(): Promise<Ctx | CtxError> {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { error: "unauthenticated", status: 401 };
   store.actor = `user:${user.id}`;
+  // Synergy Swift support access (phase 14k) works only until its session ends.
+  const supportUntil = (user.app_metadata as { support_until?: string } | undefined)?.support_until;
+  if (supportUntil && Date.parse(supportUntil) <= Date.now()) return { error: "This support session has ended.", status: 403, code: "support_ended" };
   const { data: { session } } = await sb.auth.getSession();
   const access = await checkAccess(user.id, session?.access_token ?? null);
   if (!access.ok) return { error: access.message, status: 403, code: "access_restricted" };

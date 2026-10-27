@@ -4,7 +4,7 @@ Progress against the full school-platform specification (23 sections). Updated a
 
 **Key:** ✅ built · 🟡 partly built (what is missing is noted) · ⬜ not built yet · 🔑 code built, needs your account or keys to switch on
 
-Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (done) · 14e entrance automation (done) · 14f elections (done) · 14g CRMs (done) · 14h SEN engagement (done) · 14i attendance, shifts and bus safety (done) · 14j exam extras (done) · 14k super admin centre · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
+Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) · **3** parent and community CRM (done) · **4** core platform and security (done) · **5** SIS (done) · **6** learning management (done) · **7** attendance, timetable, calendar (done) · **8** communication (done) · **9** finance (done) · **10** HR and payroll (done) · **11** welfare, boarding, transport, library, inventory, co-curricular (done) · **12** portals and apps · **13** analytics, integrations, compliance · **14** Synergy Swift master requirements (October 2026): 14a exam question types and subject tools (done) · 14b plans, modules, super admin, privileges and billing (done) · 14c Synergy Swift name and navigation (done) · 14d SwiftCipher learning module, games and classroom management (done) · 14e entrance automation (done) · 14f elections (done) · 14g CRMs (done) · 14h SEN engagement (done) · 14i attendance, shifts and bus safety (done) · 14j exam extras (done) · 14k super admin centre (done) · 14l result PINs and group reports · 14m 20,000-user test · 14n proposal and MoU · 14o portfolios and transcripts.
 
 ## 7. Assessment and examinations (phase 1, done)
 
@@ -470,6 +470,16 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Exam requests | ✅ extra time, a late sitting (a window after the class has written it), a resit, or a special arrangement (reader, scribe, separate room…) for one candidate and one paper; asked for by staff (and, through the same rules, by a parent for their child or a student for themself); the exams office approves or declines with a reply and both sides are told |
 | Requests apply themselves | ✅ approved extra time is added when the candidate starts (or straight away if they are already writing); a late sitting lets them start inside its window and run the full time; a resit keeps the first attempt word for word in an archive and lets them start again |
 
+## 14k. Super admin centre (phase 14k, done)
+
+| Feature | Status |
+|---|---|
+| Revenue | ✅ Platform → Overview: monthly recurring revenue and the annual run rate from every paying school's subscription (plan, size band, add-ons, agreed price and discount, priced exactly like its invoices), cash collected in 30 days and 12 months, overdue value, new and lost revenue in the last 30 days, revenue renewing in 60 days, trials and what they are worth, revenue by plan |
+| Module adoption | ✅ for each module: how many active schools have it switched on, and how many actually used it in the last 30 days (something recorded in it); the gap shows schools paying for something they do not use |
+| System health | ✅ when the scheduler last ran (it records a heartbeat every minute), messages waiting and the oldest, failed messages and webhooks in 24 hours, database size, accounts, schools by status; plain-word warnings when something needs a look |
+| School activity | ✅ students, staff and the share of staff who signed in this month; the most active schools and the quietest (possible churn), with last activity |
+| Support access instead of impersonation | ✅ a platform admin (admin or owner) opens one school for 15, 30 or 60 minutes, with a reason, as a separate account named "Synergy Swift support (their name)" acting as a school admin, teacher, bursar, HR manager or exam officer; a one-time link is opened in a private window; everything it does is in the school's change history under that name; the school's admins see every visit and its reason under Security & sign-in; the database stops honouring the account the moment the time is up (and the scheduler closes it and bans its sign-in); "End now" closes it early; both the platform and the school audit logs record it |
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -526,3 +536,4 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101006800_staff_time.sql` | 14i-1 |
 | `20260101006900_bus_exam_safety.sql` | 14i-2 |
 | `20260101007000_exam_office.sql` | 14j |
+| `20260101007100_platform_centre.sql` | 14k |
