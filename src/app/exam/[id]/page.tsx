@@ -2,13 +2,14 @@
 import { useCallback, useEffect, useRef, useState, use } from "react";
 import Link from "next/link";
 import QuestionView, { type PublicQuestion } from "@/components/exams/QuestionView";
-import Calculator from "@/components/exams/Calculator";
+import ExamTools from "@/components/exams/tools/ExamTools";
+import type { ToolId } from "@/lib/exams/tools";
 import WebcamProctor, { requestCamera } from "@/components/exams/WebcamProctor";
 
 type ExamInfo = {
   id: string; title: string; instructions: string | null; duration_minutes: number; opens_at: string | null; closes_at: string | null;
   window: "not_open" | "open" | "closed"; require_seb: boolean; seb_config_url: string; seb_launch_url: string;
-  require_fullscreen: boolean; block_copy_paste: boolean; violation_limit: number; allow_spellcheck: boolean; allow_calculator: boolean;
+  require_fullscreen: boolean; block_copy_paste: boolean; violation_limit: number; allow_spellcheck: boolean; tools: ToolId[]; reference_text: string | null;
   webcam_snapshots: boolean; snapshot_interval_sec: number; network_restricted: boolean;
 };
 type AttemptState = { id: string; status: string; started_at: string; deadline_at: string; violations: number; server_now: string; answers: Record<string, any>; questions: PublicQuestion[] };
@@ -41,7 +42,6 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
   const [violations, setViolations] = useState(0);
   const [warning, setWarning] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number>(0);
-  const [calc, setCalc] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [isFs, setIsFs] = useState(true);
   const [camera, setCamera] = useState<MediaStream | null>(null);
@@ -294,7 +294,8 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
         </span>
         <div className="ml-auto flex items-center gap-3">
           {violations > 0 && <span className="rounded bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700">Violations {violations}/{exam.violation_limit}</span>}
-          {exam.allow_calculator && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setCalc(c => !c)}>Calculator</button>}
+          <ExamTools tools={exam.tools ?? []} referenceText={exam.reference_text} storageKey={`exam-rough-${attempt.id}`}
+            getQuestionText={() => questionText(attempt.questions[current])} />
           <span className={"rounded-lg px-3 py-1 font-mono text-lg font-bold tabular-nums " + (remaining < 5 * 60000 ? "bg-rose-600 text-white" : "bg-slate-900 text-white")} aria-label="Time remaining">
             {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
           </span>
@@ -347,7 +348,6 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
         </main>
       </div>
 
-      {calc && <Calculator onClose={() => setCalc(false)} />}
       {exam.webcam_snapshots && (status === "in_progress" || status === "locked") && <WebcamProctor examId={id} intervalSec={exam.snapshot_interval_sec} initialStream={camera} onEvent={report} />}
 
       {confirmSubmit && (
@@ -380,6 +380,15 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
       )}
     </div>
   );
+}
+
+/** Words for the read-aloud tool: the question and any visible choices. */
+function questionText(q: PublicQuestion | undefined): string {
+  if (!q) return "";
+  const d = q.data ?? {};
+  const opts = (d.options ?? d.right ?? []).map((o: { text: string }, i: number) => `${String.fromCharCode(65 + i)}. ${o.text}`);
+  const rows = (d.rows ?? []).map((r: { text: string }) => r.text);
+  return [q.prompt, d.text, ...rows, ...opts].filter(Boolean).join(". ");
 }
 
 function Shell({ title, children }: { title?: string; children: React.ReactNode }) {

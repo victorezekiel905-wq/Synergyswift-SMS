@@ -12,6 +12,7 @@ import {
 import { appUrl } from "@/lib/school";
 import { clientIp, ipAllowed } from "@/lib/net";
 import { extraMinutes } from "@/lib/sis";
+import { examTools } from "@/lib/exams/tools";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,8 @@ function publicExam(exam: ExamRow, req: NextRequest) {
     opens_at: exam.opens_at, closes_at: exam.closes_at, window: windowState(exam),
     require_seb: Boolean(s.require_seb), seb_config_url: cfg, seb_launch_url: sebLaunchUrl(cfg),
     require_fullscreen: s.require_fullscreen !== false, block_copy_paste: s.block_copy_paste !== false,
-    violation_limit: s.violation_limit ?? 3, allow_spellcheck: Boolean(s.allow_spellcheck), allow_calculator: Boolean(s.allow_calculator),
+    violation_limit: s.violation_limit ?? 3, allow_spellcheck: Boolean(s.allow_spellcheck), tools: examTools(s),
+    reference_text: examTools(s).includes("reference_sheet") ? (s.reference_text ?? null) : null,
     webcam_snapshots: Boolean(s.webcam_snapshots), snapshot_interval_sec: Math.min(600, Math.max(15, Number(s.snapshot_interval_sec ?? 60))),
     network_restricted: Boolean((s.allowed_ips ?? []).length)
   };

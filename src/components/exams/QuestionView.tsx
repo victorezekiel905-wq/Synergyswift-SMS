@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { MatrixInput, HighlightInput, LabelImageInput, GraphPlotInput, ChemEquationInput, RatingInput, DrawingPad, AudioAnswer } from "./QuestionTypes";
 
 export type PublicQuestion = {
   id: string; type: string; prompt: string; points: number; media_url: string | null; section: string | null;
@@ -14,20 +15,26 @@ type Props = {
   spellcheck?: boolean;
   onUpload?: (file: File) => Promise<void>;
   onRunCode?: (code: string) => Promise<{ passed: boolean | null; output: string | null; expected: string | null; error: string | null }[]>;
+  /** Where a teacher can play a recorded answer (marking view). */
+  audioUrl?: string | null;
 };
 
 const wc = (s: string) => String(s ?? "").trim().split(/\s+/).filter(Boolean).length;
 
 /** Renders one question for answering (or read-only when disabled). */
-export default function QuestionView({ q, value, onChange, disabled, spellcheck, onUpload, onRunCode }: Props) {
+export default function QuestionView({ q, value, onChange, disabled, spellcheck, onUpload, onRunCode, audioUrl }: Props) {
   const d = q.data ?? {};
   return (
     <div>
       <p className="whitespace-pre-wrap text-base leading-relaxed text-slate-900">{q.prompt}</p>
-      {q.media_url && q.type !== "hotspot" && (
+      {q.media_url && q.type !== "hotspot" && q.type !== "label_image" && (/\.(mp3|m4a|wav|ogg|oga|webm)(\?|$)/i.test(q.media_url)
+        ? <audio controls src={q.media_url} className="mt-3 w-full max-w-md" />
+        : /\.(mp4|mov|m4v)(\?|$)/i.test(q.media_url)
+          ? <video controls src={q.media_url} className="mt-3 max-h-80 max-w-full rounded" />
+          : (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={q.media_url} alt="" className="mt-3 max-h-80 max-w-full rounded border border-slate-200" />
-      )}
+      ))}
       <div className="mt-4">
         {q.type === "mcq_single" && (
           <div className="space-y-2" role="radiogroup">
@@ -69,7 +76,7 @@ export default function QuestionView({ q, value, onChange, disabled, spellcheck,
         )}
         {q.type === "numeric" && (
           <div className="flex items-center gap-2">
-            <input className="input max-w-[220px]" inputMode="decimal" value={value ?? ""} disabled={disabled} autoComplete="off" onChange={e => onChange(e.target.value)} aria-label="Your answer" />
+            <input className="input max-w-[220px]" value={value ?? ""} disabled={disabled} autoComplete="off" onChange={e => onChange(e.target.value)} aria-label="Your answer" placeholder="e.g. 9.81 or 6.02 × 10^23" />
             {d.unit && <span className="text-slate-600">{d.unit}</span>}
           </div>
         )}
@@ -114,6 +121,15 @@ export default function QuestionView({ q, value, onChange, disabled, spellcheck,
         )}
         {q.type === "code" && <CodeExtras examples={d.examples ?? []} code={value ?? d.starter ?? ""} onRun={disabled ? undefined : onRunCode} />}
         {q.type === "file_upload" && <Upload accept={d.accept} maxMb={d.max_mb} value={value} disabled={disabled} onUpload={onUpload} />}
+        {q.type === "matrix" && <MatrixInput rows={d.rows ?? []} cols={d.cols ?? []} value={value ?? {}} onChange={onChange} disabled={disabled} />}
+        {q.type === "highlight" && <HighlightInput text={d.text ?? ""} instruction={d.instruction} value={Array.isArray(value) ? value : []} onChange={onChange} disabled={disabled} />}
+        {q.type === "label_image" && <LabelImageInput image={d.image_url ?? q.media_url} pins={d.pins ?? []} labels={d.labels ?? []} value={value ?? {}} onChange={onChange} disabled={disabled} />}
+        {q.type === "graph_plot" && <GraphPlotInput d={{ x_min: Number(d.x_min ?? -10), x_max: Number(d.x_max ?? 10), y_min: Number(d.y_min ?? -10), y_max: Number(d.y_max ?? 10), step: Number(d.step ?? 1), snap: d.snap !== false, join: Boolean(d.join), x_label: d.x_label ?? "x", y_label: d.y_label ?? "y", count: d.count }} value={Array.isArray(value) ? value : []} onChange={onChange} disabled={disabled} />}
+        {q.type === "chem_equation" && <ChemEquationInput value={value ?? ""} onChange={onChange} disabled={disabled} hint={d.hint} />}
+        {q.type === "rating" && <RatingInput min={Number(d.min ?? 1)} max={Number(d.max ?? 5)} minLabel={d.min_label} maxLabel={d.max_label} value={typeof value === "number" ? value : null} onChange={onChange} disabled={disabled} />}
+        {q.type === "passage" && !disabled && <p className="text-xs text-slate-500">Read this, then go on to the questions about it. Nothing to answer here.</p>}
+        {q.type === "drawing" && <DrawingPad value={value ?? null} onChange={onChange} disabled={disabled} grid={d.grid} background={d.background_url} />}
+        {q.type === "audio_response" && <AudioAnswer maxSeconds={Number(d.max_seconds ?? 120)} value={value ?? null} disabled={disabled} onUpload={onUpload} playUrl={audioUrl} />}
       </div>
     </div>
   );

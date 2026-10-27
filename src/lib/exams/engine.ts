@@ -7,6 +7,9 @@
  */
 import { secureShuffle } from "../crypto";
 import { equivalent, isValidExpression } from "./math";
+import { compareEquations, parseEquation, isBalanced } from "./chem";
+import { passageWords } from "./words";
+export { passageWords };
 
 export const QUESTION_TYPES = [
   { type: "mcq_single", label: "Multiple choice (one answer)", auto: true },
@@ -20,8 +23,17 @@ export const QUESTION_TYPES = [
   { type: "hotspot", label: "Hotspot (click on image)", auto: true },
   { type: "math", label: "Maths input (equivalent answers accepted)", auto: true },
   { type: "drag_drop", label: "Drag and drop into groups", auto: true },
+  { type: "matrix", label: "Grid (several statements, same choices)", auto: true },
+  { type: "highlight", label: "Select words in a passage", auto: true },
+  { type: "label_image", label: "Label the diagram", auto: true },
+  { type: "graph_plot", label: "Plot points on a graph", auto: true },
+  { type: "chem_equation", label: "Chemical equation", auto: true },
+  { type: "rating", label: "Rating scale", auto: true },
+  { type: "passage", label: "Reading passage or case study (no answer)", auto: true },
   { type: "essay", label: "Essay / long answer", auto: false },
   { type: "code", label: "Code answer", auto: false },
+  { type: "drawing", label: "Drawing or geometric construction", auto: false },
+  { type: "audio_response", label: "Spoken answer (recording)", auto: false },
   { type: "file_upload", label: "File upload", auto: false }
 ] as const;
 
@@ -52,6 +64,23 @@ export function isAutoMarked(type: QuestionType): boolean {
   return QUESTION_TYPES.find(q => q.type === type)?.auto ?? false;
 }
 
+
+/**
+ * Reads a typed number: "1,250", "9.8 m/s", "6.02e23", "6.02 × 10^23", "6.02x10^-3".
+ * Returns the value and its significant figures (trailing zeros of a whole number do not count).
+ */
+export function readNumber(input: unknown): { value: number; sigFigs: number } | null {
+  const s = String(input ?? "").trim().replace(/,/g, "").replace(/−/g, "-").replace(/\s+/g, " ");
+  const m = /^([+-]?(?:\d+\.?\d*|\.\d+))(?:\s*(?:[eE]|[x×*]\s*10\s*\^?\s*)([+-]?\d+))?/.exec(s);
+  if (!m) return null;
+  const mant = m[1].replace(/^[+-]/, "");
+  const value = Number(`${m[1]}e${m[2] ?? 0}`);
+  if (!Number.isFinite(value)) return null;
+  let digits = mant.replace(".", "").replace(/^0+/, "");
+  if (!mant.includes(".")) digits = digits.replace(/0+$/, "");
+  return { value, sigFigs: Math.max(1, digits.length) };
+}
+
 /** Number of blanks in a fill-in-the-blanks passage, written as [[1]], [[2]] … or [[ ]] */
 export function countBlanks(text: string): number {
   return (String(text ?? "").match(/\[\[[^\]]*\]\]/g) ?? []).length;
@@ -75,6 +104,9 @@ export function buildAttemptLayout(questions: Question[], opts: { shuffleQuestio
     }
     if (q.type === "drag_drop") {
       option_orders[q.id] = secureShuffle((q.data.items ?? []).map((o: Option) => o.id));
+    }
+    if (q.type === "label_image") {
+      option_orders[q.id] = secureShuffle((q.data.labels ?? []).map((o: Option) => o.id));
     }
     if (q.type === "ordering") {
       const items: string[] = (q.data.items ?? []).map((o: Option) => o.id);
@@ -164,6 +196,24 @@ export function toPublicQuestion(q: Question, optionOrder?: string[]) {
     }
     case "file_upload":
       return { ...base, data: { accept: d.accept ?? ".pdf,.jpg,.jpeg,.png,.docx", max_mb: d.max_mb ?? 10 } };
+    case "matrix":
+      return { ...base, data: { rows: d.rows ?? [], cols: d.cols ?? [] } };
+    case "highlight":
+      return { ...base, data: { text: d.text ?? "", instruction: d.instruction ?? null } };
+    case "label_image":
+      return { ...base, data: { image_url: d.image_url ?? q.media_url ?? null, pins: d.pins ?? [], labels: reorder(d.labels ?? [], optionOrder) } };
+    case "graph_plot":
+      return { ...base, data: { x_min: d.x_min ?? -10, x_max: d.x_max ?? 10, y_min: d.y_min ?? -10, y_max: d.y_max ?? 10, step: d.step ?? 1, snap: d.snap !== false, join: Boolean(d.join), x_label: d.x_label ?? "x", y_label: d.y_label ?? "y", count: (q.answer?.points ?? []).length } };
+    case "chem_equation":
+      return { ...base, data: { hint: d.hint ?? null } };
+    case "rating":
+      return { ...base, data: { min: d.min ?? 1, max: d.max ?? 5, min_label: d.min_label ?? null, max_label: d.max_label ?? null } };
+    case "passage":
+      return { ...base, points: 0, data: {} };
+    case "drawing":
+      return { ...base, data: { grid: d.grid ?? "square", background_url: d.background_url ?? null } };
+    case "audio_response":
+      return { ...base, data: { max_seconds: Math.min(600, Math.max(10, Number(d.max_seconds ?? 120))) } };
   }
 }
 
@@ -173,7 +223,7 @@ function clampPoints(p: number, max: number) {
 
 /** Marks one question. `points: null` means it needs a teacher. */
 export function markQuestion(q: Question, response: unknown): Mark {
-  const max = Number(q.points);
+  const max = q.type === "passage" ? 0 : Number(q.points);
   const a = q.answer ?? {};
   const empty = response === undefined || response === null || response === "" ||
     (Array.isArray(response) && response.length === 0);
@@ -210,10 +260,17 @@ export function markQuestion(q: Question, response: unknown): Mark {
     }
 
     case "numeric": {
-      const r = Number(String(response).replace(/,/g, "").trim());
-      if (!Number.isFinite(r)) return { points: 0, max, auto: true };
-      const tol = Math.abs(Number(a.tolerance ?? 0));
-      return { points: Math.abs(r - Number(a.value)) <= tol + 1e-9 ? max : 0, max, auto: true };
+      const r = readNumber(response);
+      if (!r) return { points: 0, max, auto: true };
+      const target = Number(a.value);
+      // Tolerance is ± an amount, or ± a percentage of the correct value (whichever the teacher set; the larger wins).
+      const tol = Math.max(Math.abs(Number(a.tolerance ?? 0)), Math.abs(target) * Math.abs(Number(a.tolerance_pct ?? 0)) / 100);
+      const scale = Math.max(1, Math.abs(target));
+      if (Math.abs(r.value - target) > tol + 1e-9 * scale) return { points: 0, max, auto: true };
+      // Right value but the wrong number of significant figures earns half marks.
+      const sf = Number(a.sig_figs ?? 0);
+      if (sf > 0 && r.sigFigs !== sf) return { points: clampPoints(max / 2, max), max, auto: true, feedback: `Give the answer to ${sf} significant figures.` };
+      return { points: max, max, auto: true };
     }
 
     case "fill_blanks": {
@@ -268,6 +325,72 @@ export function markQuestion(q: Question, response: unknown): Mark {
       if (a.partial === false) return { points: ok === items.length ? max : 0, max, auto: true };
       return { points: clampPoints((ok / items.length) * max, max), max, auto: true };
     }
+
+    case "matrix":
+    case "label_image": {
+      const key: Record<string, string> = (q.type === "matrix" ? a.correct : a.placement) ?? {};
+      const rows = Object.keys(key);
+      if (!rows.length) return { points: 0, max, auto: true };
+      const r = (response ?? {}) as Record<string, string>;
+      const ok = rows.filter(k => r[k] === key[k]).length;
+      if (a.partial === false) return { points: ok === rows.length ? max : 0, max, auto: true };
+      return { points: clampPoints((ok / rows.length) * max, max), max, auto: true };
+    }
+
+    case "highlight": {
+      const correct = new Set<number>((a.correct ?? []).map(Number));
+      if (!correct.size) return { points: 0, max, auto: true };
+      const chosen = new Set<number>((Array.isArray(response) ? response : []).map(Number));
+      let right = 0, wrong = 0;
+      chosen.forEach(c => (correct.has(c) ? right++ : wrong++));
+      if (a.partial === false) return { points: right === correct.size && !wrong ? max : 0, max, auto: true };
+      return { points: clampPoints(((right - wrong) / correct.size) * max, max), max, auto: true };
+    }
+
+    case "graph_plot": {
+      const expected: { x: number; y: number }[] = a.points ?? [];
+      if (!expected.length) return { points: 0, max, auto: true };
+      const given = (Array.isArray(response) ? response : []).map((p: any) => ({ x: Number(p?.x), y: Number(p?.y) })).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+      const tol = Math.abs(Number(a.tolerance ?? 0));
+      // Each expected point can be matched by one plotted point; extra points cancel matched ones.
+      const used = new Set<number>();
+      let matched = 0;
+      for (const e of expected) {
+        const k = given.findIndex((g, i) => !used.has(i) && Math.abs(g.x - e.x) <= tol + 1e-9 && Math.abs(g.y - e.y) <= tol + 1e-9);
+        if (k >= 0) { used.add(k); matched++; }
+      }
+      const extra = given.length - used.size;
+      if (a.partial === false) return { points: matched === expected.length && !extra ? max : 0, max, auto: true };
+      return { points: clampPoints(((matched - extra) / expected.length) * max, max), max, auto: true };
+    }
+
+    case "chem_equation": {
+      const keys: string[] = [a.equation, ...(a.alternatives ?? [])].filter(Boolean);
+      let best = 0;
+      let feedback: string | undefined;
+      for (const k of keys) {
+        let c;
+        try { c = compareEquations(String(response), k, { states: Boolean(a.states), acceptMultiples: Boolean(a.accept_multiples) }); } catch { continue; }
+        if (c.species && c.coefficients) { best = max; feedback = undefined; break; }
+        // Right substances, wrong numbers: the teacher's share of the marks (half by default).
+        if (c.species) {
+          const share = a.species_credit === undefined ? 0.5 : Math.max(0, Math.min(1, Number(a.species_credit)));
+          if (share * max > best) { best = share * max; feedback = "Correct substances, but the equation is not balanced as required."; }
+        }
+      }
+      return { points: clampPoints(best, max), max, auto: true, ...(feedback ? { feedback } : {}) };
+    }
+
+    case "rating": {
+      const v = Number(response);
+      if (!Number.isFinite(v)) return { points: 0, max, auto: true };
+      // No correct value: any answer earns the marks (an opinion or self-rating).
+      if (a.correct === undefined || a.correct === null || a.correct === "") return { points: max, max, auto: true };
+      return { points: v === Number(a.correct) ? max : 0, max, auto: true };
+    }
+
+    case "passage":
+      return { points: 0, max: 0, auto: true };
   }
   return { points: null, max, auto: false };
 }
@@ -354,6 +477,56 @@ export function validateQuestion(q: Pick<Question, "type" | "prompt" | "points" 
       if (items.some(i => !zones.some(z => z.id === a.placement?.[i.id]))) p.push("Put every item in its correct group.");
       break;
     }
+    case "matrix": {
+      const rows: Option[] = d.rows ?? [], cols: Option[] = d.cols ?? [];
+      if (rows.length < 1) p.push("Add at least one statement.");
+      if (cols.length < 2) p.push("Add at least two choices.");
+      if (rows.some(r => !cols.some(c => c.id === a.correct?.[r.id]))) p.push("Choose the correct answer for every statement.");
+      break;
+    }
+    case "highlight": {
+      const n = passageWords(d.text ?? "").length;
+      if (!n) p.push("Enter the passage.");
+      if (!(a.correct ?? []).length) p.push("Click the words students should select.");
+      if ((a.correct ?? []).some((i: number) => i < 0 || i >= n)) p.push("The passage changed; select the correct words again.");
+      break;
+    }
+    case "label_image": {
+      const pins: Option[] = d.pins ?? [], labels: Option[] = d.labels ?? [];
+      if (!d.image_url) p.push("Add the diagram's image URL.");
+      if (pins.length < 1) p.push("Click on the diagram to add at least one numbered point.");
+      if (labels.length < pins.length) p.push("Add a label for every point (extra labels make it harder).");
+      if (pins.some(pin => !labels.some(l => l.id === a.placement?.[pin.id]))) p.push("Choose the correct label for every point.");
+      break;
+    }
+    case "graph_plot": {
+      const [x0, x1, y0, y1] = [d.x_min, d.x_max, d.y_min, d.y_max].map(Number);
+      if (![x0, x1, y0, y1].every(Number.isFinite) || x0 >= x1 || y0 >= y1) p.push("Set the axes so each minimum is below its maximum.");
+      if (!(Number(d.step) > 0)) p.push("The grid step must be more than zero.");
+      if (!(a.points ?? []).length) p.push("Add the points students must plot.");
+      if ((a.points ?? []).some((pt: { x: number; y: number }) => pt.x < x0 || pt.x > x1 || pt.y < y0 || pt.y > y1)) p.push("Every correct point must be inside the axes.");
+      break;
+    }
+    case "chem_equation":
+      try {
+        const eq = parseEquation(a.equation ?? "");
+        if (!isBalanced(eq)) p.push("The correct equation is not balanced (atoms or charge differ). Check it.");
+      } catch (e) { p.push(`The correct equation could not be read: ${(e as Error).message}.`); }
+      break;
+    case "rating":
+      if (!(Number(d.max) > Number(d.min))) p.push("The top of the scale must be above the bottom.");
+      if (Number(d.max) - Number(d.min) > 10) p.push("Use a scale of at most 11 points.");
+      break;
+    case "passage":
+      if (Number(q.points) !== 0) p.push("A reading passage carries no marks; set points to 0.");
+      break;
+    case "audio_response":
+      if (!(Number(d.max_seconds) >= 10 && Number(d.max_seconds) <= 600)) p.push("Recording length must be between 10 and 600 seconds.");
+      break;
+  }
+  if (q.type === "numeric") {
+    if (Number(a.tolerance_pct ?? 0) < 0 || Number(a.tolerance_pct ?? 0) > 50) p.push("Percentage tolerance must be between 0 and 50.");
+    if (a.sig_figs !== undefined && a.sig_figs !== null && !(Number.isInteger(Number(a.sig_figs)) && Number(a.sig_figs) >= 0 && Number(a.sig_figs) <= 10)) p.push("Significant figures must be a whole number up to 10.");
   }
   return p;
 }
@@ -385,7 +558,14 @@ export function describeAnswer(q: Pick<Question, "type" | "data" | "answer">): s
     case "mcq_multi": return (a.correct ?? []).map((id: string) => text(d.options, id)).join("; ");
     case "true_false": return a.correct ? "True" : "False";
     case "short_answer": return (a.accepted ?? []).join(" or ");
-    case "numeric": return `${a.value}${a.tolerance ? ` (± ${a.tolerance})` : ""}${d.unit ? ` ${d.unit}` : ""}`;
+    case "numeric": return `${a.value}${a.tolerance ? ` (± ${a.tolerance})` : a.tolerance_pct ? ` (± ${a.tolerance_pct}%)` : ""}${d.unit ? ` ${d.unit}` : ""}${a.sig_figs ? `, ${a.sig_figs} s.f.` : ""}`;
+    case "matrix": return (d.rows ?? []).map((r: Option) => `${r.text}: ${text(d.cols, a.correct?.[r.id])}`).join("; ");
+    case "label_image": return (d.pins ?? []).map((p: Option, i: number) => `${i + 1}. ${text(d.labels, a.placement?.[p.id])}`).join("; ");
+    case "highlight": { const w = passageWords(d.text ?? ""); return (a.correct ?? []).map((i: number) => w[i]).filter(Boolean).join(", "); }
+    case "graph_plot": return (a.points ?? []).map((p: { x: number; y: number }) => `(${p.x}, ${p.y})`).join(" ");
+    case "chem_equation": return String(a.equation ?? "");
+    case "rating": return a.correct === undefined || a.correct === null ? "Any answer" : String(a.correct);
+    case "passage": return "";
     case "fill_blanks": return (a.blanks ?? []).map((b: string[], i: number) => `${i + 1}. ${b.join(" / ")}`).join("  ");
     case "matching": return Object.entries(a.pairs ?? {}).map(([l, r]) => `${text(d.left, l)} → ${text(d.right, r as string)}`).join("; ");
     case "ordering": return (a.order ?? []).map((id: string) => text(d.items, id)).join(" → ");

@@ -1,10 +1,11 @@
 "use client";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import QuestionView, { type PublicQuestion } from "@/components/exams/QuestionView";
-import Calculator from "@/components/exams/Calculator";
+import ExamTools from "@/components/exams/tools/ExamTools";
+import type { ToolId } from "@/lib/exams/tools";
 
 type Info = { title: string; instructions: string | null; duration_minutes: number; child: string; window: "not_open" | "open" | "closed"; opens_at: string | null; closes_at: string | null;
-  status: string; school: { name: string; logo_url: string | null; brand_color: string | null }; allow_calculator: boolean };
+  status: string; school: { name: string; logo_url: string | null; brand_color: string | null }; tools: ToolId[]; reference_text: string | null };
 type Attempt = { deadline_at: string; server_now: string; answers: Record<string, unknown>; questions: PublicQuestion[] };
 
 async function api(token: string, body?: unknown) {
@@ -21,7 +22,6 @@ export default function EntrancePage(props: { params: Promise<{ token: string }>
   const [i, setI] = useState(0);
   const [left, setLeft] = useState(0);
   const [err, setErr] = useState<string | null>(null);
-  const [calc, setCalc] = useState(false);
   const dirty = useRef<Record<string, unknown>>({});
   const offset = useRef(0);
   const submitting = useRef(false);
@@ -95,7 +95,8 @@ export default function EntrancePage(props: { params: Promise<{ token: string }>
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-2">
         <p className="truncate font-semibold">{info.title}</p><span className="text-xs text-slate-500">{answered}/{attempt.questions.length} answered</span>
         <span className="ml-auto flex items-center gap-2">
-          {info.allow_calculator && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setCalc(c => !c)}>Calculator</button>}
+          <ExamTools tools={info.tools ?? []} referenceText={info.reference_text} storageKey={`entrance-rough-${token}`}
+            getQuestionText={() => [q.prompt, ...((q.data?.options ?? []) as { text: string }[]).map(o => o.text)].join(". ")} />
           <span className={"rounded px-3 py-1 font-mono font-bold text-white " + (left < 300_000 ? "bg-rose-600" : "bg-slate-900")}>{String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}</span>
           <button className="btn text-white" style={{ background: color }} onClick={() => confirm(`Submit now? You answered ${answered} of ${attempt.questions.length}.`) && submit()}>Submit</button>
         </span>
@@ -111,7 +112,6 @@ export default function EntrancePage(props: { params: Promise<{ token: string }>
         <div className="mt-6 flex flex-wrap gap-1.5">{attempt.questions.map((x, j) => <button key={x.id} onClick={() => { flush(); setI(j); }} className={"h-8 w-8 rounded text-xs font-semibold " + (answers[x.id] !== undefined && answers[x.id] !== "" ? "text-white" : "bg-white")} style={answers[x.id] !== undefined && answers[x.id] !== "" ? { background: color } : undefined} aria-label={`Question ${j + 1}`}>{j + 1}</button>)}</div>
         {err && <p role="alert" className="mt-3 text-sm text-rose-600">{err}</p>}
       </main>
-      {calc && <Calculator onClose={() => setCalc(false)} />}
     </div>
   );
 }

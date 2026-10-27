@@ -159,7 +159,7 @@ describe("Safe Exam Browser", () => {
   });
 });
 
-import { evaluate } from "@/components/exams/Calculator";
+import { evaluate } from "@/lib/exams/calc";
 
 describe("exam calculator", () => {
   it("evaluates safely with precedence and functions", () => {

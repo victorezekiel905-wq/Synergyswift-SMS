@@ -4,12 +4,13 @@ import { requireCtx, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { secureShuffle } from "@/lib/crypto";
 import { POINTS } from "@/lib/lms";
-import { buildAttemptLayout, toPublicQuestion, markQuestion, describeAnswer, type Question } from "@/lib/exams/engine";
+import { buildAttemptLayout, toPublicQuestion, markQuestion, describeAnswer, QUESTION_TYPES, type Question } from "@/lib/exams/engine";
 
 export const dynamic = "force-dynamic";
 
 // Practice only uses questions a computer can mark instantly.
-const AUTO_TYPES = ["mcq_single", "mcq_multi", "true_false", "short_answer", "numeric", "fill_blanks", "matching", "ordering", "hotspot", "math", "drag_drop"];
+// Practice drills only use questions the computer can mark (not passages or opinion scales).
+const AUTO_TYPES = QUESTION_TYPES.filter(t => t.auto && t.type !== "passage" && t.type !== "rating").map(t => t.type as string);
 
 /** What can be practised (subjects, exam bodies, years, topics) and the student's recent sessions. */
 export async function GET() {

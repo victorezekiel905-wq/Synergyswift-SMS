@@ -83,3 +83,7 @@ html[data-lite="1"] .lite-hide { display: none !important; }
 @media print {
   body { background: #fff !important; }
 }
+
+/* Exam tool: high contrast (Tools → Larger text and contrast). */
+html[data-high-contrast] body { filter: contrast(1.35); }
+html[data-high-contrast] .card { border-color: #0f172a; }

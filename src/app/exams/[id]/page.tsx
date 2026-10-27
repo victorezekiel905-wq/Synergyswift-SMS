@@ -2,8 +2,9 @@
 import { Fragment, useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, statusTone, fmtTime, Loading } from "@/components/ui";
-import QuestionEditor, { blankQuestion, TYPE_LABELS, type EditorQuestion, type QType } from "@/components/exams/QuestionEditor";
+import QuestionEditor, { blankQuestion, TYPE_LABELS, TYPE_GROUPS, type EditorQuestion, type QType } from "@/components/exams/QuestionEditor";
 import QuestionView from "@/components/exams/QuestionView";
+import { EXAM_TOOLS, TOOL_PRESETS, examTools } from "@/lib/exams/tools";
 import BankBrowser, { DIFFICULTIES, BLOOMS, EXAM_BODIES } from "@/components/exams/BankBrowser";
 
 type Exam = {
@@ -100,9 +101,16 @@ function Questions({ exam, questions, reload }: { exam: Exam; questions: Questio
         <button className="btn btn-primary mb-2 w-full" disabled={locked} onClick={() => setBank(true)}>Add from question bank</button>
         {questions.some(q => !q.bank_question_id) && <button className="btn btn-ghost mb-3 w-full text-xs" onClick={() => toBank(questions.filter(q => !q.bank_question_id).map(q => q.id))}>Save all new questions to the bank</button>}
         <p className="mb-2 text-sm font-semibold">Or write a new question</p>
-        <div className="grid gap-1">
-          {(Object.keys(TYPE_LABELS) as QType[]).map(t => (
-            <button key={t} className="btn btn-ghost justify-start border border-slate-200 text-left text-xs" onClick={() => setEditing(blankQuestion(t))}>{TYPE_LABELS[t]}</button>
+        <div className="space-y-3">
+          {TYPE_GROUPS.map(g => (
+            <div key={g.label}>
+              <p className="mb-1 text-[11px] font-medium text-slate-500">{g.label}</p>
+              <div className="grid gap-1">
+                {g.types.map(t => (
+                  <button key={t} className="btn btn-ghost justify-start border border-slate-200 text-left text-xs" onClick={() => setEditing(blankQuestion(t))}>{TYPE_LABELS[t]}</button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </aside>
@@ -177,6 +185,45 @@ function PreviewQuestion({ q }: { q: Question }) {
   return <QuestionView q={{ id: q.id, type: q.type, prompt: q.prompt, points: q.points, media_url: q.media_url ?? null, section: q.section ?? null, data }} value={v} onChange={setV} />;
 }
 
+/* ---------- Tools ---------- */
+function ToolsSettings({ s, setS }: { s: Record<string, any>; setS: (k: string, v: unknown) => void }) {
+  const on = new Set<string>(examTools(s));
+  const set = (list: Iterable<string>) => setS("tools", [...list]);
+  const groups = [...new Set(EXAM_TOOLS.map(t => t.group))];
+  return (
+    <section className="card space-y-4 p-5">
+      <div>
+        <h2 className="font-semibold">Tools students can use</h2>
+        <p className="text-sm text-slate-600">Pick a subject to switch on the usual tools, then add or remove any. Students open them from the Tools button in the exam.</p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {TOOL_PRESETS.map(p => <button key={p.id} type="button" className="btn btn-ghost border border-slate-200 px-2.5 py-1 text-xs" onClick={() => set(p.tools)}>{p.label}</button>)}
+        <button type="button" className="btn btn-ghost px-2.5 py-1 text-xs text-rose-700" onClick={() => set([])}>No tools</button>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {groups.map(g => (
+          <div key={g}>
+            <p className="mb-1 text-xs font-medium text-slate-500">{g}</p>
+            <div className="space-y-1.5">
+              {EXAM_TOOLS.filter(t => t.group === g).map(t => (
+                <label key={t.id} className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" className="mt-0.5" checked={on.has(t.id)} onChange={ev => { const n = new Set(on); ev.target.checked ? n.add(t.id) : n.delete(t.id); set(n); }} />
+                  <span><span className="font-medium">{t.label}</span><span className="block text-xs text-slate-500">{t.hint}</span></span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      {on.has("reference_sheet") && (
+        <Field label="Reference sheet text" hint="Shown to students in the Tools menu: data tables, a key, a case study or formulae of your own.">
+          <textarea className="input h-32" maxLength={20000} value={s.reference_text ?? ""} onChange={ev => setS("reference_text", ev.target.value)} />
+        </Field>
+      )}
+    </section>
+  );
+}
+
 /* ---------- Settings ---------- */
 function toLocal(v: string | null) {
   if (!v) return "";
@@ -203,7 +250,8 @@ function Settings({ exam, questions, reload }: { exam: Exam; questions: Question
       settings: {
         shuffle_questions: Boolean(s.shuffle_questions), shuffle_options: s.shuffle_options !== false, require_fullscreen: s.require_fullscreen !== false,
         block_copy_paste: s.block_copy_paste !== false, violation_limit: Number(s.violation_limit ?? 3), show_score_after_submit: Boolean(s.show_score_after_submit),
-        allow_review: Boolean(s.allow_review), require_seb: Boolean(s.require_seb), allow_spellcheck: Boolean(s.allow_spellcheck), allow_calculator: Boolean(s.allow_calculator),
+        allow_review: Boolean(s.allow_review), require_seb: Boolean(s.require_seb), allow_spellcheck: Boolean(s.allow_spellcheck),
+        tools: examTools(s), allow_calculator: examTools(s).some(t => t === "calc_basic" || t === "calc_scientific"), reference_text: String(s.reference_text ?? ""),
         seb_browser_keys: (s.seb_browser_keys ?? []).filter(Boolean), seb_config_keys: (s.seb_config_keys ?? []).filter(Boolean), quit_password: s.quit_password ?? "",
         allowed_ips: (s.allowed_ips ?? []).map((x: string) => x.trim()).filter(Boolean),
         webcam_snapshots: Boolean(s.webcam_snapshots), snapshot_interval_sec: Number(s.snapshot_interval_sec ?? 60),
@@ -242,11 +290,12 @@ function Settings({ exam, questions, reload }: { exam: Exam; questions: Question
         {check("shuffle_questions", "Shuffle question order per student")}
         {check("shuffle_options", "Shuffle answer options per student", true)}
         {check("allow_spellcheck", "Allow browser spell-check")}
-        {check("allow_calculator", "Show on-screen calculator")}
         <Field label="Lock the exam after this many violations" hint="A locked student waits for you to unlock them in the live monitor.">
           <input className="input max-w-[120px]" type="number" min={1} max={50} value={s.violation_limit ?? 3} onChange={ev => setS("violation_limit", Number(ev.target.value))} />
         </Field>
       </section>
+
+      <ToolsSettings s={s} setS={setS} />
 
       {sections.size > 0 && (
         <section className="card space-y-3 p-5">
@@ -283,8 +332,18 @@ function Settings({ exam, questions, reload }: { exam: Exam; questions: Question
       </section>
 
       <section className="card space-y-3 p-5">
-        <h2 className="font-semibold">Safe Exam Browser</h2>
-        {check("require_seb", "Require Safe Exam Browser (students cannot start in a normal browser)")}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold">Safe Exam Browser lock</h2>
+            <p className="text-sm text-slate-600">{s.require_seb ? "Locked: students can only open this exam in Safe Exam Browser, which blocks other apps, websites and screenshots." : "Unlocked: students can sit this exam in a normal browser, with the integrity checks above."}</p>
+          </div>
+          <button type="button" role="switch" aria-checked={Boolean(s.require_seb)} onClick={() => setS("require_seb", !s.require_seb)}
+            className={"relative inline-flex h-8 w-[118px] shrink-0 items-center rounded-full border text-xs font-semibold transition-colors " + (s.require_seb ? "border-brand-700 bg-brand-700 text-white" : "border-slate-300 bg-slate-100 text-slate-700")}>
+            <span className={"absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all " + (s.require_seb ? "left-[88px]" : "left-1")} />
+            <span className={s.require_seb ? "pl-3" : "pl-9"}>{s.require_seb ? "Locked" : "Unlocked"}</span>
+          </button>
+        </div>
+        <p className="text-xs text-slate-500">Remember to press Save. You can unlock an exam later, for example for a student who has no SEB-ready computer.</p>
         {s.require_seb && (
           <div className="space-y-3 rounded-lg bg-slate-50 p-3 text-sm">
             <ol className="list-decimal space-y-1 pl-5 text-slate-700">
@@ -469,7 +528,8 @@ function Marking({ exam, reload: reloadExam }: { exam: Exam; reload: () => void 
                   <div className="mb-2 flex items-center gap-2 text-xs"><b>Q{i + 1}</b><Badge>{TYPE_LABELS[q.type]}</Badge>{m?.auto === false && <Badge tone="violet">teacher mark</Badge>}</div>
                   {q.type === "file_upload"
                     ? <p className="text-sm">{q.prompt}<br />{ans?.path ? <a className="text-brand-700 underline" href={`/api/exams/${exam.id}/file?path=${encodeURIComponent(ans.path)}`} target="_blank" rel="noreferrer">Open {ans.name}</a> : <i>No file</i>}</p>
-                    : <QuestionView q={{ id: q.id, type: q.type, prompt: q.prompt, points: q.points, media_url: q.media_url ?? null, section: null, data: pubData }} value={ans} onChange={() => {}} disabled />}
+                    : <QuestionView q={{ id: q.id, type: q.type, prompt: q.prompt, points: q.points, media_url: q.media_url ?? null, section: null, data: pubData }} value={ans} onChange={() => {}} disabled
+                        audioUrl={q.type === "audio_response" && ans?.path ? `/api/exams/${exam.id}/file?path=${encodeURIComponent(ans.path)}` : null} />}
                   {(q.answer?.rubric || q.answer?.reference) && <p className="mt-2 whitespace-pre-wrap rounded bg-amber-50 p-2 text-xs text-amber-900"><b>Marking guide:</b> {q.answer.rubric || q.answer.reference}</p>}
                   <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3">
                     <Field label={`Points (max ${q.points})`}><input className={"input w-24 " + (m?.points === null ? "border-amber-400 bg-amber-50" : "")} type="number" min={0} max={q.points} step="any"

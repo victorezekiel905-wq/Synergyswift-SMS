@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
-import { validateQuestion, countBlanks } from "@/lib/exams/engine";
+import { validateQuestion, countBlanks, QUESTION_TYPES, type QuestionType } from "@/lib/exams/engine";
+import { TOOL_IDS } from "@/lib/exams/tools";
 import { randomToken } from "@/lib/crypto";
 import { isValidIpRule } from "@/lib/net";
 
@@ -33,6 +34,7 @@ const Patch = z.object({
     show_score_after_submit: z.boolean(), allow_review: z.boolean(), require_seb: z.boolean(),
     seb_browser_keys: z.array(z.string().trim().max(128)).max(10), seb_config_keys: z.array(z.string().trim().max(128)).max(10),
     quit_password: z.string().max(64).optional(), allow_spellcheck: z.boolean(), allow_calculator: z.boolean().optional(),
+    tools: z.array(z.enum(TOOL_IDS)).max(TOOL_IDS.length), reference_text: z.string().max(20000),
     draw: z.record(z.string().max(80), z.number().int().min(0).max(500)),
     allowed_ips: z.array(z.string().trim().max(64)).max(50).refine(l => l.every(x => !x || isValidIpRule(x)), "each allowed network must be an IP address or range such as 41.58.0.0/16"),
     webcam_snapshots: z.boolean(), snapshot_interval_sec: z.number().int().min(15).max(600)
@@ -75,7 +77,7 @@ export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: s
 
 const QuestionBody = z.object({
   id: z.string().uuid().optional(),
-  type: z.enum(["mcq_single", "mcq_multi", "true_false", "short_answer", "numeric", "fill_blanks", "matching", "ordering", "hotspot", "essay", "code", "file_upload", "math", "drag_drop"]),
+  type: z.enum(QUESTION_TYPES.map(t => t.type) as [QuestionType, ...QuestionType[]]),
   prompt: z.string().trim().min(1).max(20000),
   media_url: z.string().trim().url().nullish().or(z.literal("")),
   section: z.string().trim().max(80).nullish(),

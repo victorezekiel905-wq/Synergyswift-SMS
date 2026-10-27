@@ -5,6 +5,7 @@ import { jsonError, readJson } from "@/lib/auth";
 import { buildAttemptLayout, toPublicQuestion, markAttempt, questionsForAttempt, type Question, type Mark } from "@/lib/exams/engine";
 import { loadQuestions, markCodeQuestions, GRACE_MS, VIOLATION_KINDS } from "@/lib/exams/server";
 import { refreshScore } from "@/lib/admissions-crm";
+import { examTools } from "@/lib/exams/tools";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +61,7 @@ export async function GET(_req: NextRequest, props: { params: Promise<{ token: s
   const { data: s } = await svc.from("tenant_settings").select("school_name,logo_url,brand_color").eq("tenant_id", at.tenant_id).maybeSingle();
   const info = { title: at.exams?.title, instructions: at.exams?.instructions, duration_minutes: at.exams?.duration_minutes, child: at.applications?.first_name,
     window: windowState(at), opens_at: at.opens_at, closes_at: at.closes_at, status: at.status, school: { name: s?.school_name ?? at.applications?.tenants?.name, logo_url: s?.logo_url, brand_color: s?.brand_color },
-    allow_calculator: Boolean(at.exams?.settings?.allow_calculator) };
+    tools: examTools(at.exams?.settings), reference_text: examTools(at.exams?.settings).includes("reference_sheet") ? (at.exams?.settings?.reference_text ?? null) : null };
   if (at.status !== "in_progress") return NextResponse.json({ info });
   const byId = new Map(questions.map(q => [q.id, q]));
   return NextResponse.json({ info, attempt: { deadline_at: at.deadline_at, server_now: new Date().toISOString(), answers: at.answers ?? {},

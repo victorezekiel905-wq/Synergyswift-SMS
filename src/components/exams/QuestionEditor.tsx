@@ -1,16 +1,28 @@
 "use client";
 import { useRef, useState } from "react";
 import { Field, Alert, Icon } from "@/components/ui";
+import { NumericExtras, MatrixEditor, HighlightEditor, LabelImageEditor, GraphPlotEditor, ChemEditor, RatingEditor, DrawingEditor, AudioEditor } from "./QuestionTypeEditors";
 
-export type QType = "mcq_single" | "mcq_multi" | "true_false" | "short_answer" | "numeric" | "fill_blanks" | "matching" | "ordering" | "hotspot" | "math" | "drag_drop" | "essay" | "code" | "file_upload";
+export type QType = "mcq_single" | "mcq_multi" | "true_false" | "short_answer" | "numeric" | "fill_blanks" | "matching" | "ordering" | "hotspot" | "math" | "drag_drop" | "essay" | "code" | "file_upload"
+  | "matrix" | "highlight" | "label_image" | "graph_plot" | "chem_equation" | "rating" | "passage" | "drawing" | "audio_response";
 export type EditorQuestion = { id?: string; type: QType; prompt: string; points: number; media_url?: string | null; section?: string | null; data: Record<string, any>; answer: Record<string, any> };
 
 export const TYPE_LABELS: Record<QType, string> = {
   mcq_single: "Multiple choice (one answer)", mcq_multi: "Multiple choice (several answers)", true_false: "True / False",
   short_answer: "Short answer (auto-marked)", numeric: "Numeric with tolerance", fill_blanks: "Fill in the blanks",
   matching: "Matching pairs", ordering: "Put in order", hotspot: "Hotspot on image", math: "Maths input", drag_drop: "Drag and drop into groups", essay: "Essay / long answer",
-  code: "Code answer", file_upload: "File upload"
+  code: "Code answer", file_upload: "File upload",
+  matrix: "Grid (statements × choices)", highlight: "Select words in a passage", label_image: "Label the diagram", graph_plot: "Plot points on a graph",
+  chem_equation: "Chemical equation", rating: "Rating scale", passage: "Reading passage or case study", drawing: "Drawing or construction", audio_response: "Spoken answer (recording)"
 };
+
+/** Question types grouped for the "Add question" menu. */
+export const TYPE_GROUPS: { label: string; types: QType[] }[] = [
+  { label: "Objective", types: ["mcq_single", "mcq_multi", "true_false", "matrix", "matching", "ordering", "drag_drop", "rating"] },
+  { label: "Written", types: ["short_answer", "fill_blanks", "highlight", "essay", "passage"] },
+  { label: "Maths and science", types: ["numeric", "math", "graph_plot", "chem_equation", "drawing"] },
+  { label: "Images, sound and files", types: ["hotspot", "label_image", "audio_response", "file_upload", "code"] }
+];
 
 const uid = () => Math.random().toString(36).slice(2, 8);
 
@@ -34,6 +46,18 @@ export function blankQuestion(type: QType): EditorQuestion {
     case "essay": return { ...base, points: 10, data: { min_words: null, max_words: null }, answer: { rubric: "" } };
     case "code": return { ...base, points: 10, data: { language: "python", starter: "" }, answer: { reference: "" } };
     case "file_upload": return { ...base, points: 10, data: { accept: ".pdf,.jpg,.jpeg,.png,.docx", max_mb: 10 }, answer: {} };
+    case "matrix": {
+      const t = uid(), f = uid();
+      return { ...base, points: 3, data: { rows: [{ id: uid(), text: "" }, { id: uid(), text: "" }, { id: uid(), text: "" }], cols: [{ id: t, text: "True" }, { id: f, text: "False" }] }, answer: { correct: {}, partial: true } };
+    }
+    case "highlight": return { ...base, points: 3, prompt: "Select the correct words in the passage.", data: { text: "", instruction: "" }, answer: { correct: [], partial: true } };
+    case "label_image": return { ...base, points: 4, prompt: "Label the diagram.", data: { image_url: "", pins: [], labels: [] }, answer: { placement: {}, partial: true } };
+    case "graph_plot": return { ...base, points: 4, data: { x_min: -5, x_max: 5, y_min: -5, y_max: 5, step: 1, snap: true, join: false, x_label: "x", y_label: "y" }, answer: { points: [], tolerance: 0, partial: true } };
+    case "chem_equation": return { ...base, points: 2, prompt: "Write a balanced equation for the reaction.", data: { hint: "" }, answer: { equation: "", alternatives: [], species_credit: 0.5, states: false, accept_multiples: false } };
+    case "rating": return { ...base, data: { min: 1, max: 5, min_label: "", max_label: "" }, answer: { correct: null } };
+    case "passage": return { ...base, points: 0, prompt: "Read the passage below and answer the questions that follow.\n\n", data: {}, answer: {} };
+    case "drawing": return { ...base, points: 6, data: { grid: "square", background_url: null }, answer: { rubric: "" } };
+    case "audio_response": return { ...base, points: 5, data: { max_seconds: 120 }, answer: { rubric: "" } };
   }
 }
 
@@ -79,6 +103,14 @@ export default function QuestionEditor({ initial, onSave, onCancel, extra }: { i
       const items = (q.data.items ?? []).filter((i: { text: string }) => i.text.trim());
       out = { ...q, data: { zones, items }, answer: { ...q.answer, placement: Object.fromEntries(items.map((i: { id: string }) => [i.id, q.answer.placement?.[i.id]]).filter(([, z]: [string, string]) => zones.some((x: { id: string }) => x.id === z))) } };
     }
+    if (q.type === "matrix") {
+      const rows = (q.data.rows ?? []).filter((r: { text: string }) => r.text.trim()), cols = (q.data.cols ?? []).filter((c: { text: string }) => c.text.trim());
+      out = { ...q, data: { rows, cols }, answer: { ...q.answer, correct: Object.fromEntries(rows.map((r: { id: string }) => [r.id, q.answer.correct?.[r.id]]).filter(([, c]: [string, string]) => cols.some((x: { id: string }) => x.id === c))) } };
+    }
+    if (q.type === "label_image") {
+      out = { ...q, data: { ...q.data, labels: (q.data.labels ?? []).filter((l: { text: string }) => l.text.trim()) } };
+    }
+    if (q.type === "passage") out = { ...out, points: 0 };
     const e = await onSave({ ...out, points: Number(out.points) });
     setBusy(false);
     if (e) setErr(e);
@@ -90,9 +122,9 @@ export default function QuestionEditor({ initial, onSave, onCancel, extra }: { i
       <p className="text-xs font-semibold uppercase text-brand-600">{TYPE_LABELS[q.type]}</p>
       <Field label="Question"><textarea className="input h-24" value={q.prompt} onChange={e => setQ({ ...q, prompt: e.target.value })} /></Field>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Points"><input className="input" type="number" min={0} step="any" value={q.points} onChange={e => setQ({ ...q, points: e.target.value as unknown as number })} /></Field>
+        <Field label="Points"><input className="input" type="number" min={0} step="any" value={q.type === "passage" ? 0 : q.points} disabled={q.type === "passage"} onChange={e => setQ({ ...q, points: e.target.value as unknown as number })} /></Field>
         <Field label="Section (optional)"><input className="input" value={q.section ?? ""} onChange={e => setQ({ ...q, section: e.target.value || null })} placeholder="Section A" /></Field>
-        {q.type !== "hotspot" && <Field label="Image / diagram URL (optional)"><input className="input" value={q.media_url ?? ""} onChange={e => setQ({ ...q, media_url: e.target.value || null })} /></Field>}
+        {q.type !== "hotspot" && q.type !== "label_image" && <Field label="Image, audio or video URL (optional)"><input className="input" value={q.media_url ?? ""} onChange={e => setQ({ ...q, media_url: e.target.value || null })} /></Field>}
       </div>
 
       {(q.type === "mcq_single" || q.type === "mcq_multi") && (
@@ -135,8 +167,19 @@ export default function QuestionEditor({ initial, onSave, onCancel, extra }: { i
           <Field label="Correct value"><input className="input" type="number" step="any" value={q.answer.value} onChange={e => setAnswer({ value: Number(e.target.value) })} /></Field>
           <Field label="Tolerance (±)"><input className="input" type="number" step="any" min={0} value={q.answer.tolerance} onChange={e => setAnswer({ tolerance: Number(e.target.value) })} /></Field>
           <Field label="Unit shown to students"><input className="input" value={q.data.unit ?? ""} onChange={e => setData({ unit: e.target.value })} /></Field>
+          <div className="sm:col-span-3"><NumericExtras q={q} setAnswer={setAnswer} /></div>
         </div>
       )}
+
+      {q.type === "matrix" && <MatrixEditor q={q} setData={setData} setAnswer={setAnswer} />}
+      {q.type === "highlight" && <HighlightEditor q={q} setData={setData} setAnswer={setAnswer} />}
+      {q.type === "label_image" && <LabelImageEditor q={q} setData={setData} setAnswer={setAnswer} />}
+      {q.type === "graph_plot" && <GraphPlotEditor q={q} setData={setData} setAnswer={setAnswer} />}
+      {q.type === "chem_equation" && <ChemEditor q={q} setData={setData} setAnswer={setAnswer} />}
+      {q.type === "rating" && <RatingEditor q={q} setData={setData} setAnswer={setAnswer} />}
+      {q.type === "drawing" && <DrawingEditor q={q} setData={setData} setAnswer={setAnswer} />}
+      {q.type === "audio_response" && <AudioEditor q={q} setData={setData} setAnswer={setAnswer} />}
+      {q.type === "passage" && <p className="text-sm text-slate-600">Put the passage, case study or data in the question box above. It carries no marks; add the questions about it after it, in the same section.</p>}
 
       {q.type === "fill_blanks" && (
         <Field label="Passage" hint="Wrap each answer in double brackets. Separate alternatives with |, for example: Water boils at [[100|one hundred]] degrees.">
