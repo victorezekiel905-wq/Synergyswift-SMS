@@ -6,6 +6,7 @@ const LINKS = [
   { href: "/platform/centre", label: "Overview" },
   { href: "/platform", label: "Schools" },
   { href: "/platform/codes", label: "School codes" },
+  { href: "/platform/signups", label: "Sign-ups" },
   { href: "/platform/sales", label: "Sales & customers" },
   { href: "/platform/billing", label: "Billing & requests" },
   { href: "/platform/plans", label: "Plans & prices" },

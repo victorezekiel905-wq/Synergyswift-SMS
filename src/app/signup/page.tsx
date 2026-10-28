@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Monogram } from "@/components/AppShell";
+import PendingConfirm from "@/components/auth/PendingConfirm";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -16,23 +17,23 @@ export default function SignupPage() {
   const [schoolCode, setSchoolCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
+  const [pending, setPending] = useState<"sent" | "waiting" | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(null);
-    const sb = createClient();
-    const { data, error } = await sb.auth.signUp({
-      email, password,
-      options: { data: role === "teacher" ? { full_name: fullName, school_name: tenantName.trim(), school_code: schoolCode.trim() } : { full_name: fullName } }
+    // The account is made by Synergy Swift, which sends the confirmation email itself.
+    const reg = await fetch("/api/auth/register", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(role === "teacher"
+        ? { as: "school", email, password, full_name: fullName, school_name: tenantName.trim(), school_code: schoolCode.trim() }
+        : { as: "student", email, password, full_name: fullName, join_code: joinCode.trim().toUpperCase() })
     });
+    const rj = await reg.json().catch(() => ({}));
+    if (!reg.ok) { setBusy(false); setErr(rj.error ?? "We couldn't create the account. Please try again."); return; }
+    if (rj.status !== "confirmed") { setBusy(false); setPending(rj.status); return; }
+    const { error } = await createClient().auth.signInWithPassword({ email, password });
     if (error) { setBusy(false); setErr(error.message); return; }
-
-    if (!data.user) {
-      // Email confirmation required before the session exists.
-      setBusy(false); setConfirming(true);
-      return;
-    }
 
     const body = role === "student"
       ? { role: "student", full_name: fullName, join_code: joinCode.trim().toUpperCase() }
@@ -55,6 +56,7 @@ export default function SignupPage() {
       <h1 className="mt-14 font-serif text-[30px] font-semibold leading-tight tracking-[-0.01em]">Set up your school</h1>
       <p className="mt-2 text-[15px] text-slate-600 sm:text-sm">Create the first admin account with the school code Synergy Swift gave you. Each code works once. Staff joining an existing school: ask your school administrator for an invitation instead.</p>
 
+      {pending ? <PendingConfirm email={email} status={pending} /> : (
       <form onSubmit={onSubmit} className="card mt-7 space-y-5 p-6">
         <div>
           <label className="label">I am a…</label>
@@ -73,7 +75,7 @@ export default function SignupPage() {
         </div>
         <div>
           <label className="label">Password</label>
-          <input className="input" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input className="input" type="password" required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
 
         {role === "teacher" ? (
@@ -88,14 +90,11 @@ export default function SignupPage() {
         ) : (
           <div>
             <label className="label">Class join code (from your teacher)</label>
-            <input className="input uppercase" placeholder="ABC123" maxLength={6} value={joinCode} onChange={(e) => setJoinCode(e.target.value)} />
+            <input className="input uppercase" required placeholder="ABC123" maxLength={6} value={joinCode} onChange={(e) => setJoinCode(e.target.value)} />
           </div>
         )}
 
         {err && <p className="text-sm text-rose-600">{err}</p>}
-        {confirming && (
-          <p className="text-sm text-amber-700">Confirm your email address first, then sign in. Your school is set up the first time you sign in.</p>
-        )}
         <button className="btn btn-primary w-full" disabled={busy}>
           {busy ? "Creating…" : role === "teacher" ? "Create school account" : "Create student account"}
         </button>
@@ -103,6 +102,7 @@ export default function SignupPage() {
           Already registered? <Link href="/login" className="font-medium text-brand-600">Sign in</Link>
         </p>
       </form>
+      )}
     </main>
   );
 }

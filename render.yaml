@@ -36,9 +36,11 @@ services:
         sync: false
       - key: NEXT_PUBLIC_APP_URL      # e.g. https://educlass-fusion.onrender.com, or your own domain
         sync: false
-      # ---- Email (Resend) ----
-      - key: EMAIL_PROVIDER
-        value: resend
+      # ---- Email: SendGrid or Resend. Also sends the sign-in emails (confirm account, reset password). ----
+      - key: EMAIL_PROVIDER           # sendgrid or resend
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM               # e.g. "School Updates <updates@yourdomain.com>"

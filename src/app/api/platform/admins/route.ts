@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requirePlatformAdmin, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { appUrl } from "@/lib/school";
+import { authMailConfigured, linkFrom, sendAuthEmail } from "@/lib/auth-mail";
 
 /** The people who run Synergy Swift itself. Schools never see this list. */
 export async function GET() {
@@ -29,7 +30,16 @@ export async function POST(req: NextRequest) {
   let userId: string | null = null;
   const { data: list } = await svc.auth.admin.listUsers({ page: 1, perPage: 1000 });
   userId = list?.users?.find((u: { email?: string }) => (u.email ?? "").toLowerCase() === email)?.id ?? null;
-  if (!userId) {
+  if (!userId && authMailConfigured()) {
+    // The invitation comes from Synergy Swift's own email service.
+    const base = appUrl(req);
+    const { data, error } = await svc.auth.admin.generateLink({ type: "invite", email, options: { redirectTo: `${base}/auth/welcome?next=/platform` } });
+    if (error) return jsonError(error.message);
+    userId = data.user?.id ?? null;
+    const url = linkFrom(base, data, "invite", "/platform");
+    const sent = url ? await sendAuthEmail({ kind: "invite", to: email, link: url, brand: "Synergy Swift" }) : null;
+    if (!sent?.ok) console.error("[platform admins] invite email:", sent?.error);
+  } else if (!userId) {
     const { data, error } = await svc.auth.admin.inviteUserByEmail(email, { redirectTo: `${appUrl(req)}/auth/welcome?next=/platform` });
     if (error) return jsonError(error.message);
     userId = data.user?.id ?? null;

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { signInEmail } from "@/lib/login-name";
+import { signInEmail, isUsernameEmail } from "@/lib/login-name";
 import SsoButtons, { ssoEnabled } from "@/components/auth/SsoButtons";
 import PhoneLogin from "@/components/auth/PhoneLogin";
 import { Monogram } from "@/components/AppShell";
@@ -28,6 +28,8 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"email" | "phone">("email");
   const [phoneOk, setPhoneOk] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [unconfirmed, setUnconfirmed] = useState(false);
   useEffect(() => {
     const e = new URLSearchParams(window.location.search).get("error");
     if (e) setNotice(REASONS[e] ?? e);
@@ -73,8 +75,13 @@ export default function LoginPage() {
     e.preventDefault();
     setBusy(true); setErr(null);
     const sb = createClient();
+    setInfo(null); setUnconfirmed(false);
     const { error } = await sb.auth.signInWithPassword({ email: signInEmail(email), password });
-    if (error) { setBusy(false); setErr(error.message); return; }
+    if (error) {
+      setBusy(false);
+      if (/not confirmed/i.test(error.message)) { setUnconfirmed(true); setErr("This account is not confirmed yet. Open the link we emailed you, or wait for your administrator to confirm it."); return; }
+      setErr(error.message); return;
+    }
     const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
       const { data: f } = await sb.auth.mfa.listFactors();
@@ -82,6 +89,17 @@ export default function LoginPage() {
       if (totp) { setFactorId(totp.id); setBusy(false); return; }
     }
     await finish();
+  }
+
+  /** Sign-in emails from Synergy Swift: a password reset link, or the confirmation link again. */
+  async function mail(action: "reset" | "resend") {
+    if (!email.trim()) { setErr("Enter your email address first."); return; }
+    const to = signInEmail(email);
+    if (isUsernameEmail(to)) { setErr("Ask your teacher for a new starting password. They can reset it on the class page."); return; }
+    setErr(null); setInfo(null);
+    const r = await fetch("/api/auth/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, email: to }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) setInfo(j.message); else setErr(j.error ?? "Please try again in a minute.");
   }
 
   async function onCode(e: React.FormEvent) {
@@ -130,7 +148,12 @@ export default function LoginPage() {
                 <input className="input" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
               {err && <p className="text-sm text-rose-600">{err}</p>}
+              {info && <p role="status" className="text-sm text-emerald-700">{info}</p>}
               <button className="btn btn-primary w-full" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+              <div className="flex flex-wrap justify-between gap-2 text-xs">
+                <button type="button" className="font-medium text-brand-700 hover:underline" onClick={() => mail("reset")}>Forgot password?</button>
+                {unconfirmed && <button type="button" className="font-medium text-brand-700 hover:underline" onClick={() => mail("resend")}>Send the confirmation email again</button>}
+              </div>
               <p className="text-center text-xs leading-relaxed text-slate-500">
                 Staff and parents get an invitation from their school.{" "}
                 <Link href="/student/join" className="font-medium text-brand-700 hover:underline">Students: join a class</Link>

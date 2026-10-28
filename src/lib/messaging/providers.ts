@@ -12,7 +12,9 @@ export type SendResult =
   | { ok: true; providerId?: string }
   | { ok: false; error: string; retryable: boolean; notConfigured?: boolean };
 
-export type EmailMessage = { to: string; toName?: string | null; subject: string; text: string; html?: string | null; fromName?: string | null; replyTo?: string | null };
+export type EmailMessage = { to: string; toName?: string | null; subject: string; text: string; html?: string | null; fromName?: string | null; replyTo?: string | null;
+  /** Sign-in links: no click tracking, which would rewrite (and could spend) the one-time link. */
+  noTracking?: boolean };
 export type WhatsAppMessage = { to: string; text: string; template?: string | null; params?: string[] };
 
 const env = (k: string) => {
@@ -67,7 +69,8 @@ export async function sendEmail(m: EmailMessage): Promise<SendResult> {
           from: { email: fromAddr.replace(/^.*<|>.*$/g, ""), name: m.fromName ?? undefined },
           reply_to: m.replyTo ? { email: m.replyTo } : undefined,
           subject: m.subject,
-          content: [{ type: "text/plain", value: m.text }, ...(m.html ? [{ type: "text/html", value: m.html }] : [])]
+          content: [{ type: "text/plain", value: m.text }, ...(m.html ? [{ type: "text/html", value: m.html }] : [])],
+          tracking_settings: m.noTracking ? { click_tracking: { enable: false, enable_text: false }, open_tracking: { enable: false } } : undefined
         })
       });
       if (r.ok) return { ok: true, providerId: r.headers.get("x-message-id") ?? undefined };

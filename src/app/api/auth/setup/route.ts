@@ -46,12 +46,14 @@ export async function POST(req: NextRequest) {
   if (Array.isArray(groups) && groups.length) return NextResponse.json({ ok: true, group: true, already: true, next: "/group" });
 
   const body = await req.json().catch(() => ({}));
-  const role = String(body.role ?? "");
+  // Sign-ups that had to confirm their email first carry their answers on the account (/api/auth/register).
+  const signedUp = (user.user_metadata ?? {}) as { signup_as?: string; join_code?: string };
+  const role = String(body.role ?? (signedUp.signup_as === "student" ? "student" : ""));
   const fullName = String(body.full_name ?? user.user_metadata?.full_name ?? user.email ?? "User").slice(0, 120);
   const svc = createServiceClient();
 
   if (role === "student") {
-    const code = String(body.join_code ?? "").trim().toUpperCase();
+    const code = String(body.join_code ?? signedUp.join_code ?? "").trim().toUpperCase();
     if (!code) return NextResponse.json({ error: "join_code required for students" }, { status: 400 });
     const { data: cls } = await sb.rpc("class_lookup_by_code", { p_code: code });
     const c = cls?.[0] as { id: string; tenant_id: string } | undefined;
