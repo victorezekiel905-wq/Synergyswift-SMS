@@ -110,6 +110,8 @@ export async function resolveCtx(): Promise<Ctx | CtxError> {
   }
   // Own role and extra roles, plus a custom role's grants, within the roles the platform allows this school.
   const roles = effectiveRoles([profile.role, ...(profile.extra_roles ?? [])], customRole, tenant.allowed_roles ?? null);
+  store.tenantId = tenant.id;
+  store.userId = user.id;
   return { sb, userId: user.id, profile: { ...profile, extra_roles: profile.extra_roles ?? [] }, tenant, roles, customRole };
 }
 
@@ -160,6 +162,7 @@ export async function requirePlatformAdmin(need: PlatformRole = "support"): Prom
   const { data: role } = await sb.rpc("platform_role");
   if (!role) return jsonError("not found", 404); // don't reveal the console exists
   if (!platformAtLeast(role, need)) return jsonError(need === "owner" ? "only the platform owner can do this" : "your platform role can only view", 403);
+  store.userId = user.id;
   return { sb, userId: user.id, role };
 }
 

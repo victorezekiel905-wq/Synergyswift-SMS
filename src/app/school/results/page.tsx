@@ -322,6 +322,7 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [editing, setEditing] = useState<Card | null>(null);
+  const [style, setStyle] = useState<{ tone: string; length: string; overwrite: boolean }>({ tone: "warm", length: "short", overwrite: false });
   const subjects = useMemo(() => {
     const out: { id: string; name: string }[] = [];
     for (const c of data ?? []) for (const s of c.data?.subjects ?? []) if (!out.some(x => x.id === s.subject_id)) out.push({ id: s.subject_id, name: s.subject });
@@ -350,10 +351,17 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
   }
   async function draftComments(role: "form_teacher" | "principal") {
     setBusy("draft_" + role);
-    const r = await send("/api/results/draft-comments", { term_id: termId, class_group_id: cg, role, kind });
+    if (style.overwrite && !confirm("Rewrite every unpublished comment in this class, including ones already written?")) { setBusy(null); return; }
+    const r = await send("/api/results/draft-comments", { term_id: termId, class_group_id: cg, role, kind, tone: style.tone, length: style.length, overwrite: style.overwrite });
     setBusy(null);
     setMsg({ ok: r.ok, text: r.ok ? `Drafted ${r.data.drafted} comments${r.data.note ? ` (${r.data.note})` : ""}. Read and edit them before publishing.` : r.error ?? "failed" });
     if (r.ok) reload();
+  }
+  /** A fresh draft for one student, shown in the form and saved only when the teacher saves. */
+  async function writeOne(card: Card, role: "form_teacher" | "principal"): Promise<string | null> {
+    const r = await send("/api/results/draft-comments", { term_id: termId, class_group_id: cg, role, kind, tone: style.tone, length: style.length, student_id: card.student_id, preview: true });
+    if (!r.ok) { setMsg({ ok: false, text: r.error ?? "failed" }); return null; }
+    return r.data.comments?.[card.student_id] ?? null;
   }
   async function patch(id: string, body: Record<string, unknown>) {
     const r = await send("/api/results/report-cards", { id, ...body }, "PATCH");
@@ -385,6 +393,19 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
         {isAdmin && <button className="btn btn-outline" disabled={busy !== null || !data?.length} onClick={() => draftComments("principal")}>{busy === "draft_principal" ? "Drafting comments…" : "Draft principal comments"}</button>}
         <a className="btn btn-ghost ml-auto" href={`/api/results/report-cards?term_id=${termId}&class_group_id=${cg}&kind=${kind}&format=csv`}>Download broadsheet (CSV)</a>
       </div>
+      {(isAdmin || isFormTeacher) && (data?.length ?? 0) > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
+          <span className="font-medium text-slate-700">Comment style</span>
+          <select className="input w-auto py-1 text-sm" aria-label="Tone" value={style.tone} onChange={e => setStyle({ ...style, tone: e.target.value })}>
+            <option value="warm">Warm</option><option value="formal">Formal</option><option value="encouraging">Encouraging</option><option value="firm">Firm</option>
+          </select>
+          <select className="input w-auto py-1 text-sm" aria-label="Length" value={style.length} onChange={e => setStyle({ ...style, length: e.target.value })}>
+            <option value="short">Short (1–2 sentences)</option><option value="medium">Longer (2–3 sentences)</option>
+          </select>
+          <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={style.overwrite} onChange={e => setStyle({ ...style, overwrite: e.target.checked })} /> Rewrite comments already written</label>
+          <span className="text-xs text-slate-500">Each comment uses the student&apos;s own subjects, progress since last term, attendance and conduct ratings.</span>
+        </div>
+      )}
       {error && <Alert>{error}</Alert>}
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
       {incomplete > 0 && <div className="mb-3"><Alert tone="amber">{incomplete} students have subjects with missing components (for example no exam score yet). Check before publishing.</Alert></div>}
@@ -419,19 +440,31 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
         </div>
       )}
       <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title={`Comments: ${editing?.data.student_name ?? ""}`}>
-        {editing && <CommentForm card={editing} isAdmin={isAdmin} onSave={async (b) => { await patch(editing.id, b); setEditing(null); }} />}
+        {editing && <CommentForm card={editing} isAdmin={isAdmin} draft={(role) => writeOne(editing, role)} onSave={async (b) => { await patch(editing.id, b); setEditing(null); }} />}
       </Modal>
     </div>
   );
 }
 
-function CommentForm({ card, isAdmin, onSave }: { card: Card; isAdmin: boolean; onSave: (b: Record<string, unknown>) => void }) {
+function CommentForm({ card, isAdmin, onSave, draft }: { card: Card; isAdmin: boolean; onSave: (b: Record<string, unknown>) => void; draft: (role: "form_teacher" | "principal") => Promise<string | null> }) {
   const [t, setT] = useState(card.teacher_comment ?? "");
   const [p, setP] = useState(card.principal_comment ?? "");
+  const [writing, setWriting] = useState<string | null>(null);
+  const write = async (role: "form_teacher" | "principal") => {
+    setWriting(role);
+    const text = await draft(role);
+    setWriting(null);
+    if (text) (role === "principal" ? setP : setT)(text);
+  };
+  const writeBtn = (role: "form_teacher" | "principal") => (
+    <button type="button" className="btn btn-ghost px-2 py-1 text-xs" disabled={writing !== null} onClick={() => write(role)}>{writing === role ? "Writing…" : "Write for me"}</button>
+  );
   return (
     <form className="space-y-3" onSubmit={e => { e.preventDefault(); onSave(isAdmin ? { teacher_comment: t, principal_comment: p } : { teacher_comment: t }); }}>
+      <div className="flex justify-end -mb-2">{writeBtn("form_teacher")}</div>
       <Field label="Form teacher's comment"><textarea className="input h-24" value={t} onChange={e => setT(e.target.value)} maxLength={600} /></Field>
       <CommentBankPicker role="form_teacher" average={card.average} name={card.data.student_name} onPick={setT} isAdmin={isAdmin} />
+      {isAdmin && <div className="flex justify-end -mb-2">{writeBtn("principal")}</div>}
       {isAdmin && <Field label="Principal's comment"><textarea className="input h-24" value={p} onChange={e => setP(e.target.value)} maxLength={600} /></Field>}
       {isAdmin && <CommentBankPicker role="principal" average={card.average} name={card.data.student_name} onPick={setP} isAdmin={isAdmin} />}
       <div className="flex justify-end"><button className="btn btn-primary">Save</button></div>

@@ -31,7 +31,7 @@ export const POST = withErrorLog(async function POST(req: Request) {
   const count = Math.min(20, Math.max(1, Math.round(Number(body.count) || 10)));
   const kinds = (body.kinds ?? []).filter((k): k is (typeof AI_KINDS)[number] => (AI_KINDS as readonly string[]).includes(k));
   try {
-    const questions = await draftQuestions({ source: { topic, text, pdfBase64: pdf }, level, subject: body.subject?.trim().slice(0, 60) || undefined, count, kinds });
+    const questions = await draftQuestions({ source: { topic, text, pdfBase64: pdf }, level, subject: body.subject?.trim().slice(0, 60) || undefined, count, kinds, tenantId: me.tenant_id, userId: me.id });
     if (!questions.length) return fail(422, "No usable questions came back. Try a clearer topic or different notes.");
     return ok({ questions });
   } catch (e) {

@@ -1,19 +1,21 @@
 import "server-only";
 import { DECK_LAYOUTS, type Outline, type Photo } from "@/live/slides/ai-deck";
+import * as z from "zod/v4";
+import { generateJson, aiConfigured, AiUnavailable, AiDeclined } from "@/lib/ai";
 
 /*
  * "Create slides with AI". Gemini writes a lesson outline (what each slide says and
  * which photo would help, plus notes for the teacher); Unsplash finds the photos;
  * src/slides/ai-deck.ts designs the slides. Keys live on the server only:
- * GEMINI_API_KEY (and optionally GEMINI_MODEL), UNSPLASH_ACCESS_KEY.
+ * GEMINI_API_KEY (through src/lib/ai.ts), UNSPLASH_ACCESS_KEY.
  */
 
 export class SlidesUnavailable extends Error {}
 
-export const slidesConfigured = () => Boolean(process.env.GEMINI_API_KEY?.trim());
+export const slidesConfigured = aiConfigured;
 export const photosConfigured = () => Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim());
 
-export type SlidesRequest = { topic: string; level: string; subject?: string; count: number; notes?: string; pictures: boolean };
+export type SlidesRequest = { topic: string; level: string; subject?: string; count: number; notes?: string; pictures: boolean; tenantId?: string; userId?: string };
 
 const SYSTEM = `You plan lesson slides for Synergy Swift, a live lesson platform used by teachers in Nigerian schools and elsewhere.
 
@@ -34,87 +36,35 @@ Plan slides a good teacher would be proud to project:
 - image_query: for picture, big_picture and (optionally) title: 2 to 4 plain English words for a real photograph that exists on a stock photo site, e.g. "green leaf sunlight", "market in Lagos". Never ask for diagrams, text, logos or famous people. Leave it empty on other layouts.
 - notes: 2 to 4 sentences the teacher can say or do for that slide (an example, a question to ask, a quick activity).`;
 
-const SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    title: { type: "STRING" },
-    slides: {
-      type: "ARRAY",
-      items: {
-        type: "OBJECT",
-        properties: {
-          layout: { type: "STRING", enum: [...DECK_LAYOUTS] },
-          heading: { type: "STRING" },
-          subheading: { type: "STRING" },
-          points: { type: "ARRAY", items: { type: "STRING" } },
-          left_heading: { type: "STRING" },
-          left_points: { type: "ARRAY", items: { type: "STRING" } },
-          right_heading: { type: "STRING" },
-          right_points: { type: "ARRAY", items: { type: "STRING" } },
-          image_query: { type: "STRING" },
-          notes: { type: "STRING" }
-        },
-        required: ["layout", "heading", "notes"],
-        propertyOrdering: ["layout", "heading", "subheading", "points", "left_heading", "left_points", "right_heading", "right_points", "image_query", "notes"]
-      }
-    }
-  },
-  required: ["title", "slides"],
-  propertyOrdering: ["title", "slides"]
-};
-
-type GeminiReply = { candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[]; promptFeedback?: { blockReason?: string }; error?: { message?: string; status?: string } };
+const Slide = z.object({
+  layout: z.enum(DECK_LAYOUTS),
+  heading: z.string(),
+  subheading: z.string().optional(),
+  points: z.array(z.string()).optional(),
+  left_heading: z.string().optional(),
+  left_points: z.array(z.string()).optional(),
+  right_heading: z.string().optional(),
+  right_points: z.array(z.string()).optional(),
+  image_query: z.string().optional(),
+  notes: z.string()
+});
+const OutlineSchema = z.object({ title: z.string(), slides: z.array(Slide) });
 
 /** Asks Gemini for the outline. Throws SlidesUnavailable for anything the teacher should be told plainly. */
 export async function outlineSlides(req: SlidesRequest): Promise<Outline> {
-  const key = process.env.GEMINI_API_KEY?.trim();
-  if (!key) throw new SlidesUnavailable("Creating slides with AI isn't set up on this site yet. Ask your Synergy Swift administrator to add a Gemini API key.");
-  const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+  if (!slidesConfigured()) throw new SlidesUnavailable("Creating slides with AI isn't set up on this site yet. Ask your Synergy Swift administrator to add a Gemini API key.");
   const brief = [
     `Plan ${req.count} slides on "${req.topic}" for ${req.level}${req.subject ? `, ${req.subject}` : ""}.`,
     req.pictures ? "Use picture or big_picture layouts on about a third of the slides." : "Don't use the picture or big_picture layouts, and leave image_query empty.",
     req.notes ? `Base the slides on these notes from the teacher, and stay inside them:\n<notes>\n${req.notes}\n</notes>` : ""
   ].filter(Boolean).join("\n\n");
-  const body = JSON.stringify({
-    systemInstruction: { parts: [{ text: SYSTEM }] },
-    contents: [{ role: "user", parts: [{ text: brief }] }],
-    generationConfig: { responseMimeType: "application/json", responseSchema: SCHEMA, temperature: 0.6, maxOutputTokens: 16384 }
-  });
-
-  // Google AI Studio keys use the Gemini API; Vertex AI "express" keys use Vertex. Try both.
-  const endpoints: { url: string; headers: Record<string, string> }[] = [
-    { url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, headers: { "x-goog-api-key": key } },
-    { url: `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent?key=${encodeURIComponent(key)}`, headers: {} }
-  ];
-  let lastProblem = "";
-  for (const ep of endpoints) {
-    let res: Response;
-    try {
-      res = await fetch(ep.url, { method: "POST", headers: { "Content-Type": "application/json", ...ep.headers }, body, signal: AbortSignal.timeout(90_000) });
-    } catch (e) {
-      lastProblem = (e as Error).name === "TimeoutError" ? "timeout" : "network";
-      continue;
-    }
-    const data = (await res.json().catch(() => ({}))) as GeminiReply;
-    if (res.status === 429) throw new SlidesUnavailable("The AI is busy or this site has used its Gemini allowance. Try again in a minute.");
-    if (!res.ok) { lastProblem = `${res.status} ${data.error?.status ?? ""} ${data.error?.message ?? ""}`; continue; }
-    if (data.promptFeedback?.blockReason) throw new SlidesUnavailable("The AI wouldn't plan slides for that. Try wording the topic differently.");
-    const raw = (data.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
-    try {
-      const parsed = JSON.parse(raw) as Outline;
-      if (!parsed || !Array.isArray(parsed.slides)) throw new Error("no slides");
-      return parsed;
-    } catch {
-      throw new SlidesUnavailable(data.candidates?.[0]?.finishReason === "MAX_TOKENS"
-        ? "That was too long for one go. Ask for fewer slides." : "The AI's answer came back broken. Try again.");
-    }
+  try {
+    return await generateJson({ task: "slides", schema: OutlineSchema, system: SYSTEM, prompt: brief, temperature: 0.6, maxTokens: 16384,
+      quality: "best", timeoutMs: 90_000, tenantId: req.tenantId ?? null, userId: req.userId ?? null });
+  } catch (e) {
+    if (e instanceof AiUnavailable || e instanceof AiDeclined) throw new SlidesUnavailable(e instanceof AiDeclined ? "The AI wouldn't plan slides for that. Try wording the topic differently." : e.message);
+    throw e;
   }
-  console.error("[ai-slides] Gemini failed:", lastProblem.slice(0, 300));
-  if (/API_KEY_INVALID|API key not valid|PERMISSION_DENIED|UNAUTHENTICATED|40[13]/.test(lastProblem)) {
-    throw new SlidesUnavailable("The site's Gemini API key was refused. Ask your Synergy Swift administrator to check it.");
-  }
-  if (/^404/.test(lastProblem)) throw new SlidesUnavailable("The Gemini model set for this site wasn't found. Ask your administrator to check GEMINI_MODEL.");
-  throw new SlidesUnavailable("Couldn't reach the AI just now. Try again in a minute.");
 }
 
 type UnsplashPhoto = {

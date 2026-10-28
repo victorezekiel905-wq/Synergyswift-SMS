@@ -88,7 +88,16 @@ services:
         sync: false
       - key: MICROSOFT_TENANT
         value: common
-      # ---- Drafting and translation ----
+      # ---- AI on Google Gemini (phase 14p) ----
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: AI_MONTHLY_LIMIT
+        value: "3000"
+      - key: UNSPLASH_ACCESS_KEY
+        sync: false
+      # Only used when GEMINI_API_KEY is empty.
       - key: ANTHROPIC_API_KEY
         sync: false
 

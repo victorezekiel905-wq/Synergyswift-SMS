@@ -28,7 +28,7 @@ export default function QuizGenerator({ subjects, defaults, onSaved }: { subject
   const [drafts, setDrafts] = useState<(Q & { keep: boolean })[]>([]);
   const [practice, setPractice] = useState(true);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  if (avail && !avail.available) return <Alert tone="amber">Question drafting is not set up on this server (ANTHROPIC_API_KEY).</Alert>;
+  if (avail && !avail.available) return <Alert tone="amber">Question drafting is not set up on this server (GEMINI_API_KEY).</Alert>;
 
   async function generate(e: React.FormEvent) {
     e.preventDefault();

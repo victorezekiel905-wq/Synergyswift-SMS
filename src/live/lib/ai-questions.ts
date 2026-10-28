@@ -1,15 +1,14 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import * as z from "zod/v4";
+import { generateJson, aiConfigured as sharedConfigured, AiUnavailable as SharedUnavailable, AiDeclined } from "@/lib/ai";
 import { toImported } from "./ai-question-shape";
 import type { ImportedQuestion } from "./question-import";
 
 /*
- * "Write with AI": Claude drafts questions from a topic, pasted notes or a PDF.
+ * "Write with AI": the AI drafts questions from a topic, pasted notes or a PDF.
  * They come back in the importer's own shape (ImportedQuestion), so the teacher
  * sees them in the same editable preview as pasted questions and nothing is added
- * until they choose to. Needs ANTHROPIC_API_KEY on the server.
+ * until they choose to. Needs GEMINI_API_KEY on the server (src/lib/ai.ts).
  */
 
 export const AI_KINDS = ["mcq", "multi_select", "true_false", "short", "fill_blank"] as const;
@@ -27,13 +26,11 @@ const Question = z.object({
 const Output = z.object({ questions: z.array(Question) });
 
 export type AiSource = { topic?: string; text?: string; pdfBase64?: string };
-export type AiRequest = { source: AiSource; level: string; subject?: string; count: number; kinds: AiKind[] };
+export type AiRequest = { source: AiSource; level: string; subject?: string; count: number; kinds: AiKind[]; tenantId?: string; userId?: string };
 
 export class AiUnavailable extends Error {}
 
-export function aiConfigured(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
-}
+export const aiConfigured = sharedConfigured;
 
 const SYSTEM = `You write classroom questions for Synergy Swift, a live lesson and quiz platform used in schools in Nigeria and elsewhere.
 
@@ -45,10 +42,9 @@ Write questions a good teacher would be glad to use:
 - When source material is given, base every question on it and stay inside it. Never invent facts beyond it.
 - Keep each question short enough to read on a phone in a few seconds.`;
 
-/** Drafts questions with Claude. Throws AiUnavailable for anything the teacher should be told plainly. */
+/** Drafts questions. Throws AiUnavailable for anything the teacher should be told plainly. */
 export async function draftQuestions(req: AiRequest): Promise<ImportedQuestion[]> {
-  if (!aiConfigured()) throw new AiUnavailable("AI question writing isn't set up on this site yet. Ask your Synergy Swift administrator to add an Anthropic API key.");
-  const client = new Anthropic();
+  if (!aiConfigured()) throw new AiUnavailable("AI question writing isn't set up on this site yet. Ask your Synergy Swift administrator to add a Gemini API key.");
   const kinds = req.kinds.length ? req.kinds : (["mcq", "true_false"] as AiKind[]);
   const brief = [
     `Write ${req.count} questions for ${req.level}${req.subject ? `, ${req.subject}` : ""}.`,
@@ -57,35 +53,15 @@ export async function draftQuestions(req: AiRequest): Promise<ImportedQuestion[]
     req.source.text ? `Base the questions on these notes:\n<notes>\n${req.source.text}\n</notes>` : "",
     req.source.pdfBase64 ? "Base the questions on the attached document." : ""
   ].filter(Boolean).join("\n\n");
-
-  const content: Anthropic.Beta.BetaContentBlockParam[] = [];
-  if (req.source.pdfBase64) content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: req.source.pdfBase64 } });
-  content.push({ type: "text", text: brief });
-
-  let res;
+  let out: z.infer<typeof Output>;
   try {
-    res = await client.beta.messages.parse({
-      model: "claude-opus-5-5",
-      max_tokens: 16000,
-      system: SYSTEM,
-      messages: [{ role: "user", content }],
-      output_config: { effort: "medium", format: betaZodOutputFormat(Output) },
-      // If the main model declines, the API retries on a fallback model in the same call.
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default"
-    });
+    out = await generateJson({ task: "live_questions", schema: Output, system: SYSTEM, prompt: brief, quality: "best", temperature: 0.6, maxTokens: 16000,
+      files: req.source.pdfBase64 ? [{ mimeType: "application/pdf", base64: req.source.pdfBase64 }] : [],
+      tenantId: req.tenantId ?? null, userId: req.userId ?? null });
   } catch (e) {
-    if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) {
-      throw new AiUnavailable("The site's Anthropic API key was refused. Ask your Synergy Swift administrator to check it.");
-    }
-    if (e instanceof Anthropic.RateLimitError) throw new AiUnavailable("AI question writing is busy right now. Try again in a minute.");
-    if (e instanceof Anthropic.BadRequestError) throw new AiUnavailable("That material couldn't be read. Try a shorter text, or a smaller PDF.");
-    if (e instanceof Anthropic.APIError) throw new AiUnavailable("AI question writing isn't answering right now. Try again shortly.");
+    if (e instanceof AiDeclined) throw new AiUnavailable("The AI declined to write questions from this material. Try a different topic or text.");
+    if (e instanceof SharedUnavailable) throw new AiUnavailable(e.message);
     throw e;
   }
-  if (res.stop_reason === "refusal") throw new AiUnavailable("Claude declined to write questions from this material. Try a different topic or text.");
-  if (res.stop_reason === "max_tokens") throw new AiUnavailable("That was too much to write at once. Ask for fewer questions.");
-  const out = res.parsed_output;
-  if (!out) throw new AiUnavailable("The questions came back in an unexpected form. Try again.");
   return out.questions.filter((q) => kinds.includes(q.kind)).slice(0, req.count).map(toImported).filter((q): q is ImportedQuestion => q !== null);
 }

@@ -24,7 +24,7 @@ export default function TutorAdmin() {
   return (
     <div className="space-y-4 text-sm">
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
-      {!s.available && <Alert tone="amber">The study helper needs ANTHROPIC_API_KEY on the server.</Alert>}
+      {!s.available && <Alert tone="amber">The study helper needs GEMINI_API_KEY on the server.</Alert>}
       {data.admin && (
         <form className="card flex flex-wrap items-end gap-3 p-4" onSubmit={async e => {
           e.preventDefault();

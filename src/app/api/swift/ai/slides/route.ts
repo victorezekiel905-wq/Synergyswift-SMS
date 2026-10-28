@@ -25,7 +25,7 @@ export const POST = withErrorLog(async function POST(req: Request) {
   const pictures = body?.pictures !== false && photosConfigured();
   try {
     const outline = tidyOutline(await outlineSlides({
-      topic, count, pictures,
+      topic, count, pictures, tenantId: me.tenant_id, userId: me.id,
       level: body?.level?.trim().slice(0, 60) || "a secondary school class",
       subject: body?.subject?.trim().slice(0, 60) || undefined,
       notes: body?.notes?.trim().slice(0, 30_000) || undefined

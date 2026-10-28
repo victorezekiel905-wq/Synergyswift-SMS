@@ -6,7 +6,8 @@
  */
 import { AsyncLocalStorage } from "node:async_hooks";
 
-type Store = { actor: string | null };
+/** tenantId/userId: the school and person the request is for (AI usage is counted against them). */
+type Store = { actor: string | null; tenantId?: string | null; userId?: string | null };
 const als = new AsyncLocalStorage<Store>();
 
 /** Starts (or reuses) this request's store. Call before the first await of the request's guard. */
@@ -20,4 +21,9 @@ export function beginRequest(): Store {
 
 export function currentActor(): string | null {
   return als.getStore()?.actor ?? null;
+}
+
+export function currentRequest(): { tenantId: string | null; userId: string | null } {
+  const s = als.getStore();
+  return { tenantId: s?.tenantId ?? null, userId: s?.userId ?? null };
 }

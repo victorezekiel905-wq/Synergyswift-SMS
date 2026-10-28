@@ -7,33 +7,19 @@
  * lesson notes are flagged `drafted` and go through the normal approval flow.
  * Product copy never describes how drafts are produced.
  *
- * Requires ANTHROPIC_API_KEY on the server. When it is missing the drafting
- * buttons are hidden and messages are sent untranslated.
+ * Runs on Gemini through src/lib/ai.ts (GEMINI_API_KEY). When no AI key is
+ * set the drafting buttons are hidden and messages are sent untranslated.
  */
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
 import { languageName } from "./languages";
+import { generateJson, aiConfigured, aiErrorMessage, AiDeclined } from "./ai";
 
-export const AI_MODEL = "claude-opus-5-5";
+export const assistConfigured = aiConfigured;
 
-export function assistConfigured(): boolean {
-  const k = process.env.ANTHROPIC_API_KEY;
-  return Boolean(k && !k.includes("replace"));
-}
+/** Kept for older callers: a draft the AI would not write. */
+export class DraftDeclined extends AiDeclined {}
 
-let client: Anthropic | null = null;
-function anthropic(): Anthropic {
-  if (!assistConfigured()) throw new Error("Drafting is not available on this server.");
-  client ??= new Anthropic();
-  return client;
-}
-
-// Server-side refusal fallback: if a request is declined by a safety
-// classifier, the API re-runs it on Anthropic's recommended fallback model.
-const FALLBACK_BETA = "server-side-fallback-2026-07-01";
-
-export class DraftDeclined extends Error {}
+const AS_SCHOOL = " Write as the school or the teacher would. Never mention how the text was produced, and never refer to yourself, to software, to assistants or to automation.";
 
 const LessonNoteSchema = z.object({
   topic: z.string(),
@@ -54,37 +40,23 @@ export async function generateLessonNote(p: {
   subject: string; level: string; topic: string; week?: number | null; durationMinutes?: number | null;
   curriculum?: string | null; notes?: string | null; country?: string | null;
 }): Promise<LessonNote> {
-  const response = await anthropic().messages.parse(
-    {
-      model: AI_MODEL,
-      max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium", format: zodOutputFormat(LessonNoteSchema) },
-      system:
-        "You write lesson notes for school teachers. Notes must be accurate, age-appropriate, practical for a real classroom with limited resources, " +
-        "and aligned with the stated curriculum. Use clear, simple English. Include concrete examples relevant to the students' country and daily life." +
-        " Write as the school or the teacher would. Never mention how the text was produced, and never refer to yourself, to software, to assistants or to automation.",
-      messages: [{
-        role: "user",
-        content: [
-          `Subject: ${p.subject}`,
-          `Class / level: ${p.level}`,
-          `Topic: ${p.topic}`,
-          p.week ? `Week of term: ${p.week}` : "",
-          `Lesson length: ${p.durationMinutes ?? 40} minutes`,
-          `Curriculum: ${p.curriculum ?? "the national curriculum"}`,
-          p.country ? `Country: ${p.country}` : "",
-          p.notes ? `Teacher's notes: ${p.notes}` : "",
-          "Write the complete lesson note. Step minutes should add up to the lesson length."
-        ].filter(Boolean).join("\n")
-      }],
-      fallbacks: "default"
-    },
-    { headers: { "anthropic-beta": FALLBACK_BETA } }
-  );
-  if (response.stop_reason === "refusal") throw new DraftDeclined("This lesson note could not be drafted. Please rephrase the topic.");
-  if (!response.parsed_output) throw new Error("The draft could not be completed. Please try again.");
-  return response.parsed_output;
+  return generateJson({
+    task: "lesson_note", schema: LessonNoteSchema, quality: "best", temperature: 0.6,
+    system:
+      "You write lesson notes for school teachers. Notes must be accurate, age-appropriate, practical for a real classroom with limited resources, " +
+      "and aligned with the stated curriculum. Use clear, simple English. Include concrete examples relevant to the students' country and daily life." + AS_SCHOOL,
+    prompt: [
+      `Subject: ${p.subject}`,
+      `Class / level: ${p.level}`,
+      `Topic: ${p.topic}`,
+      p.week ? `Week of term: ${p.week}` : "",
+      `Lesson length: ${p.durationMinutes ?? 40} minutes`,
+      `Curriculum: ${p.curriculum ?? "the national curriculum"}`,
+      p.country ? `Country: ${p.country}` : "",
+      p.notes ? `Teacher's notes: ${p.notes}` : "",
+      "Write the complete lesson note. Step minutes should add up to the lesson length."
+    ].filter(Boolean).join("\n")
+  });
 }
 
 /** Plain-text rendering of a generated note for the lesson-note editor. */
@@ -105,6 +77,8 @@ export function lessonNoteToText(n: LessonNote): string {
   ].join("\n");
 }
 
+// ---------------- report-card comments ----------------
+
 const CommentsSchema = z.object({
   comments: z.array(z.object({ student_id: z.string(), comment: z.string() }))
 });
@@ -112,39 +86,72 @@ const CommentsSchema = z.object({
 export type CommentInput = {
   student_id: string; first_name: string; average: number | null; position: number | null; class_size: number;
   strongest: string[]; weakest: string[]; attendance_rate: number | null; trend: "up" | "down" | "steady" | "new";
+  /** For he/she; null writes the name or "they". */
+  gender?: "male" | "female" | null;
+  previous_average?: number | null;
+  /** Subjects that rose or fell most since last term, e.g. "Mathematics +12". */
+  movers?: string[];
+  /** Character and skills ratings, e.g. "Punctuality 5/5". */
+  traits?: string[];
+  /** Teachers' effort grades and subject remarks, short. */
+  effort?: string[];
+  /** The form teacher's comment, when drafting the principal's (so the two don't repeat). */
+  teacher_comment?: string | null;
 };
 
+export type CommentStyle = { tone?: "warm" | "formal" | "encouraging" | "firm"; length?: "short" | "medium"; signoff?: boolean };
+
+const TONES: Record<NonNullable<CommentStyle["tone"]>, string> = {
+  warm: "warm and caring, like a teacher who knows the child well",
+  formal: "formal and measured, in the register of a traditional school report",
+  encouraging: "upbeat and encouraging, celebrating effort and growth",
+  firm: "honest and firm about what must change, while still respectful and hopeful"
+};
+
+/** Words and phrases that make report comments sound generic; the prompt bans them. */
+export const STOCK_PHRASES = ["keep it up", "keep up the good work", "room for improvement", "can do better", "a pleasure to have",
+  "good result", "fair result", "work harder", "more effort is needed", "excellent performance", "impressive"];
+
+/** The system prompt for one batch of comments (exported for tests). */
+export function commentSystem(role: "form_teacher" | "principal", style: CommentStyle = {}): string {
+  const len = style.length === "medium" ? "two or three sentences (40–70 words)" : "one or two sentences (20–45 words)";
+  return [
+    `You write the ${role === "principal" ? "principal's" : "form teacher's"} comment on school report cards in Nigeria (British spelling).`,
+    `Each comment is ${len}, ${TONES[style.tone ?? "warm"]}, and sounds like a real, experienced teacher wrote it about this one child.`,
+    "Make every comment personal and specific: name at least one real subject from the data (a strength, a subject that improved, or one to work on),",
+    "reflect the trend since last term when it is given, and mention attendance or conduct only when the data shows something worth saying.",
+    "End with one clear, practical next step for the term ahead (what to do, not just \"work harder\").",
+    "Use the student's first name once at most; use he/she from the gender given, or the name when no gender is given.",
+    "Vary how comments open and how they are built so no two in the batch read alike. Never start two comments with the same word.",
+    `Avoid stock phrases such as: ${STOCK_PHRASES.map(s => `"${s}"`).join(", ")}.`,
+    "Never mention other students, class rankings of others, scores that are not in the data, or anything about family, health or behaviour that the data does not show.",
+    "Do not invent facts. If the data is thin, keep the comment short and general but still kind and useful.",
+    role === "principal"
+      ? "The principal's comment is shorter and more decisive than the form teacher's, adds a different angle (overall standing, promotion readiness, a word to parents), and never repeats the form teacher's wording."
+      : "",
+    AS_SCHOOL.trim()
+  ].filter(Boolean).join(" ");
+}
+
 /**
- * Report-card comments for a whole class in one call. Only first names and
- * results are sent: no surnames, contact details or other personal data.
+ * Report-card comments for a batch of students in one call. Only first names,
+ * gender (for pronouns) and results are sent: no surnames, contact details or
+ * other personal data.
  */
-export async function generateReportComments(p: { role: "form_teacher" | "principal"; termLabel: string; passMark: number; students: CommentInput[] }) {
+export async function generateReportComments(p: { role: "form_teacher" | "principal"; termLabel: string; passMark: number; students: CommentInput[]; style?: CommentStyle }) {
   if (!p.students.length) return new Map<string, string>();
-  const response = await anthropic().messages.parse(
-    {
-      model: AI_MODEL,
-      max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium", format: zodOutputFormat(CommentsSchema) },
-      system:
-        `You write ${p.role === "principal" ? "principal's" : "form teacher's"} comments for school report cards. Each comment is one or two sentences, ` +
-        "specific to the student's results, warm and honest, and ends with one clear next step. Never mention other students, rankings of others, or anything not in the data. " +
-        "Do not repeat the same sentence across students." +
-        " Write as the school or the teacher would. Never mention how the text was produced, and never refer to yourself, to software, to assistants or to automation.",
-      messages: [{
-        role: "user",
-        content: `Term: ${p.termLabel}. Pass mark: ${p.passMark}%.\nStudents (JSON):\n${JSON.stringify(p.students)}\nReturn one comment per student_id.`
-      }],
-      fallbacks: "default"
-    },
-    { headers: { "anthropic-beta": FALLBACK_BETA } }
-  );
-  if (response.stop_reason === "refusal") throw new DraftDeclined("These comments could not be drafted. Please write them by hand.");
+  const res = await generateJson({
+    task: "report_comments", schema: CommentsSchema, temperature: 0.9, maxTokens: 12000,
+    system: commentSystem(p.role, p.style),
+    prompt: `Term: ${p.termLabel}. Pass mark: ${p.passMark}%.\nStudents (JSON):\n${JSON.stringify(p.students)}\nReturn exactly one comment per student_id.`
+  });
   const out = new Map<string, string>();
   const valid = new Set(p.students.map(s => s.student_id));
-  for (const c of response.parsed_output?.comments ?? []) if (valid.has(c.student_id)) out.set(c.student_id, c.comment.trim().slice(0, 600));
+  for (const c of res.comments) if (valid.has(c.student_id) && c.comment.trim()) out.set(c.student_id, c.comment.trim().slice(0, 600));
   return out;
 }
+
+// ---------------- translation and notices ----------------
 
 const TranslationSchema = z.object({ translations: z.array(z.string()) });
 
@@ -155,67 +162,44 @@ const TranslationSchema = z.object({ translations: z.array(z.string()) });
  */
 export async function translateTexts(p: { texts: string[]; target: string; source?: string | null }): Promise<string[]> {
   if (!p.texts.length) return [];
-  const response = await anthropic().messages.parse(
-    {
-      model: AI_MODEL,
-      max_tokens: 8000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "low", format: zodOutputFormat(TranslationSchema) },
+  try {
+    const res = await generateJson({
+      task: "translate", schema: TranslationSchema, temperature: 0.2, maxTokens: 8000,
       system:
         "You translate messages between a school and families. Translate faithfully and naturally, keeping the tone polite and warm. " +
         "Keep names, dates, times, amounts, codes, numbers and links exactly as written. Do not add or leave out anything. " +
         "Return one translation per input, in the same order. Output only the translations, with no notes about them.",
-      messages: [{
-        role: "user",
-        content: `Translate from ${p.source ? languageName(p.source) : "the source language"} into ${languageName(p.target)}.\nInputs (JSON array):\n${JSON.stringify(p.texts)}`
-      }],
-      fallbacks: "default"
-    },
-    { headers: { "anthropic-beta": FALLBACK_BETA } }
-  );
-  const out = response.parsed_output?.translations;
-  if (response.stop_reason === "refusal" || !out || out.length !== p.texts.length) return p.texts;
-  return out.map((t, i) => t.trim() || p.texts[i]);
+      prompt: `Translate from ${p.source ? languageName(p.source) : "the source language"} into ${languageName(p.target)}.\nInputs (JSON array):\n${JSON.stringify(p.texts)}`
+    });
+    if (res.translations.length !== p.texts.length) return p.texts;
+    return res.translations.map((t, i) => t.trim() || p.texts[i]);
+  } catch (e) {
+    if (e instanceof AiDeclined) return p.texts;
+    throw e;
+  }
 }
 
 const NoticeSchema = z.object({ title: z.string(), body: z.string() });
 
 /** Drafts a notice to parents from a short instruction. The sender edits it before sending. */
 export async function draftNotice(p: { instruction: string; schoolName: string; tone?: "friendly" | "formal" | "urgent" }) {
-  const response = await anthropic().messages.parse(
-    {
-      model: AI_MODEL,
-      max_tokens: 8000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "low", format: zodOutputFormat(NoticeSchema) },
-      system:
-        `You write notices from ${p.schoolName} to parents. Use plain, ${p.tone ?? "friendly"} English that reads well on a phone. ` +
-        "Keep it under 150 words, lead with what parents need to know or do, and include any date, time, place or cost given. " +
-        "Never invent facts that were not given; leave a clear [placeholder] instead. The title is at most 8 words." +
-        " Write as the school or the teacher would. Never mention how the text was produced, and never refer to yourself, to software, to assistants or to automation.",
-      messages: [{ role: "user", content: p.instruction }],
-      fallbacks: "default"
-    },
-    { headers: { "anthropic-beta": FALLBACK_BETA } }
-  );
-  if (response.stop_reason === "refusal") throw new DraftDeclined("This notice could not be drafted. Please rephrase it.");
-  if (!response.parsed_output) throw new Error("The draft could not be completed. Please try again.");
-  return { title: response.parsed_output.title.slice(0, 120), body: response.parsed_output.body.slice(0, 3000) };
+  const res = await generateJson({
+    task: "notice", schema: NoticeSchema, temperature: 0.6, maxTokens: 4000,
+    system:
+      `You write notices from ${p.schoolName} to parents. Use plain, ${p.tone ?? "friendly"} English that reads well on a phone. ` +
+      "Keep it under 150 words, lead with what parents need to know or do, and include any date, time, place or cost given. " +
+      "Never invent facts that were not given; leave a clear [placeholder] instead. The title is at most 8 words." + AS_SCHOOL,
+    prompt: p.instruction
+  });
+  return { title: res.title.slice(0, 120), body: res.body.slice(0, 3000) };
 }
 
 /** Maps service errors to messages staff can act on. */
 export function assistErrorMessage(e: unknown): { message: string; status: number } {
-  if (e instanceof DraftDeclined) return { message: e.message, status: 422 };
-  if (e instanceof Anthropic.RateLimitError) return { message: "Drafting is busy. Please try again in a minute.", status: 429 };
-  if (e instanceof Anthropic.AuthenticationError) return { message: "Drafting is not available right now. Please contact your administrator.", status: 503 };
-  if (e instanceof Anthropic.APIError) return { message: "Drafting did not finish. Please try again.", status: 502 };
-  return { message: (e as Error).message, status: 400 };
+  return aiErrorMessage(e);
 }
 
 // ---------------- learning (phase 6) ----------------
-
-/** Feedback drafts, quizzes and the study helper use the same model as the rest. */
-export const LEARNING_MODEL = AI_MODEL;
 
 const FeedbackSchema = z.object({
   feedback: z.string(),
@@ -231,36 +215,23 @@ export type FeedbackDraft = z.infer<typeof FeedbackSchema>;
  * the task and the answer are sent: no name or other personal details.
  */
 export async function draftFeedback(p: { subject: string | null; level: string | null; task: string; answer: string; maxScore: number | null; teacherNotes?: string | null }): Promise<FeedbackDraft> {
-  const response = await anthropic().messages.parse(
-    {
-      model: LEARNING_MODEL,
-      max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium", format: zodOutputFormat(FeedbackSchema) },
-      system:
-        "You help teachers write feedback on school homework. Feedback speaks directly to the student in two to four short, kind, specific sentences, " +
-        "says what was done well, and gives one or two clear next steps. Judge only what is in the answer. " +
-        "Suggest a score only when a maximum is given and the task makes the standard clear; otherwise return null. " +
-        "Use note_for_teacher for anything the teacher should check (for example, an answer that does not address the task)." +
-        " Write as the teacher would. Never mention how the text was produced, and never refer to yourself, to software, to assistants or to automation.",
-      messages: [{
-        role: "user",
-        content: [
-          p.subject ? `Subject: ${p.subject}` : "",
-          p.level ? `Class: ${p.level}` : "",
-          `Task:\n${p.task.slice(0, 8000)}`,
-          p.maxScore != null ? `Maximum score: ${p.maxScore}` : "No score is given for this task.",
-          p.teacherNotes ? `Teacher's marking notes: ${p.teacherNotes.slice(0, 2000)}` : "",
-          `Student's answer:\n${p.answer.slice(0, 30000)}`
-        ].filter(Boolean).join("\n\n")
-      }],
-      fallbacks: "default"
-    },
-    { headers: { "anthropic-beta": FALLBACK_BETA } }
-  );
-  if (response.stop_reason === "refusal") throw new DraftDeclined("Feedback for this answer could not be drafted. Please write it yourself.");
-  if (!response.parsed_output) throw new Error("The draft could not be completed. Please try again.");
-  const out = response.parsed_output;
+  const out = await generateJson({
+    task: "homework_feedback", schema: FeedbackSchema, temperature: 0.5,
+    system:
+      "You help teachers write feedback on school homework. Feedback speaks directly to the student in two to four short, kind, specific sentences, " +
+      "says what was done well, and gives one or two clear next steps. Judge only what is in the answer. " +
+      "Suggest a score only when a maximum is given and the task makes the standard clear; otherwise return null. " +
+      "Use note_for_teacher for anything the teacher should check (for example, an answer that does not address the task)." +
+      " Write as the teacher would. Never mention how the text was produced, and never refer to yourself, to software, to assistants or to automation.",
+    prompt: [
+      p.subject ? `Subject: ${p.subject}` : "",
+      p.level ? `Class: ${p.level}` : "",
+      `Task:\n${p.task.slice(0, 8000)}`,
+      p.maxScore != null ? `Maximum score: ${p.maxScore}` : "No score is given for this task.",
+      p.teacherNotes ? `Teacher's marking notes: ${p.teacherNotes.slice(0, 2000)}` : "",
+      `Student's answer:\n${p.answer.slice(0, 30000)}`
+    ].filter(Boolean).join("\n\n")
+  });
   const cap = p.maxScore ?? null;
   return { ...out, suggested_score: cap === null || out.suggested_score === null ? null : Math.max(0, Math.min(cap, out.suggested_score)) };
 }
@@ -292,35 +263,23 @@ export type GeneratedQuestion = z.infer<typeof QuizSchema>["questions"][number];
  */
 export async function generateQuiz(p: { subject: string; level: string; topic: string; count: number; types: string[]; difficulty: "mixed" | "easy" | "medium" | "hard";
   objectives?: string[]; source?: string | null; curriculum?: string | null; country?: string | null }): Promise<GeneratedQuestion[]> {
-  const response = await anthropic().messages.parse(
-    {
-      model: LEARNING_MODEL,
-      max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium", format: zodOutputFormat(QuizSchema) },
-      system:
-        "You write school quiz questions for teachers to review. Every question must have exactly one defensible correct answer, be answerable from what the class is expected to know, " +
-        "and suit the stated class level and curriculum. Vary what is tested and avoid giving answers away in the wording. Use plain text: write maths as you would type it (x^2, 3/4, sqrt(2)). " +
-        "For mcq_single give four options and the 0-based index of the correct one; for true_false set correct_true; for short_answer list every acceptable answer (short words or phrases); " +
-        "for numeric give the number, a sensible tolerance and the unit (or null). Leave the fields a type does not use as empty lists or null. " +
-        "Each explanation says in one or two sentences why the answer is right, for a student who got it wrong. When objectives are given, set objective to the one the question tests.",
-      messages: [{
-        role: "user",
-        content: [
-          `Subject: ${p.subject}`, `Class level: ${p.level}`, `Topic: ${p.topic}`,
-          p.curriculum ? `Curriculum: ${p.curriculum}` : "", p.country ? `Country: ${p.country}` : "",
-          `Write ${Math.min(20, Math.max(1, p.count))} questions. Allowed types: ${p.types.join(", ")}. Difficulty: ${p.difficulty === "mixed" ? "a mix of easy, medium and hard" : p.difficulty}.`,
-          p.objectives?.length ? `Curriculum objectives to cover:\n${p.objectives.map(o => `- ${o}`).join("\n")}` : "",
-          p.source ? `Base the questions on these lesson notes:\n${p.source.slice(0, 30000)}` : ""
-        ].filter(Boolean).join("\n\n")
-      }],
-      fallbacks: "default"
-    },
-    { headers: { "anthropic-beta": FALLBACK_BETA } }
-  );
-  if (response.stop_reason === "refusal") throw new DraftDeclined("Questions for this topic could not be drafted. Try rewording the topic.");
-  if (!response.parsed_output) throw new Error("The questions could not be completed. Please try again.");
-  return response.parsed_output.questions.filter(q => p.types.includes(q.type));
+  const res = await generateJson({
+    task: "quiz", schema: QuizSchema, quality: "best", temperature: 0.6,
+    system:
+      "You write school quiz questions for teachers to review. Every question must have exactly one defensible correct answer, be answerable from what the class is expected to know, " +
+      "and suit the stated class level and curriculum. Vary what is tested and avoid giving answers away in the wording. Use plain text: write maths as you would type it (x^2, 3/4, sqrt(2)). " +
+      "For mcq_single give four options and the 0-based index of the correct one; for true_false set correct_true; for short_answer list every acceptable answer (short words or phrases); " +
+      "for numeric give the number, a sensible tolerance and the unit (or null). Leave the fields a type does not use as empty lists or null. " +
+      "Each explanation says in one or two sentences why the answer is right, for a student who got it wrong. When objectives are given, set objective to the one the question tests.",
+    prompt: [
+      `Subject: ${p.subject}`, `Class level: ${p.level}`, `Topic: ${p.topic}`,
+      p.curriculum ? `Curriculum: ${p.curriculum}` : "", p.country ? `Country: ${p.country}` : "",
+      `Write ${Math.min(20, Math.max(1, p.count))} questions. Allowed types: ${p.types.join(", ")}. Difficulty: ${p.difficulty === "mixed" ? "a mix of easy, medium and hard" : p.difficulty}.`,
+      p.objectives?.length ? `Curriculum objectives to cover:\n${p.objectives.map(o => `- ${o}`).join("\n")}` : "",
+      p.source ? `Base the questions on these lesson notes:\n${p.source.slice(0, 30000)}` : ""
+    ].filter(Boolean).join("\n\n")
+  });
+  return res.questions.filter(q => p.types.includes(q.type));
 }
 
 // ---------------- study tutor ----------------
@@ -333,21 +292,18 @@ export type TutorTurn = { role: "student" | "tutor"; content: string };
  * study helper and that their teachers and parents can read the chat.
  */
 export async function tutorReply(p: { level: string | null; subject: string | null; schoolName: string; context?: { kind: string; title: string; text: string } | null; history: TutorTurn[] }) {
-  // The API needs turns to alternate, starting with the student.
-  const turns: { role: "user" | "assistant"; content: string }[] = [];
+  // Turns alternate, starting with the student.
+  const turns: { role: "user" | "model"; text: string }[] = [];
   for (const t of p.history.slice(-24)) {
-    const role = t.role === "student" ? "user" : "assistant";
-    if (!turns.length && role === "assistant") continue;
+    const role = t.role === "student" ? "user" : "model";
+    if (!turns.length && role === "model") continue;
     const last = turns[turns.length - 1];
-    if (last && last.role === role) last.content += `\n\n${t.content}`;
-    else turns.push({ role, content: t.content.slice(0, 8000) });
+    if (last && last.role === role) last.text += `\n\n${t.content}`;
+    else turns.push({ role, text: t.content.slice(0, 8000) });
   }
-  const response = await anthropic().messages.parse(
-    {
-      model: LEARNING_MODEL,
-      max_tokens: 6000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "low", format: zodOutputFormat(TutorSchema) },
+  try {
+    return await generateJson({
+      task: "tutor", schema: TutorSchema, temperature: 0.6, maxTokens: 4000, turns,
       system:
         `You are the study helper for students at ${p.schoolName}${p.level ? `, talking with a student in ${p.level}` : ""}${p.subject ? ` about ${p.subject}` : ""}. ` +
         "The student knows you are an AI study helper and that their teachers and parents can read this chat. " +
@@ -358,15 +314,11 @@ export async function tutorReply(p: { level: string | null; subject: string | nu
         "If the student says they are being hurt, are in danger, are thinking about harming themselves, or someone is harming them, reply with warmth, tell them it matters, and urge them to talk to a trusted adult or the school counsellor today; set concern to \"safety\". " +
         "If they seem very upset, stressed, lonely or bullied, be kind, suggest talking to someone they trust at school, and set concern to \"wellbeing\". Otherwise set concern to \"none\". " +
         "Set title to a short name (two to six words) for what this conversation is about." +
-        (p.context ? `\n\nThe student opened this chat from their ${p.context.kind} "${p.context.title}":\n${p.context.text.slice(0, 6000)}` : ""),
-      messages: turns,
-      fallbacks: "default"
-    },
-    { headers: { "anthropic-beta": FALLBACK_BETA } }
-  );
-  if (response.stop_reason === "refusal") {
-    return { reply: "I can't help with that one. Let's get back to your school work, or talk to your teacher about it.", concern: "none" as const, title: "" };
+        (p.context ? `\n\nThe student opened this chat from their ${p.context.kind} "${p.context.title}":\n${p.context.text.slice(0, 6000)}` : "")
+    });
+  } catch (e) {
+    // A blocked message may be a child saying something worrying: flag it for staff rather than drop it.
+    if (e instanceof AiDeclined) return { reply: "I can't help with that one here. If something is worrying you, please talk to a trusted adult or your school counsellor today. Otherwise, let's get back to your school work.", concern: "wellbeing" as const, title: "" };
+    throw e;
   }
-  if (!response.parsed_output) throw new Error("The study helper did not finish. Please try again.");
-  return response.parsed_output;
 }
