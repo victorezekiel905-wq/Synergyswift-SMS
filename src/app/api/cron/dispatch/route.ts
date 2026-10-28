@@ -12,11 +12,9 @@ import { snapshotKpis } from "@/lib/portal-server";
 import { sendDueReports } from "@/lib/report-builder-server";
 import { deliverWebhooks } from "@/lib/open-api-server";
 import { appUrl } from "@/lib/school";
-import { runBilling } from "@/lib/saas-server";
-import { runAccountAutomation } from "@/lib/accounts-server";
-import { runEntranceAutomation } from "@/lib/entrance-server";
 import { runBusChecks } from "@/lib/bus-checks-server";
 import { endExpiredSupport } from "@/lib/support-server";
+import { takeCronLock, releaseCronLock, startCron } from "@/lib/cron-lock";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -34,11 +32,20 @@ async function run(req: NextRequest) {
   const svc = createServiceClient();
   // Heartbeat for the super admin centre's health panel.
   await svc.from("platform_settings").upsert({ key: "cron.dispatch", value: { at: new Date().toISOString() }, updated_at: new Date().toISOString() }).then(() => null, () => null);
+  const base = appUrl(req);
+  // Slow jobs every 5 minutes and AI jobs every 10, each in its own request with its own lock.
+  const minute = new Date().getUTCMinutes();
+  if (minute % 5 === 0) startCron(base, "/api/cron/slow", secret);
+  if (minute % 10 === 0) startCron(base, "/api/cron/ai", secret);
+  // One dispatcher at a time: if the last run is still sending, this one steps aside.
+  const lock = await takeCronLock(svc, "dispatch", 58);
+  if (lock.skip) return NextResponse.json({ ok: true, skipped: "previous run still going" });
+  try { return await work(svc, base); } finally { await releaseCronLock(svc, "dispatch", lock.run); }
+}
+
+async function work(svc: any, base: string) {
   await requeueStale(svc);
   // Admissions follow-ups and visit reminders queue messages, which this run then sends.
-  const base = appUrl(req);
-  // The AI jobs run every 10 minutes in their own request (phase 14p), so they never hold this one up.
-  if (new Date().getUTCMinutes() % 10 === 0) void fetch(`${base}/api/cron/ai`, { headers: { authorization: `Bearer ${secret}` } }).catch(() => null);
   const followUps = await processSequences(svc, { limit: 50, baseUrl: base }).catch(() => null);
   const reminders = await sendBookingReminders(svc, base).catch(() => 0);
   // Overdue complaints escalate to the admins; scheduled campaigns go out.
@@ -59,18 +66,12 @@ async function run(req: NextRequest) {
   const scheduledReports = await sendDueReports(svc, base).catch(() => 0);
   // Signed webhooks to other systems, with retries.
   const webhooks = await deliverWebhooks(svc).catch(() => null);
-  // Synergy Swift billing: renewals, overdue and paused schools, cancellations, module end dates.
-  const billing = await runBilling(svc).catch(() => null);
-  // New students get sign-ins (sent to their parents); new parents get invited.
-  const accounts = await runAccountAutomation(svc, base).catch(() => null);
-  // Entrance tests: seats, PINs, reminders, absences and decisions (queued, then sent below).
-  const entrance = await runEntranceAutomation(svc, base).catch(() => null);
   // Every five minutes: children who boarded a bus but are not in school, or were never dropped off.
   const busChecks = await runBusChecks(svc, base).catch(() => null);
   // Support access that has run out is closed and its sign-in banned (the database already ignores it).
   const supportEnded = await endExpiredSupport(svc).catch(() => 0);
   const stats = await dispatchDue(svc, { budgetMs: 40_000, limit: 100, concurrency: 10 });
-  return NextResponse.json({ ok: true, ...stats, admissions_follow_ups: followUps, visit_reminders: reminders, tickets_escalated: escalated, campaigns_sent: campaigns, notices_sent: notices, safeguarding_escalated: safeguarding, late_exeat_returns: lateReturns, library_holds_ready: holds, late_trips: lateTrips, kpi_snapshots: kpiSnapshots, scheduled_reports: scheduledReports, webhooks, billing, accounts, entrance, bus_checks: busChecks, support_ended: supportEnded });
+  return NextResponse.json({ ok: true, ...stats, admissions_follow_ups: followUps, visit_reminders: reminders, tickets_escalated: escalated, campaigns_sent: campaigns, notices_sent: notices, safeguarding_escalated: safeguarding, late_exeat_returns: lateReturns, library_holds_ready: holds, late_trips: lateTrips, kpi_snapshots: kpiSnapshots, scheduled_reports: scheduledReports, webhooks, bus_checks: busChecks, support_ended: supportEnded });
 }
 
 export const GET = run;

@@ -78,13 +78,30 @@ const STATE_ERRORS: Record<string, { error: string; status: number }> = {
 export type CtxError = { error: string; status: number; code?: string };
 
 /**
+ * The signed-in user from the session token. With asymmetric JWT signing keys
+ * (Supabase → Project Settings → JWT Keys) the token is checked locally with
+ * the cached public key, so most requests make no call to Supabase Auth; with
+ * the legacy shared secret, getClaims asks Auth, exactly as getUser did.
+ */
+export async function sessionUser(sb: any): Promise<{ id: string; app_metadata?: Record<string, unknown> } | null> {
+  if (typeof sb.auth.getClaims === "function") {
+    const { data, error } = await sb.auth.getClaims();
+    const c = data?.claims as { sub?: string; app_metadata?: Record<string, unknown> } | undefined;
+    if (!error && c?.sub) return { id: c.sub, app_metadata: c.app_metadata ?? {} };
+    return null;
+  }
+  const { data: { user } } = await sb.auth.getUser();
+  return user ?? null;
+}
+
+/**
  * Loads the signed-in user's profile and tenant, after the school's network
  * and device rules. Names the user as the actor for the change history.
  */
 export async function resolveCtx(): Promise<Ctx | CtxError> {
   const store = beginRequest();
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb);
   if (!user) return { error: "unauthenticated", status: 401 };
   store.actor = `user:${user.id}`;
   // Synergy Swift support access (phase 14k) works only until its session ends.
@@ -156,7 +173,7 @@ export function denyUnless(ctx: Ctx, perm: Permission): NextResponse | null {
 export async function requirePlatformAdmin(need: PlatformRole = "support"): Promise<{ sb: any; userId: string; role: PlatformRole } | NextResponse> {
   const store = beginRequest();
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb);
   if (!user) return jsonError("unauthenticated", 401);
   store.actor = `user:${user.id}`;
   const { data: role } = await sb.rpc("platform_role");

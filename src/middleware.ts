@@ -19,7 +19,9 @@ export async function middleware(request: NextRequest) {
       }
     }
   );
-  await supabase.auth.getUser();
+  // Refreshes the session cookie when it is about to expire. getClaims checks the token locally when the
+  // project uses asymmetric signing keys (no call to Supabase Auth on every page and API request).
+  await supabase.auth.getClaims();
   // A long-lived random id for this browser, used when a school only lets staff in from approved devices.
   if (!request.cookies.get("ecf_dev")) {
     const id = Array.from(crypto.getRandomValues(new Uint8Array(20)), b => b.toString(16).padStart(2, "0")).join("");

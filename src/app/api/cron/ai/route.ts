@@ -4,6 +4,7 @@ import { aiConfigured } from "@/lib/ai";
 import { runSalesAutopilot } from "@/lib/sales-ai";
 import { runAdmissionsAutopilot } from "@/lib/admissions-ai";
 import { sendEmail } from "@/lib/messaging/providers";
+import { takeCronLock, releaseCronLock } from "@/lib/cron-lock";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -20,15 +21,13 @@ export async function GET(req: NextRequest) {
   if (!aiConfigured()) return NextResponse.json({ skipped: "no AI key" });
   const svc = createServiceClient();
   // One run at a time: a run that overlaps the next one would draft twice.
-  const { data: lock } = await svc.from("platform_settings").select("value").eq("key", "cron.ai").maybeSingle();
-  const busyUntil = (lock?.value as { until?: string } | null)?.until;
-  if (busyUntil && Date.parse(busyUntil) > Date.now()) return NextResponse.json({ skipped: "running" });
-  await svc.from("platform_settings").upsert({ key: "cron.ai", value: { until: new Date(Date.now() + 280_000).toISOString() }, updated_at: new Date().toISOString() });
+  const lock = await takeCronLock(svc, "ai", 290);
+  if (lock.skip) return NextResponse.json({ skipped: "previous run still going" });
   try {
     const sales = await runSalesAutopilot(svc, { budgetMs: 90_000, send: (to, subject, text) => sendEmail({ to, subject, text }) }).catch(e => ({ error: (e as Error).message }));
     const admissions = await runAdmissionsAutopilot(svc, { budgetMs: 150_000 }).catch(e => ({ error: (e as Error).message }));
     return NextResponse.json({ sales, admissions });
   } finally {
-    await svc.from("platform_settings").upsert({ key: "cron.ai", value: { until: null, at: new Date().toISOString() }, updated_at: new Date().toISOString() });
+    await releaseCronLock(svc, "ai", lock.run);
   }
 }
