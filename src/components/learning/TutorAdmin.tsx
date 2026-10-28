@@ -11,17 +11,34 @@ export default function TutorAdmin() {
   const [flaggedOnly, setFlaggedOnly] = useState(false);
   const { data, reload } = useApi<{ items: Conv[]; settings: { enabled: boolean; switchedOn: boolean; limit: number; available: boolean }; admin: boolean }>(`/api/tutor${flaggedOnly ? "?flagged=1" : ""}`, [flaggedOnly]);
   const [open, setOpen] = useState<string | null>(null);
+  const [form, setForm] = useState<{ enabled: boolean; daily_limit: number } | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("conversation");
     if (id) setOpen(id);
   }, []);
   if (!data) return null;
+  const s = data.settings;
+  const f = form ?? { enabled: s.switchedOn, daily_limit: s.limit };
   const open_concerns = data.items.filter(c => c.concern && !c.reviewed_at);
   return (
     <div className="space-y-4 text-sm">
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
-      <Alert tone="amber">The study helper for students is switched off: AI tools are for teachers and school staff only. Past conversations stay below for review.</Alert>
+      {!s.available && <Alert tone="amber">The study helper needs GEMINI_API_KEY on the server.</Alert>}
+      {data.admin && (
+        <form className="card flex flex-wrap items-end gap-3 p-4" onSubmit={async e => {
+          e.preventDefault();
+          const r = await send("/api/tutor", { action: "settings", ...f });
+          setMsg({ ok: r.ok, text: r.ok ? (f.enabled ? "The study helper is on for students." : "The study helper is off.") : r.error ?? "failed" });
+          if (r.ok) { setForm(null); reload(); }
+        }}>
+          <div className="mr-auto max-w-xl"><h2 className="font-semibold">Study helper for students</h2>
+            <p className="text-xs text-slate-500">Students ask questions about their work and get hints and explanations, not homework answers. Students are told it is an AI helper and that their teachers and parents can read the chats. If a student writes something that suggests they are unsafe or very upset, counsellors, the principal and their form teacher are alerted.</p></div>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={f.enabled} onChange={e => setForm({ ...f, enabled: e.target.checked })} /> Switched on</label>
+          <Field label="Questions per student per day"><input className="input w-24" type="number" min={1} max={500} value={f.daily_limit} onChange={e => setForm({ ...f, daily_limit: Number(e.target.value) })} /></Field>
+          <button className="btn btn-primary">Save</button>
+        </form>
+      )}
       {open_concerns.length > 0 && <Alert tone="amber">{open_concerns.length} conversation{open_concerns.length === 1 ? "" : "s"} raised a concern and {open_concerns.length === 1 ? "has" : "have"} not been followed up yet.</Alert>}
       <section className="card space-y-2 p-4">
         <div className="flex items-center gap-2"><h2 className="mr-auto font-semibold">{flaggedOnly ? "Conversations with a concern" : "This week's conversations"}</h2>

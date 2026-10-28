@@ -11,8 +11,7 @@ export const maxDuration = 90;
 
 async function settings(svc: any, tid: string) {
   const { data } = await svc.from("tenant_settings").select("ai_tutor_enabled,ai_tutor_daily_limit,school_name").eq("tenant_id", tid).maybeSingle();
-  // AI is for teachers and staff only, so the students' study helper stays off (past chats can still be read).
-  return { enabled: false, switchedOn: false, limit: data?.ai_tutor_daily_limit ?? 30, school: data?.school_name ?? null, available: false, staffOnly: true, configured: assistConfigured() };
+  return { enabled: Boolean(data?.ai_tutor_enabled) && assistConfigured(), switchedOn: Boolean(data?.ai_tutor_enabled), limit: data?.ai_tutor_daily_limit ?? 30, school: data?.school_name ?? null, available: assistConfigured() };
 }
 const startOfDay = () => { const d = new Date(); d.setUTCHours(0, 0, 0, 0); return d.toISOString(); };
 

@@ -9,10 +9,11 @@
  * Each request is counted in ai_usage against the school (and person) the
  * request is for, and refused once the school has used its monthly allowance
  * (tenant_settings.ai_monthly_limit, else AI_MONTHLY_LIMIT, else 3,000).
- * AI is for teachers and school staff only: students and parents can't
- * generate anything (translating a parent's message for the school is the one
- * exception, and it counts only against the school's total). The allowance is
- * split evenly across the school's staff so the shares fit inside it. School
+ * AI tools are for teachers and school staff. Students use only the study
+ * helper (when the school switches it on), and parents nothing except having
+ * their messages translated for the school. While the study helper is on, 30%
+ * of the allowance is kept for it; the rest is split evenly across the
+ * school's staff so the shares fit inside it. School
  * admins and the principal are not held to a share (they draft for the whole
  * school, e.g. principal's comments); scheduled jobs count only against the
  * school's total.
@@ -76,8 +77,17 @@ type Raw = { text: string; model: string; inputTokens: number; outputTokens: num
 // ---------------- allowance and usage ----------------
 
 const DEFAULT_MONTHLY = () => Number(process.env.AI_MONTHLY_LIMIT) > 0 ? Number(process.env.AI_MONTHLY_LIMIT) : 3000;
-const seen = new Map<string, { used: number; limit: number; off: boolean; staff: number; at: number }>();
-const mine = new Map<string, { used: number; kind: "staff" | "family" | "free"; at: number }>();
+const seen = new Map<string, { used: number; limit: number; off: boolean; staff: number; tutorOn: boolean; tutorUsed: number; at: number }>();
+const mine = new Map<string, { used: number; kind: "staff" | "student" | "family" | "free"; at: number }>();
+
+/** The part of the allowance kept for the students' study helper while it is switched on. */
+export const STUDY_HELPER_SHARE = 0.3;
+/** How a school's monthly allowance is shared: the study helper's pool (when on), and each staff member's even share of the rest. */
+export function splitAllowance(limit: number, staff: number, studyHelperOn: boolean) {
+  const tutorPool = studyHelperOn ? Math.floor(limit * STUDY_HELPER_SHARE) : 0;
+  const staffPool = limit - tutorPool;
+  return { tutorPool, staffPool, perStaff: staffShare(staffPool, staff) };
+}
 
 /** Each staff member's share of a school's monthly allowance: an even split, so the shares add up to at most the total. */
 export function staffShare(limit: number, staff: number): number {
@@ -85,6 +95,7 @@ export function staffShare(limit: number, staff: number): number {
 }
 /** Tasks a student's or parent's action may start (school communication, not generating content). */
 const FAMILY_TASKS = new Set(["translate"]);
+const STUDENT_TASKS = new Set(["tutor", "translate"]);
 const UNCAPPED = new Set(["school_admin", "principal", "platform_admin"]);
 const monthStart = () => { const d = new Date(); d.setUTCDate(1); d.setUTCHours(0, 0, 0, 0); return d.toISOString(); };
 
@@ -100,15 +111,17 @@ async function checkAllowance(tenantId: string | null, userId: string | null, ta
   if (!entry || Date.now() - entry.at > 60_000) {
     try {
       const svc = await service();
-      const [{ data: used }, { data: st }, { data: t }, { count: staff }] = await Promise.all([
+      const [{ data: used }, { data: st }, { data: t }, { count: staff }, { count: tutorUsed }] = await Promise.all([
         svc.rpc("ai_requests_this_month", { p_tenant: tenantId }),
         svc.from("tenant_settings").select("*").eq("tenant_id", tenantId).maybeSingle(),
         svc.from("tenants").select("modules").eq("id", tenantId).maybeSingle(),
-        svc.from("users").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("active", true).not("role", "in", "(student,parent)")
+        svc.from("users").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("active", true).not("role", "in", "(student,parent)"),
+        svc.from("ai_usage").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("task", "tutor").gte("at", monthStart())
       ]);
       const own = (st as { ai_monthly_limit?: number | null } | null)?.ai_monthly_limit;
       const off = (t as { modules?: Record<string, boolean> | null } | null)?.modules?.ai === false;
-      entry = { used: Number(used ?? 0), limit: typeof own === "number" ? own : DEFAULT_MONTHLY(), off, staff: staff ?? 0, at: Date.now() };
+      const tutorOn = Boolean((st as { ai_tutor_enabled?: boolean } | null)?.ai_tutor_enabled);
+      entry = { used: Number(used ?? 0), limit: typeof own === "number" ? own : DEFAULT_MONTHLY(), off, staff: staff ?? 0, tutorOn, tutorUsed: tutorUsed ?? 0, at: Date.now() };
       seen.set(tenantId, entry);
     } catch { return; }
   }
@@ -128,17 +141,25 @@ async function checkAllowance(tenantId: string | null, userId: string | null, ta
         svc.from("ai_usage").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("user_id", userId).gte("at", monthStart())
       ]);
       const roles = [u?.role, ...((u?.extra_roles as string[] | null) ?? [])].filter(Boolean) as string[];
-      const kind = roles.some(r => UNCAPPED.has(r)) ? "free" : roles.every(r => r === "student" || r === "parent") ? "family" : "staff";
+      const kind = roles.some(r => UNCAPPED.has(r)) ? "free" : roles.length > 0 && roles.every(r => r === "student") ? "student"
+        : roles.every(r => r === "student" || r === "parent") ? "family" : "staff";
       me = { used: count ?? 0, kind, at: Date.now() };
       mine.set(key, me);
     } catch { return; }
   }
   if (me.kind === "free") return;
+  const split = splitAllowance(entry.limit, entry.staff, entry.tutorOn);
+  if (me.kind === "student") {
+    if (!STUDENT_TASKS.has(task)) throw new AiUnavailable("Students can use the study helper. Other AI tools are for teachers and school staff.", 403);
+    if (task === "tutor" && !entry.tutorOn) throw new AiUnavailable("The study helper is switched off at your school.", 403);
+    if (task === "tutor" && entry.tutorUsed >= split.tutorPool) throw new AiUnavailable("The study helper has used this month's share of the school's AI. It will be back on the 1st.", 429);
+    return;
+  }
   if (me.kind === "family") {
     if (FAMILY_TASKS.has(task)) return;
     throw new AiUnavailable("AI tools are for teachers and school staff.", 403);
   }
-  const share = staffShare(entry.limit, entry.staff);
+  const share = split.perStaff;
   if (me.used >= share) {
     throw new AiUnavailable(`You've used your share of the school's AI for this month (${share} requests). It renews on the 1st; your school admin can ask for a bigger allowance.`, 429);
   }
@@ -146,14 +167,19 @@ async function checkAllowance(tenantId: string | null, userId: string | null, ta
 
 /** A person's share and use this month, for the school's AI page. */
 export async function allowanceFor(svc: any, tenantId: string, limit: number) {
-  const { count } = await svc.from("users").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("active", true).not("role", "in", "(student,parent)");
-  const staff = count ?? 0;
-  return { staff, share: staffShare(limit, staff) };
+  const [{ count }, { data: st }, { count: tutorUsed }] = await Promise.all([
+    svc.from("users").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("active", true).not("role", "in", "(student,parent)"),
+    svc.from("tenant_settings").select("ai_tutor_enabled").eq("tenant_id", tenantId).maybeSingle(),
+    svc.from("ai_usage").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("task", "tutor").gte("at", monthStart())
+  ]);
+  const staff = count ?? 0, on = Boolean(st?.ai_tutor_enabled);
+  const split = splitAllowance(limit, staff, on);
+  return { staff, share: split.perStaff, tutor: { on, pool: split.tutorPool, used: tutorUsed ?? 0 } };
 }
 
 async function recordUsage(row: { tenantId: string | null; userId: string | null; task: string; provider: AiProvider; model: string; inputTokens: number; outputTokens: number; ok: boolean }) {
   if (row.tenantId) {
-    const e = seen.get(row.tenantId); if (e) e.used++;
+    const e = seen.get(row.tenantId); if (e) { e.used++; if (row.task === "tutor") e.tutorUsed++; }
     const m = row.userId ? mine.get(`${row.tenantId}:${row.userId}`) : undefined; if (m) m.used++;
   }
   try {
