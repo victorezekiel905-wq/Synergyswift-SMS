@@ -218,7 +218,8 @@ export function SignupForm({ mode, who }: { mode: "school" | "code"; who?: Who }
 
 export async function completeIntent(intent: Intent, fullName: string) {
   if (intent.intent === "school") {
-    await rpc("bootstrap_school", { p_school_name: intent.school_name, p_full_name: fullName });
+    // Schools are created by Synergy Swift (or with a one-time school code at /signup), never from here.
+    throw new Error("To set up a new school, use the school code Synergy Swift gave you at /signup.");
   } else {
     const r = await rpc<{ error?: string }>("redeem_code", { p_code: intent.code, p_full_name: fullName, p_as: intent.as ?? null });
     // A wrong code comes back as a value (so the server can count it), not an exception.

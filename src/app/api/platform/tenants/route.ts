@@ -60,7 +60,8 @@ const CreateTenant = z.object({
  * overrides, and (optionally) its first invoice, in one step.
  */
 export async function POST(req: NextRequest) {
-  const gate = await requirePlatformAdmin("admin");
+  // Only the platform owner (the super admin) creates schools; prospects use a one-time school code instead.
+  const gate = await requirePlatformAdmin("owner");
   if (gate instanceof NextResponse) return gate;
   const parsed = CreateTenant.safeParse(await readJson(req));
   if (!parsed.success) return jsonError(parsed.error.issues.map(i => i.message).join("; "));
