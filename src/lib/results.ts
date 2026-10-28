@@ -2,6 +2,7 @@
  * Server-side result compilation for one class group and term: loads data,
  * runs the pure grading engine, and writes report_cards rows.
  */
+import { traitScale } from "./traits";
 import { computeClassResults, midtermScheme, projectScore, cumulativeResults, gradeFor } from "./grading";
 import { schemeFor, termLabel, studentName } from "./school";
 import { signPublishedCards } from "./report-sign";
@@ -93,6 +94,9 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
   }
   // Character and skills ratings for the report card.
   const { data: traitDefs } = await sb.from("trait_definitions").select("id,domain,name,position").eq("tenant_id", tenantId).order("position");
+  // The school's own rating scale, kept with each card so old cards still read right if it changes (8400).
+  const { data: traitSettings } = await sb.from("tenant_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
+  const scale = traitScale(traitSettings);
   const traitRows = (traitDefs ?? []).length
     ? await fetchAll<{ student_id: string; trait_id: string; rating: number }>(() => sb.from("trait_ratings").select("student_id,trait_id,rating")
         .eq("term_id", termId).in("student_id", studentIds).order("student_id").order("trait_id"))
@@ -177,6 +181,7 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
           days_present: register.has(r.student_id) ? register.get(r.student_id)!.present : term.starts_on ? present.get(r.student_id) ?? 0 : null,
           days_absent: register.get(r.student_id)?.absent ?? null,
           days_opened: register.get(r.student_id)?.opened ?? null,
+          trait_scale: kind === "midterm" ? undefined : scale,
           traits: kind === "midterm" ? [] : (traitDefs ?? []).map((t: any) => ({ domain: t.domain, name: t.name,
             rating: traitRows.find(x => x.student_id === r.student_id && x.trait_id === t.id)?.rating ?? null }))
         }

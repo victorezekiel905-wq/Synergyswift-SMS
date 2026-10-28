@@ -4,6 +4,7 @@ import { useApi, send, Page, PageHeader, Tabs, Alert, Field, Badge, Empty, Icon 
 import { LANGUAGES } from "@/lib/languages";
 import { CURRENCIES } from "@/lib/currency";
 import Sections from "@/components/admin/Sections";
+import { GRADING_PRESETS } from "@/lib/grading-presets";
 
 type Tab = "profile" | "academic" | "sections" | "grading" | "classes" | "departments";
 
@@ -273,6 +274,14 @@ function Grading() {
           </button>
         ))}
         <button className="btn btn-ghost border border-dashed border-slate-300" onClick={() => setEdit({ name: "New scheme", is_default: false, pass_mark: 40, show_position: true, show_class_average: true, cumulative_mode: "average", decimals: 1, grading_components: [{ name: "Exam", max_score: 100, weight: 100 }], grade_bands: [{ grade: "A", min_score: 70, max_score: 100, remark: "Excellent", grade_point: 5 }, { grade: "F", min_score: 0, max_score: 69.99, remark: "Fail", grade_point: 0 }] })}>+ New scheme</button>
+      </div>
+      <div className="card flex flex-wrap items-center gap-2 p-3 text-sm">
+        <span className="text-slate-600">Start from a pattern:</span>
+        {GRADING_PRESETS.map(p => (
+          <button key={p.id} className="btn btn-outline px-2.5 py-1 text-xs" title={p.hint} onClick={() => setEdit(e => ({ ...(e && !e.id ? e : { is_default: !(data ?? []).length, show_position: true, show_class_average: true, cumulative_mode: "average", decimals: 1 }),
+            id: undefined, name: p.name, template: p.template, pass_mark: p.pass_mark, grading_components: p.parts.map(x => ({ ...x })), grade_bands: p.bands.map(x => ({ ...x })) } as Scheme))}>{p.name}</button>
+        ))}
+        <span className="text-xs text-slate-500">Fills a new scheme you can change: add a CAT, a project, or your own marks and weights.</span>
       </div>
       {edit && (
         <div className="grid gap-5 xl:grid-cols-2">

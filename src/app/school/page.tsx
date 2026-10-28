@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
-import { useApi, Page, PageHeader, Stat, Alert } from "@/components/ui";
+import { useEffect, useState } from "react";
+import { useApi, send, Page, PageHeader, Stat, Alert } from "@/components/ui";
+import { SECTIONS, STATS, DEFAULT_LAYOUT, move, type Layout, type SectionId } from "@/lib/dashboard-layout";
 import KpiBoard from "@/components/school/KpiBoard";
 import HeadSummary from "@/components/school/HeadSummary";
 
@@ -27,39 +29,85 @@ const QUICK: { href: string; label: string; desc: string }[] = [
 export default function SchoolHome() {
   const { data, error } = useApi<Overview>("/api/school/overview");
   const c = data?.counts ?? {};
-  return (
-    <Page wide>
-      <PageHeader eyebrow={data?.term ?? "No current term set"} title={data?.school ?? "School"}
-        subtitle="Live numbers from sign-in, results, approvals and messaging." />
-      {error && <Alert>{error}</Alert>}
-      {data && !data.term && (
-        <div className="mb-5"><Alert tone="amber">No current term is set. Go to <Link className="font-semibold underline" href="/school/setup">School setup</Link> to create a session and mark a term as current.</Alert></div>
-      )}
-      <KpiBoard />
-      {data?.roles?.some(r => ["school_admin", "principal", "platform_admin"].includes(r)) && <HeadSummary />}
+  const { data: saved, reload: reloadLayout } = useApi<{ layout: Layout; can_edit: boolean }>("/api/school/dashboard");
+  const [layout, setLayout] = useState<Layout>(DEFAULT_LAYOUT);
+  const [editing, setEditing] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => { if (saved) setLayout(saved.layout); }, [saved]);
+  const isHead = data?.roles?.some(r => ["school_admin", "principal", "platform_admin"].includes(r));
+  const tones: Record<string, "good" | "warn" | "bad" | undefined> = {
+    students_on_site: "good", late_today: (c.late_today ?? 0) > 0 ? "warn" : undefined, pending_requisitions: (c.pending_requisitions ?? 0) > 0 ? "warn" : undefined,
+    pending_leave: (c.pending_leave ?? 0) > 0 ? "warn" : undefined, failed_messages: (c.failed_messages ?? 0) > 0 ? "bad" : "good"
+  };
+  const hints: Record<string, string> = { students_on_site: "students signed in", staff_on_site: `of ${c.staff ?? 0} staff` };
+  const section = (id: SectionId) => {
+    if (id === "kpis") return <KpiBoard />;
+    if (id === "summary") return isHead ? <HeadSummary /> : null;
+    if (id === "now") return (<>
       <h2 className="mb-3 text-lg font-semibold">Right now</h2>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-        <Stat label="Students" value={c.students ?? "…"} />
-        <Stat label="On site now" value={c.students_on_site ?? "…"} hint="students signed in" tone="good" />
-        <Stat label="Staff on site" value={c.staff_on_site ?? "…"} hint={`of ${c.staff ?? 0} staff`} />
-        <Stat label="Late today" value={c.late_today ?? "…"} tone={(c.late_today ?? 0) > 0 ? "warn" : undefined} />
-        <Stat label="Open exams" value={c.open_exams ?? "…"} />
-        <Stat label="Report cards out" value={c.published_report_cards ?? "…"} />
-        <Stat label="Pending requisitions" value={c.pending_requisitions ?? "…"} tone={(c.pending_requisitions ?? 0) > 0 ? "warn" : undefined} />
-        <Stat label="Pending leave" value={c.pending_leave ?? "…"} tone={(c.pending_leave ?? 0) > 0 ? "warn" : undefined} />
-        <Stat label="Guardians" value={c.guardians ?? "…"} />
-        <Stat label="Classes" value={c.class_groups ?? "…"} />
-        <Stat label="Failed messages" value={c.failed_messages ?? "…"} tone={(c.failed_messages ?? 0) > 0 ? "bad" : "good"} />
-      </div>
-      <h2 className="mb-3 mt-8 text-lg font-semibold">Go to</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {QUICK.map(q => (
+      <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
+        {STATS.filter(([k]) => !layout.hidden_stats.includes(k)).map(([k, label]) => <Stat key={k} label={label} value={c[k] ?? "…"} hint={hints[k]} tone={tones[k]} />)}
+      </div></>);
+    return (<>
+      <h2 className="mb-3 text-lg font-semibold">Go to</h2>
+      <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {QUICK.filter(q => !layout.hidden_links.includes(q.href)).map(q => (
           <Link key={q.href} href={q.href} className="card block p-4 transition hover:border-brand-300 hover:shadow">
             <p className="font-semibold">{q.label}</p>
             <p className="mt-0.5 text-sm text-slate-500">{q.desc}</p>
           </Link>
         ))}
-      </div>
+      </div></>);
+  };
+  return (
+    <Page wide>
+      <PageHeader eyebrow={data?.term ?? "No current term set"} title={data?.school ?? "School"}
+        subtitle="Live numbers from sign-in, results, approvals and messaging."
+        actions={saved?.can_edit && !editing ? <button className="btn btn-outline" onClick={() => { setEditing(true); setNote(null); }}>Customise</button> : undefined} />
+      {error && <Alert>{error}</Alert>}
+      {data && !data.term && (
+        <div className="mb-5"><Alert tone="amber">No current term is set. Go to <Link className="font-semibold underline" href="/school/setup">School setup</Link> to create a session and mark a term as current.</Alert></div>
+      )}
+      {editing && saved && <Customise layout={layout} setLayout={setLayout} onSave={async () => {
+        const r = await send("/api/school/dashboard", { layout });
+        setNote(r.ok ? "Saved for the school." : r.error ?? "failed"); if (r.ok) { setEditing(false); reloadLayout(); }
+      }} onCancel={() => { setLayout(saved.layout); setEditing(false); }} />}
+      {note && <div className="mb-4"><Alert tone={note.startsWith("Saved") ? "green" : "red"}>{note}</Alert></div>}
+      {layout.sections.map(id => <div key={id}>{section(id)}</div>)}
     </Page>
+  );
+}
+
+/** Admins arrange the overview for the whole school: which panels, in what order, which tiles and shortcuts. */
+function Customise({ layout, setLayout, onSave, onCancel }: { layout: Layout; setLayout: (l: Layout) => void; onSave: () => void; onCancel: () => void }) {
+  const on = (id: SectionId) => layout.sections.includes(id);
+  const toggle = (list: string[], k: string) => (list.includes(k) ? list.filter(x => x !== k) : [...list, k]);
+  return (
+    <section className="card mb-6 grid gap-6 p-5 text-sm lg:grid-cols-3">
+      <div>
+        <h2 className="font-semibold">Panels, in order</h2>
+        <ul className="mt-2 space-y-1.5">
+          {[...layout.sections, ...SECTIONS.map(x => x.id).filter(id => !on(id))].map(id => (
+            <li key={id} className="flex items-center gap-2">
+              <input type="checkbox" checked={on(id)} aria-label={SECTIONS.find(x => x.id === id)!.label}
+                onChange={() => setLayout({ ...layout, sections: on(id) ? layout.sections.filter(x => x !== id) : [...layout.sections, id] })} />
+              <span className="flex-1">{SECTIONS.find(x => x.id === id)!.label}</span>
+              {on(id) && <><button className="btn btn-ghost px-1.5 py-0.5 text-xs" aria-label="Move up" onClick={() => setLayout({ ...layout, sections: move(layout.sections, id, -1) })}>↑</button>
+                <button className="btn btn-ghost px-1.5 py-0.5 text-xs" aria-label="Move down" onClick={() => setLayout({ ...layout, sections: move(layout.sections, id, 1) })}>↓</button></>}
+            </li>))}
+        </ul>
+      </div>
+      <div>
+        <h2 className="font-semibold">Right now tiles</h2>
+        <div className="mt-2 grid grid-cols-2 gap-1">{STATS.map(([k, label]) => <label key={k} className="flex items-center gap-1.5"><input type="checkbox" checked={!layout.hidden_stats.includes(k)}
+          onChange={() => setLayout({ ...layout, hidden_stats: toggle(layout.hidden_stats, k) })} />{label}</label>)}</div>
+      </div>
+      <div>
+        <h2 className="font-semibold">Shortcuts</h2>
+        <div className="mt-2 grid grid-cols-2 gap-1">{QUICK.map(q => <label key={q.href} className="flex items-center gap-1.5"><input type="checkbox" checked={!layout.hidden_links.includes(q.href)}
+          onChange={() => setLayout({ ...layout, hidden_links: toggle(layout.hidden_links, q.href) })} />{q.label}</label>)}</div>
+      </div>
+      <div className="flex gap-2 lg:col-span-3"><button className="btn btn-primary" onClick={onSave}>Save for the school</button><button className="btn btn-ghost" onClick={onCancel}>Cancel</button></div>
+    </section>
   );
 }

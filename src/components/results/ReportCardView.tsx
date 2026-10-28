@@ -1,3 +1,4 @@
+import { DEFAULT_SCALE, areaTitle, ratingShort, scaleKey, type ScaleItem } from "@/lib/traits";
 import QrCode from "@/components/QrCode";
 import { ordinal } from "@/lib/grading";
 
@@ -18,6 +19,7 @@ export type ReportCard = {
     components?: { id: string; name: string; max_score: number }[]; subjects?: Subject[];
     cumulative?: { terms: { id: string; label: string }[]; average: number | null; position: number | null } | null;
     traits?: { domain: string; name: string; rating: number | null }[];
+    trait_scale?: ScaleItem[];
   };
 };
 export type SchoolBrand = {
@@ -140,17 +142,17 @@ export default function ReportCardView({ card, school, studentPhoto, verifyUrl, 
 
       {Array.isArray(d.traits) && d.traits.some(t => t.rating !== null) && (
         <section className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
-          {(["affective", "psychomotor"] as const).map(domain => {
+          {[...new Set((d.traits ?? []).map(t => t.domain))].map(domain => {
             const rows = (d.traits ?? []).filter(t => t.domain === domain);
-            if (!rows.length) return null;
+            if (!rows.some(t => t.rating !== null)) return null;
             return (
               <table key={domain} className="w-full border-collapse">
-                <thead><tr><th className={cell + " text-left text-xs uppercase"}>{domain === "affective" ? "Character" : "Skills"}</th><th className={cell + " text-xs"}>Rating (1–5)</th></tr></thead>
-                <tbody>{rows.map(t => <tr key={t.name}><td className={cell}>{t.name}</td><td className={cell + " text-center font-semibold"}>{t.rating ?? "—"}</td></tr>)}</tbody>
+                <thead><tr><th className={cell + " text-left text-xs uppercase"}>{areaTitle(domain)}</th><th className={cell + " text-xs"}>Rating</th></tr></thead>
+                <tbody>{rows.map(t => <tr key={t.name}><td className={cell}>{t.name}</td><td className={cell + " text-center font-semibold"}>{ratingShort(d.trait_scale ?? DEFAULT_SCALE, t.rating)}</td></tr>)}</tbody>
               </table>
             );
           })}
-          <p className="text-xs text-slate-500 sm:col-span-2">5 Excellent · 4 Very good · 3 Good · 2 Fair · 1 Needs improvement</p>
+          <p className="text-xs text-slate-500 sm:col-span-2">{scaleKey(d.trait_scale ?? DEFAULT_SCALE)}</p>
         </section>
       )}
 

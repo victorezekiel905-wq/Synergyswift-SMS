@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Badge, statusTone, Empty, Field, Modal, Loading, fmtDate } from "@/components/ui";
 import { subjectTotal, gradeFor as bandFor, round } from "@/lib/grading";
+import { DEFAULT_SCALE, SCALE_PRESETS, TRAIT_PRESETS, areaTitle, scaleKey, type ScaleItem } from "@/lib/traits";
 
 type Session = { id: string; name: string; terms: { id: string; name: string; is_current: boolean }[] };
 type Structure = {
@@ -509,37 +510,83 @@ function CommentBankPicker({ role, average, name, onPick, isAdmin }: { role: "fo
   );
 }
 
-type TraitData = { traits: { id: string; domain: string; name: string }[]; students?: { id: string; first_name: string; last_name: string; admission_no: string }[]; ratings?: { student_id: string; trait_id: string; rating: number }[] };
+type TraitData = { traits: { id: string; domain: string; name: string }[]; students?: { id: string; first_name: string; last_name: string; admission_no: string }[];
+  ratings?: { student_id: string; trait_id: string; rating: number }[]; scale?: ScaleItem[] };
 
+/** The school's own ratings of the whole child: its areas, its scale (migration 8400). */
 function Traits({ termId, cg, isAdmin }: { termId: string; cg: string; isAdmin: boolean }) {
   const { data, reload } = useApi<TraitData>(`/api/traits?term_id=${termId}&class_group_id=${cg}`, [termId, cg]);
   const [grid, setGrid] = useState<Record<string, number | null>>({});
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [setup, setSetup] = useState(false);
   useEffect(() => {
     if (!data) return;
     setGrid(Object.fromEntries((data.ratings ?? []).map(r => [`${r.student_id}|${r.trait_id}`, r.rating])));
   }, [data]);
   if (!data) return <Loading />;
-  if (!data.traits.length) return (
-    <Empty>No character or skills traits set up.{isAdmin && <button className="btn btn-primary ml-2 text-xs" onClick={async () => { await send("/api/traits", { action: "seed_defaults" }); reload(); }}>Add the standard list</button>}</Empty>
-  );
+  const scale = data.scale ?? DEFAULT_SCALE;
   async function save() {
     const ratings = Object.entries(grid).map(([k, rating]) => { const [student_id, trait_id] = k.split("|"); return { student_id, trait_id, rating }; });
     const r = await send("/api/traits", { action: "rate", term_id: termId, ratings });
     setMsg({ ok: r.ok, text: r.ok ? `Saved ${r.data.saved} ratings. Recompile report cards to include them.` : r.error ?? "failed" });
   }
+  const act = async (body: Record<string, unknown>, ok: string) => { const r = await send("/api/traits", body); setMsg({ ok: r.ok, text: r.ok ? ok : r.error ?? "failed" }); if (r.ok) reload(); };
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between"><p className="text-sm text-slate-600">Rate each student 1 (needs improvement) to 5 (excellent). These print on the report card.</p><button className="btn btn-primary" onClick={save}>Save ratings</button></div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-slate-600">Rate each student on the school&apos;s scale ({scaleKey(scale)}). These print on the report card under each area.</p>
+        <div className="flex gap-2">{isAdmin && <button className="btn btn-outline" onClick={() => setSetup(!setup)}>Areas and scale</button>}{data.traits.length > 0 && <button className="btn btn-primary" onClick={save}>Save ratings</button>}</div>
+      </div>
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
-      <div className="card overflow-x-auto"><table className="w-full text-xs">
-        <thead className="bg-slate-50"><tr><th className="p-2 text-left">Student</th>{data.traits.map(t => <th key={t.id} className="p-1" title={t.domain}><span className="block max-w-[80px] truncate">{t.name}</span></th>)}</tr></thead>
-        <tbody>{(data.students ?? []).map(s => (
-          <tr key={s.id} className="border-t border-slate-100"><td className="whitespace-nowrap p-2 text-sm">{s.last_name}, {s.first_name}</td>
-            {data.traits.map(t => { const k = `${s.id}|${t.id}`; return (
-              <td key={t.id} className="p-1 text-center"><select className="rounded border border-slate-300 px-1 py-0.5" value={grid[k] ?? ""} aria-label={`${s.first_name} ${t.name}`}
-                onChange={e => setGrid({ ...grid, [k]: e.target.value ? Number(e.target.value) : null })}><option value="">—</option>{[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n}</option>)}</select></td>); })}
-          </tr>))}</tbody></table></div>
+      {isAdmin && (setup || !data.traits.length) && <TraitSetup data={data} scale={scale} act={act} />}
+      {!isAdmin && !data.traits.length && <Empty>Your school admin chooses what is rated on the report card.</Empty>}
+      {data.traits.length > 0 && (
+        <div className="card overflow-x-auto"><table className="w-full text-xs">
+          <thead className="bg-slate-50"><tr><th className="p-2 text-left">Student</th>{data.traits.map(t => <th key={t.id} className="p-1" title={areaTitle(t.domain)}><span className="block text-[10px] font-normal text-slate-400">{areaTitle(t.domain)}</span><span className="block max-w-[90px] truncate">{t.name}</span></th>)}</tr></thead>
+          <tbody>{(data.students ?? []).map(s => (
+            <tr key={s.id} className="border-t border-slate-100"><td className="whitespace-nowrap p-2 text-sm">{s.last_name}, {s.first_name}</td>
+              {data.traits.map(t => { const k = `${s.id}|${t.id}`; return (
+                <td key={t.id} className="p-1 text-center"><select className="rounded border border-slate-300 px-1 py-0.5" value={grid[k] ?? ""} aria-label={`${s.first_name} ${t.name}`}
+                  onChange={e => setGrid({ ...grid, [k]: e.target.value ? Number(e.target.value) : null })}><option value="">—</option>{scale.map(p => <option key={p.value} value={p.value} title={p.label}>{p.short}</option>)}</select></td>); })}
+            </tr>))}</tbody></table></div>
+      )}
     </div>
+  );
+}
+
+/** Admins: which areas the report card rates, and the scale it uses. */
+function TraitSetup({ data, scale, act }: { data: TraitData; scale: ScaleItem[]; act: (b: Record<string, unknown>, ok: string) => Promise<void> }) {
+  const [area, setArea] = useState({ name: "", items: "" });
+  const [custom, setCustom] = useState(scale.map(p => `${p.short} = ${p.label}`).join("\n"));
+  const have = [...new Set(data.traits.map(t => t.domain))];
+  return (
+    <section className="card mb-4 grid gap-5 p-4 text-sm lg:grid-cols-2">
+      <div>
+        <h3 className="font-semibold">Areas on the report card</h3>
+        {!have.length && <p className="mt-1 text-slate-600">Nothing is rated yet. Add the areas your school reports on.</p>}
+        <ul className="mt-2 space-y-1">{have.map(d => <li key={d}><b>{areaTitle(d)}</b>: <span className="text-slate-600">{data.traits.filter(t => t.domain === d).map(t => t.name).join(", ")}</span>
+          <button className="ml-2 text-xs text-rose-700 underline" onClick={() => { if (confirm(`Remove ${areaTitle(d)} and its ratings?`)) act({ action: "save_traits", traits: data.traits.filter(t => t.domain !== d) }, `${areaTitle(d)} removed.`); }}>remove</button></li>)}</ul>
+        <p className="mt-3 text-slate-600">Add a ready area:</p>
+        <div className="mt-1 flex flex-wrap gap-1.5">{TRAIT_PRESETS.filter(p => !have.includes(p.domain)).map(p => <button key={p.domain} className="btn btn-outline px-2.5 py-1 text-xs" onClick={() => act({ action: "add_area", preset: p.domain }, `${p.title} added.`)}>+ {p.title}</button>)}</div>
+        <p className="mt-3 text-slate-600">Or your own area, e.g. &quot;Clubs&quot;, with one item per line:</p>
+        <div className="mt-1 grid gap-2 sm:grid-cols-[1fr_1.4fr_auto]">
+          <input className="input" placeholder="Area name" maxLength={40} value={area.name} onChange={e => setArea({ ...area, name: e.target.value })} aria-label="Area name" />
+          <textarea className="input" rows={2} placeholder={"Football\nChess club"} value={area.items} onChange={e => setArea({ ...area, items: e.target.value })} aria-label="Items in the area" />
+          <button className="btn btn-primary self-start" disabled={area.name.trim().length < 2 || !area.items.trim()} onClick={() => act({ action: "save_traits", traits: [...data.traits,
+            ...area.items.split("\n").map(x => x.trim()).filter(Boolean).slice(0, 20).map(name => ({ domain: area.name.trim(), name }))] }, `${area.name.trim()} added.`).then(() => setArea({ name: "", items: "" }))}>Add</button>
+        </div>
+      </div>
+      <div>
+        <h3 className="font-semibold">Rating scale</h3>
+        <p className="mt-1 text-slate-600">Best first. Each line: the mark on the report card, then what it means.</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">{SCALE_PRESETS.map(p => <button key={p.name} className="btn btn-outline px-2.5 py-1 text-xs" onClick={() => setCustom(p.scale.map(x => `${x.short} = ${x.label}`).join("\n"))}>{p.name}</button>)}</div>
+        <textarea className="input mt-2 font-mono" rows={6} value={custom} onChange={e => setCustom(e.target.value)} aria-label="Rating scale" />
+        <button className="btn btn-primary mt-2" onClick={() => {
+          const lines = custom.split("\n").map(l => l.trim()).filter(Boolean).slice(0, 10);
+          const items = lines.map((l, i) => { const [short, ...rest] = l.split("="); return { value: lines.length - i, short: short.trim().slice(0, 4), label: (rest.join("=").trim() || short.trim()).slice(0, 40) }; });
+          act({ action: "save_scale", scale: items }, "Scale saved.");
+        }}>Save scale</button>
+      </div>
+    </section>
   );
 }
