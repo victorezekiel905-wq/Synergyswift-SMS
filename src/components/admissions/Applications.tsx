@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { ApplicantSummaryPanel } from "./AiOffice";
 import { useApi, send, Alert, Empty, Modal, Field, Badge, Stat, fmtDate, money } from "@/components/ui";
 
 const STATUSES = ["new", "reviewing", "assessment", "interview", "waitlisted", "offered", "accepted", "enrolled", "rejected", "withdrawn", "declined", "expired"] as const;
@@ -7,7 +8,7 @@ export type App = {
   id: string; application_no: string; status: string; first_name: string; last_name: string; gender: string | null; date_of_birth: string | null; applying_for: string;
   previous_school: string | null; guardian_name: string; guardian_phone: string; guardian_email: string | null; notes: string | null; source: string; assessment_at: string | null;
   assessment_score: number | null; interview_at: string | null; interview_notes: string | null; interview_score: number | null; decision_note: string | null; fee_paid: boolean; created_at: string;
-  student_id: string | null; lead_id: string | null; waitlist_position: number | null; tracking_token: string; acceptance_fee: number; acceptance_paid: boolean;
+  student_id: string | null; lead_id: string | null; waitlist_position: number | null; ai_summary?: string | null; tracking_token: string; acceptance_fee: number; acceptance_paid: boolean;
   offer_letter: { subject: string; body: string; expires_on: string } | null; offer_accepted_at: string | null; offer_signer_name: string | null; offer_expires_on: string | null;
   application_documents: { id: string; kind: string; name: string; size: number; uploaded_at: string }[];
   admission_payments: { kind: string; amount: number; status: string; paid_at: string | null }[];
@@ -15,6 +16,7 @@ export type App = {
 };
 export type AppsData = { applications: App[]; funnel: Record<string, number>; total: number; conversion: { offer_rate: number | null; yield: number | null };
   seats: { level: string; seats: number; left: number }[]; exams: { id: string; title: string; status: string; duration_minutes: number }[];
+  ai?: boolean;
   settings: { admissions_open?: boolean; application_fee?: number; admissions_intro?: string | null; currency?: string; public_slug: string | null; acceptance_fee?: number; offer_valid_days?: number } };
 
 export const statusTone = (s: string) => (s === "enrolled" ? "green" : ["rejected", "withdrawn", "declined", "expired"].includes(s) ? "red" : ["offered", "accepted"].includes(s) ? "blue" : s === "waitlisted" ? "violet" : "amber") as "green" | "red" | "blue" | "violet" | "amber";
@@ -130,6 +132,7 @@ function AppDetail({ app, data, currency, onChanged, onOpenLead }: { app: App; d
         {app.notes && <p className="sm:col-span-2"><b>Notes from the family:</b> {app.notes}</p>}
       </div>
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
+      {data.ai && <ApplicantSummaryPanel key={app.id} appId={app.id} saved={app.ai_summary ?? null} onChanged={onChanged} />}
 
       <section className="rounded-lg border border-slate-200 p-3">
         <h3 className="mb-2 font-semibold">Documents</h3>

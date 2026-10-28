@@ -117,6 +117,7 @@ export const NAV: NavGroup[] = [
     { href: "/school/roles", label: "Roles & privileges", roles: ADMIN },
     { href: "/school/subscription", label: "Subscription & modules", roles: ADMIN },
     { href: "/school/security", label: "Security & sign-in", roles: ADMIN },
+    { href: "/school/ai", label: "AI assistant", roles: ADMIN, module: "ai" },
     { href: "/school/consent", label: "Consent & privacy", roles: ADMIN },
     { href: "/school/data", label: "Import & export", roles: [...ADMIN, "it_admin"] },
     { href: "/school/integrations", label: "Website & connections", roles: [...ADMIN, "admissions_officer"] },

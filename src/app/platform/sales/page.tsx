@@ -3,14 +3,16 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useApi, send, Page, PageHeader, Alert, Loading, Modal, Field, Badge, Stat, Tabs, fmtDate } from "@/components/ui";
 import PlatformNav from "@/components/platform/PlatformNav";
+import { SalesBrief, WeeklySummary, type Brief, type Summary } from "@/components/platform/SalesAi";
 import { quote, bandFor, bandLabel, naira, MODULE_GROUPS, type ModuleGroup, type PlanDef } from "@/lib/saas";
 import { ONBOARDING, SOURCES, SOURCE_LABEL, STAGES, stageLabel, type Stage } from "@/lib/sales";
 
 type Lead = { id: string; school_name: string; contact_name: string | null; contact_role: string | null; phone: string | null; email: string | null; city: string | null; state: string | null;
   students_estimate: number | null; source: (typeof SOURCES)[number]; stage: Stage; owner_id: string | null; next_action: string | null; next_action_at: string | null; demo_at: string | null;
-  package_code: string | null; value_estimate: number | null; score: number; lost_reason: string | null; tenant_id: string | null; needs: string | null; created_at: string; last_activity_at?: string | null };
+  package_code: string | null; value_estimate: number | null; score: number; lost_reason: string | null; tenant_id: string | null; needs: string | null; created_at: string; last_activity_at?: string | null; ai_brief?: Brief | null };
 type Plan = { code: string; name: string; groups: string[]; prices: number[] | null };
 type Data = { leads: Lead[]; plans: Plan[]; group_prices: Record<string, number[]>; team: { user_id: string; email: string | null; role: string }[];
+  ai?: { available: boolean; summary: Summary | null };
   stats: { open: number; pipeline: number; weighted: number; won_this_month: number; won_value_this_month: number; due_today: number } };
 type Customer = { tenant_id: string; name: string; status: string; students: number; staff: number; staff_signed_in_30: number; plan_name: string | null; period_end: string | null; sub_status: string | null;
   health: { score: number; risk: "low" | "medium" | "high"; reasons: string[] }; onboarding: string[] };
@@ -42,6 +44,7 @@ export default function Sales() {
       </div>
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "pipeline", label: "Pipeline" }, { id: "customers", label: "Customers & renewals" }]} />
       {tab === "pipeline" ? (<>
+        <WeeklySummary summary={data.ai?.summary ?? null} available={Boolean(data.ai?.available)} onChanged={reload} />
         <div className="mb-3 flex flex-wrap gap-2">
           <button className="btn btn-primary" onClick={() => setAdding(true)}>+ New lead</button>
           <input className="input w-64" placeholder="Find a school, contact or city" value={q} onChange={e => setQ(e.target.value)} aria-label="Find a lead" />
@@ -163,6 +166,7 @@ function LeadDrawer({ id, data, onChanged }: { id: string; data: Data; onChanged
         }} className={"rounded-full border px-3 py-1 text-xs " + (s.key === l.stage ? "border-brand-700 bg-brand-700 text-white" : "border-slate-300 hover:border-slate-500")}>{s.label}</button>)}
       </div>
       {l.lost_reason && <p className="text-sm text-slate-600">Lost: {l.lost_reason}</p>}
+      {!["won", "lost"].includes(l.stage) && <SalesBrief key={l.id} lead={l} plans={data.plans} available={Boolean(data.ai?.available)} onChanged={() => { reload(); onChanged(); }} />}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-4">

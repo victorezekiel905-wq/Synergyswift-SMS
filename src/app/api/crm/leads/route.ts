@@ -7,6 +7,8 @@ import { upsertLead, setLeadStage, refreshScore, syncLeadFromApplication, brandA
 import { notifyContact } from "@/lib/notify";
 import { admissionNote } from "@/lib/messaging/notices";
 import { appUrl } from "@/lib/school";
+import { aiAllowed, aiErrorMessage } from "@/lib/ai";
+import { briefFamily, sendFamilyReply } from "@/lib/admissions-ai";
 
 /**
  * GET: leads for the board and list (?stage=&source=&owner=me&search=), or
@@ -28,7 +30,7 @@ export async function GET(req: NextRequest) {
       lead.owner_id ? ctx.sb.from("users").select("full_name").eq("id", lead.owner_id).maybeSingle() : Promise.resolve({ data: null }),
       lead.referred_by ? ctx.sb.from("guardians").select("full_name").eq("id", lead.referred_by).maybeSingle() : Promise.resolve({ data: null })
     ]);
-    return NextResponse.json({ lead: { ...lead, owner_name: (owner as any)?.full_name ?? null, referred_by_name: (referrer as any)?.full_name ?? null }, activities: activities ?? [], bookings: bookings ?? [], application: app });
+    return NextResponse.json({ lead: { ...lead, owner_name: (owner as any)?.full_name ?? null, referred_by_name: (referrer as any)?.full_name ?? null }, activities: activities ?? [], ai: aiAllowed(ctx), bookings: bookings ?? [], application: app });
   }
   let q = ctx.sb.from("admission_leads").select("id,stage,parent_name,email,phone,child_name,applying_for,intake,source,owner_id,score,next_follow_up_at,last_contact_at,application_id,created_at,updated_at,lost_reason")
     .eq("tenant_id", tid);
@@ -45,7 +47,7 @@ export async function GET(req: NextRequest) {
   ]);
   if (error) return jsonError(error.message);
   const officers = (staff ?? []).filter((x: any) => [x.role, ...(x.extra_roles ?? [])].some((r: string) => ["admissions_officer", "school_admin", "principal"].includes(r)));
-  return NextResponse.json({ leads: leads ?? [], staff: officers.map((x: any) => ({ id: x.id, full_name: x.full_name })), tasks: tasks ?? [], me: ctx.userId });
+  return NextResponse.json({ leads: leads ?? [], staff: officers.map((x: any) => ({ id: x.id, full_name: x.full_name })), tasks: tasks ?? [], me: ctx.userId, ai: aiAllowed(ctx) });
 }
 
 const opt = (s: z.ZodTypeAny) => s.nullish().or(z.literal(""));
@@ -63,7 +65,9 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("message"), id: z.string().uuid(), channel: z.enum(["email", "sms", "whatsapp"]), subject: opt(z.string().trim().max(160)), body: z.string().trim().min(2).max(2000) }),
   z.object({ action: z.literal("start_application"), id: z.string().uuid(), first_name: z.string().trim().min(1).max(60), last_name: z.string().trim().min(1).max(60),
     applying_for: z.string().trim().min(1).max(60), gender: z.enum(["male", "female", "other"]).nullish() }),
-  z.object({ action: z.literal("delete"), id: z.string().uuid() })
+  z.object({ action: z.literal("delete"), id: z.string().uuid() }),
+  z.object({ action: z.literal("ai_brief"), id: z.string().uuid() }),
+  z.object({ action: z.literal("ai_send"), id: z.string().uuid(), subject: z.string().trim().min(2).max(160), body: z.string().trim().min(5).max(2000) })
 ]);
 
 export async function POST(req: NextRequest) {
@@ -149,6 +153,15 @@ export async function POST(req: NextRequest) {
         await ctx.sb.from("admission_leads").update({ application_id: app.id }).eq("id", lead.id);
         await syncLeadFromApplication(svc, app);
         return NextResponse.json({ application_id: app.id, application_no: app.application_no, tracking_link: `${base}/apply/track/${app.tracking_token}` }, { status: 201 });
+      }
+      case "ai_brief": {
+        try { return NextResponse.json({ brief: await briefFamily(svc, tid, b.id) }); }
+        catch (e) { const { message, status } = aiErrorMessage(e); return jsonError(message, status); }
+      }
+      case "ai_send": {
+        const n = await sendFamilyReply(svc, tid, b.id, { subject: b.subject, body: b.body }, ctx.userId);
+        await refreshScore(svc, tid, b.id);
+        return NextResponse.json({ ok: true, queued: n });
       }
       case "delete": {
         if (!ROLES.admin.some(r => ctx.roles.has(r))) return jsonError("only admins can delete leads", 403);

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, denyUnless } from "@/lib/auth";
+import { aiAllowed, aiErrorMessage } from "@/lib/ai";
+import { summariseApplicant } from "@/lib/admissions-ai";
 import { createServiceClient } from "@/lib/supabase/service";
 import { notifyApplicant, enrollApplication } from "@/lib/admissions";
 import { syncLeadFromApplication } from "@/lib/admissions-crm";
@@ -45,7 +47,8 @@ export async function GET(req: NextRequest) {
     applications: apps ?? [], funnel, total, exams: exams ?? [],
     seats: (capacity ?? []).map((c: any) => ({ level: c.level, seats: c.seats, left: left.get(c.level) ?? c.seats })),
     conversion: { offer_rate: total ? Math.round((offered / total) * 1000) / 10 : null, yield: offered ? Math.round((enrolled / offered) * 1000) / 10 : null },
-    settings: { ...(settings ?? {}), public_slug: tenant?.public_slug ?? null }
+    settings: { ...(settings ?? {}), public_slug: tenant?.public_slug ?? null },
+    ai: aiAllowed(ctx)
   });
 }
 
@@ -68,7 +71,8 @@ const Body = z.discriminatedUnion("action", [
     date_of_birth: date.nullish(), applying_for: z.string().trim().min(1).max(60), guardian_name: z.string().trim().min(2).max(120), guardian_phone: z.string().trim().min(5).max(30),
     guardian_email: z.string().trim().email().nullish().or(z.literal("")), previous_school: z.string().trim().max(120).nullish(), source: z.enum(["walk_in", "referral", "agent", "phone"]).default("walk_in") }),
   z.object({ action: z.literal("settings"), admissions_open: z.boolean(), application_fee: z.number().min(0).max(1e9), admissions_intro: z.string().trim().max(3000).nullish(),
-    public_slug: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,48}$/, "use lowercase letters, numbers and dashes").nullish() })
+    public_slug: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,48}$/, "use lowercase letters, numbers and dashes").nullish() }),
+  z.object({ action: z.literal("ai_summary"), id: z.string().uuid() })
 ]);
 
 export async function POST(req: NextRequest) {
@@ -83,6 +87,10 @@ export async function POST(req: NextRequest) {
   const now = () => new Date().toISOString();
   try {
     switch (b.action) {
+      case "ai_summary": {
+        try { return NextResponse.json({ summary: await summariseApplicant(svc, tid, b.id) }); }
+        catch (e) { const { message, status } = aiErrorMessage(e); return jsonError(message, status); }
+      }
       case "status": {
         const extra: Record<string, unknown> = {};
         if (b.status === "waitlisted") {

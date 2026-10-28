@@ -3,12 +3,14 @@ import { useEffect, useState } from "react";
 import { useApi, send, Alert, Badge, Field, Modal, Loading, fmtDate, Icon } from "@/components/ui";
 import { STAGE_LABEL, SOURCE_LABEL, SOURCES, type Stage } from "@/lib/crm";
 import { LostForm, scoreTone } from "./Pipeline";
+import { FamilyBriefPanel } from "./AiOffice";
 
 type Activity = { id: string; kind: string; body: string | null; due_at: string | null; done_at: string | null; created_at: string; meta: Record<string, any>; actor: { full_name: string } | null };
 type Detail = {
   lead: { id: string; stage: Stage; parent_name: string; email: string | null; phone: string | null; child_name: string | null; child_dob: string | null; applying_for: string | null; intake: string | null;
     source: string; utm: Record<string, string>; referral_code: string | null; referred_by_name: string | null; owner_id: string | null; owner_name: string | null; score: number; notes: string | null;
-    lost_reason: string | null; application_id: string | null; next_follow_up_at: string | null; created_at: string };
+    lost_reason: string | null; application_id: string | null; next_follow_up_at: string | null; created_at: string; ai_brief?: any };
+  ai?: boolean;
   activities: Activity[];
   bookings: { id: string; status: string; party_size: number; admission_events: { title: string; kind: string; starts_at: string } | null }[];
   application: { id: string; application_no: string; status: string; tracking_token: string; fee_paid: boolean; assessment_score: number | null;
@@ -89,6 +91,8 @@ export default function LeadDrawer({ id, onClose, onChanged, staff, openApplicat
             {data.application.entrance_attempts.map((e, i) => <span key={i}> · {e.exams?.title}: {e.status === "assigned" ? "not started" : e.total_score !== null ? `${e.total_score}/${e.max_score}` : e.status}</span>)}</p>
         </div>
       )}
+
+      {data.ai && !["enrolled", "lost"].includes(l.stage) && <FamilyBriefPanel key={l.id} leadId={l.id} brief={l.ai_brief ?? null} canMessage={Boolean(l.email || l.phone)} onChanged={() => { reload(); onChanged(); }} />}
 
       <section className="rounded-lg border border-slate-200 p-3">
         <div className="mb-2 flex gap-1 text-xs">

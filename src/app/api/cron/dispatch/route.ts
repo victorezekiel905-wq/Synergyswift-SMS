@@ -37,6 +37,8 @@ async function run(req: NextRequest) {
   await requeueStale(svc);
   // Admissions follow-ups and visit reminders queue messages, which this run then sends.
   const base = appUrl(req);
+  // The AI jobs run every 10 minutes in their own request (phase 14p), so they never hold this one up.
+  if (new Date().getUTCMinutes() % 10 === 0) void fetch(`${base}/api/cron/ai`, { headers: { authorization: `Bearer ${secret}` } }).catch(() => null);
   const followUps = await processSequences(svc, { limit: 50, baseUrl: base }).catch(() => null);
   const reminders = await sendBookingReminders(svc, base).catch(() => 0);
   // Overdue complaints escalate to the admins; scheduled campaigns go out.

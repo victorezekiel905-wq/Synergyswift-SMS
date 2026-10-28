@@ -6,6 +6,8 @@ import { groupPrices } from "@/lib/saas-server";
 import { bandFor, quote, naira, type ModuleGroup, type PlanDef } from "@/lib/saas";
 import { autoOnboarding, customerHealth, leadScore, weightedPipeline, SOURCES, STAGES, type Metrics, type Stage } from "@/lib/sales";
 import { sendEmail } from "@/lib/messaging/providers";
+import { aiConfigured, aiErrorMessage } from "@/lib/ai";
+import { briefLead, pipelineSummary } from "@/lib/sales-ai";
 
 export const dynamic = "force-dynamic";
 
@@ -40,11 +42,12 @@ export async function GET(req: NextRequest) {
     }).sort((a, b) => a.health.score - b.health.score);
     return NextResponse.json({ customers });
   }
-  const [{ data: leads, error }, { data: last }, { data: plans }, { data: team }] = await Promise.all([
+  const [{ data: leads, error }, { data: last }, { data: plans }, { data: team }, { data: aiSummary }] = await Promise.all([
     svc.from("sales_leads").select("*").order("updated_at", { ascending: false }).limit(2000),
     svc.from("sales_activities").select("lead_id,at").order("at", { ascending: false }).limit(5000),
     svc.from("plans").select("code,name,groups,prices,active").eq("active", true).order("sort"),
-    svc.from("platform_admins").select("user_id,role,email")
+    svc.from("platform_admins").select("user_id,role,email"),
+    svc.from("platform_settings").select("value").eq("key", "sales.ai_summary").maybeSingle()
   ]);
   if (error) return jsonError(error.message.includes("sales_leads") ? "The sales CRM needs the database update (migration 20260101006400)." : error.message);
   const lastAt = new Map<string, string>();
@@ -54,6 +57,7 @@ export async function GET(req: NextRequest) {
   const won = rows.filter((l: any) => l.stage === "won" && new Date(l.stage_changed_at) >= month);
   return NextResponse.json({
     leads: rows, plans: plans ?? [], group_prices: await groupPrices(svc), team: team ?? [],
+    ai: { available: aiConfigured(), summary: aiSummary?.value ?? null },
     stats: {
       open: rows.filter((l: any) => !["won", "lost"].includes(l.stage)).length,
       pipeline: rows.filter((l: any) => !["won", "lost"].includes(l.stage)).reduce((s: number, l: any) => s + Number(l.value_estimate ?? 0), 0),
@@ -80,6 +84,10 @@ const Body = z.discriminatedUnion("action", [
     add_on_groups: z.array(z.string()).max(6).default([]), cycle: z.enum(["annual", "termly"]).default("annual"), custom_annual: z.number().int().min(0).max(1e12).nullish(),
     discount_pct: z.number().min(0).max(100).default(0), valid_until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish() }),
   z.object({ action: z.literal("quote_status"), quote_id: z.string().uuid(), status: z.enum(["sent", "accepted", "declined"]), email: z.boolean().default(false) }),
+  z.object({ action: z.literal("ai_brief"), lead_id: z.string().uuid() }),
+  z.object({ action: z.literal("ai_summary") }),
+  z.object({ action: z.literal("ai_apply"), lead_id: z.string().uuid() }),
+  z.object({ action: z.literal("send_email"), lead_id: z.string().uuid(), subject: z.string().trim().min(2).max(160), body: z.string().trim().min(5).max(4000) }),
   z.object({ action: z.literal("onboarding"), tenant_id: z.string().uuid(), step: z.enum(["school_created", "data_imported", "staff_trained", "parents_invited", "go_live"]), done: z.boolean() })
 ]);
 
@@ -159,6 +167,38 @@ export async function POST(req: NextRequest) {
         await log(lead.id, "quote", `Quote ${q.number} ${b.status}${b.email && b.status === "sent" ? " by email" : ""}.`);
         await rescore(lead.id);
       }
+      return NextResponse.json({ ok: true });
+    }
+    case "ai_brief": {
+      try { return NextResponse.json({ ok: true, brief: await briefLead(svc, b.lead_id) }); }
+      catch (e) { const { message, status } = aiErrorMessage(e); return jsonError(message, status); }
+    }
+    case "ai_summary": {
+      try { return NextResponse.json({ ok: true, summary: await pipelineSummary(svc) }); }
+      catch (e) { const { message, status } = aiErrorMessage(e); return jsonError(message, status); }
+    }
+    case "ai_apply": {
+      // Puts the brief's next step on the lead, due in the days it suggested.
+      const { data: l } = await svc.from("sales_leads").select("ai_brief").eq("id", b.lead_id).maybeSingle();
+      const brief = l?.ai_brief as { next_step?: string; next_step_in_days?: number } | null;
+      if (!brief?.next_step) return jsonError("Ask the AI sales manager for a brief first.");
+      const due = new Date(Date.now() + (brief.next_step_in_days ?? 1) * 86_400_000);
+      due.setUTCHours(8, 0, 0, 0);
+      await svc.from("sales_leads").update({ next_action: brief.next_step.slice(0, 300), next_action_at: due.toISOString(), updated_at: now }).eq("id", b.lead_id);
+      await rescore(b.lead_id);
+      return NextResponse.json({ ok: true, next_action_at: due.toISOString() });
+    }
+    case "send_email": {
+      const { data: l } = await svc.from("sales_leads").select("email,school_name").eq("id", b.lead_id).maybeSingle();
+      if (!l) return jsonError("lead not found", 404);
+      if (!l.email) return jsonError("Add the contact's email first.");
+      const r = await sendEmail({ to: l.email, subject: b.subject, text: b.body });
+      if (!r.ok) return jsonError(r.error ?? "The email could not be sent.", 502);
+      await log(b.lead_id, "email", `${b.subject}
+
+${b.body}`.slice(0, 4000));
+      await svc.from("sales_leads").update({ updated_at: now }).eq("id", b.lead_id);
+      await rescore(b.lead_id);
       return NextResponse.json({ ok: true });
     }
     case "onboarding": {
