@@ -31,16 +31,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ lead, activities: activities ?? [], quotes: quotes ?? [] });
   }
   if (u.searchParams.get("view") === "customers") {
-    const [{ data: rows, error }, { data: steps }] = await Promise.all([
-      svc.rpc("platform_customer_metrics"),
-      svc.from("tenant_onboarding").select("tenant_id,step,done_at,auto")
-    ]);
-    if (error) return jsonError(error.message.includes("platform_customer_metrics") ? "Customers need the database update (migration 20260101006400)." : error.message);
+    // Counting every school's history is the slowest query on the platform (1.3 s at 25 schools in the
+    // 50,000-user test), so the figures are kept for up to 6 hours; ?fresh=1 recounts now.
+    const { data: snap } = await svc.from("platform_settings").select("value").eq("key", "customers.snapshot").maybeSingle();
+    const kept = snap?.value as { at?: string; rows?: unknown[] } | null;
+    const fresh = u.searchParams.get("fresh") === "1" || !kept?.at || !Array.isArray(kept.rows) || Date.now() - Date.parse(kept.at) > 6 * 3600_000;
+    let rows: unknown[] | null = fresh ? null : kept!.rows!;
+    let countedAt = kept?.at ?? null;
+    if (fresh) {
+      const { data, error } = await svc.rpc("platform_customer_metrics");
+      if (error) return jsonError(error.message.includes("platform_customer_metrics") ? "Customers need the database update (migration 20260101006400)." : error.message);
+      rows = data ?? [];
+      countedAt = new Date().toISOString();
+      await svc.from("platform_settings").upsert({ key: "customers.snapshot", value: { at: countedAt, rows }, updated_at: countedAt });
+    }
+    const { data: steps } = await svc.from("tenant_onboarding").select("tenant_id,step,done_at,auto");
     const customers = ((rows ?? []) as (Metrics & { tenant_id: string; name: string; plan_name: string | null; custom_annual: number | null })[]).map(m => {
       const stored = (steps ?? []).filter((s: any) => s.tenant_id === m.tenant_id).map((s: any) => s.step as string);
       return { ...m, health: customerHealth(m), onboarding: [...new Set([...stored, ...autoOnboarding(m)])] };
     }).sort((a, b) => a.health.score - b.health.score);
-    return NextResponse.json({ customers });
+    return NextResponse.json({ customers, counted_at: countedAt });
   }
   const [{ data: leads, error }, { data: last }, { data: plans }, { data: team }, { data: aiSummary }] = await Promise.all([
     svc.from("sales_leads").select("*").order("updated_at", { ascending: false }).limit(2000),

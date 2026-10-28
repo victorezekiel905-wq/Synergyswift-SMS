@@ -136,7 +136,39 @@ busy" message rather than a frozen screen.
 Until 1–3 are done, sell to pilot schools (up to about 2,000 accounts in total), not to a
 20,000-account group.
 
+## Update, 28 October 2026: 50,000 accounts
+
+Same test with **25 schools of 2,000 accounts** (35,000 students, 700,000 register entries,
+350,000 gate sign-ins, 125,000 change-history entries), after migrations 7400–7800:
+
+| Query (50,000 accounts) | 20,000 | 50,000 |
+|---|---:|---:|
+| Parent: my children (portal home) | 4 ms | 5 ms |
+| Parent: my children's report cards | 6 ms | 10 ms |
+| Parent: my children's attendance this month | 38 ms | 71 ms |
+| Student: my report card | 6 ms | 10 ms |
+| Teacher: a class register for today | 27 ms | 59 ms |
+| Teacher: my classes' attendance this week | 59 ms | 87 ms |
+| Admin: today's attendance summary | 2 ms | 3 ms |
+| Admin: 30-day attendance dashboard | 17 ms | 17 ms |
+| Admin: fees outstanding | 45 ms | 44 ms |
+| Admin: change history (latest 50) | 3 ms | 3 ms |
+| Super admin: customer health (all schools) | 304 ms | 1,659 ms → 1,255 ms, now counted at most every 6 hours |
+
+**Outcome:** every page a teacher, parent, student or school admin opens stays under 0.1 s in
+the database at 50,000 accounts; growth from 20,000 to 50,000 is well under linear. The test found
+two problems, both fixed:
+
+- **users and guardians had no index by school** (migration 7800): every "staff of this school"
+  lookup read all accounts on the platform.
+- **Customer health recounted every school's history on each view**: the figures are now kept for
+  up to 6 hours, with "Count again now" for the super admin.
+
+What this does **not** change: the hosting findings above (one Render Starter instance, Supabase
+plan size, Realtime quota) decide whether 50,000 people can be served at once. Database speed is no
+longer the limit; the web server and the Supabase plan are.
+
 ## Reproduce
 
-See `scripts/load/README.md`. Raw results: `node scripts/load/scale-bench.mjs` (after) and
+See `scripts/load/README.md`. Raw results: `node scripts/load/scale-bench.mjs` (after; add `--schools=25` for 50,000 accounts) and
 `--before` (without migration 7400) write `scripts/load/out/scale-bench*.json`.

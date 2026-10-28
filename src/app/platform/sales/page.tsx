@@ -221,7 +221,8 @@ function LeadDrawer({ id, data, onChanged }: { id: string; data: Data; onChanged
 }
 
 function Customers() {
-  const { data, error, reload } = useApi<{ customers: Customer[] }>("/api/platform/sales?view=customers");
+  const [fresh, setFresh] = useState(0);
+  const { data, error, reload } = useApi<{ customers: Customer[]; counted_at: string | null }>(`/api/platform/sales?view=customers${fresh ? `&fresh=1&n=${fresh}` : ""}`, [fresh]);
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Loading />;
   const soon = data.customers.filter(c => c.period_end && new Date(c.period_end).getTime() - Date.now() < 60 * 86_400_000 && new Date(c.period_end) > new Date());
@@ -251,6 +252,7 @@ function Customers() {
             </tr>))}</tbody>
         </table>
       </div>
+      <p className="text-xs text-slate-500">Figures counted {data.counted_at ? fmtDate(data.counted_at, true) : "now"} (kept for up to 6 hours). <button className="text-brand-700 underline" onClick={() => setFresh(fresh + 1)}>Count again now</button></p>
       <p className="text-xs text-slate-500">Onboarding steps tick themselves from what the school does (students in, staff signing in, parents signed up, daily use); click to tick or untick by hand.</p>
     </div>
   );

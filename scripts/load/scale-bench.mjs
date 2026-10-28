@@ -4,7 +4,7 @@
 // invoices and change history, then times each query as a real signed-in user (row-level security on)
 // and prints the query plans of the slowest. PGlite is single-threaded WebAssembly: absolute times are
 // several times slower than Supabase, but the ratios and the plans (sequential scans, per-row function
-// calls) are what matter.  Usage: node scripts/load/scale-bench.mjs [--quick]
+// calls) are what matter.  Usage: node scripts/load/scale-bench.mjs [--quick] [--schools=25]
 import { PGlite } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
@@ -13,7 +13,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const QUICK = process.argv.includes("--quick");
-const SCHOOLS = QUICK ? 2 : 10, STUDENTS = 1400, PARENTS = 500, STAFF = 100, CLASSES = 30, DAYS = QUICK ? 5 : 20;
+// --schools=N: N schools of 2,000 accounts each (default 10 = 20,000 accounts; 25 = 50,000).
+const ARG_SCHOOLS = Number((process.argv.find(x => x.startsWith("--schools=")) ?? "").split("=")[1]);
+const SCHOOLS = QUICK ? 2 : ARG_SCHOOLS > 0 ? ARG_SCHOOLS : 10, STUDENTS = 1400, PARENTS = 500, STAFF = 100, CLASSES = 30, DAYS = QUICK ? 5 : 20;
 const MIG = fileURLToPath(new URL("../../supabase/migrations/", import.meta.url));
 const harness = fs.readFileSync(fileURLToPath(new URL("../db-test.mjs", import.meta.url)), "utf8");
 const bootstrap = harness.slice(harness.indexOf("const bootstrap = `") + 19, harness.indexOf("`;", harness.indexOf("const bootstrap = `")));
@@ -130,7 +132,7 @@ for (const r of slow) {
 }
 const out = { seeded: counts, schools: SCHOOLS, runs: RUNS, results, plans, at: new Date().toISOString() };
 fs.mkdirSync(fileURLToPath(new URL("./out/", import.meta.url)), { recursive: true });
-fs.writeFileSync(fileURLToPath(new URL(`./out/scale-bench${BEFORE ? "-before" : ""}.json`, import.meta.url)), JSON.stringify({ ...out, before: BEFORE }, null, 2));
+fs.writeFileSync(fileURLToPath(new URL(`./out/scale-bench${SCHOOLS !== 10 && !QUICK ? `-${SCHOOLS * 2}k` : ""}${BEFORE ? "-before" : ""}.json`, import.meta.url)), JSON.stringify({ ...out, before: BEFORE }, null, 2));
 log("written scripts/load/out/scale-bench.json");
 for (const p of plans) console.log(`\n--- plan: ${p.label}\n${p.plan}`);
 process.exit(0);
