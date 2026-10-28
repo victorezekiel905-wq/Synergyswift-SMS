@@ -9,7 +9,7 @@ import TutorAdmin from "@/components/learning/TutorAdmin";
 type TabId = "paths" | "content" | "online" | "tutor";
 
 export default function LearningPage() {
-  const { data: structure } = useApi<{ class_groups: { id: string; name: string }[]; subjects: { id: string; name: string }[] }>("/api/school/structure");
+  const { data: structure } = useApi<{ class_groups: { id: string; name: string }[]; subjects: { id: string; name: string }[] }>("/api/school/structure?mine=1");
   const [tab, setTab] = useState<TabId>("paths");
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");

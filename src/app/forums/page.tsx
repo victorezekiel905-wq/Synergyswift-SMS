@@ -25,7 +25,7 @@ const who = (u: { full_name: string; role: string } | null) => u ? `${u.full_nam
 function ForumList() {
   const { data, error, reload } = useApi<{ forums: { id: string; kind: string; title: string; description: string | null; locked: boolean; class_groups: { name: string } | null; subjects: { name: string } | null; forum_threads: { count: number }[] }[];
     reports: { id: string; reason: string; created_at: string; post_id: string | null; thread_id: string | null; forum_posts: { body: string; thread_id: string } | null; forum_threads: { title: string } | null; users: { full_name: string } | null }[]; staff: boolean }>("/api/forums");
-  const { data: structure } = useApi<{ class_groups: { id: string; name: string }[]; subjects: { id: string; name: string }[] }>(data?.staff ? "/api/school/structure" : null);
+  const { data: structure } = useApi<{ class_groups: { id: string; name: string }[]; subjects: { id: string; name: string }[] }>(data?.staff ? "/api/school/structure?mine=1" : null);
   const [create, setCreate] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   if (error) return <Alert>{error}</Alert>;

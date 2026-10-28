@@ -30,7 +30,7 @@ export async function GET() {
   ]);
   return NextResponse.json({
     classes: classes.data ?? [], offerings: offerings.data ?? [], team: team.data ?? [], staff: staff.data ?? [], subjects: subjects.data ?? [],
-    settings: Object.fromEntries(["auto_student_logins", "auto_parent_invites", "story_photo_consent", "points_allow_needs_work", "ussd_enabled"].map(k => [k, (settings.data as any)?.[k]])),
+    settings: Object.fromEntries(["auto_student_logins", "auto_parent_invites", "story_photo_consent", "points_allow_needs_work", "ussd_enabled", "all_classes_roles"].map(k => [k, (settings.data as any)?.[k]])),
     accounts: {
       students: studentsAll.count ?? 0, students_without_login: studentsNoLogin.count ?? 0, students_waiting: studentsNoLogin.data ?? [],
       parents: guardiansAll.count ?? 0, parents_without_login: guardiansNoLogin.count ?? 0, parents_waiting: guardiansWaiting.data ?? []
@@ -46,7 +46,8 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("remove"), id: z.string().uuid() }),
   z.object({ action: z.literal("form_teacher"), class_group_id: z.string().uuid(), user_id: z.string().uuid().nullable() }),
   z.object({ action: z.literal("subject_teacher"), offering_id: z.string().uuid(), user_id: z.string().uuid().nullable() }),
-  z.object({ action: z.literal("settings"), auto_student_logins: z.boolean().optional(), auto_parent_invites: z.boolean().optional(), story_photo_consent: z.boolean().optional(), ussd_enabled: z.boolean().optional() }),
+  z.object({ action: z.literal("settings"), auto_student_logins: z.boolean().optional(), auto_parent_invites: z.boolean().optional(), story_photo_consent: z.boolean().optional(), ussd_enabled: z.boolean().optional(),
+    all_classes_roles: z.array(z.enum(["school_admin", "principal", "teacher", "exam_officer", "qa_officer", "counsellor", "it_admin", "librarian", "hr_manager", "admissions_officer"])).max(10).optional() }),
   z.object({ action: z.literal("run_accounts") }),
   z.object({ action: z.literal("resend_key"), student_id: z.string().uuid() }),
   z.object({ action: z.literal("invite_parent"), guardian_id: z.string().uuid() })

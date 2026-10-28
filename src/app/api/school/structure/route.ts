@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 
-/** Class groups (arms), subjects, subject-teacher assignments and the staff list for pickers. */
-export async function GET() {
+/**
+ * Class groups (arms), subjects, subject-teacher assignments and the staff list for pickers.
+ * ?mine=1: only the classes this person teaches, unless they see every class (migration 8300).
+ */
+export async function GET(req: NextRequest) {
   const ctx = await requireCtx(ROLES.staff);
   if (ctx instanceof NextResponse) return ctx;
   const tid = ctx.tenant.id;
@@ -16,10 +19,23 @@ export async function GET() {
     ctx.sb.from("students").select("class_group_id").eq("tenant_id", tid).eq("status", "active"),
     ctx.sb.from("departments").select("id,name,head_user_id").eq("tenant_id", tid).order("name")
   ]);
+  let mine: Set<string> | null = null;
+  if (new URL(req.url).searchParams.get("mine") === "1") {
+    // Before migration 8300 the check does not exist: show every class, as before.
+    const { data: all, error: noRule } = await ctx.sb.rpc("sees_all_classes");
+    if (!noRule && all !== true) {
+      const { data: staff } = await ctx.sb.from("class_staff").select("class_group_id").eq("tenant_id", tid).eq("user_id", ctx.userId);
+      mine = new Set<string>([
+        ...(groups.data ?? []).filter((g: any) => g.form_teacher_id === ctx.userId).map((g: any) => g.id),
+        ...(offerings.data ?? []).filter((o: any) => o.teacher_id === ctx.userId).map((o: any) => o.class_group_id),
+        ...(staff ?? []).map((s: any) => s.class_group_id)
+      ]);
+    }
+  }
   const counts: Record<string, number> = {};
   for (const s of students.data ?? []) if (s.class_group_id) counts[s.class_group_id] = (counts[s.class_group_id] ?? 0) + 1;
   return NextResponse.json({
-    class_groups: (groups.data ?? []).map((g: any) => ({ ...g, students: counts[g.id] ?? 0 })),
+    class_groups: (groups.data ?? []).filter((g: any) => !mine || mine.has(g.id)).map((g: any) => ({ ...g, students: counts[g.id] ?? 0 })),
     subjects: subjects.data ?? [],
     offerings: offerings.data ?? [],
     staff: teachers.data ?? [],

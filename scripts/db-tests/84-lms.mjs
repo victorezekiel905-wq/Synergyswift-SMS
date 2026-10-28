@@ -37,8 +37,10 @@ export default async function ({ db, q, expectRows, expectError, expectOk, check
   await db.exec(`insert into class_groups (id, tenant_id, name) values ('${OTHER_CLASS}', '${T.A}', 'LMS other class')`);
   await expectOk("a teacher opens a class forum", U.teacherA, `insert into forums (id, tenant_id, kind, class_group_id, title, created_by) values ('${FORUM}', '${T.A}', 'class', '${CLASS}', 'JSS1 Maths', '${U.teacherA}')`);
   await expectOk("a staff-room forum", U.teacherA, `insert into forums (id, tenant_id, kind, title, created_by) values ('${STAFF_F}', '${T.A}', 'staff', 'Staff room', '${U.teacherA}')`);
-  await expectOk("and another class's forum", U.teacherA, `insert into forums (id, tenant_id, kind, class_group_id, title) values ('${OTHER_FORUM}', '${T.A}', 'class', '${OTHER_CLASS}', 'JSS2 Maths')`);
-  await expectError("a class forum needs a class", U.teacherA, `insert into forums (tenant_id, kind, title) values ('${T.A}', 'class', 'Nowhere')`, /check/);
+  // Since migration 8300 a teacher opens forums only for classes they teach; the admin opens the other one.
+  await expectError("…but not for a class they don't teach", U.teacherA, `insert into forums (tenant_id, kind, class_group_id, title) values ('${T.A}', 'class', '${OTHER_CLASS}', 'JSS2 Maths')`, /row-level security/);
+  await expectOk("the admin opens another class's forum", U.adminA, `insert into forums (id, tenant_id, kind, class_group_id, title) values ('${OTHER_FORUM}', '${T.A}', 'class', '${OTHER_CLASS}', 'JSS2 Maths')`);
+  await expectError("a class forum needs a class", U.teacherA, `insert into forums (tenant_id, kind, title) values ('${T.A}', 'class', 'Nowhere')`, /check|row-level security/);
   await expectError("students cannot open forums", U.studentA, `insert into forums (tenant_id, kind, title) values ('${T.A}', 'school', 'Mine')`, /row-level security/);
   await expectRows("the student sees their own class's forum only", U.studentA, "select count(*) n from forums", 1);
   await expectRows("parents see no forums", U.parentA, "select count(*) n from forums", 0);

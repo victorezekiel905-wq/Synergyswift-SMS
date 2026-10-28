@@ -10,7 +10,7 @@ type Structure = { class_groups: { id: string; name: string }[]; subjects: { id:
 
 export default function HomeworkPage() {
   const { data, error, reload } = useApi<Hw[]>("/api/homework");
-  const { data: structure } = useApi<Structure>("/api/school/structure");
+  const { data: structure } = useApi<Structure>("/api/school/structure?mine=1");
   const { data: providers } = useApi<{ drafting: boolean }>("/api/homework/capabilities");
   const [tab, setTab] = useState<"homework" | "groups" | "badges">("homework");
   const [open, setOpen] = useState(false);
