@@ -21,7 +21,7 @@ export async function GET() {
     svc.from("class_staff").select("*").eq("tenant_id", tid),
     svc.from("users").select("id,full_name,role").eq("tenant_id", tid).not("role", "in", "(student,parent)").eq("active", true).order("full_name"),
     svc.from("subjects").select("id,name").eq("tenant_id", tid).order("name"),
-    svc.from("tenant_settings").select("auto_student_logins,auto_parent_invites,story_photo_consent,points_allow_needs_work").eq("tenant_id", tid).maybeSingle(),
+    svc.from("tenant_settings").select("*").eq("tenant_id", tid).maybeSingle(),
     svc.from("students").select("id", { count: "exact", head: true }).eq("tenant_id", tid).eq("status", "active"),
     svc.from("students").select("id,first_name,last_name,login_sent_at", { count: "exact" }).eq("tenant_id", tid).eq("status", "active").is("user_id", null).limit(50),
     svc.from("guardians").select("id", { count: "exact", head: true }).eq("tenant_id", tid),
@@ -30,7 +30,7 @@ export async function GET() {
   ]);
   return NextResponse.json({
     classes: classes.data ?? [], offerings: offerings.data ?? [], team: team.data ?? [], staff: staff.data ?? [], subjects: subjects.data ?? [],
-    settings: settings.data ?? {},
+    settings: Object.fromEntries(["auto_student_logins", "auto_parent_invites", "story_photo_consent", "points_allow_needs_work", "ussd_enabled"].map(k => [k, (settings.data as any)?.[k]])),
     accounts: {
       students: studentsAll.count ?? 0, students_without_login: studentsNoLogin.count ?? 0, students_waiting: studentsNoLogin.data ?? [],
       parents: guardiansAll.count ?? 0, parents_without_login: guardiansNoLogin.count ?? 0, parents_waiting: guardiansWaiting.data ?? []
@@ -46,7 +46,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("remove"), id: z.string().uuid() }),
   z.object({ action: z.literal("form_teacher"), class_group_id: z.string().uuid(), user_id: z.string().uuid().nullable() }),
   z.object({ action: z.literal("subject_teacher"), offering_id: z.string().uuid(), user_id: z.string().uuid().nullable() }),
-  z.object({ action: z.literal("settings"), auto_student_logins: z.boolean().optional(), auto_parent_invites: z.boolean().optional(), story_photo_consent: z.boolean().optional() }),
+  z.object({ action: z.literal("settings"), auto_student_logins: z.boolean().optional(), auto_parent_invites: z.boolean().optional(), story_photo_consent: z.boolean().optional(), ussd_enabled: z.boolean().optional() }),
   z.object({ action: z.literal("run_accounts") }),
   z.object({ action: z.literal("resend_key"), student_id: z.string().uuid() }),
   z.object({ action: z.literal("invite_parent"), guardian_id: z.string().uuid() })

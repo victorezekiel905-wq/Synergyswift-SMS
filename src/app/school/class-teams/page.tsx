@@ -8,7 +8,7 @@ type Data = {
   classes: { id: string; name: string; level: string | null; form_teacher_id: string | null }[];
   offerings: { id: string; class_group_id: string; subject_id: string; teacher_id: string | null; subjects: { name: string } | null }[];
   team: Member[]; staff: Staff[]; subjects: { id: string; name: string }[];
-  settings: { auto_student_logins?: boolean; auto_parent_invites?: boolean; story_photo_consent?: boolean };
+  settings: { auto_student_logins?: boolean; auto_parent_invites?: boolean; story_photo_consent?: boolean; ussd_enabled?: boolean };
   accounts: { students: number; students_without_login: number; students_waiting: { id: string; first_name: string; last_name: string; login_sent_at: string | null }[]; parents: number; parents_without_login: number; parents_waiting: { id: string; full_name: string; email: string | null; phone: string | null }[] };
 };
 
@@ -49,6 +49,8 @@ export default function ClassTeamsPage() {
             <span><b>Parents</b>: parents with an email get an invitation to set a password; parents with only a phone get their private portal link and can sign in with a code sent to their phone.</span></label>
           <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5" checked={data.settings.story_photo_consent !== false} onChange={e => act({ action: "settings", story_photo_consent: e.target.checked }, "Saved")} />
             <span><b>Class story photos</b> only of children whose parents agreed to photos inside the school.</span></label>
+          <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5" checked={data.settings.ussd_enabled !== false} onChange={e => act({ action: "settings", ussd_enabled: e.target.checked }, "Saved")} />
+            <span><b>Basic phones (USSD)</b>: parents dial the Synergy Swift code from the phone number on their child&apos;s record to check results (with a result PIN if you sell them), fees, today&apos;s attendance and the school bus.</span></label>
           <button className="btn btn-primary" onClick={async () => { const r = await act({ action: "run_accounts" }, "Done"); if (r.ok) setMsg({ ok: true, text: `${r.data.student_logins} student sign-ins sent to parents, ${r.data.parent_invites} parents invited.` }); }}>Set up waiting accounts now</button>
           <p className="text-xs text-slate-500">This also happens by itself every few minutes, so new students and parents are set up without anyone remembering to.</p>
         </div>
