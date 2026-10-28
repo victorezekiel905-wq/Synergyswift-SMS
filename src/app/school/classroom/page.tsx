@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import WeeklyReportCard from "@/components/classroom/WeeklyReportCard";
 import { useApi, send, Page, PageHeader, Alert, Badge, Field, Loading, Empty, Tabs, Icon, fmtDate } from "@/components/ui";
 import { makeGroups } from "@/lib/classroom";
 
@@ -30,6 +31,7 @@ export default function ClassroomPage() {
             </select>
           </div>
         )} />
+      <WeeklyReportCard />
       {!mine.classes.length ? <Empty>You have no classes yet. A school admin adds you to classes under Class teams &amp; accounts.</Empty> : (
         <>
           <Tabs value={tab} onChange={setTab} tabs={[{ id: "points", label: "Points" }, { id: "story", label: "Class story" }, { id: "tools", label: "Class tools" }, { id: "targets", label: "Class targets" }]} />

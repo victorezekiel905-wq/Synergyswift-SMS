@@ -4,6 +4,7 @@ import { appUrl } from "@/lib/school";
 import { runBilling } from "@/lib/saas-server";
 import { runAccountAutomation } from "@/lib/accounts-server";
 import { runEntranceAutomation } from "@/lib/entrance-server";
+import { runWeeklyParentReports } from "@/lib/weekly-report-server";
 import { takeCronLock, releaseCronLock } from "@/lib/cron-lock";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,9 @@ export async function GET(req: NextRequest) {
     const accounts = await runAccountAutomation(svc, base).catch(() => null);
     // Entrance tests: seats, PINs, reminders, absences and decisions.
     const entrance = await runEntranceAutomation(svc, base).catch(() => null);
-    return NextResponse.json({ billing, accounts, entrance });
+    // Friday afternoons: each family's week at school (points, attendance, homework, class story).
+    const weekly = await runWeeklyParentReports(svc, base).catch(() => null);
+    return NextResponse.json({ billing, accounts, entrance, weekly });
   } finally {
     await releaseCronLock(svc, "slow", lock.run);
   }
