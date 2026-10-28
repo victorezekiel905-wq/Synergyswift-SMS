@@ -61,7 +61,7 @@ export default function Sen({ studentId }: { studentId: string }) {
       <section className="space-y-3">
         <div className="flex items-center"><h3 className="mr-auto font-semibold">Support plans (IEPs)</h3>
           {data.can_manage && p && <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => act({ action: "iep", title: "Individual education plan", starts_on: new Date().toISOString().slice(0, 10), status: "draft" }, "Draft plan started.")}>New plan</button>}</div>
-        {!data.ieps.length ? <Empty>No plans yet.</Empty> : data.ieps.map(i => <Plan key={i.id} iep={i} data={data} act={act} />)}
+        {!data.ieps.length ? <Empty>No plans yet.</Empty> : data.ieps.map(i => <Plan key={i.id} iep={i} data={data} act={act} studentId={studentId} />)}
       </section>
       {p && <HomeSchool notes={data.notes ?? []} act={act} />}
     </div>
@@ -102,8 +102,16 @@ function ProfileForm({ initial, vocab, staff, onSave, onCancel }: { initial: Pro
   );
 }
 
-function Plan({ iep, data, act }: { iep: Iep; data: Data; act: (b: Record<string, unknown>, ok: string) => Promise<boolean> }) {
+function Plan({ iep, data, act, studentId }: { iep: Iep; data: Data; act: (b: Record<string, unknown>, ok: string) => Promise<boolean>; studentId: string }) {
   const [edit, setEdit] = useState(false);
+  const [ideas, setIdeas] = useState<{ area: string; target: string; strategies: string; success_criteria: string }[] | null>(null);
+  const [thinking, setThinking] = useState<string | null>(null);
+  async function suggest() {
+    setThinking("Thinking…");
+    const r = await send<{ targets: { area: string; target: string; strategies: string; success_criteria: string }[] }>("/api/ai/draft", { kind: "iep_targets", student_id: studentId, iep_id: iep.id });
+    setThinking(r.ok ? null : r.error ?? "failed");
+    if (r.ok) setIdeas(r.data.targets);
+  }
   const [f, setF] = useState({ title: iep.title, starts_on: iep.starts_on, review_on: iep.review_on ?? "", student_voice: iep.student_voice ?? "", parent_views: iep.parent_views ?? "" });
   const [t, setT] = useState({ area: "", target: "", strategies: "", success_criteria: "", owner_id: "" });
   const [rv, setRv] = useState({ reviewed_on: new Date().toISOString().slice(0, 10), summary: "", attendees: "", next_review: "" });
@@ -152,6 +160,16 @@ function Plan({ iep, data, act }: { iep: Iep; data: Data; act: (b: Record<string
               <td className="p-1 align-top">{m && <button className="text-rose-600" onClick={() => confirm("Remove this target?") && act({ action: "delete_target", id: x.id }, "Removed.")} aria-label="Remove target">✕</button>}</td></tr>
           ))}{!iep.iep_targets.length && <tr><td className="p-2 text-slate-500" colSpan={5}>No targets yet.</td></tr>}</tbody></table>
       </div>
+      {m && iep.status !== "closed" && (
+        <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-2 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2"><span>Suggested targets from the profile (needs, strengths, what works). Pick one to fill the form, then edit it.</span>
+            <button type="button" className="btn btn-outline px-2 py-1 text-xs" disabled={thinking === "Thinking…"} onClick={suggest}>{thinking === "Thinking…" ? "Thinking…" : ideas ? "More ideas" : "Suggest targets"}</button></div>
+          {thinking && thinking !== "Thinking…" && <p className="mt-1 text-rose-700">{thinking}</p>}
+          {ideas && <ul className="mt-2 space-y-1">{ideas.map((x, i) => (
+            <li key={i} className="flex items-start justify-between gap-2 rounded bg-white p-2"><span><b>{x.area}:</b> {x.target}<span className="block text-slate-500">How: {x.strategies} · Success: {x.success_criteria}</span></span>
+              <button type="button" className="text-brand-700 underline" onClick={() => setT({ ...t, area: x.area, target: x.target, strategies: x.strategies, success_criteria: x.success_criteria })}>Use</button></li>))}</ul>}
+        </div>
+      )}
       {m && iep.status !== "closed" && (
         <form className="grid gap-2 rounded-lg bg-slate-50 p-2 sm:grid-cols-5" onSubmit={async e => {
           e.preventDefault();

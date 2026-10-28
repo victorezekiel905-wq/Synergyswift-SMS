@@ -70,7 +70,18 @@ export function Recruitment({ initialPosting, initialApplication }: { initialPos
 function PostingEditor({ posting, onClose, onSaved }: { posting: Partial<Posting> | null; onClose: () => void; onSaved: (id: string) => void }) {
   const [p, setP] = useState<Partial<Posting>>({});
   const [err, setErr] = useState<string | null>(null);
+  const [writing, setWriting] = useState(false);
   const cur = { ...posting, ...p };
+  async function writeAdvert() {
+    if (!cur.title || cur.title.length < 2) return setErr("Type the job title first.");
+    if ((cur.description || cur.requirements) && !confirm("Replace the text already written?")) return;
+    setWriting(true); setErr(null);
+    const r = await send<{ description: string; requirements: string }>("/api/ai/draft", { kind: "job_advert", title: cur.title, department: cur.department || null,
+      employment_type: cur.employment_type || null, location: cur.location || null, salary_range: cur.salary_range || null, notes: cur.description || null });
+    setWriting(false);
+    if (!r.ok) return setErr(r.error);
+    setP({ ...p, description: r.data.description, requirements: r.data.requirements });
+  }
   const bind = (k: keyof Posting) => ({ value: (cur[k] as string | number | undefined) ?? "", onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setP({ ...p, [k]: e.target.value }) });
   return (
     <Modal open={Boolean(posting)} onClose={() => { setP({}); setErr(null); onClose(); }} title={cur.id ? "Edit job" : "New job"} wide>
@@ -90,6 +101,8 @@ function PostingEditor({ posting, onClose, onSaved }: { posting: Partial<Posting
         <Field label="Places"><input className="input" type="number" min={1} max={100} {...bind("positions")} /></Field>
         <Field label="Closing date"><input className="input" type="date" {...bind("closes_on")} /></Field>
         <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" checked={Boolean(cur.internal_only)} onChange={e => setP({ ...p, internal_only: e.target.checked })} />Current staff only</label>
+        <div className="flex items-center justify-between gap-2 sm:col-span-3"><span className="text-xs text-slate-500">Type the title (and any notes under About the job), then let the assistant write the advert for you to edit.</span>
+          <button type="button" className="btn btn-outline px-3 py-1 text-xs" disabled={writing} onClick={writeAdvert}>{writing ? "Writing…" : "Write the advert"}</button></div>
         <div className="sm:col-span-3"><Field label="About the job"><textarea className="input" rows={6} maxLength={8000} {...bind("description")} /></Field></div>
         <div className="sm:col-span-3"><Field label="What we are looking for (qualifications, experience)"><textarea className="input" rows={4} maxLength={6000} {...bind("requirements")} /></Field></div>
         {err && <div className="sm:col-span-3"><Alert>{err}</Alert></div>}
