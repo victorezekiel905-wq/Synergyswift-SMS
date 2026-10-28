@@ -18,6 +18,27 @@ export async function GET(req: NextRequest) {
   const ctx = await requireCtx(undefined, "exams");
   if (ctx instanceof NextResponse) return ctx;
   const status = new URL(req.url).searchParams.get("status");
+  // For the family screen: the children this person can ask for, and each one's exams in the next 90 days (or the last 30, for resits).
+  if (new URL(req.url).searchParams.get("view") === "options") {
+    const svc = createServiceClient();
+    const { data: kids } = ctx.roles.has("parent")
+      ? await svc.from("student_guardians").select("students!inner(id,first_name,last_name,other_names,class_group_id,status,tenant_id),guardians!inner(user_id)").eq("guardians.user_id", ctx.userId).eq("students.tenant_id", ctx.tenant.id)
+      : await svc.from("students").select("id,first_name,last_name,other_names,class_group_id,status,tenant_id").eq("tenant_id", ctx.tenant.id).eq("user_id", ctx.userId);
+    const children = ((kids ?? []) as any[]).map(k => k.students ?? k).filter(c => c.status === "active");
+    const from = new Date(Date.now() - 30 * 86_400_000).toISOString(), to = new Date(Date.now() + 90 * 86_400_000).toISOString();
+    const out = [];
+    for (const c of children) {
+      const [{ data: exams }, { data: papers }] = await Promise.all([
+        svc.from("exams").select("id,title,opens_at,closes_at,class_group_id").eq("tenant_id", ctx.tenant.id).in("status", ["published", "closed"])
+          .or(`class_group_id.is.null,class_group_id.eq.${c.class_group_id ?? "00000000-0000-0000-0000-000000000000"}`).gte("closes_at", from).lte("opens_at", to).order("opens_at").limit(50),
+        c.class_group_id ? svc.from("exam_papers").select("id,title,slot_date,exam_series!inner(status)").eq("tenant_id", ctx.tenant.id).eq("exam_series.status", "published")
+          .contains("class_group_ids", [c.class_group_id]).gte("slot_date", from.slice(0, 10)).lte("slot_date", to.slice(0, 10)).order("slot_date").limit(50) : Promise.resolve({ data: [] })
+      ]);
+      out.push({ id: c.id, name: studentName(c), exams: (exams ?? []).map((e: any) => ({ id: e.id, title: e.title, at: e.opens_at })),
+        papers: (papers ?? []).map((p: any) => ({ id: p.id, title: p.title, at: p.slot_date })) });
+    }
+    return NextResponse.json({ children: out });
+  }
   let q = ctx.sb.from("exam_requests").select("*,students(first_name,last_name,other_names,admission_no,class_groups(name)),exams(title,opens_at,closes_at),exam_papers(title,slot_date)")
     .eq("tenant_id", ctx.tenant.id).order("created_at", { ascending: false }).limit(300);
   if (status) q = q.eq("status", status);
