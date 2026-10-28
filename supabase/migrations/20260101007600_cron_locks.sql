@@ -35,7 +35,8 @@ end $$;
 -- Frees the lock, but only for the run that holds it.
 create or replace function public.release_cron_lock(p_key text, p_run uuid)
 returns void language sql security definer set search_path = public as $$
-  update public.cron_locks set locked_until = now(), last_finished = now() where key = p_key and run_id = p_run;
+  -- A second in the past, so a run starting in the same instant finds it free.
+  update public.cron_locks set locked_until = now() - interval '1 second', last_finished = now() where key = p_key and run_id = p_run;
 $$;
 
 revoke all on function public.take_cron_lock(text, int) from public, anon, authenticated;

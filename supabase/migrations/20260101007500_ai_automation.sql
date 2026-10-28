@@ -17,7 +17,7 @@ create table if not exists public.ai_usage (
   tenant_id      uuid references public.tenants(id) on delete cascade,   -- null: platform work (sales)
   user_id        uuid,
   task           text not null check (length(task) between 1 and 60),
-  provider       text not null check (provider in ('gemini','anthropic')),
+  provider       text not null check (length(provider) between 1 and 40),   -- gemini, anthropic, or an extra provider's name
   model          text not null,
   input_tokens   int not null default 0,
   output_tokens  int not null default 0,

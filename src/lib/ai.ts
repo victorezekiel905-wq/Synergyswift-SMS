@@ -2,9 +2,14 @@
  * The one door to AI for the whole platform (phase 14p). Every feature asks for
  * JSON that matches a zod schema, so the app never scrapes free text.
  *
- * Provider: Google Gemini (GEMINI_API_KEY, optional GEMINI_MODEL and, for the
- * heavier jobs, GEMINI_MODEL_PRO). A server that only has ANTHROPIC_API_KEY
- * keeps working on Claude until a Gemini key is added.
+ * Providers, tried in order until one answers: Google Gemini (GEMINI_API_KEY,
+ * GEMINI_MODEL, GEMINI_MODEL_PRO), then up to six extra OpenAI-compatible
+ * services (Groq, OpenRouter, Mistral, Cerebras, GitHub Models, Together...):
+ * AI_EXTRA_<n>_NAME, _URL (the API base, e.g. https://api.groq.com/openai/v1),
+ * _KEY, _MODEL and optionally _MODEL_PRO, for n = 1..6; then Claude
+ * (ANTHROPIC_API_KEY) if set. When one is busy, out of free quota, refuses its
+ * key or sends a broken answer, the next takes over. AI_ROTATE=1 spreads
+ * requests across them instead of always starting with the first.
  *
  * Each request is counted in ai_usage against the school (and person) the
  * request is for, and refused once the school has used its monthly allowance
@@ -23,7 +28,8 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod/v4";
 import { currentRequest } from "./request-actor";
 
-export type AiProvider = "gemini" | "anthropic";
+/** "gemini", "anthropic", or an extra provider's name. */
+export type AiProvider = string;
 export type AiTurn = { role: "user" | "model"; text: string };
 export type AiFile = { mimeType: string; base64: string };
 
@@ -36,12 +42,35 @@ export class AiDeclined extends Error {}
 
 const usable = (k: string | undefined) => Boolean(k?.trim() && !k.includes("replace"));
 
+/** An extra OpenAI-compatible text service. */
+export type ExtraProvider = { name: string; url: string; key: string; model: string; modelBest?: string };
+export function extraProviders(): ExtraProvider[] {
+  const out: ExtraProvider[] = [];
+  for (let i = 1; i <= 6; i++) {
+    const env = (k: string) => process.env[`AI_EXTRA_${i}_${k}`]?.trim() || "";
+    const url = env("URL"), key = env("KEY"), model = env("MODEL");
+    if (!/^https:\/\//.test(url) || !usable(key) || !model) continue;
+    const name = env("NAME").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 30) || `extra${i}`;
+    out.push({ name, url: url.replace(/\/+$/, ""), key, model, modelBest: env("MODEL_PRO") || undefined });
+  }
+  return out;
+}
+type Slot = { kind: "gemini" } | { kind: "anthropic" } | { kind: "openai"; p: ExtraProvider };
+const slotName = (x: Slot) => (x.kind === "openai" ? x.p.name : x.kind);
+/** Every configured provider, in the order they are tried. */
+export function providerChain(): Slot[] {
+  const chain: Slot[] = [];
+  if (usable(process.env.GEMINI_API_KEY)) chain.push({ kind: "gemini" });
+  for (const p of extraProviders()) chain.push({ kind: "openai", p });
+  if (usable(process.env.ANTHROPIC_API_KEY)) chain.push({ kind: "anthropic" });
+  return chain;
+}
 export function aiProvider(): AiProvider | null {
-  if (usable(process.env.GEMINI_API_KEY)) return "gemini";
-  if (usable(process.env.ANTHROPIC_API_KEY)) return "anthropic";
-  return null;
+  const first = providerChain()[0];
+  return first ? slotName(first) : null;
 }
 export const aiConfigured = () => aiProvider() !== null;
+let turn = 0;
 
 /** Whether this school may use AI: the server has a key and the school has the AI module. */
 export function aiAllowed(ctx: { tenant: { modules?: Record<string, boolean> | null } }): boolean {
@@ -265,6 +294,40 @@ async function callGemini(r: JsonRequest<z.ZodType>, strict: boolean): Promise<R
 }
 class SchemaRejected extends Error {}
 
+// ---------------- extra OpenAI-compatible providers ----------------
+
+type ChatReply = {
+  choices?: { message?: { content?: string | null }; finish_reason?: string }[];
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
+  error?: { message?: string } | string;
+};
+
+async function callOpenAI(r: JsonRequest<z.ZodType>, p: ExtraProvider, jsonMode: boolean): Promise<Raw> {
+  const model = r.quality === "best" && p.modelBest ? p.modelBest : p.model;
+  const system = `${r.system}\n\nReply with JSON only, matching this JSON Schema exactly:\n${JSON.stringify(geminiSchema(r.schema))}`;
+  const turns = r.turns?.length ? r.turns : [{ role: "user" as const, text: r.prompt ?? "" }];
+  const body: Record<string, unknown> = {
+    model, temperature: r.temperature ?? 0.7, max_tokens: Math.min(r.maxTokens ?? 8192, 16384),
+    messages: [{ role: "system", content: system }, ...turns.map(t => ({ role: t.role === "model" ? "assistant" : "user", content: t.text }))]
+  };
+  if (jsonMode) body.response_format = { type: "json_object" };
+  let res: Response;
+  try {
+    res = await fetch(`${p.url}/chat/completions`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${p.key}` },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(r.timeoutMs ?? 120_000) });
+  } catch { throw new AiUnavailable("Couldn't reach the AI just now. Try again in a minute.", 502); }
+  const data = (await res.json().catch(() => ({}))) as ChatReply;
+  const problem = typeof data.error === "string" ? data.error : data.error?.message ?? "";
+  if (res.status === 429) throw new AiUnavailable("The AI is busy right now. Try again in a minute.", 429);
+  if (res.status === 401 || res.status === 403) { console.error(`[ai] ${p.name} refused its key`); throw new AiUnavailable("The AI is not available right now.", 503); }
+  if (res.status === 400 && jsonMode && /response_format|json/i.test(problem)) throw new SchemaRejected();
+  if (!res.ok) { console.error(`[ai] ${p.name} failed:`, res.status, problem.slice(0, 200)); throw new AiUnavailable("Couldn't reach the AI just now. Try again in a minute.", 502); }
+  const c = data.choices?.[0];
+  if (c?.finish_reason === "content_filter") throw new AiDeclined("The AI would not write this. Try wording it differently.");
+  if (c?.finish_reason === "length") throw new AiUnavailable("That was too much to write in one go. Ask for less and try again.", 422);
+  return { text: c?.message?.content ?? "", model, inputTokens: data.usage?.prompt_tokens ?? 0, outputTokens: data.usage?.completion_tokens ?? 0 };
+}
+
 // ---------------- Claude (until a Gemini key is added) ----------------
 
 let claude: Anthropic | null = null;
@@ -311,39 +374,60 @@ export function extractJson(text: string): unknown {
 
 /** Asks the AI for JSON matching `schema`. Throws AiUnavailable / AiDeclined for things to tell the person. */
 export async function generateJson<S extends z.ZodType>(r: JsonRequest<S>): Promise<z.infer<S>> {
-  const provider = aiProvider();
-  if (!provider) throw new AiUnavailable("AI isn't set up on this site yet. Ask your Synergy Swift administrator to add a Gemini API key.");
+  let chain = providerChain();
+  if (!chain.length) throw new AiUnavailable("AI isn't set up on this site yet. Ask your Synergy Swift administrator to add a Gemini API key.");
+  if (process.env.AI_ROTATE === "1" && chain.length > 1) { const k = turn++ % chain.length; chain = [...chain.slice(k), ...chain.slice(0, k)]; }
   const req = currentRequest();
   const tenantId = r.tenantId !== undefined ? r.tenantId : req.tenantId;
   const userId = r.userId !== undefined ? r.userId : req.userId;
   await checkAllowance(tenantId, userId, r.task);
-  const log = (model: string, inTok: number, outTok: number, ok: boolean) =>
-    recordUsage({ tenantId, userId: r.userId !== undefined ? r.userId : req.userId, task: r.task, provider, model, inputTokens: inTok, outputTokens: outTok, ok });
+  const log = (provider: string, model: string, inTok: number, outTok: number, ok: boolean) =>
+    recordUsage({ tenantId, userId, task: r.task, provider, model, inputTokens: inTok, outputTokens: outTok, ok });
 
-  if (provider === "anthropic") {
+  let last: unknown = null;
+  for (const slot of chain) {
+    // Documents (PDFs) need Gemini or Claude.
+    if (slot.kind === "openai" && r.files?.length) continue;
+    try {
+      return await viaSlot(r, slot, log) as z.infer<S>;
+    } catch (e) {
+      last = e;
+      // A refusal or a request that is too big would be the same anywhere; anything else, try the next provider.
+      if (e instanceof AiDeclined || (e instanceof AiUnavailable && e.status === 422)) throw e;
+    }
+  }
+  throw last instanceof AiUnavailable || last instanceof AiDeclined ? last : new AiUnavailable("Couldn't reach the AI just now. Try again in a minute.", 502);
+}
+
+type Log = (provider: string, model: string, inTok: number, outTok: number, ok: boolean) => Promise<void>;
+
+/** One provider's attempt: the answer must fit the schema (one retry); failures are logged and cost nothing. */
+async function viaSlot(r: JsonRequest<z.ZodType>, slot: Slot, log: Log): Promise<unknown> {
+  const name = slotName(slot);
+  if (slot.kind === "anthropic") {
     try {
       const { raw, parsed } = await callClaude(r);
       const ok = r.schema.safeParse(parsed);
-      await log(raw.model, raw.inputTokens, raw.outputTokens, ok.success);
+      await log(name, raw.model, raw.inputTokens, raw.outputTokens, ok.success);
       if (!ok.success) throw new AiUnavailable("The AI's answer came back in an unexpected form. Try again.", 502);
       return ok.data;
-    } catch (e) { if (!(e instanceof AiUnavailable)) await log(CLAUDE_MODEL, 0, 0, false); throw e; }
+    } catch (e) { if (!(e instanceof AiUnavailable)) await log(name, CLAUDE_MODEL, 0, 0, false); throw e; }
   }
-
-  let strict = true, inTok = 0, outTok = 0, model = geminiModel(r.quality);
+  let strict = true, inTok = 0, outTok = 0;
+  let model = slot.kind === "gemini" ? geminiModel(r.quality) : (r.quality === "best" && slot.p.modelBest ? slot.p.modelBest : slot.p.model);
   for (let attempt = 0; attempt < 2; attempt++) {
     let raw: Raw;
-    try { raw = await callGemini(r, strict); }
+    try { raw = slot.kind === "gemini" ? await callGemini(r, strict) : await callOpenAI(r, slot.p, strict); }
     catch (e) {
-      if (e instanceof SchemaRejected) { strict = false; attempt--; continue; }
-      await log(model, inTok, outTok, false);
+      if (e instanceof SchemaRejected && strict) { strict = false; attempt--; continue; }
+      await log(name, model, inTok, outTok, false);
       throw e;
     }
     inTok += raw.inputTokens; outTok += raw.outputTokens; model = raw.model;
     const ok = r.schema.safeParse(extractJson(raw.text));
-    if (ok.success) { await log(model, inTok, outTok, true); return ok.data; }
+    if (ok.success) { await log(name, model, inTok, outTok, true); return ok.data; }
   }
-  await log(model, inTok, outTok, false);
+  await log(name, model, inTok, outTok, false);
   throw new AiUnavailable("The AI's answer came back in an unexpected form. Try again.", 502);
 }
 

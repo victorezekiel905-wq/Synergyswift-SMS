@@ -9,7 +9,8 @@ export default async function ({ db, q, expectRows, expectError, check, U, T }) 
   await server("the server logs a request for school A", `insert into ai_usage (tenant_id, user_id, task, provider, model, input_tokens, output_tokens) values ('${T.A}', '${U.teacherA}', 'report_comments', 'gemini', 'gemini-2.5-flash', 1200, 400)`);
   await server("…and one for school B", `insert into ai_usage (tenant_id, task, provider, model) values ('${T.B}', 'slides', 'gemini', 'gemini-2.5-flash')`);
   await server("…and platform work with no school", `insert into ai_usage (task, provider, model) values ('sales_brief', 'gemini', 'gemini-2.5-flash')`);
-  await server("only known providers", `insert into ai_usage (tenant_id, task, provider, model) values ('${T.A}', 'x', 'openai', 'gpt')`, /check/);
+  await server("any provider is named (Gemini, Groq, OpenRouter…)", `insert into ai_usage (tenant_id, task, provider, model) values ('${T.B}', 'x', 'groq', 'llama')`);
+  await server("…but it must be named", `insert into ai_usage (tenant_id, task, provider, model) values ('${T.A}', 'x', '', 'm')`, /check/);
   await expectRows("school A's admin sees school A's usage", U.adminA, `select count(*) n from ai_usage`, 1);
   await expectRows("school B's admin sees only school B's", U.adminB, `select count(*) n from ai_usage where task = 'slides'`, 1);
   await expectRows("…and nothing of school A's", U.adminB, `select count(*) n from ai_usage where tenant_id = '${T.A}'`, 0);
