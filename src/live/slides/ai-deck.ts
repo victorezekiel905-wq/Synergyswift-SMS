@@ -19,7 +19,9 @@ export type OutlineSlide = {
   image_query?: string; notes?: string;
 };
 export type Outline = { title: string; slides: OutlineSlide[] };
-export type Photo = { url: string; alt: string; credit: string; credit_url: string; download_location: string };
+/** source: where it came from (credited on the slide). Pixabay photos are copied to the school's storage (media_path); Unsplash ones are linked (url). */
+export type Photo = { url: string; media_path?: string; alt: string; credit: string; credit_url: string; download_location: string; source?: "pixabay" | "unsplash" };
+const sourceName = (p: Photo) => (p.source === "pixabay" ? "Pixabay" : "Unsplash");
 export type DeckSlide = { content: CanvasContent; notes: string; heading: string; photo?: Photo };
 
 export type ThemeKey = "swift" | "ocean" | "sunrise";
@@ -60,11 +62,11 @@ const shape = (over: Partial<ShapeElement> & Pick<ShapeElement, "x" | "y" | "w" 
   id: id(), type: "shape", shape: "rect", fill: "#2547d0", stroke: "transparent", strokeWidth: 0, ...over
 });
 const image = (p: Photo, over: Pick<ImageElement, "x" | "y" | "w" | "h"> & Partial<ImageElement>): ImageElement => ({
-  id: id(), type: "image", url: p.url, alt: p.alt, fit: "cover", ...over
+  id: id(), type: "image", ...(p.media_path ? { media_path: p.media_path } : { url: p.url }), alt: p.alt, fit: "cover", ...over
 });
-/** "Photo: Name / Unsplash", small, in a corner of the slide. */
+/** "Photo: Name / Pixabay" (or Unsplash), small, in a corner of the slide. */
 const credit = (p: Photo, onDark: boolean): TextElement => text({
-  x: 1040, y: 852, w: 540, h: 36, text: `Photo: ${clip(p.credit, 40)} / Unsplash`, size: 18, align: "right", valign: "middle",
+  x: 1040, y: 852, w: 540, h: 36, text: `Photo: ${clip(p.credit, 40)} / ${sourceName(p)}`, size: 18, align: "right", valign: "middle",
   color: onDark ? "#e2e8f0" : "#64748b"
 });
 const heading = (t: Theme, s: string, over: Partial<TextElement> = {}) => {
@@ -175,7 +177,7 @@ export function buildDeck(o: Outline, photos: (Photo | undefined)[], theme: Them
   const t = THEMES[theme] ?? THEMES.swift;
   return o.slides.map((s, i) => {
     const photo = photos[i];
-    const notes = [clip(s.notes, 1500), photo ? `Photo by ${photo.credit} on Unsplash: ${photo.credit_url}` : ""].filter(Boolean).join("\n\n");
+    const notes = [clip(s.notes, 1500), photo ? `Photo by ${photo.credit} on ${sourceName(photo)}: ${photo.credit_url}` : ""].filter(Boolean).join("\n\n");
     return { content: designSlide(s, t, photo), notes, heading: clip(s.heading, 120), photo };
   });
 }

@@ -1,12 +1,12 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Download, RefreshCw, Sparkles, X } from "lucide-react";
+import { Download, ExternalLink, RefreshCw, Sparkles, X } from "lucide-react";
 import { Alert, Button, Field, Input, Select, Textarea, Toggle, useToast } from "@/live/components/ui";
 import { CanvasFrame } from "@/live/components/slides/CanvasView";
 import { createClient } from "@/live/lib/supabase/client";
 import { errorText, must } from "@/live/lib/rpc";
-import { downloadPptx } from "@/live/lib/pptx-export";
+import { downloadPptx, pptxBlob } from "@/live/lib/pptx-export";
 import { THEMES, type DeckSlide, type ThemeKey } from "@/live/slides/ai-deck";
 import { cn } from "@/live/lib/utils";
 
@@ -15,13 +15,13 @@ type Deck = { title: string; slides: DeckSlide[]; pictures: boolean };
 
 /** Unsplash asks to be told when its photos are used. */
 function reportUsed(slides: DeckSlide[]) {
-  const locations = slides.flatMap((s) => (s.photo ? [s.photo.download_location] : []));
+  const locations = slides.flatMap((s) => (s.photo?.download_location ? [s.photo.download_location] : []));
   if (locations.length) void fetch("/api/swift/ai/slides/used", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locations }) }).catch(() => {});
 }
 
 /**
  * Create slides with AI: the teacher says what the lesson is about; Gemini plans the
- * slides, Unsplash finds photos, and they come back designed in the chosen theme. The
+ * slides, Pixabay (or Unsplash) finds photos, and they come back designed in the chosen theme. The
  * teacher checks them, drops any they don't want, then creates a lesson (or adds them
  * to the open one) and/or downloads them as a PowerPoint file.
  */
@@ -39,7 +39,7 @@ export function AiSlides({ lesson, onAdded }: {
   const [pictures, setPictures] = useState(true);
   const [theme, setTheme] = useState<ThemeKey>("swift");
   const [notes, setNotes] = useState("");
-  const [busy, setBusy] = useState<"make" | "save" | "download" | null>(null);
+  const [busy, setBusy] = useState<"make" | "save" | "download" | "canva" | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [deck, setDeck] = useState<Deck | null>(null);
 
@@ -82,6 +82,38 @@ export function AiSlides({ lesson, onAdded }: {
     finally { setBusy(null); }
   }
 
+  /**
+   * "Open in Canva": the deck goes into the teacher's own Canva account as a presentation they can
+   * keep designing there (Canva's photos, elements and templates). The first time, they connect Canva.
+   */
+  async function openInCanva() {
+    if (!deck?.slides.length) return;
+    // Open the window now (browsers block windows opened after a wait), then point it at Canva.
+    const win = window.open("about:blank", "_blank");
+    setBusy("canva");
+    try {
+      const status = await fetch("/api/canva/status").then((r) => r.json()).catch(() => null) as { configured?: boolean; connected?: boolean } | null;
+      if (!status?.configured) { win?.close(); toast("Canva isn't set up on this site yet. Your Synergy Swift administrator adds it.", "error"); return; }
+      if (!status.connected) {
+        if (win) win.location.href = "/api/canva/connect";
+        const ok = await new Promise<boolean>((resolve) => {
+          const done = (e: MessageEvent) => { if (e.origin === window.location.origin && typeof e.data === "string" && e.data.startsWith("canva-")) { window.removeEventListener("message", done); resolve(e.data === "canva-connected"); } };
+          window.addEventListener("message", done);
+          setTimeout(() => { window.removeEventListener("message", done); resolve(false); }, 180_000);
+        });
+        if (!ok) { toast("Canva wasn't connected.", "error"); return; }
+      }
+      const blob = await pptxBlob(deck.title, deck.slides.map((s) => ({ kind: "canvas", content: s.content, notes: s.notes })));
+      const r = await fetch(`/api/canva/import?title=${encodeURIComponent(deck.title)}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: blob });
+      const d = await r.json().catch(() => ({})) as { edit_url?: string; error?: string };
+      if (!r.ok || !d.edit_url) { toast(d.error ?? "Canva didn't take the slides.", "error"); return; }
+      reportUsed(deck.slides);
+      const target = win && !win.closed ? win : window.open("about:blank", "_blank");
+      if (target) target.location.href = d.edit_url; else window.location.href = d.edit_url;
+    } catch (e) { toast(`Couldn't send to Canva: ${errorText(e)}`, "error"); }
+    finally { setBusy(null); }
+  }
+
   async function download() {
     if (!deck?.slides.length) return;
     setBusy("download");
@@ -103,6 +135,7 @@ export function AiSlides({ lesson, onAdded }: {
           <div className="flex flex-wrap gap-2">
             <Button variant="ghost" onClick={() => setDeck(null)}><RefreshCw className="h-4 w-4" aria-hidden /> Start again</Button>
             <Button variant="secondary" loading={busy === "download"} disabled={!!busy || !deck.slides.length} onClick={download}><Download className="h-4 w-4" aria-hidden /> Download PowerPoint</Button>
+            <Button variant="secondary" loading={busy === "canva"} disabled={!!busy || !deck.slides.length} onClick={openInCanva}><ExternalLink className="h-4 w-4" aria-hidden /> Open in Canva</Button>
             <Button loading={busy === "save"} disabled={!!busy || !deck.slides.length} onClick={save}>{lesson ? `Add ${deck.slides.length} slides to this lesson` : "Create the lesson"}</Button>
           </div>
         </div>

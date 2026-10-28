@@ -35,7 +35,7 @@ export const POST = withErrorLog(async function POST(req: Request) {
     const photos = [];
     for (const s of outline.slides) {
       const wants = pictures && !!s.image_query && ["title", "picture", "big_picture"].includes(s.layout);
-      photos.push(wants ? await findPhoto(s.image_query!, used) : undefined);
+      photos.push(wants ? await findPhoto(s.image_query!, used, { tenantId: me.tenant_id, userId: me.id }) : undefined);
     }
     return ok({ title: outline.title, slides: buildDeck(outline, photos, theme), pictures });
   } catch (e) {

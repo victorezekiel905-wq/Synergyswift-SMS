@@ -5,7 +5,7 @@ import { generateJson, aiConfigured, AiUnavailable, AiDeclined } from "@/lib/ai"
 
 /*
  * "Create slides with AI". Gemini writes a lesson outline (what each slide says and
- * which photo would help, plus notes for the teacher); Unsplash finds the photos;
+ * which photo would help, plus notes for the teacher); Pixabay (or Unsplash) finds the photos;
  * src/slides/ai-deck.ts designs the slides. Keys live on the server only:
  * GEMINI_API_KEY (through src/lib/ai.ts), UNSPLASH_ACCESS_KEY.
  */
@@ -13,7 +13,7 @@ import { generateJson, aiConfigured, AiUnavailable, AiDeclined } from "@/lib/ai"
 export class SlidesUnavailable extends Error {}
 
 export const slidesConfigured = aiConfigured;
-export const photosConfigured = () => Boolean(process.env.UNSPLASH_ACCESS_KEY?.trim());
+export const photosConfigured = () => Boolean(process.env.PIXABAY_API_KEY?.trim() || process.env.UNSPLASH_ACCESS_KEY?.trim());
 
 export type SlidesRequest = { topic: string; level: string; subject?: string; count: number; notes?: string; pictures: boolean; tenantId?: string; userId?: string };
 
@@ -74,8 +74,64 @@ type UnsplashPhoto = {
 };
 const UTM = "utm_source=swiftcipher&utm_medium=referral";
 
-/** The best landscape photo for a search, skipping ones already used in this deck. Never throws. */
-export async function findPhoto(query: string, used: Set<string>): Promise<Photo | undefined> {
+/**
+ * The best landscape photo for a search, skipping ones already used in this deck: Pixabay first
+ * (PIXABAY_API_KEY), then Unsplash (UNSPLASH_ACCESS_KEY). Never throws.
+ */
+export async function findPhoto(query: string, used: Set<string>, owner?: { tenantId: string; userId: string }): Promise<Photo | undefined> {
+  if (process.env.PIXABAY_API_KEY?.trim() && owner) {
+    const p = await pixabayPhoto(query, used, owner);
+    if (p) return p;
+  }
+  return unsplashPhoto(query, used);
+}
+
+type PixabayHit = { id: number; pageURL: string; tags: string; webformatURL: string; largeImageURL: string; user: string; imageWidth: number; imageHeight: number };
+// Pixabay asks for search results to be cached for 24 hours.
+const pixabayCache = new Map<string, { at: number; hits: PixabayHit[] }>();
+
+export async function pixabaySearch(q: string): Promise<PixabayHit[]> {
+  const hit = pixabayCache.get(q);
+  if (hit && Date.now() - hit.at < 24 * 3600_000) return hit.hits;
+  const url = `https://pixabay.com/api/?key=${encodeURIComponent(process.env.PIXABAY_API_KEY!.trim())}&q=${encodeURIComponent(q.slice(0, 100))}&image_type=photo&orientation=horizontal&safesearch=true&per_page=12&order=popular`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  if (!res.ok) { console.error("[ai-slides] Pixabay", res.status); return []; }
+  const { hits } = (await res.json()) as { hits?: PixabayHit[] };
+  const list = (hits ?? []).filter(h => h.imageWidth >= 960);
+  pixabayCache.set(q, { at: Date.now(), hits: list });
+  if (pixabayCache.size > 500) pixabayCache.delete(pixabayCache.keys().next().value!);
+  return list;
+}
+
+/**
+ * Pixabay doesn't allow lasting hotlinks, so the chosen photo is downloaded once into the school's
+ * own lesson media (and its media library), and the slide points at that copy.
+ */
+async function pixabayPhoto(query: string, used: Set<string>, owner: { tenantId: string; userId: string }): Promise<Photo | undefined> {
+  const q = query.trim();
+  if (!q) return undefined;
+  try {
+    const p = (await pixabaySearch(q)).find(h => !used.has(`pixabay:${h.id}`));
+    if (!p) return undefined;
+    used.add(`pixabay:${p.id}`);
+    const img = await fetch(p.largeImageURL || p.webformatURL, { signal: AbortSignal.timeout(15_000) });
+    if (!img.ok) return undefined;
+    const bytes = new Uint8Array(await img.arrayBuffer());
+    if (bytes.byteLength > 8_000_000) return undefined;
+    const { createServiceClient } = await import("@/live/lib/supabase/service");
+    const svc = createServiceClient();
+    const path = `${owner.tenantId}/${owner.userId}/pixabay-${p.id}.jpg`;
+    const { error } = await svc.storage.from("live-lesson-media").upload(path, bytes, { contentType: "image/jpeg", upsert: true });
+    if (error) { console.error("[ai-slides] photo copy", error.message); return undefined; }
+    const alt = (p.tags || q).slice(0, 200);
+    const { data: had } = await svc.from("lesson_media").select("id").eq("tenant_id", owner.tenantId).eq("storage_path", path).maybeSingle();
+    if (!had) await svc.from("lesson_media").insert({ tenant_id: owner.tenantId, owner_id: owner.userId, storage_path: path, kind: "image", mime_type: "image/jpeg",
+      bytes: bytes.byteLength, title: `${q} (Pixabay)`.slice(0, 200), alt_text: alt, tags: ["pixabay", "ai slides"] }).then(() => null, () => null);
+    return { url: "", media_path: path, alt, credit: p.user, credit_url: p.pageURL, download_location: "", source: "pixabay" };
+  } catch { return undefined; }
+}
+
+async function unsplashPhoto(query: string, used: Set<string>): Promise<Photo | undefined> {
   const key = process.env.UNSPLASH_ACCESS_KEY?.trim();
   const q = query.trim().slice(0, 80);
   if (!key || !q) return undefined;
@@ -89,7 +145,7 @@ export async function findPhoto(query: string, used: Set<string>): Promise<Photo
     used.add(p.urls.regular);
     return {
       url: p.urls.regular, alt: (p.alt_description || p.description || q).slice(0, 200),
-      credit: p.user.name, credit_url: `${p.user.links.html}?${UTM}`, download_location: p.links.download_location
+      credit: p.user.name, credit_url: `${p.user.links.html}?${UTM}`, download_location: p.links.download_location, source: "unsplash"
     };
   } catch { return undefined; }
 }

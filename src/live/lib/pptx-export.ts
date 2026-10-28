@@ -58,6 +58,18 @@ const SHAPES: Record<ShapeKind, string> = { rect: "rect", round: "roundRect", el
 
 /** Builds the file and saves it to the device ("Downloads", or wherever the browser asks). */
 export async function downloadPptx(title: string, slides: ExportSlide[]) {
+  const pptx = await buildPptx(title, slides);
+  const safe = title.replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80) || "Lesson";
+  await pptx.writeFile({ fileName: `${safe}.pptx` });
+}
+
+/** The same file as bytes, for sending to Canva ("Open in Canva"). */
+export async function pptxBlob(title: string, slides: ExportSlide[]): Promise<Blob> {
+  const pptx = await buildPptx(title, slides);
+  return (await pptx.write({ outputType: "blob" })) as Blob;
+}
+
+async function buildPptx(title: string, slides: ExportSlide[]) {
   const { default: PptxGenJS } = await import("pptxgenjs");
   const pptx = new PptxGenJS();
   pptx.layout = "LAYOUT_WIDE";
@@ -105,6 +117,5 @@ export async function downloadPptx(title: string, slides: ExportSlide[]) {
     }
     if (s.notes) slide.addNotes(s.notes);
   }
-  const safe = title.replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80) || "Lesson";
-  await pptx.writeFile({ fileName: `${safe}.pptx` });
+  return pptx;
 }

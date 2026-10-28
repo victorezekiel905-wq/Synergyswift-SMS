@@ -95,7 +95,13 @@ services:
         value: gemini-2.5-flash
       - key: AI_MONTHLY_LIMIT
         value: "3000"
+      - key: PIXABAY_API_KEY
+        sync: false
       - key: UNSPLASH_ACCESS_KEY
+        sync: false
+      - key: CANVA_CLIENT_ID
+        sync: false
+      - key: CANVA_CLIENT_SECRET
         sync: false
       # Only used when GEMINI_API_KEY is empty.
       - key: ANTHROPIC_API_KEY
