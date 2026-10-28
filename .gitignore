@@ -14,3 +14,7 @@ public/mediapipe
 
 # load-test output (test accounts, results)
 scripts/load/out/
+
+# Playwright
+/test-results/
+/playwright-report/
