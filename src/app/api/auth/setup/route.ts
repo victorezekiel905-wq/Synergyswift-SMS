@@ -91,21 +91,27 @@ export async function POST(req: NextRequest) {
   }
 
   // A new school needs a one-time school code from the Synergy Swift owner (migration 7900).
-  // Kept on the account at sign-up too, for when the email had to be confirmed before the first sign-in.
-  const meta = (user.user_metadata ?? {}) as { school_code?: string; school_name?: string };
-  const schoolCode = String(body.school_code ?? meta.school_code ?? "").trim();
-  if (!schoolCode) {
-    return NextResponse.json({
-      error: "Your account is not linked to a school yet. Staff: ask your school administrator for an invitation. Setting up a new school: you need a school code from Synergy Swift.",
-      code: "not_provisioned"
-    }, { status: 403 });
+  // Normally the code was used up when the account was made (/api/auth/register), inside its
+  // 20 minutes; the school is created now, at the first sign-in after the email is confirmed.
+  const meta = (user.user_metadata ?? {}) as { school_name?: string };
+  const { data: held } = await svc.from("school_signup_codes").select("id").eq("used_by", user.id).is("tenant_id", null).is("revoked_at", null).limit(1).maybeSingle();
+  let codeId: string | null = held?.id ?? null;
+  if (!codeId) {
+    const schoolCode = String(body.school_code ?? "").trim();
+    if (!schoolCode) {
+      return NextResponse.json({
+        error: "Your account is not linked to a school yet. Staff: ask your school administrator for an invitation. Setting up a new school: you need a school code from Synergy Swift.",
+        code: "not_provisioned"
+      }, { status: 403 });
+    }
+    if (!isSchoolCodeShape(schoolCode)) return NextResponse.json({ error: "That school code isn't right. Check it and try again.", code: "bad_code" }, { status: 400 });
+    const { data: claimed, error: cErr } = await svc.rpc("claim_school_code", { p_hash: hashSchoolCode(schoolCode), p_user: user.id });
+    if (cErr) return NextResponse.json({ error: "Setting up schools needs the database update (migration 20260101007900)." }, { status: 503 });
+    if (!claimed) return NextResponse.json({ error: "That school code has already been used, has expired, or was cancelled. Ask Synergy Swift for a new one.", code: "code_used" }, { status: 403 });
+    codeId = claimed as string;
   }
-  if (!isSchoolCodeShape(schoolCode)) return NextResponse.json({ error: "That school code isn't right. Check it and try again.", code: "bad_code" }, { status: 400 });
-  const { data: codeId, error: cErr } = await svc.rpc("claim_school_code", { p_hash: hashSchoolCode(schoolCode), p_user: user.id });
-  if (cErr) return NextResponse.json({ error: "Setting up schools needs the database update (migration 20260101007900)." }, { status: 503 });
-  if (!codeId) return NextResponse.json({ error: "That school code has already been used, has expired, or was cancelled. Ask Synergy Swift for a new one.", code: "code_used" }, { status: 403 });
 
-  // The code is now used up. If creating the school fails, it is put back so the prospect can try again.
+  // The code is used up. If creating the school fails, the prospect can try again.
   const tenantName = String(body.tenant_name ?? meta.school_name ?? "").trim().slice(0, 120) || "My School";
   try {
     const slug = `school-${user.id.slice(0, 8)}`;
@@ -129,8 +135,9 @@ export async function POST(req: NextRequest) {
     }
     await svc.from("audit_logs").insert({ tenant_id: tenant.id, actor_id: user.id, action: "tenant.created_with_code", meta: { code_id: codeId, label: used?.label ?? null } });
   } catch (e) {
-    await svc.rpc("release_school_code", { p_id: codeId });
-    return NextResponse.json({ error: `The school couldn't be set up: ${(e as Error).message}. Your code still works; try again.` }, { status: 400 });
+    // A code claimed in this request is put back; one used when the account was made stays with this account.
+    if (!held) await svc.rpc("release_school_code", { p_id: codeId });
+    return NextResponse.json({ error: `The school couldn't be set up: ${(e as Error).message}. Your code still works; sign in again to retry.` }, { status: 400 });
   }
   return NextResponse.json({ ok: true, role: "school_admin", next: "/school" });
 }

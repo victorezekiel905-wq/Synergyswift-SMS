@@ -158,6 +158,7 @@ export default function LoginPage() {
                 Staff and parents get an invitation from their school.{" "}
                 <Link href="/student/join" className="font-medium text-brand-700 hover:underline">Students: join a class</Link>
               </p>
+              <p className="text-center text-xs text-slate-500">New school with an onboarding code? <Link href="/onboard" className="font-medium text-brand-700 hover:underline">Onboard your school</Link></p>
             </form>
             )}
           </>

@@ -1,12 +1,15 @@
 /**
  * One-time school codes (migration 7900). Only the platform owner makes
  * them; a prospect uses one to set up their school, and it is used up at
- * that moment. Codes are 12 characters from an alphabet without look-alikes
+ * that moment. A code lasts 20 minutes from when it is made, so it is made
+ * while the school is ready to start. Codes are 12 characters from an alphabet without look-alikes
  * (no 0/O, 1/I/L), shown as SSC-XXXX-XXXX-XXXX, and stored only as a hash.
  */
 import { createHash, randomInt } from "crypto";
 
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+/** How long a new code works for. */
+export const SCHOOL_CODE_TTL_MIN = 20;
 
 export function newSchoolCode(): string {
   const chars = Array.from({ length: 12 }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");

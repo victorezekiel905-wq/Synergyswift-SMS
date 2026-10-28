@@ -121,3 +121,22 @@ html.readable .live-root, html.readable .live-root .font-sans, html.readable .li
 html.readable .live-root h1, html.readable .live-root h2, html.readable .live-root h3, html.readable .live-root h4 {
   font-family: var(--font-readable), var(--font-sans), system-ui, sans-serif;
 }
+
+/*
+ * Brand pages (welcome, how it works, onboarding): a few quiet, precise motions.
+ * Lines draw in, labels settle, one brass hand sweeps. Reduced motion stops all of them (above).
+ */
+@keyframes ss-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes ss-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes ss-sweep { to { transform: rotate(360deg); } }
+@keyframes ss-fade { from { opacity: 0; } to { opacity: 1; } }
+.ss-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: ss-draw 1.6s cubic-bezier(.65,0,.35,1) forwards; animation-delay: var(--d, 0s); }
+.ss-rise { opacity: 0; animation: ss-rise .7s cubic-bezier(.2,.7,.2,1) forwards; animation-delay: var(--d, 0s); }
+.ss-fade { opacity: 0; animation: ss-fade 1s ease forwards; animation-delay: var(--d, 0s); }
+.ss-sweep { transform-origin: 256px 256px; animation: ss-sweep 60s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .ss-draw { stroke-dashoffset: 0; } .ss-rise, .ss-fade { opacity: 1; transform: none; } .ss-sweep { animation: none; }
+}
+.ss-menu > summary { list-style: none; }
+.ss-menu > summary::before { content: none; display: none; }
+.ss-menu > summary::-webkit-details-marker, .ss-menu > summary::marker { display: none; content: ""; }

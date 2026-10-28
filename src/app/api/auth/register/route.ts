@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     const hash = isSchoolCodeShape(b.school_code) ? hashSchoolCode(b.school_code) : null;
     const { data: open } = hash ? await svc.from("school_signup_codes").select("id").eq("code_hash", hash).is("used_at", null).is("revoked_at", null).gt("expires_at", new Date().toISOString()).maybeSingle() : { data: null };
     if (!open) { await logMail(svc, b.email, ip, "code_miss"); return jsonError("That school code isn't right, has been used, or has expired. Ask Synergy Swift for a new one.", 403); }
-    meta = { full_name: b.full_name, signup_as: "school", school_name: b.school_name, school_code: b.school_code };
+    meta = { full_name: b.full_name, signup_as: "school", school_name: b.school_name };
   } else {
     const code = b.join_code.toUpperCase();
     const { data: cls } = await svc.rpc("class_lookup_by_code", { p_code: code });
@@ -65,6 +65,15 @@ export async function POST(req: NextRequest) {
     return jsonError("We couldn't create the account just now. Please try again.", 502);
   }
   const user = link.user;
+  // The school code is used up now, while it is still inside its 20 minutes; the school itself
+  // is created at the first sign-in (/api/auth/setup), which finds the code by this account.
+  if (b.as === "school") {
+    const { data: claimed } = await svc.rpc("claim_school_code", { p_hash: hashSchoolCode(b.school_code), p_user: user.id });
+    if (!claimed) {
+      await svc.auth.admin.deleteUser(user.id);
+      return jsonError("That school code was used or expired a moment ago. Ask Synergy Swift for a new one.", 403);
+    }
+  }
   await svc.from("signup_requests").upsert({ user_id: user.id, tenant_id: tenantId, email: b.email, full_name: b.full_name, kind: b.as, detail: b.as === "school" ? b.school_name : null, ip }, { onConflict: "user_id" });
   const done = (status: RegisterResult["status"]) => NextResponse.json({ ok: true, status, email: b.email } satisfies RegisterResult);
 

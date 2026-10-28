@@ -155,7 +155,7 @@ function LeadDrawer({ id, data, onChanged }: { id: string; data: Data; onChanged
           {l.phone && <a className="btn btn-ghost no-underline" href={`https://wa.me/${l.phone.replace(/[^0-9]/g, "").replace(/^0/, "234")}`} target="_blank" rel="noreferrer">WhatsApp</a>}
           {l.tenant_id ? <Link className="btn btn-primary no-underline" href={`/platform/${l.tenant_id}`}>Open the school</Link>
             : <Link className="btn btn-primary no-underline" href={`/platform/new?lead=${l.id}`}>Create the school</Link>}
-          {!l.tenant_id && <Link className="btn btn-outline no-underline" href={`/platform/codes?lead=${l.id}&school=${encodeURIComponent(l.school_name)}`}>Send a school code</Link>}
+          {!l.tenant_id && <Link className="btn btn-outline no-underline" href={`/platform/codes?lead=${l.id}&school=${encodeURIComponent(l.school_name)}`}>Make an onboarding code</Link>}
         </div>
       </div>
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}

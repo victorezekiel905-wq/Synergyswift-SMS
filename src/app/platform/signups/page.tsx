@@ -8,7 +8,7 @@ export default function PlatformSignupsPage() {
   return (
     <Page wide>
       <PlatformNav />
-      <PageHeader eyebrow="Synergy Swift platform" title="Sign-ups" subtitle="Everyone who has signed up and not confirmed their email yet: people setting up a new school with a school code, and students joining a class. Confirm an account here and it can sign in straight away." />
+      <PageHeader eyebrow="Synergy Swift platform" title="Sign-ups" subtitle="Everyone who has signed up and not confirmed their email yet: people setting up a new school with an onboarding code, and students joining a class. Confirm an account here and it can sign in straight away." />
       <SignupsTable api="/api/platform/signups" platform />
     </Page>
   );

@@ -4,7 +4,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const db = vi.hoisted(() => ({
   rows: {} as Record<string, any[]>,
   calls: [] as { table: string; op: string; payload?: any; filters: [string, string, unknown][] }[],
-  admin: {} as Record<string, any>
+  admin: {} as Record<string, any>,
+  claim: null as string | null
 }));
 function table(name: string) {
   const call = { table: name, op: "select", payload: undefined as any, filters: [] as [string, string, unknown][] };
@@ -25,7 +26,8 @@ function table(name: string) {
 vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: () => ({
     from: table,
-    rpc: async (fn: string, args: any) => fn === "class_lookup_by_code" ? { data: args.p_code === "ABC123" ? [{ id: "c1", tenant_id: "t-a" }] : [], error: null } : { data: null, error: null },
+    rpc: async (fn: string, args: any) => fn === "class_lookup_by_code" ? { data: args.p_code === "ABC123" ? [{ id: "c1", tenant_id: "t-a" }] : [], error: null }
+      : fn === "claim_school_code" ? { data: db.claim, error: null } : { data: null, error: null },
     auth: { admin: db.admin }
   })
 }));
@@ -35,13 +37,17 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { v
 import { confirmLink, linkFrom, safeNext, mailable, sendAuthEmail } from "@/lib/auth-mail";
 import { POST as register } from "@/app/api/auth/register/route";
 import { POST as confirmPost } from "@/app/api/auth/confirm/route";
+import { POST as checkCode } from "@/app/api/auth/school-code/route";
+import { hashSchoolCode } from "@/lib/school-codes";
 import { NextRequest } from "next/server";
 
 const post = (url: string, body: unknown) => new NextRequest(`https://app.example${url}`, { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json" } });
 const keep = { ...process.env };
 let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
-  db.rows = { tenants: [{ id: "t-a", status: "active" }] }; db.calls = [];
+  db.rows = { tenants: [{ id: "t-a", status: "active" }], school_signup_codes: [{ code_hash: hashSchoolCode("SSC-ABCD-EFGH-JKMN"), label: "Greenfield College", expires_at: "2099-01-01T00:00:00Z", used_at: null, revoked_at: null }] };
+  db.calls = []; db.claim = "code-1";
+  db.admin.deleteUser = vi.fn(async () => ({ error: null }));
   Object.assign(process.env, { NEXT_PUBLIC_APP_URL: "https://app.example", EMAIL_PROVIDER: "sendgrid", SENDGRID_API_KEY: "SG.test", EMAIL_FROM: "Synergy Swift <hello@school.example>" });
   fetchMock = vi.fn(async () => ({ ok: true, status: 202, headers: new Headers({ "x-message-id": "m1" }), text: async () => "" }));
   vi.stubGlobal("fetch", fetchMock);
@@ -121,5 +127,29 @@ describe("the confirm button", () => {
     verifyOtp.mockResolvedValueOnce({ data: { user: null }, error: { message: "expired" } });
     const res = await confirmPost(form({ token_hash: "old", type: "recovery", next: "/account/security?reset=1" }));
     expect(res.headers.get("location")).toMatch(/^https:\/\/app\.example\/login\?error=That%20link%20has%20expired/);
+  });
+});
+
+describe("onboarding a school with a one-time code", () => {
+  it("checks the code first, and tells the school who it was made for and when it runs out", async () => {
+    const ok = await checkCode(post("/api/auth/school-code", { code: "ssc abcd efgh jkmn" }));
+    expect(await ok.json()).toEqual({ ok: true, school: "Greenfield College", expires_at: "2099-01-01T00:00:00Z" });
+    const bad = await checkCode(post("/api/auth/school-code", { code: "SSC-AAAA-BBBB-CCCC" }));
+    expect(bad.status).toBe(404);
+    expect(db.calls.find(c => c.table === "auth_mail_log" && c.op === "insert")?.payload).toMatchObject({ kind: "code_miss" });
+  });
+  it("uses the code up the moment the account is made, so confirming the email later can't outrun the 20 minutes", async () => {
+    const res = await register(post("/api/auth/register", { as: "school", email: "head@greenfield.ng", password: "longenough", full_name: "Ngozi Okonkwo", school_name: "Greenfield College", school_code: "SSC-ABCD-EFGH-JKMN" }));
+    expect((await res.json()).status).toBe("sent");
+    const meta = db.admin.generateLink.mock.calls[0][0].options.data;
+    expect(meta).toEqual({ full_name: "Ngozi Okonkwo", signup_as: "school", school_name: "Greenfield College" });   // the code itself is not kept
+    expect(db.calls.find(c => c.table === "signup_requests" && c.op === "upsert")?.payload).toMatchObject({ kind: "school", tenant_id: null, detail: "Greenfield College" });
+  });
+  it("takes the account back if someone else used the code a moment earlier", async () => {
+    db.claim = null;
+    const res = await register(post("/api/auth/register", { as: "school", email: "head@greenfield.ng", password: "longenough", full_name: "N", school_name: "Greenfield College", school_code: "SSC-ABCD-EFGH-JKMN" }));
+    expect(res.status).toBe(403);
+    expect(db.admin.deleteUser).toHaveBeenCalledWith("u-new");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

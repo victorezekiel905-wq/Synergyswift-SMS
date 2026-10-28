@@ -20,6 +20,10 @@ const config: Config = {
           800: "#1f335c", 900: "#1a2a4a", 950: "#111c33"
         },
         canvas: "#f6f7f9",
+        // The logo: the ink of the tile and the brass of the centre jewel. Brand pages only, used sparingly.
+        navy: "#1b2d55",
+        brass: { 100: "#f3ecdf", 200: "#e6d6b8", 300: "#d2b98a", 500: "#b08d4f", 600: "#94733b", 700: "#765b2e" },
+        paper: "#fbfaf8",
         // Live module neutrals = the app's slate greys, so staff screens look the same everywhere.
         ink: {
           50: "#f8fafc", 100: "#f1f5f9", 200: "#e2e8f0", 300: "#cbd5e1", 400: "#94a3b8",
