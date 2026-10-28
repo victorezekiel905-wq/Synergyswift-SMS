@@ -98,7 +98,7 @@ describe("Pixabay photos for AI slides", () => {
   it("puts the stored copy on the slide with a Pixabay credit", () => {
     const photo = { url: "", media_path: "t1/u1/pixabay-2.jpg", alt: "leaf", credit: "Sunny", credit_url: "https://pixabay.com/photos/leaf-2/", download_location: "", source: "pixabay" as const };
     const c = designSlide({ layout: "picture", heading: "Leaves make food", points: ["Sunlight", "Water"], notes: "" }, THEMES.swift, photo);
-    const img = c.elements.find((e: any) => e.type === "image") as any;
+    const img = (c.elements ?? []).find((e: any) => e.type === "image") as any;
     expect(img.media_path).toBe("t1/u1/pixabay-2.jpg");
     expect(img.url).toBeUndefined();
     expect(JSON.stringify(c.elements)).toContain("Photo: Sunny / Pixabay");

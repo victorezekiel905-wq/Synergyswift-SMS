@@ -26,6 +26,8 @@ create table if not exists public.ai_usage (
 );
 create index if not exists ai_usage_tenant_at on public.ai_usage(tenant_id, at desc);
 create index if not exists ai_usage_at on public.ai_usage(at desc);
+-- Each person's share of the allowance is checked against their own requests this month.
+create index if not exists ai_usage_user_at on public.ai_usage(tenant_id, user_id, at desc);
 
 alter table public.ai_usage enable row level security;
 revoke all on public.ai_usage from anon, authenticated;

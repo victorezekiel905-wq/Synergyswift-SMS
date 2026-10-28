@@ -4,6 +4,8 @@ import { useApi, send, Page, PageHeader, Alert, Loading, Field, Stat } from "@/c
 
 type Data = {
   available: boolean; used: number; limit: number; by_task: { task: string; label: string; n: number }[];
+  split: { staff: number; students: number; shares: { staff: number; student: number } };
+  people: { name: string; role: string; used: number; share: number | null }[];
   settings: { comments: { tone: string; length: string }; admissions: { autopilot?: boolean; auto_reply?: boolean; auto_chase?: boolean; weekly_report?: boolean } };
   admissions_report: { headline: string; highlights: string[]; bottlenecks: string[]; actions: string[]; at: string } | null;
 };
@@ -51,6 +53,24 @@ export default function SchoolAi() {
           <div className={"h-full " + (pct >= 90 ? "bg-rose-500" : pct >= 75 ? "bg-amber-500" : "bg-brand-600")} style={{ width: `${pct}%` }} />
         </div>
         {data.by_task.length > 0 && <ul className="mt-3 grid gap-1 text-sm sm:grid-cols-2">{data.by_task.map(t => <li key={t.task} className="flex justify-between border-b border-slate-100 py-1"><span>{t.label}</span><span className="tabular-nums text-slate-600">{t.n}</span></li>)}</ul>}
+      </section>
+
+      <section className="card mb-4 p-4">
+        <h2 className="font-semibold">Each person&apos;s share</h2>
+        <p className="text-sm text-slate-600">The allowance is shared out across everyone registered, so one person can&apos;t use it all up. A staff member gets four times a student&apos;s share, because staff write for whole classes. Parents don&apos;t use it. School admins and the principal aren&apos;t held to a share (they draft for the whole school), but everything still comes out of the school&apos;s total.</p>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat label="Staff" value={data.split.staff.toLocaleString()} />
+          <Stat label="Each staff member" value={`${data.split.shares.staff.toLocaleString()} a month`} />
+          <Stat label="Students" value={data.split.students.toLocaleString()} />
+          <Stat label="Each student" value={`${data.split.shares.student.toLocaleString()} a month`} />
+        </div>
+        {data.people.length > 0 && (
+          <table className="mt-3 w-full text-sm"><thead className="text-left text-xs text-slate-500"><tr><th className="py-1">Most use this month</th><th className="py-1 text-right">Used</th><th className="py-1 text-right">Share</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">{data.people.map((p, i) => (
+              <tr key={i}><td className="py-1">{p.name} <span className="text-xs text-slate-500">{p.role.replace(/_/g, " ")}</span></td>
+                <td className={"py-1 text-right tabular-nums " + (p.share !== null && p.used >= p.share ? "font-semibold text-rose-700" : "")}>{p.used}</td>
+                <td className="py-1 text-right tabular-nums text-slate-600">{p.share ?? "no limit"}</td></tr>))}</tbody></table>
+        )}
       </section>
 
       <section className="card mb-4 p-4">

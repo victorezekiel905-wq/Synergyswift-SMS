@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { aiConfigured } from "@/lib/ai";
+import { aiConfigured, allowanceFor } from "@/lib/ai";
 
 export const dynamic = "force-dynamic";
 
@@ -18,15 +18,28 @@ export async function GET() {
   if (ctx instanceof NextResponse) return ctx;
   const month = new Date(); month.setUTCDate(1); month.setUTCHours(0, 0, 0, 0);
   const [{ data: rows }, { data: st }] = await Promise.all([
-    ctx.sb.from("ai_usage").select("task,ok,input_tokens,output_tokens,at").eq("tenant_id", ctx.tenant.id).gte("at", month.toISOString()).order("at", { ascending: false }).limit(20000),
+    ctx.sb.from("ai_usage").select("task,ok,user_id,input_tokens,output_tokens,at").eq("tenant_id", ctx.tenant.id).gte("at", month.toISOString()).order("at", { ascending: false }).limit(20000),
     ctx.sb.from("tenant_settings").select("*").eq("tenant_id", ctx.tenant.id).maybeSingle()
   ]);
   const byTask = new Map<string, number>();
   for (const r of rows ?? []) byTask.set(r.task, (byTask.get(r.task) ?? 0) + 1);
   const limit = typeof (st as any)?.ai_monthly_limit === "number" ? (st as any).ai_monthly_limit : Number(process.env.AI_MONTHLY_LIMIT) > 0 ? Number(process.env.AI_MONTHLY_LIMIT) : 3000;
   const s = ((st as any)?.ai_settings ?? {}) as Record<string, any>;
+  // The allowance split across the school's people, and who has used most of their share.
+  const split = await allowanceFor(createServiceClient(), ctx.tenant.id, limit);
+  const byUser = new Map<string, number>();
+  for (const r of rows ?? []) if (r.user_id) byUser.set(r.user_id, (byUser.get(r.user_id) ?? 0) + 1);
+  const top = [...byUser].sort((a, b) => b[1] - a[1]).slice(0, 15);
+  const { data: who } = top.length ? await ctx.sb.from("users").select("id,full_name,role,extra_roles").in("id", top.map(t => t[0])) : { data: [] };
+  const people = top.map(([id, n]) => {
+    const u = (who ?? []).find((x: any) => x.id === id);
+    const roles = [u?.role, ...(u?.extra_roles ?? [])];
+    const free = roles.some((r: string) => ["school_admin", "principal"].includes(r));
+    const share = free ? null : u?.role === "student" ? split.shares.student : split.shares.staff;
+    return { name: u?.full_name ?? "Someone", role: u?.role ?? "", used: n, share };
+  });
   return NextResponse.json({
-    available: aiConfigured(), used: rows?.length ?? 0, limit,
+    available: aiConfigured(), used: rows?.length ?? 0, limit, split, people,
     by_task: [...byTask].map(([task, n]) => ({ task, label: TASK_LABEL[task] ?? task.replace(/_/g, " "), n })).sort((a, b) => b.n - a.n),
     settings: { comments: s.comments ?? { tone: "warm", length: "short" }, admissions: s.admissions ?? {} },
     admissions_report: s.admissions_report ?? null

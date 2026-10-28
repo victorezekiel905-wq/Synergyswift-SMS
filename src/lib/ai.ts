@@ -9,6 +9,11 @@
  * Each request is counted in ai_usage against the school (and person) the
  * request is for, and refused once the school has used its monthly allowance
  * (tenant_settings.ai_monthly_limit, else AI_MONTHLY_LIMIT, else 3,000).
+ * The allowance is split across the school's registered people so the shares
+ * fit inside it: staff count 4, students 1 (parents don't use AI directly).
+ * School admins and the principal are not held to a share (they draft for the
+ * whole school, e.g. principal's comments); scheduled jobs count only against
+ * the school's total.
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -69,7 +74,19 @@ type Raw = { text: string; model: string; inputTokens: number; outputTokens: num
 // ---------------- allowance and usage ----------------
 
 const DEFAULT_MONTHLY = () => Number(process.env.AI_MONTHLY_LIMIT) > 0 ? Number(process.env.AI_MONTHLY_LIMIT) : 3000;
-const seen = new Map<string, { used: number; limit: number; off: boolean; at: number }>();
+const seen = new Map<string, { used: number; limit: number; off: boolean; staff: number; students: number; at: number }>();
+const mine = new Map<string, { used: number; kind: "staff" | "student" | "free"; at: number }>();
+
+/** How much of a school's monthly allowance each person gets. Staff count 4, students 1; the shares add up to at most the total. */
+export const SHARE_WEIGHT = { staff: 4, student: 1 } as const;
+export function allowanceShares(limit: number, staff: number, students: number): { staff: number; student: number } {
+  const units = staff * SHARE_WEIGHT.staff + students * SHARE_WEIGHT.student;
+  if (units <= 0) return { staff: limit, student: limit };
+  const per = limit / units;
+  return { staff: Math.max(1, Math.floor(per * SHARE_WEIGHT.staff)), student: Math.max(1, Math.floor(per * SHARE_WEIGHT.student)) };
+}
+const UNCAPPED = new Set(["school_admin", "principal", "platform_admin"]);
+const monthStart = () => { const d = new Date(); d.setUTCDate(1); d.setUTCHours(0, 0, 0, 0); return d.toISOString(); };
 
 async function service() {
   const { createServiceClient } = await import("./supabase/service");
@@ -77,20 +94,23 @@ async function service() {
 }
 
 /** Refuses when the school doesn't have the AI module or has used this month's allowance. Never blocks when they can't be read. */
-async function checkAllowance(tenantId: string | null) {
+async function checkAllowance(tenantId: string | null, userId: string | null) {
   if (!tenantId) return;
   let entry = seen.get(tenantId);
   if (!entry || Date.now() - entry.at > 60_000) {
     try {
       const svc = await service();
-      const [{ data: used }, { data: st }, { data: t }] = await Promise.all([
+      const [{ data: used }, { data: st }, { data: t }, { count: students }, { count: everyone }] = await Promise.all([
         svc.rpc("ai_requests_this_month", { p_tenant: tenantId }),
         svc.from("tenant_settings").select("*").eq("tenant_id", tenantId).maybeSingle(),
-        svc.from("tenants").select("modules").eq("id", tenantId).maybeSingle()
+        svc.from("tenants").select("modules").eq("id", tenantId).maybeSingle(),
+        svc.from("users").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("active", true).eq("role", "student"),
+        svc.from("users").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("active", true).neq("role", "parent")
       ]);
       const own = (st as { ai_monthly_limit?: number | null } | null)?.ai_monthly_limit;
       const off = (t as { modules?: Record<string, boolean> | null } | null)?.modules?.ai === false;
-      entry = { used: Number(used ?? 0), limit: typeof own === "number" ? own : DEFAULT_MONTHLY(), off, at: Date.now() };
+      const kids = students ?? 0;
+      entry = { used: Number(used ?? 0), limit: typeof own === "number" ? own : DEFAULT_MONTHLY(), off, staff: Math.max(0, (everyone ?? 0) - kids), students: kids, at: Date.now() };
       seen.set(tenantId, entry);
     } catch { return; }
   }
@@ -98,10 +118,45 @@ async function checkAllowance(tenantId: string | null) {
   if (entry.used >= entry.limit) {
     throw new AiUnavailable("Your school has used this month's AI allowance. It renews on the 1st; your Synergy Swift account manager can raise it.", 429);
   }
+  if (!userId) return;
+  // This person's share of the school's allowance.
+  const key = `${tenantId}:${userId}`;
+  let me = mine.get(key);
+  if (!me || Date.now() - me.at > 60_000) {
+    try {
+      const svc = await service();
+      const [{ data: u }, { count }] = await Promise.all([
+        svc.from("users").select("role,extra_roles").eq("id", userId).maybeSingle(),
+        svc.from("ai_usage").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("user_id", userId).gte("at", monthStart())
+      ]);
+      const roles = [u?.role, ...((u?.extra_roles as string[] | null) ?? [])].filter(Boolean) as string[];
+      const kind = roles.some(r => UNCAPPED.has(r)) ? "free" : roles.includes("student") && roles.length === 1 ? "student" : "staff";
+      me = { used: count ?? 0, kind, at: Date.now() };
+      mine.set(key, me);
+    } catch { return; }
+  }
+  if (me.kind === "free") return;
+  const share = allowanceShares(entry.limit, entry.staff, entry.students)[me.kind];
+  if (me.used >= share) {
+    throw new AiUnavailable(`You've used your share of the school's AI for this month (${share} requests). It renews on the 1st; your school admin can ask for a bigger allowance.`, 429);
+  }
+}
+
+/** A person's share and use this month, for the school's AI page. */
+export async function allowanceFor(svc: any, tenantId: string, limit: number) {
+  const [{ count: students }, { count: everyone }] = await Promise.all([
+    svc.from("users").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("active", true).eq("role", "student"),
+    svc.from("users").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("active", true).neq("role", "parent")
+  ]);
+  const kids = students ?? 0, staff = Math.max(0, (everyone ?? 0) - kids);
+  return { staff, students: kids, shares: allowanceShares(limit, staff, kids) };
 }
 
 async function recordUsage(row: { tenantId: string | null; userId: string | null; task: string; provider: AiProvider; model: string; inputTokens: number; outputTokens: number; ok: boolean }) {
-  if (row.tenantId) { const e = seen.get(row.tenantId); if (e) e.used++; }
+  if (row.tenantId) {
+    const e = seen.get(row.tenantId); if (e) e.used++;
+    const m = row.userId ? mine.get(`${row.tenantId}:${row.userId}`) : undefined; if (m) m.used++;
+  }
   try {
     const svc = await service();
     await svc.from("ai_usage").insert({ tenant_id: row.tenantId, user_id: row.userId, task: row.task.slice(0, 60), provider: row.provider,
@@ -234,7 +289,8 @@ export async function generateJson<S extends z.ZodType>(r: JsonRequest<S>): Prom
   if (!provider) throw new AiUnavailable("AI isn't set up on this site yet. Ask your Synergy Swift administrator to add a Gemini API key.");
   const req = currentRequest();
   const tenantId = r.tenantId !== undefined ? r.tenantId : req.tenantId;
-  await checkAllowance(tenantId);
+  const userId = r.userId !== undefined ? r.userId : req.userId;
+  await checkAllowance(tenantId, userId);
   const log = (model: string, inTok: number, outTok: number, ok: boolean) =>
     recordUsage({ tenantId, userId: r.userId !== undefined ? r.userId : req.userId, task: r.task, provider, model, inputTokens: inTok, outputTokens: outTok, ok });
 
@@ -273,4 +329,4 @@ export function aiErrorMessage(e: unknown): { message: string; status: number } 
 }
 
 /** Test hook: forget cached allowances. */
-export function resetAiAllowanceCache() { seen.clear(); }
+export function resetAiAllowanceCache() { seen.clear(); mine.clear(); }
