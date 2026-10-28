@@ -510,6 +510,30 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 | Report and recommendations | ✅ `docs/LOAD_TEST_REPORT.md`: verdict, findings by severity, actions in order |
 | Real-traffic run and Playwright journeys | ⏳ need a staging Supabase project and Render service |
 
+## 14p. AI automation on Gemini (phase 14p, done)
+
+| Item | Status |
+|---|---|
+| One AI door for the platform | ✅ `src/lib/ai.ts`: Gemini with JSON-schema answers checked by zod, one retry, AI Studio and Vertex keys, plain messages; Claude only when no Gemini key |
+| Usage and limits | ✅ every request logged in `ai_usage` per school and person; refused without the AI module or past the monthly allowance (school limit, else `AI_MONTHLY_LIMIT`, else 3,000); `/school/ai` shows the month |
+| Report comments | ✅ each student's subjects, change since last term, biggest movers, attendance, conduct ratings, effort, pronoun; tone and length; stock phrases banned; principal's differs from the teacher's; "Write for me" per card |
+| Everything else moved to Gemini | ✅ lesson notes, notices, translation, homework feedback, quiz questions, study helper, live-lesson questions and slides |
+| AI sales manager (super admin) | ✅ lead brief (stage, warmth, next step, talking points, risks, plan from the price list, drafted email/WhatsApp), send or open in WhatsApp, weekly summary emailed Monday, autopilot drafts for stale deals |
+| AI admissions office (schools) | ✅ family brief with what is missing and a reply in the school's voice; applicant summary with a suggested decision; optional autopilot: answer enquiries after 15 min, chase quiet applications, weekly report |
+| HR and SEN | ✅ job adverts from the title; SMART support-plan targets from the SEN profile |
+| Scheduling | ✅ `/api/cron/ai` every 10 minutes in its own request, one run at a time |
+
+## Scale fixes after the 20,000-user test (done)
+
+| Finding | Status |
+|---|---|
+| 4: Supabase Auth called on every request | ✅ `getClaims()` in the middleware and route guards: checked locally once the project uses asymmetric JWT signing keys (Supabase → JWT Keys) |
+| 5: scheduler with no lock, 19 jobs in one request | ✅ migration 7600 `cron_locks`; dispatcher, `/api/cron/slow` (billing, accounts, entrance, every 5 min) and `/api/cron/ai` each run one at a time |
+| 2: 1,000-row cap | ⏳ configuration: Supabase → Data API → Max rows 50000 |
+| 3: one small server | ⏳ hosting: Render Standard x2 before a large group |
+
+Also: parents and students can now ask the exams office for extra time, a late sitting, a resit or a special arrangement (`/parent/exam-requests`, `/student/exam-requests`).
+
 ## Database updates to run
 
 Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
@@ -570,3 +594,5 @@ Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor an
 | `20260101007200_result_pins_perf.sql` | 14l |
 | `20260101007300_portfolios_transcripts.sql` | 14o |
 | `20260101007400_rls_performance.sql` | 14m |
+| `20260101007500_ai_automation.sql` | 14p |
+| `20260101007600_cron_locks.sql` | scale fixes |
