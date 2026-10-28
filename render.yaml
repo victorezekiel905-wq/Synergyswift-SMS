@@ -95,7 +95,12 @@ services:
         value: gemini-2.5-flash
       - key: AI_MONTHLY_LIMIT
         value: "3000"
-      # Extra OpenAI-compatible text AI (see .env.example): AI_EXTRA_1_NAME/_URL/_KEY/_MODEL, up to 6.
+      # Groq and OpenRouter need only their key; other OpenAI-compatible text AI (see .env.example):
+      # AI_EXTRA_1_NAME/_URL/_KEY/_MODEL, up to 6.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
       - key: AI_EXTRA_1_NAME
         sync: false
       - key: AI_EXTRA_1_URL

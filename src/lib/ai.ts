@@ -6,8 +6,10 @@
  * GEMINI_MODEL, GEMINI_MODEL_PRO), then up to six extra OpenAI-compatible
  * services (Groq, OpenRouter, Mistral, Cerebras, GitHub Models, Together...):
  * AI_EXTRA_<n>_NAME, _URL (the API base, e.g. https://api.groq.com/openai/v1),
- * _KEY, _MODEL and optionally _MODEL_PRO, for n = 1..6; then Claude
- * (ANTHROPIC_API_KEY) if set. When one is busy, out of free quota, refuses its
+ * _KEY, _MODEL and optionally _MODEL_PRO, for n = 1..6. Groq and OpenRouter
+ * also work from just their key (GROQ_API_KEY, OPENROUTER_API_KEY; spelling
+ * and case are forgiven, e.g. Grog_API, Openrouter_Api), with GROQ_MODEL /
+ * OPENROUTER_MODEL to change the model. Then Claude (ANTHROPIC_API_KEY) if set. When one is busy, out of free quota, refuses its
  * key or sends a broken answer, the next takes over. AI_ROTATE=1 spreads
  * requests across them instead of always starting with the first.
  *
@@ -44,6 +46,26 @@ const usable = (k: string | undefined) => Boolean(k?.trim() && !k.includes("repl
 
 /** An extra OpenAI-compatible text service. */
 export type ExtraProvider = { name: string; url: string; key: string; model: string; modelBest?: string };
+
+/** Services that need only a key. Setting names are matched ignoring case, "_" and the Groq/Grog slip. */
+const KNOWN: { name: string; url: string; model: string; keys: string[]; modelKey: string }[] = [
+  // Groq retired its Llama 3.x models on 16 August 2026; gpt-oss-120b is its suggested replacement.
+  { name: "groq", url: "https://api.groq.com/openai/v1", model: "openai/gpt-oss-120b", keys: ["GROQAPIKEY", "GROQAPI", "GROQKEY", "GROGAPIKEY", "GROGAPI", "GROGKEY"], modelKey: "GROQ_MODEL" },
+  // openrouter/free sends each request to one of OpenRouter's free models that can answer in JSON.
+  { name: "openrouter", url: "https://openrouter.ai/api/v1", model: "openrouter/free", keys: ["OPENROUTERAPIKEY", "OPENROUTERAPI", "OPENROUTERKEY"], modelKey: "OPENROUTER_MODEL" }
+];
+function knownProviders(taken: ExtraProvider[]): ExtraProvider[] {
+  const byShape = new Map<string, string>();
+  for (const [k, v] of Object.entries(process.env)) if (v?.trim()) byShape.set(k.toUpperCase().replace(/[^A-Z0-9]/g, ""), v.trim());
+  const out: ExtraProvider[] = [];
+  for (const s of KNOWN) {
+    if (taken.some(p => p.url.startsWith(s.url))) continue;   // already set up with the numbered settings
+    const key = s.keys.map(k => byShape.get(k)).find(usable);
+    if (key) out.push({ name: s.name, url: s.url, key, model: process.env[s.modelKey]?.trim() || s.model });
+  }
+  return out;
+}
+
 export function extraProviders(): ExtraProvider[] {
   const out: ExtraProvider[] = [];
   for (let i = 1; i <= 6; i++) {
@@ -53,7 +75,7 @@ export function extraProviders(): ExtraProvider[] {
     const name = env("NAME").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 30) || `extra${i}`;
     out.push({ name, url: url.replace(/\/+$/, ""), key, model, modelBest: env("MODEL_PRO") || undefined });
   }
-  return out;
+  return [...out, ...knownProviders(out)];
 }
 type Slot = { kind: "gemini" } | { kind: "anthropic" } | { kind: "openai"; p: ExtraProvider };
 const slotName = (x: Slot) => (x.kind === "openai" ? x.p.name : x.kind);

@@ -14,7 +14,7 @@ describe("several AI providers, one after another", () => {
   const keep = { ...process.env };
   beforeEach(() => {
     resetAiAllowanceCache();
-    for (const k of Object.keys(process.env)) if (k.startsWith("AI_EXTRA_") || k === "AI_ROTATE") delete process.env[k];
+    for (const k of Object.keys(process.env)) if (/^(AI_EXTRA_|AI_ROTATE$|GRO[QG]|OPENROUTER)/i.test(k)) delete process.env[k];
     process.env.GEMINI_API_KEY = "g";
     Object.assign(process.env, {
       AI_EXTRA_1_NAME: "Groq", AI_EXTRA_1_URL: "https://api.groq.com/openai/v1/", AI_EXTRA_1_KEY: "gk", AI_EXTRA_1_MODEL: "llama-3.3-70b-versatile",
@@ -30,6 +30,22 @@ describe("several AI providers, one after another", () => {
     expect(providerChain().map(x => (x.kind === "openai" ? x.p.name : x.kind))).toEqual(["gemini", "groq", "openrouter"]);
     delete process.env.GEMINI_API_KEY;
     expect(aiProvider()).toBe("groq");
+  });
+
+  it("takes Groq and OpenRouter from just their key, whatever the setting is called", () => {
+    for (let i = 1; i <= 2; i++) for (const k of ["NAME", "URL", "KEY", "MODEL"]) delete process.env[`AI_EXTRA_${i}_${k}`];
+    process.env.Grog_API = "gk"; process.env.Openrouter_Api = "ok";
+    expect(extraProviders()).toEqual([
+      { name: "groq", url: "https://api.groq.com/openai/v1", key: "gk", model: "openai/gpt-oss-120b" },
+      { name: "openrouter", url: "https://openrouter.ai/api/v1", key: "ok", model: "openrouter/free" }
+    ]);
+    process.env.GROQ_MODEL = "qwen/qwen3.6-27b";
+    expect(extraProviders()[0].model).toBe("qwen/qwen3.6-27b");
+    // Set up both ways: the numbered settings win and the service is not added twice.
+    process.env.AI_EXTRA_1_URL = "https://api.groq.com/openai/v1"; process.env.AI_EXTRA_1_KEY = "gk2"; process.env.AI_EXTRA_1_MODEL = "m";
+    expect(extraProviders().map(p => [p.name, p.key])).toEqual([["extra1", "gk2"], ["openrouter", "ok"]]);
+    process.env.Openrouter_Api = "replace-me";
+    expect(extraProviders().map(p => p.name)).toEqual(["extra1"]);
   });
 
   it("moves to the next provider when Gemini is out of free quota", async () => {
