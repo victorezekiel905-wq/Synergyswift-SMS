@@ -8,6 +8,7 @@ import {
   type Override, type Cycle, type ModuleGroup, type PlanDef
 } from "./saas";
 import { sendEmail } from "./messaging/providers";
+import { payLink } from "./invoice-link";
 
 type Svc = any;
 
@@ -97,6 +98,13 @@ export async function markInvoicePaid(svc: Svc, invoiceId: string, p: { method: 
   return { ...inv, status: "paid", paid_at: paidAt };
 }
 
+/** "Pay online: <private link>" for billing emails, when online payment is set up (14q). */
+function payLine(invoiceId: string): string {
+  const base = process.env.NEXT_PUBLIC_APP_URL;
+  if (!base || !process.env.PAYSTACK_SECRET_KEY) return "";
+  try { return `\nPay online (card, transfer or USSD): ${payLink(base, invoiceId)}\n`; } catch { return ""; }
+}
+
 async function tellSchool(svc: Svc, tenantId: string, subject: string, text: string) {
   const { data: t } = await svc.from("tenants").select("name,contact_email").eq("id", tenantId).maybeSingle();
   if (!t?.contact_email) return;
@@ -142,20 +150,20 @@ export async function runBilling(svc: Svc, now = new Date(), opts: { force?: boo
         const inv = await issueInvoice(svc, sub, plan, nextPeriod(sub.period_end!, sub.cycle), "renewal", null);
         out.renewals++;
         await tellSchool(svc, sub.tenant_id, `Synergy Swift renewal ${inv.number}`,
-          `Your Synergy Swift subscription renews on ${new Date(sub.period_end!).toDateString()}.\n\nInvoice ${inv.number}: ${naira(inv.amount_cents / 100)}.\n${billing.bank_details ? `\nPay by transfer to:\n${billing.bank_details}\nUse ${inv.number} as the reference.\n` : ""}\nThe invoice is under Settings → Subscription.\n\n${billing.company}`);
+          `Your Synergy Swift subscription renews on ${new Date(sub.period_end!).toDateString()}.\n\nInvoice ${inv.number}: ${naira(inv.amount_cents / 100)}.\n${payLine(inv.id)}${billing.bank_details ? `\nPay by transfer to:\n${billing.bank_details}\nUse ${inv.number} as the reference.\n` : ""}\nThe invoice is under Settings → Subscription.\n\n${billing.company}`);
       } catch { /* needs an agreed price: shown on the platform's billing page */ }
     } else if (action === "mark_past_due") {
       await svc.from("subscriptions").update({ status: "past_due", updated_at: now.toISOString() }).eq("id", sub.id);
       out.past_due++;
       await tellSchool(svc, sub.tenant_id, "Synergy Swift: payment overdue",
-        `Your Synergy Swift subscription ended on ${new Date(sub.period_end!).toDateString()} and invoice ${renewal?.number ?? ""} is unpaid. Please pay within ${sub.grace_days} days to keep your school's access.\n\n${billing.company}`);
+        `Your Synergy Swift subscription ended on ${new Date(sub.period_end!).toDateString()} and invoice ${renewal?.number ?? ""} is unpaid. Please pay within ${sub.grace_days} days to keep your school's access.\n${renewal ? payLine(renewal.id) : ""}\n${billing.company}`);
     } else if (action === "suspend") {
       await svc.from("subscriptions").update({ status: "suspended", updated_at: now.toISOString() }).eq("id", sub.id);
       await svc.from("tenants").update({ status: "paused", billing_hold: true, status_message: "Synergy Swift is paused until the subscription is paid. Your data is safe." }).eq("id", sub.tenant_id).eq("status", "active");
       await svc.from("platform_audit_logs").insert({ actor_id: null, action: "tenant.billing_hold", tenant_id: sub.tenant_id, meta: { invoice: renewal?.number } });
       out.suspended++;
       await tellSchool(svc, sub.tenant_id, "Synergy Swift paused for an unpaid bill",
-        `Access to Synergy Swift is paused because invoice ${renewal?.number ?? ""} is unpaid. Your data is safe and access returns as soon as payment is recorded.\n\n${billing.company}`);
+        `Access to Synergy Swift is paused because invoice ${renewal?.number ?? ""} is unpaid. Your data is safe and access returns as soon as payment is recorded.\n${renewal ? payLine(renewal.id) : ""}\n${billing.company}`);
     } else if (action === "cancel") {
       await svc.from("subscriptions").update({ status: "cancelled", updated_at: now.toISOString() }).eq("id", sub.id);
       await svc.from("tenants").update({ status: "suspended", status_message: "This school's Synergy Swift subscription has ended." }).eq("id", sub.tenant_id);

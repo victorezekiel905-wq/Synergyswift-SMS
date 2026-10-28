@@ -5,6 +5,7 @@ import { appUrl } from "@/lib/school";
 import { confirmWalletTopUp, safeReturnPath } from "@/lib/wallet";
 import { confirmAdmissionPayment } from "@/lib/admissions-crm";
 import { confirmDonation } from "@/lib/collections-server";
+import { confirmInvoicePayment } from "@/lib/platform-pay";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,11 @@ export async function GET(req: NextRequest) {
     const w = await confirmWalletTopUp(createServiceClient(), reference);
     const back = safeReturnPath(u.searchParams.get("return"));
     return NextResponse.redirect(`${base}${back}${back.includes("?") ? "&" : "?"}wallet=${encodeURIComponent(w.status)}#wallet`);
+  }
+  // A school paying its Synergy Swift invoice (14q).
+  if (reference.startsWith("SSI-")) {
+    const p = await confirmInvoicePayment(createServiceClient(), reference);
+    return NextResponse.redirect(p.token ? `${base}/billing/${p.token}?payment=${encodeURIComponent(p.status)}` : `${base}/`);
   }
   if (reference.startsWith("DON-")) {
     const d = await confirmDonation(createServiceClient(), reference, base);

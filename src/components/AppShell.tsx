@@ -14,7 +14,7 @@ import SideNav, { BottomBar } from "@/components/SideNav";
 import { BrandMark } from "@/components/BrandMark";
 
 // Pages that render without the app chrome (public links, kiosk, exam lockdown).
-const BARE = [/^\/sign\//, /^\/login$/, /^\/signup$/, /^\/onboard$/, /^\/how-it-works$/,/^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/school\/gate\/clock-code/, /^\/clock$/, /^\/results\/check\//, /^\/p\/[0-9a-f]{40}$/,/^\/school\/elections\/[^/]+\/kiosk/, /^\/demo$/, /^\/give\//, /^\/pay\//, /^\/apply\//, /^\/careers\//, /^\/enquire\//, /^\/visit\//, /^\/entrance\//, /^\/t\//, /^\/s\//, /^\/unsubscribe\//, /^\/alumni\//, /^\/v\//, /^\/n\//, /\/print$/, /\/transcript$/,
+const BARE = [/^\/sign\//, /^\/login$/, /^\/signup$/, /^\/onboard$/, /^\/how-it-works$/, /^\/billing\//, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/school\/gate\/clock-code/, /^\/clock$/, /^\/results\/check\//, /^\/p\/[0-9a-f]{40}$/,/^\/school\/elections\/[^/]+\/kiosk/, /^\/demo$/, /^\/give\//, /^\/pay\//, /^\/apply\//, /^\/careers\//, /^\/enquire\//, /^\/visit\//, /^\/entrance\//, /^\/t\//, /^\/s\//, /^\/unsubscribe\//, /^\/alumni\//, /^\/v\//, /^\/n\//, /\/print$/, /\/transcript$/,
   // Live lessons: the projector view, students in a lesson or game, and guests joining by code are full screen.
   /^\/live\/present\//, /^\/live\/student\/(live|game)\//, /^\/live\/guest\//, /^\/live\/join/];
 

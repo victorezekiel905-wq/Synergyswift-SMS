@@ -6,6 +6,7 @@ import { appUrl } from "@/lib/school";
 import { confirmWalletTopUp } from "@/lib/wallet";
 import { confirmAdmissionPayment } from "@/lib/admissions-crm";
 import { confirmDonation } from "@/lib/collections-server";
+import { confirmInvoicePayment } from "@/lib/platform-pay";
 import { moreCreds, verifyStripeSignature, type StripeCreds } from "@/lib/payments-more";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ provider
   const reference = provider === "paystack" ? body?.data?.reference : body?.data?.tx_ref ?? body?.txRef;
   if (reference && String(reference).startsWith("WAL-")) await confirmWalletTopUp(createServiceClient(), String(reference));
   else if (reference && String(reference).startsWith("ADM-")) await confirmAdmissionPayment(createServiceClient(), String(reference));
+  else if (reference && String(reference).startsWith("SSI-")) await confirmInvoicePayment(createServiceClient(), String(reference));
   else if (reference && String(reference).startsWith("DON-")) await confirmDonation(createServiceClient(), String(reference), appUrl(req));
   else if (reference) await confirmOnlinePayment(createServiceClient(), String(reference), appUrl(req));
   return NextResponse.json({ ok: true });

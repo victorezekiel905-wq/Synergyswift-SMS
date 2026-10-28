@@ -9,7 +9,8 @@ type Data = {
   price: { lines: { label: string; amount: number }[]; annual: number | null; per_invoice: number | null } | null;
   groups: { key: string; label: string; hint: string }[];
   modules: { key: string; label: string; group: string; on: boolean; until: string | null }[];
-  invoices: { id: string; number: string; status: string; amount_cents: number; lines: { label: string; amount: number }[]; period_start: string | null; period_end: string | null; due_at: string | null; paid_at: string | null; created_at: string }[];
+  invoices: { id: string; number: string; status: string; amount_cents: number; lines: { label: string; amount: number }[]; period_start: string | null; period_end: string | null; due_at: string | null; paid_at: string | null; created_at: string; pay_token: string | null }[];
+  pay_online?: boolean;
   requests: { id: string; module: string; action: string; note: string | null; status: string; reply: string | null; created_at: string }[];
   billing: { company: string; bank_details: string };
 };
@@ -91,7 +92,7 @@ export default function SubscriptionPage() {
                   <td className="text-right tabular-nums">{naira(i.amount_cents / 100)}</td>
                   <td>{i.due_at ? fmtDate(i.due_at) : "—"}</td>
                   <td><Badge tone={i.status === "paid" ? "green" : i.status === "open" ? "amber" : "slate"}>{i.status === "open" ? "to pay" : i.status === "void" ? "cancelled" : "paid"}</Badge></td>
-                  <td className="text-right"><button className="text-xs text-brand-700 hover:underline" onClick={() => setPrint(i)}>View</button></td>
+                  <td className="whitespace-nowrap text-right">{i.pay_token && data.pay_online && <a className="btn btn-primary mr-2 px-2.5 py-1 text-xs no-underline" href={`/billing/${i.pay_token}`}>Pay now</a>}<button className="text-xs text-brand-700 hover:underline" onClick={() => setPrint(i)}>View</button></td>
                 </tr>
               ))}
             </tbody>

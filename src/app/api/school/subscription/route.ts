@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, readJson, jsonError, ROLES } from "@/lib/auth";
+import { payToken, onlineInvoicePayments } from "@/lib/platform-pay";
 import { createServiceClient } from "@/lib/supabase/service";
 import { resolveModules, MODULE_KEYS, MODULE_GROUPS, moduleLabel, bandLabel } from "@/lib/saas";
 import { loadSubscription, loadOverrides, subscriptionModules, priceFor, platformSetting } from "@/lib/saas-server";
@@ -26,7 +27,7 @@ export async function GET() {
     price: price ? { lines: price.lines, annual: price.annual, per_invoice: price.perInvoice } : null,
     groups: MODULE_GROUPS,
     modules: rows.map(r => ({ key: r.key, label: r.label, group: r.group, on: r.effective, until: !r.expired && r.mode !== "inherit" ? r.expires_at : null })),
-    invoices: invoices.data ?? [], requests: requests.data ?? [], billing
+    invoices: (invoices.data ?? []).map((i: any) => ({ ...i, pay_token: i.status === "open" ? payToken(i.id) : null })), pay_online: onlineInvoicePayments(), requests: requests.data ?? [], billing
   });
 }
 
