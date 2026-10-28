@@ -11,6 +11,7 @@ import { claimDevice } from "@/components/offline";
 
 import { NAV, PLATFORM_NAV, visibleNav, bottomBar, type NavGroup } from "@/lib/nav";
 import SideNav, { BottomBar } from "@/components/SideNav";
+import { BrandMark } from "@/components/BrandMark";
 
 // Pages that render without the app chrome (public links, kiosk, exam lockdown).
 const BARE = [/^\/sign\//, /^\/login$/, /^\/signup$/, /^\/student\/join$/, /^\/r\//, /^\/g\//, /^\/exam\//, /^\/auth\//, /^\/school\/gate\/kiosk/, /^\/school\/gate\/clock-code/, /^\/clock$/, /^\/results\/check\//, /^\/p\/[0-9a-f]{40}$/,/^\/school\/elections\/[^/]+\/kiosk/, /^\/demo$/, /^\/give\//, /^\/pay\//, /^\/apply\//, /^\/careers\//, /^\/enquire\//, /^\/visit\//, /^\/entrance\//, /^\/t\//, /^\/s\//, /^\/unsubscribe\//, /^\/alumni\//, /^\/v\//, /^\/n\//, /\/print$/, /\/transcript$/,
@@ -174,9 +175,9 @@ const PREVIEW_ME = {
   tenant: { id: "preview", name: "Greenfield College", status: "active", modules: {} }
 } as Me;
 
-/** The product mark: a quiet serif initial on the primary colour. */
-export function Monogram({ size = "h-8 w-8 text-[17px]" }: { size?: string }) {
-  return <span aria-hidden className={`grid shrink-0 place-items-center rounded-md bg-brand-700 font-serif font-semibold leading-none text-white ${size}`}>S</span>;
+/** The product mark (see BrandMark). `solid` for the 16 px sizes. */
+export function Monogram({ size = "h-8 w-8", solid = false }: { size?: string; solid?: boolean }) {
+  return <BrandMark className={size} solid={solid} />;
 }
 
 /** Shown instead of the app when a school only lets staff in from its network or approved devices. */

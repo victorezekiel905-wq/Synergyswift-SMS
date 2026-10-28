@@ -15,7 +15,10 @@ export const metadata: Metadata = {
   title: "Synergy Swift",
   description: "School management: admissions, attendance, results, fees, learning and the parent app.",
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }, { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" }],
+    apple: "/icons/apple-touch-icon.png"
+  },
   appleWebApp: { capable: true, title: "Synergy Swift", statusBarStyle: "default" }
 };
 

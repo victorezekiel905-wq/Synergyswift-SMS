@@ -203,7 +203,7 @@ export default function Home() {
       <footer className="border-t border-slate-200">
         <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 text-[13px] sm:px-8 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
           <div>
-            <span className="flex items-center gap-2 text-[15px] font-semibold"><Monogram size="h-6 w-6 text-[13px]" /> Synergy Swift</span>
+            <span className="flex items-center gap-2 text-[15px] font-semibold"><Monogram size="h-6 w-6" /> Synergy Swift</span>
             <p className="mt-3 max-w-xs leading-relaxed text-slate-500">School management and learning for primary and secondary schools.</p>
           </div>
           <FooterCol title="Product" links={[["#offices", "Overview"], ["#exams", "Exams"], ["#learning", "Teaching"], ["#families", "Families"], ["#pricing", "Pricing"]]} />
@@ -251,7 +251,7 @@ function Frame({ title, children }: { title: string; children: React.ReactNode }
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-pop">
       <div className="flex h-9 items-center gap-2 border-b border-slate-200 bg-slate-50 px-3.5">
-        <Monogram size="h-4 w-4 text-[9px]" /><span className="text-[11px] font-medium text-slate-600">{title}</span>
+        <Monogram size="h-4 w-4" solid /><span className="text-[11px] font-medium text-slate-600">{title}</span>
       </div>
       {children}
     </div>

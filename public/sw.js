@@ -8,7 +8,7 @@
  * - Learning content a student chose to keep offline ("ecf-content-<id>"
  *   caches, filled by the page) opens without a connection.
  */
-const CACHE = "educlass-static-v3";
+const CACHE = "educlass-static-v4";
 // App pages that must open without a connection. They hold no school data:
 // the data is fetched by the page, and the register and the portals' "today"
 // views keep their own copy on the device (removed on sign-out).
