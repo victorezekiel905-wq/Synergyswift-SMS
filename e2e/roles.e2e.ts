@@ -2,12 +2,12 @@ import { test, expect, type Page } from "@playwright/test";
 
 /**
  * Each role signs in to a seeded TEST copy of Synergy Swift and does its main job.
- * Set E2E_BASE_URL plus E2E_<ROLE>_EMAIL / E2E_<ROLE>_PASSWORD for OWNER, ADMIN,
+ * Set E2E_BASE_URL plus E2E_<ROLE>_EMAIL and E2E_<ROLE>_PASSWORD (or one E2E_PASSWORD) for OWNER, ADMIN,
  * TEACHER, PARENT and STUDENT (never real people's accounts). Roles without
  * accounts are skipped. Never point this at the live site: it creates records.
  */
 const account = (role: string) => {
-  const email = process.env[`E2E_${role}_EMAIL`], password = process.env[`E2E_${role}_PASSWORD`];
+  const email = process.env[`E2E_${role}_EMAIL`], password = process.env[`E2E_${role}_PASSWORD`] ?? process.env.E2E_PASSWORD;
   return email && password ? { email, password } : null;
 };
 

@@ -18,13 +18,17 @@ const byRole = r => users.filter(u => u.role === r);
 const pageTime = new Trend("page_api_ms", true);
 const failures = new Rate("failed_requests");
 
+// SCALE multiplies every crowd: 1 = the 20,000-account day (10 schools), 2.5 = 50,000 (25 schools).
+const SCALE = Math.max(0.05, Number(__ENV.SCALE || 1));
+const n = (x) => Math.max(1, Math.round(x * SCALE));
+
 export const options = {
   scenarios: {
-    morning: { executor: "ramping-vus", exec: "teacherMorning", startVUs: 0, stages: [{ duration: "2m", target: 600 }, { duration: "5m", target: 600 }, { duration: "1m", target: 0 }] },
-    results: { executor: "ramping-arrival-rate", exec: "parentResults", startRate: 5, timeUnit: "1s", preAllocatedVUs: 500, maxVUs: 3000,
-      stages: [{ duration: "2m", target: 80 }, { duration: "5m", target: 80 }, { duration: "1m", target: 0 }], startTime: "8m" },
-    exam: { executor: "constant-vus", exec: "studentExam", vus: 1500, duration: "10m", startTime: "16m" },
-    browsing: { executor: "constant-vus", exec: "browse", vus: 300, duration: "26m" }
+    morning: { executor: "ramping-vus", exec: "teacherMorning", startVUs: 0, stages: [{ duration: "2m", target: n(600) }, { duration: "5m", target: n(600) }, { duration: "1m", target: 0 }] },
+    results: { executor: "ramping-arrival-rate", exec: "parentResults", startRate: n(5), timeUnit: "1s", preAllocatedVUs: n(500), maxVUs: n(3000),
+      stages: [{ duration: "2m", target: n(80) }, { duration: "5m", target: n(80) }, { duration: "1m", target: 0 }], startTime: "8m" },
+    exam: { executor: "constant-vus", exec: "studentExam", vus: n(1500), duration: "10m", startTime: "16m" },
+    browsing: { executor: "constant-vus", exec: "browse", vus: n(300), duration: "26m" }
   },
   thresholds: {
     "http_req_failed": ["rate<0.01"],
