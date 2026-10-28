@@ -43,34 +43,27 @@ export default function StudentJoin() {
       if (error) { setBusy(false); setErr(error.message); return; }
     }
 
-    // Bootstrap the student profile into the class's tenant, then find the session.
+    // Put the student in the class's school (and the class), then on to their day.
     const setup = await fetch("/api/auth/setup", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: "student", full_name: fullName, join_code: code.trim().toUpperCase() })
     });
     const setupJson = await setup.json().catch(() => ({}));
-    if (!setup.ok && !setupJson.already) { setBusy(false); setErr(setupJson.error ?? "class not found"); return; }
-
-    const r = await fetch("/api/class-sessions/lookup", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ join_code: code.trim().toUpperCase() })
-    });
     setBusy(false);
-    if (!r.ok) { const j = await r.json().catch(() => ({})); setErr(j.error ?? "No live session found for that code."); return; }
-    const j = await r.json();
-    if (!j.id) { setErr("No live session found for that code."); return; }
-    router.push(`/student/live/${j.id}`);
+    if (!setup.ok && !setupJson.already) { setErr(setupJson.error ?? "No class has that code. Check it with your teacher."); return; }
+    router.push("/student");
+    router.refresh();
   }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[400px] flex-col px-5 py-10 sm:py-16">
       <Link href="/" className="flex items-center gap-2.5 self-start"><Monogram /><span className="text-[15px] font-semibold tracking-tight">Synergy Swift</span></Link>
-      <h1 className="mt-14 font-serif text-[30px] font-semibold leading-tight tracking-[-0.01em]">Join a class</h1>
-      <p className="mt-2 text-[15px] text-slate-600 sm:text-sm">Enter the six-character code your teacher shows you.</p>
+      <h1 className="mt-14 font-serif text-[30px] font-semibold leading-tight tracking-[-0.01em]">Student account</h1>
+      <p className="mt-2 text-[15px] text-slate-600 sm:text-sm">Make your account with the six-character class code from your teacher. In a lesson right now? <Link href="/live/join" className="font-medium text-brand-700">Join as a guest</Link> instead, no account needed.</p>
       {pending ? <PendingConfirm email={email} status={pending} /> : (
       <form onSubmit={onSubmit} className="card mt-7 space-y-5 p-6">
         <div>
-          <label className="label">Join code</label>
+          <label className="label">Class code</label>
           <input className="input uppercase" required maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} />
         </div>
         {mode === "signup" && (
@@ -88,7 +81,7 @@ export default function StudentJoin() {
           <input className="input" type="password" required minLength={mode === "signup" ? 8 : 1} value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         {err && <p className="text-sm text-rose-600">{err}</p>}
-        <button className="btn btn-primary w-full" disabled={busy}>{busy ? "Joining…" : mode === "signup" ? "Sign up + join" : "Sign in + join"}</button>
+        <button className="btn btn-primary w-full" disabled={busy}>{busy ? "One moment…" : mode === "signup" ? "Create my account" : "Sign in and join the class"}</button>
         <button type="button" onClick={() => setMode(mode === "signup" ? "login" : "signup")} className="btn btn-ghost w-full text-xs">
           {mode === "signup" ? "Already have an account? Sign in instead" : "First time here? Create a student account"}
         </button>

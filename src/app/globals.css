@@ -88,7 +88,7 @@ html[data-lite="1"] .lite-hide { display: none !important; }
 html[data-high-contrast] body { filter: contrast(1.35); }
 html[data-high-contrast] .card { border-color: #0f172a; }
 
-/* ---------- Live lessons module (src/live, from SwiftCipher): the extra classes its screens use ---------- */
+/* ---------- Live lessons module (src/live): the extra classes its screens use ---------- */
 @layer components {
   .btn-secondary { @apply border border-slate-300 bg-white text-slate-800 hover:bg-slate-50; }
   .btn-accent { @apply bg-accent-500 text-accent-ink hover:bg-accent-400; }

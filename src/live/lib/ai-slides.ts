@@ -72,7 +72,7 @@ type UnsplashPhoto = {
   urls: { regular: string }; links: { html: string; download_location: string };
   user: { name: string; links: { html: string } };
 };
-const UTM = "utm_source=swiftcipher&utm_medium=referral";
+const UTM = "utm_source=synergyswift&utm_medium=referral";
 
 /**
  * The best landscape photo for a search, skipping ones already used in this deck: Pixabay first

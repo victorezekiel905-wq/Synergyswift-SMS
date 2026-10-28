@@ -64,9 +64,9 @@ export function Presenter({ sessionId }: { sessionId: string }) {
   const captureOk = !!state.data && state.data.settings.monitoring_enabled !== false && !!state.data.settings.allow_screen_capture;
   const screens = useSessionScreens(sessionId, captureOk ? state.data : null);
   const [railOn, setRailOn] = useState(true);
-  useEffect(() => { try { if (localStorage.getItem("swiftcipher.present.screens") === "off") setRailOn(false); } catch { /* storage blocked */ } }, []);
+  useEffect(() => { try { if (localStorage.getItem("synergyswift.present.screens") === "off") setRailOn(false); } catch { /* storage blocked */ } }, []);
   const toggleRail = useCallback(() => setRailOn((v) => {
-    try { localStorage.setItem("swiftcipher.present.screens", v ? "off" : "on"); } catch { /* storage blocked */ }
+    try { localStorage.setItem("synergyswift.present.screens", v ? "off" : "on"); } catch { /* storage blocked */ }
     return !v;
   }), []);
   const rail = railOn && !!s && s.phase !== "lobby";

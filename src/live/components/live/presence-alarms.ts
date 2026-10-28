@@ -17,7 +17,7 @@ export function beep(freq: number) {
 /** A system notification, only when this tab is in the background and the teacher allowed them. */
 export function osNotify(title: string, body?: string) {
   if (document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
-    new Notification(title, { body, tag: `swiftcipher-${title}` });
+    new Notification(title, { body, tag: `synergyswift-${title}` });
   }
 }
 

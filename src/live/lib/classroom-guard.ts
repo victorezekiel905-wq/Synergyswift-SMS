@@ -251,7 +251,7 @@ export function useClassroomGuard(sessionId: string, opts: {
         nudge?.close();
         nudge = new Notification("Return to your lesson", {
           body: "You left the class. Your teacher has been notified.",
-          tag: `swiftcipher-return-${sessionId}`, requireInteraction: true
+          tag: `synergyswift-return-${sessionId}`, requireInteraction: true
         });
         nudge.onclick = () => { window.focus(); nudge?.close(); };
       } else if (!leftLesson) {

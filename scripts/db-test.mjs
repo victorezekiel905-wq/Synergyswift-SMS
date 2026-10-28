@@ -25,7 +25,7 @@ grant execute on function auth.uid(), auth.jwt() to anon, authenticated;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
--- What the live-lesson engine (schema live, from SwiftCipher) also expects of Supabase.
+-- What the live-lesson engine (schema live) also expects of Supabase.
 create schema extensions;
 alter table auth.users add column raw_user_meta_data jsonb not null default '{}'::jsonb, add column raw_app_meta_data jsonb not null default '{}'::jsonb,
   add column is_anonymous boolean not null default false, add column created_at timestamptz not null default now(), add column last_sign_in_at timestamptz;
