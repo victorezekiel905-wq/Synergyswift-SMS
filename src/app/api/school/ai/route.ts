@@ -18,7 +18,7 @@ export async function GET() {
   if (ctx instanceof NextResponse) return ctx;
   const month = new Date(); month.setUTCDate(1); month.setUTCHours(0, 0, 0, 0);
   const [{ data: rows }, { data: st }] = await Promise.all([
-    ctx.sb.from("ai_usage").select("task,ok,user_id,input_tokens,output_tokens,at").eq("tenant_id", ctx.tenant.id).gte("at", month.toISOString()).order("at", { ascending: false }).limit(20000),
+    ctx.sb.from("ai_usage").select("task,ok,user_id,input_tokens,output_tokens,at").eq("tenant_id", ctx.tenant.id).eq("ok", true).gte("at", month.toISOString()).order("at", { ascending: false }).limit(20000),
     ctx.sb.from("tenant_settings").select("*").eq("tenant_id", ctx.tenant.id).maybeSingle()
   ]);
   const byTask = new Map<string, number>();

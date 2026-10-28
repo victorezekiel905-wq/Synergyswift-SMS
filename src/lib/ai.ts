@@ -116,7 +116,7 @@ async function checkAllowance(tenantId: string | null, userId: string | null, ta
         svc.from("tenant_settings").select("*").eq("tenant_id", tenantId).maybeSingle(),
         svc.from("tenants").select("modules").eq("id", tenantId).maybeSingle(),
         svc.from("users").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("active", true).not("role", "in", "(student,parent)"),
-        svc.from("ai_usage").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("task", "tutor").gte("at", monthStart())
+        svc.from("ai_usage").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("task", "tutor").eq("ok", true).gte("at", monthStart())
       ]);
       const own = (st as { ai_monthly_limit?: number | null } | null)?.ai_monthly_limit;
       const off = (t as { modules?: Record<string, boolean> | null } | null)?.modules?.ai === false;
@@ -138,7 +138,7 @@ async function checkAllowance(tenantId: string | null, userId: string | null, ta
       const svc = await service();
       const [{ data: u }, { count }] = await Promise.all([
         svc.from("users").select("role,extra_roles").eq("id", userId).maybeSingle(),
-        svc.from("ai_usage").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("user_id", userId).gte("at", monthStart())
+        svc.from("ai_usage").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("user_id", userId).eq("ok", true).gte("at", monthStart())
       ]);
       const roles = [u?.role, ...((u?.extra_roles as string[] | null) ?? [])].filter(Boolean) as string[];
       const kind = roles.some(r => UNCAPPED.has(r)) ? "free" : roles.length > 0 && roles.every(r => r === "student") ? "student"
@@ -170,7 +170,7 @@ export async function allowanceFor(svc: any, tenantId: string, limit: number) {
   const [{ count }, { data: st }, { count: tutorUsed }] = await Promise.all([
     svc.from("users").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("active", true).not("role", "in", "(student,parent)"),
     svc.from("tenant_settings").select("ai_tutor_enabled").eq("tenant_id", tenantId).maybeSingle(),
-    svc.from("ai_usage").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("task", "tutor").gte("at", monthStart())
+    svc.from("ai_usage").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("task", "tutor").eq("ok", true).gte("at", monthStart())
   ]);
   const staff = count ?? 0, on = Boolean(st?.ai_tutor_enabled);
   const split = splitAllowance(limit, staff, on);
@@ -178,7 +178,8 @@ export async function allowanceFor(svc: any, tenantId: string, limit: number) {
 }
 
 async function recordUsage(row: { tenantId: string | null; userId: string | null; task: string; provider: AiProvider; model: string; inputTokens: number; outputTokens: number; ok: boolean }) {
-  if (row.tenantId) {
+  // Only answers that came back count against the allowance; failures are logged but free.
+  if (row.tenantId && row.ok) {
     const e = seen.get(row.tenantId); if (e) { e.used++; if (row.task === "tutor") e.tutorUsed++; }
     const m = row.userId ? mine.get(`${row.tenantId}:${row.userId}`) : undefined; if (m) m.used++;
   }

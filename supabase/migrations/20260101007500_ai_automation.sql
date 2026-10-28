@@ -62,11 +62,11 @@ do $$ begin
     check (kind in ('note','call','email','sms','whatsapp','meeting','stage','task','system','ai'));
 end $$;
 
--- This month's AI requests for one school (the server checks it before each request).
+-- This month's AI requests for one school (the server checks it before each request). Failed requests don't count.
 create or replace function public.ai_requests_this_month(p_tenant uuid)
 returns int language sql stable security definer set search_path = public as $$
   select count(*)::int from public.ai_usage
-  where tenant_id = p_tenant and at >= date_trunc('month', now());
+  where tenant_id = p_tenant and ok and at >= date_trunc('month', now());
 $$;
 revoke all on function public.ai_requests_this_month(uuid) from public, anon, authenticated;
 grant execute on function public.ai_requests_this_month(uuid) to service_role;

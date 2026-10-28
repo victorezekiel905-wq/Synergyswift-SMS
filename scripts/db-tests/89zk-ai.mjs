@@ -21,6 +21,9 @@ export default async function ({ db, q, expectRows, expectError, check, U, T }) 
   console.log("\nAI: monthly allowance");
   const n = await q(`select public.ai_requests_this_month('${T.A}') n`);
   check("this month's requests are counted per school", n[0]?.n === 1, n);
+  await q(`insert into ai_usage (tenant_id, task, provider, model, ok) values ('${T.A}', 'quiz', 'gemini', 'm', false)`);
+  const n2 = await q(`select public.ai_requests_this_month('${T.A}') n`);
+  check("…and a request that failed doesn't use the allowance", n2[0]?.n === 1, n2);
   await expectError("schools can't call the counter for another school", U.adminA, `select public.ai_requests_this_month('${T.B}')`, /permission denied/);
   await server("a school can have its own limit", `update tenant_settings set ai_monthly_limit = 500, ai_settings = '{"comments":{"tone":"formal"}}' where tenant_id = '${T.A}'`);
   await server("…but not a negative one", `update tenant_settings set ai_monthly_limit = -1 where tenant_id = '${T.A}'`, /check/);
