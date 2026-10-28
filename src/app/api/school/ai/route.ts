@@ -35,7 +35,7 @@ export async function GET() {
     const u = (who ?? []).find((x: any) => x.id === id);
     const roles = [u?.role, ...(u?.extra_roles ?? [])];
     const free = roles.some((r: string) => ["school_admin", "principal"].includes(r));
-    const share = free ? null : u?.role === "student" ? split.shares.student : split.shares.staff;
+    const share = free ? null : split.share;
     return { name: u?.full_name ?? "Someone", role: u?.role ?? "", used: n, share };
   });
   return NextResponse.json({

@@ -4,7 +4,7 @@ import { useApi, send, Page, PageHeader, Alert, Loading, Field, Stat } from "@/c
 
 type Data = {
   available: boolean; used: number; limit: number; by_task: { task: string; label: string; n: number }[];
-  split: { staff: number; students: number; shares: { staff: number; student: number } };
+  split: { staff: number; share: number };
   people: { name: string; role: string; used: number; share: number | null }[];
   settings: { comments: { tone: string; length: string }; admissions: { autopilot?: boolean; auto_reply?: boolean; auto_chase?: boolean; weekly_report?: boolean } };
   admissions_report: { headline: string; highlights: string[]; bottlenecks: string[]; actions: string[]; at: string } | null;
@@ -57,12 +57,10 @@ export default function SchoolAi() {
 
       <section className="card mb-4 p-4">
         <h2 className="font-semibold">Each person&apos;s share</h2>
-        <p className="text-sm text-slate-600">The allowance is shared out across everyone registered, so one person can&apos;t use it all up. A staff member gets four times a student&apos;s share, because staff write for whole classes. Parents don&apos;t use it. School admins and the principal aren&apos;t held to a share (they draft for the whole school), but everything still comes out of the school&apos;s total.</p>
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <p className="text-sm text-slate-600">AI is for teachers and staff: lesson notes, report comments, slides, quiz questions, notices and the admissions assistant. Students and parents can&apos;t generate anything. The allowance is shared evenly across your staff so one person can&apos;t use it all up. School admins and the principal aren&apos;t held to a share (they draft for the whole school), but everything still comes out of the school&apos;s total.</p>
+        <div className="mt-3 grid grid-cols-2 gap-3">
           <Stat label="Staff" value={data.split.staff.toLocaleString()} />
-          <Stat label="Each staff member" value={`${data.split.shares.staff.toLocaleString()} a month`} />
-          <Stat label="Students" value={data.split.students.toLocaleString()} />
-          <Stat label="Each student" value={`${data.split.shares.student.toLocaleString()} a month`} />
+          <Stat label="Each staff member" value={`${data.split.share.toLocaleString()} a month`} />
         </div>
         {data.people.length > 0 && (
           <table className="mt-3 w-full text-sm"><thead className="text-left text-xs text-slate-500"><tr><th className="py-1">Most use this month</th><th className="py-1 text-right">Used</th><th className="py-1 text-right">Share</th></tr></thead>

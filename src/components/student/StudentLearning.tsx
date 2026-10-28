@@ -16,7 +16,7 @@ type StepView = { id: string; title: string; kind: string; state: "open" | "lock
 
 const Bar = ({ pct }: { pct: number }) => <div className="h-2 overflow-hidden rounded bg-slate-100" role="img" aria-label={`${pct}% done`}><div className="h-full bg-emerald-500" style={{ width: `${pct}%` }} /></div>;
 
-export function StudentPaths({ onAsk }: { onAsk: (ctx: { kind: "step"; ref_id: string; title: string }) => void }) {
+export function StudentPaths({ onAsk }: { onAsk?: (ctx: { kind: "step"; ref_id: string; title: string }) => void }) {
   const { data, reload } = useApi<{ items: PathCard[] }>("/api/learning-paths");
   const [open, setOpen] = useState<string | null>(null);
   if (open) return <PathView id={open} onBack={() => { setOpen(null); reload(); }} onAsk={onAsk} />;
@@ -32,7 +32,7 @@ export function StudentPaths({ onAsk }: { onAsk: (ctx: { kind: "step"; ref_id: s
   );
 }
 
-function PathView({ id, onBack, onAsk }: { id: string; onBack: () => void; onAsk: (ctx: { kind: "step"; ref_id: string; title: string }) => void }) {
+function PathView({ id, onBack, onAsk }: { id: string; onBack: () => void; onAsk?: (ctx: { kind: "step"; ref_id: string; title: string }) => void }) {
   const { data, error, reload } = useApi<{ path: { title: string; description: string | null; subject: string | null }; pct: number; done: number; total: number; steps: StepView[] }>(`/api/learning-paths?id=${id}`, [id]);
   const [play, setPlay] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -64,7 +64,7 @@ function PathView({ id, onBack, onAsk }: { id: string; onBack: () => void; onAsk
               {s.kind === "quiz" && <QuizStep step={s} onDone={(t, ok) => { setMsg({ ok, text: t }); reload(); }} />}
               <div className="flex flex-wrap gap-2">
                 {["text", "link", "video"].includes(s.kind) && s.state === "open" && <button className="btn btn-primary" onClick={async () => { const r = await send("/api/learning-paths", { action: "complete", step_id: s.id }); setMsg({ ok: r.ok, text: r.ok ? "Step done. Well done!" : r.error ?? "failed" }); if (r.ok) reload(); }}>I have done this</button>}
-                <button className="btn btn-ghost text-xs" onClick={() => onAsk({ kind: "step", ref_id: s.id, title: s.title })}>Ask the study helper</button>
+                {onAsk && <button className="btn btn-ghost text-xs" onClick={() => onAsk({ kind: "step", ref_id: s.id, title: s.title })}>Ask the study helper</button>}
               </div>
             </div>
           )}
