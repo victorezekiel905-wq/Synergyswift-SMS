@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 const TASK_LABEL: Record<string, string> = {
   report_comments: "Report comments", lesson_note: "Lesson notes", quiz: "Quiz questions", live_questions: "Live lesson questions", slides: "Slides",
   translate: "Translation for parents", notice: "Notices", homework_feedback: "Homework feedback", tutor: "Study helper",
-  admissions_brief: "Admissions replies", applicant_summary: "Applicant summaries", admissions_report: "Weekly admissions report"
+  admissions_brief: "Admissions replies", applicant_summary: "Applicant summaries", admissions_report: "Weekly admissions report", head_summary: "Head's summary", essay_mark: "Essay marking help",
+  appraisal_summary: "Appraisal summaries", fee_reminder: "Fee reminders", timetable_help: "Timetable suggestions", parent_help: "Parents' help assistant", job_advert: "Job adverts", iep_targets: "Support plan targets"
 };
 
 /** The school's AI: this month's use against its allowance, and how drafts are written (phase 14p). Admins only. */
@@ -41,14 +42,15 @@ export async function GET() {
   return NextResponse.json({
     available: aiConfigured(), used: rows?.length ?? 0, limit, split, people,
     by_task: [...byTask].map(([task, n]) => ({ task, label: TASK_LABEL[task] ?? task.replace(/_/g, " "), n })).sort((a, b) => b.n - a.n),
-    settings: { comments: s.comments ?? { tone: "warm", length: "short" }, admissions: s.admissions ?? {} },
+    settings: { comments: s.comments ?? { tone: "warm", length: "short" }, admissions: s.admissions ?? {}, parent: { help: s.parent_help !== false, faq: s.parent_faq ?? "" } },
     admissions_report: s.admissions_report ?? null
   });
 }
 
 const Body = z.object({
   comments: z.object({ tone: z.enum(["warm", "formal", "encouraging", "firm"]), length: z.enum(["short", "medium"]) }).optional(),
-  admissions: z.object({ autopilot: z.boolean(), auto_reply: z.boolean(), auto_chase: z.boolean(), weekly_report: z.boolean() }).optional()
+  admissions: z.object({ autopilot: z.boolean(), auto_reply: z.boolean(), auto_chase: z.boolean(), weekly_report: z.boolean() }).optional(),
+  parent: z.object({ help: z.boolean(), faq: z.string().max(6000) }).optional()
 });
 
 export async function POST(req: NextRequest) {
@@ -60,7 +62,8 @@ export async function POST(req: NextRequest) {
   const svc = createServiceClient();
   const { data: st } = await svc.from("tenant_settings").select("ai_settings").eq("tenant_id", ctx.tenant.id).maybeSingle();
   if (!st) return jsonError("Finish School setup first.");
-  const next = { ...(st.ai_settings ?? {}), ...parsed.data };
+  const { parent, ...rest } = parsed.data;
+  const next = { ...(st.ai_settings ?? {}), ...rest, ...(parent ? { parent_help: parent.help, parent_faq: parent.faq.trim() } : {}) };
   const { error } = await svc.from("tenant_settings").update({ ai_settings: next }).eq("tenant_id", ctx.tenant.id);
   if (error) return jsonError(error.message.includes("ai_settings") ? "AI settings need the database update (migration 20260101007500)." : error.message);
   await ctx.sb.from("audit_logs").insert({ tenant_id: ctx.tenant.id, actor_id: ctx.userId, action: "ai.settings", meta: parsed.data });

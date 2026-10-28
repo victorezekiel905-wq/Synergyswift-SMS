@@ -3,6 +3,8 @@ import { z } from "zod";
 import { z as z4 } from "zod/v4";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { generateJson, aiErrorMessage } from "@/lib/ai";
+import { createServiceClient } from "@/lib/supabase/service";
+import { essayMark, appraisalSummary, feeReminder, timetableHelp } from "@/lib/ai-drafts";
 
 export const maxDuration = 120;
 
@@ -12,11 +14,17 @@ export const maxDuration = 120;
  *  - job_advert: the "About the job" and "What we are looking for" text (HR).
  *  - iep_targets: SMART targets for a student's support plan, from the SEN
  *    profile (needs, strengths, what works) and the plan's existing targets.
+ *  - essay_mark, appraisal_summary, fee_reminder, timetable_help (14q): see lib/ai-drafts.ts.
  */
 const Body = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("job_advert"), title: z.string().trim().min(2).max(160), department: z.string().trim().max(120).nullish(),
     employment_type: z.string().max(40).nullish(), location: z.string().trim().max(120).nullish(), salary_range: z.string().trim().max(120).nullish(), notes: z.string().trim().max(3000).nullish() }),
-  z.object({ kind: z.literal("iep_targets"), student_id: z.string().uuid(), iep_id: z.string().uuid().nullish(), focus: z.string().trim().max(500).nullish() })
+  z.object({ kind: z.literal("iep_targets"), student_id: z.string().uuid(), iep_id: z.string().uuid().nullish(), focus: z.string().trim().max(500).nullish() }),
+  z.object({ kind: z.literal("essay_mark"), exam_id: z.string().uuid(), attempt_id: z.string().uuid(), question_id: z.string().uuid() }),
+  z.object({ kind: z.literal("appraisal_summary"), appraisal_id: z.string().uuid() }),
+  z.object({ kind: z.literal("fee_reminder"), guardian_id: z.string().uuid() }),
+  z.object({ kind: z.literal("timetable_help"), days: z.number().int().min(1).max(7).default(5),
+    unplaced: z.array(z.object({ classId: z.string().uuid(), subjectId: z.string().uuid(), teacherId: z.string().uuid().nullable(), perWeek: z.number().int().min(1).max(20), reason: z.string().max(200).nullish() })).min(1).max(200) })
 ]);
 
 const Advert = z4.object({ description: z4.string(), requirements: z4.string() });
@@ -27,6 +35,29 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return jsonError(parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "));
   const b = parsed.data;
   try {
+    if (b.kind === "essay_mark") {
+      const ctx = await requireCtx(ROLES.staff, "exams");
+      if (ctx instanceof NextResponse) return ctx;
+      const r = await essayMark(ctx, createServiceClient(), b.exam_id, b.attempt_id, b.question_id);
+      return "error" in r ? jsonError(r.error, r.error === "not found" ? 404 : 400) : NextResponse.json(r);
+    }
+    if (b.kind === "appraisal_summary") {
+      const ctx = await requireCtx(ROLES.staff, "hr");
+      if (ctx instanceof NextResponse) return ctx;
+      const r = await appraisalSummary(ctx, createServiceClient(), b.appraisal_id);
+      return "error" in r ? jsonError(r.error, r.status ?? 400) : NextResponse.json(r);
+    }
+    if (b.kind === "fee_reminder") {
+      const ctx = await requireCtx(ROLES.finance, "fees");
+      if (ctx instanceof NextResponse) return ctx;
+      const r = await feeReminder(ctx, createServiceClient(), b.guardian_id);
+      return "error" in r ? jsonError(r.error, r.status ?? 400) : NextResponse.json(r);
+    }
+    if (b.kind === "timetable_help") {
+      const ctx = await requireCtx(ROLES.admin, "timetable");
+      if (ctx instanceof NextResponse) return ctx;
+      return NextResponse.json(await timetableHelp(ctx, b.unplaced, b.days));
+    }
     if (b.kind === "job_advert") {
       const ctx = await requireCtx(ROLES.hr, "hr");
       if (ctx instanceof NextResponse) return ctx;
@@ -42,6 +73,7 @@ and qualities. Never invent pay, benefits, dates or facts about the school that 
       return NextResponse.json({ description: out.description.slice(0, 8000), requirements: out.requirements.slice(0, 6000) });
     }
 
+    if (b.kind !== "iep_targets") return jsonError("unknown kind");
     const ctx = await requireCtx(ROLES.staff, "sims");
     if (ctx instanceof NextResponse) return ctx;
     const { data: can } = await ctx.sb.rpc("can_manage_sen", { p_student: b.student_id });

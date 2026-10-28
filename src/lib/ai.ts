@@ -145,7 +145,9 @@ export function staffShare(limit: number, staff: number): number {
   return staff > 0 ? Math.max(1, Math.floor(limit / staff)) : limit;
 }
 /** Tasks a student's or parent's action may start (school communication, not generating content). */
-const FAMILY_TASKS = new Set(["translate"]);
+const FAMILY_TASKS = new Set(["translate", "parent_help"]);
+/** Questions a parent may ask the help chat each day; they count against the school's total. */
+export const PARENT_HELP_PER_DAY = 15;
 const STUDENT_TASKS = new Set(["tutor", "translate"]);
 const UNCAPPED = new Set(["school_admin", "principal", "platform_admin"]);
 const monthStart = () => { const d = new Date(); d.setUTCDate(1); d.setUTCHours(0, 0, 0, 0); return d.toISOString(); };
@@ -207,6 +209,13 @@ async function checkAllowance(tenantId: string | null, userId: string | null, ta
     return;
   }
   if (me.kind === "family") {
+    if (task === "parent_help") {
+      const svc = await service();
+      const { count } = await svc.from("ai_usage").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("user_id", userId).eq("task", "parent_help").eq("ok", true)
+        .gte("at", new Date(Date.now() - 86_400_000).toISOString());
+      if ((count ?? 0) >= PARENT_HELP_PER_DAY) throw new AiUnavailable("You've asked a lot of questions today. Please contact the school office, or try again tomorrow.", 429);
+      return;
+    }
     if (FAMILY_TASKS.has(task)) return;
     throw new AiUnavailable("AI tools are for teachers and school staff.", 403);
   }

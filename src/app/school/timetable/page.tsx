@@ -92,6 +92,17 @@ function Load() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [days, setDays] = useState([1, 2, 3, 4, 5]);
+  // Lessons the last run could not place, and the AI's suggestions for them (14q).
+  const [unplaced, setUnplaced] = useState<{ classId: string; subjectId: string; teacherId: string | null; perWeek: number; reason?: string | null }[]>([]);
+  const [advice, setAdvice] = useState<{ summary: string; suggestions: string[] } | null>(null);
+  const [advising, setAdvising] = useState(false);
+  async function suggestFixes() {
+    setAdvising(true);
+    const r = await send<{ summary: string; suggestions: string[] }>("/api/ai/draft", { kind: "timetable_help", days: days.length, unplaced });
+    setAdvising(false);
+    if (!r.ok) return setMsg({ ok: false, text: r.error ?? "failed" });
+    setAdvice(r.data);
+  }
   const groups = [...new Set((data?.offerings ?? []).map(o => o.class_groups?.name ?? ""))].sort();
   const placed = (o: Offering) => (data?.entries ?? []).filter(e => e.class_group_id === o.class_group_id && e.subject_id === o.subject_id).length;
   async function generate() {
@@ -99,6 +110,8 @@ function Load() {
     setBusy(true);
     const r = await send("/api/timetable", { action: "generate", days, keep_locked: true });
     setBusy(false);
+    setAdvice(null);
+    setUnplaced(r.ok ? (r.data.unplaced ?? []).map((u: any) => ({ classId: u.classId, subjectId: u.subjectId, teacherId: u.teacherId ?? null, perWeek: u.perWeek, reason: u.reason ?? null })) : []);
     setMsg({ ok: r.ok, text: r.ok ? `Placed ${r.data.placed} lessons.${r.data.unplaced.length ? ` Could not fit: ${r.data.unplaced.map((u: any) => `${u.subject} ×${u.perWeek}${u.reason ? ` (${u.reason})` : ""}`).join("; ")}.` : " Everything fits with no clashes."}` : r.error ?? "failed" });
     reload();
   }
@@ -111,6 +124,17 @@ function Load() {
         <button className="btn btn-primary ml-auto" disabled={busy} onClick={generate}>{busy ? "Generating…" : "Generate timetable"}</button>
       </div>
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
+      {unplaced.length > 0 && !advice && (
+        <button className="btn btn-outline" disabled={advising} onClick={suggestFixes}>{advising ? "Looking at the clashes…" : "Suggest fixes"}</button>
+      )}
+      {advice && (
+        <section className="card p-4 text-sm">
+          <h3 className="font-semibold">Why some lessons did not fit</h3>
+          <p className="mt-1 text-slate-700">{advice.summary}</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-700">{advice.suggestions.map((x, i) => <li key={i}>{x}</li>)}</ul>
+          <p className="mt-2 text-xs text-slate-500">Suggestions by AI from your periods and teaching loads. Change the loads or teachers, then generate again.</p>
+        </section>
+      )}
       {groups.map(gname => (
         <section key={gname} className="card p-4">
           <h3 className="mb-2 font-semibold">{gname}</h3>

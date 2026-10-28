@@ -6,7 +6,7 @@ type Data = {
   available: boolean; used: number; limit: number; by_task: { task: string; label: string; n: number }[];
   split: { staff: number; share: number; tutor: { on: boolean; pool: number; used: number } };
   people: { name: string; role: string; used: number; share: number | null }[];
-  settings: { comments: { tone: string; length: string }; admissions: { autopilot?: boolean; auto_reply?: boolean; auto_chase?: boolean; weekly_report?: boolean } };
+  settings: { comments: { tone: string; length: string }; admissions: { autopilot?: boolean; auto_reply?: boolean; auto_chase?: boolean; weekly_report?: boolean }; parent: { help: boolean; faq: string } };
   admissions_report: { headline: string; highlights: string[]; bottlenecks: string[]; actions: string[]; at: string } | null;
 };
 
@@ -16,11 +16,13 @@ export default function SchoolAi() {
   const [c, setC] = useState({ tone: "warm", length: "short" });
   const [a, setA] = useState({ autopilot: false, auto_reply: false, auto_chase: false, weekly_report: true });
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [p, setP] = useState({ help: true, faq: "" });
   useEffect(() => {
     if (!data) return;
     setC({ tone: data.settings.comments.tone ?? "warm", length: data.settings.comments.length ?? "short" });
     setA({ autopilot: Boolean(data.settings.admissions.autopilot), auto_reply: Boolean(data.settings.admissions.auto_reply),
       auto_chase: Boolean(data.settings.admissions.auto_chase), weekly_report: data.settings.admissions.weekly_report !== false });
+    setP({ help: data.settings.parent?.help !== false, faq: data.settings.parent?.faq ?? "" });
   }, [data]);
   if (error) return <Page><Alert>{error}</Alert></Page>;
   if (!data) return <Page><Loading /></Page>;
@@ -97,6 +99,22 @@ export default function SchoolAi() {
           {toggle("weekly_report", "Weekly admissions report", "Monday mornings: enquiries, how fast families were answered, where they are stuck, and actions for the week, by email to admissions staff and the head.", !a.autopilot)}
         </div>
         <div className="mt-3 flex justify-end"><button className="btn btn-primary" onClick={() => save({ admissions: a }, "Admissions assistant saved.")}>Save</button></div>
+      </section>
+
+      <section className="card mb-4 p-4">
+        <h2 className="font-semibold">Parents&apos; help assistant</h2>
+        <p className="text-sm text-slate-600">&quot;Ask the school&quot; in the parent app answers everyday questions (term dates, events, notices, how to pay, their own child&apos;s fees) from what the school has published. Anything it cannot answer, it sends to the school office. Each parent can ask up to 15 questions a day.</p>
+        <label className="mt-3 flex items-start gap-3 rounded-lg border border-slate-200 p-3">
+          <input type="checkbox" className="mt-1" checked={p.help} onChange={e => setP({ ...p, help: e.target.checked })} />
+          <span><span className="block font-medium">Show &quot;Ask the school&quot; to parents</span><span className="block text-sm text-slate-600">Uses the school&apos;s AI allowance.</span></span>
+        </label>
+        <label className="mt-3 block">
+          <span className="label">The school&apos;s own answers (optional)</span>
+          <textarea className="input min-h-[140px]" maxLength={6000} value={p.faq} onChange={e => setP({ ...p, faq: e.target.value })}
+            placeholder={"e.g. Uniform: the school shop opens 8am to 2pm on weekdays.\nResumption time is 7:30am; the gate closes at 7:45am.\nThe school bus leaves at 3:15pm."} />
+          <span className="mt-1 block text-xs text-slate-500">Uniform, resumption and closing times, transport, visiting rules: anything parents often ask.</span>
+        </label>
+        <div className="mt-3 flex justify-end"><button className="btn btn-primary" onClick={() => save({ parent: p }, "Parents' help assistant saved.")}>Save</button></div>
       </section>
 
       {data.admissions_report && (

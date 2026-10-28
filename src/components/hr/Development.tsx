@@ -138,6 +138,7 @@ function AppraisalDetail({ id, onClose, people }: { id: string | null; onClose: 
   const [goals, setGoals] = useState<any[] | null>(null);
   const [comment, setComment] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [drafting, setDrafting] = useState(false);
   const a = data?.appraisal, role = data?.role ?? {}, criteria: Criterion[] = data?.criteria ?? [];
   const call = async (body: object, ok: string) => { const r = await send("/api/hr/development", body); setMsg({ ok: r.ok, text: r.ok ? ok : r.error ?? "failed" }); if (r.ok) { setSelf(null); setRev(null); setGoals(null); reload(); } };
   const selfEditable = role.self && a?.status === "self_review";
@@ -172,7 +173,17 @@ function AppraisalDetail({ id, onClose, people }: { id: string | null; onClose: 
           <button className="btn btn-primary" onClick={() => { if (confirm("Send your self-review to your reviewer? You cannot change it afterwards.")) call({ action: "self_review", id: a.id, scores: s.scores, comments: s.comments || null, submit: true }, "Sent to your reviewer."); }}>Send self-review</button></div>}
 
         {showReview && <section className="space-y-2 rounded-lg bg-slate-50 p-3">
-          <h3 className="font-semibold">Reviewer’s view</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-semibold">Reviewer’s view</h3>
+            {reviewEditable && <button type="button" className="btn btn-outline px-2.5 py-1 text-xs" disabled={drafting} onClick={async () => {
+              setDrafting(true);
+              const d = await send<{ strengths: string; development: string }>("/api/ai/draft", { kind: "appraisal_summary", appraisal_id: a.id });
+              setDrafting(false);
+              if (!d.ok) return setMsg({ ok: false, text: d.error ?? "failed" });
+              setRev({ ...r, strengths: d.data.strengths, development: d.data.development });
+              setMsg({ ok: true, text: "Drafted from the scores, self-review, observations and training. Read it and change anything before you save." });
+            }}>{drafting ? "Drafting…" : "Draft from the evidence"}</button>}
+          </div>
           <Field label="Strengths"><textarea className="input" rows={2} disabled={!reviewEditable} value={r.strengths} onChange={e => setRev({ ...r, strengths: e.target.value })} /></Field>
           <Field label="Areas to develop"><textarea className="input" rows={2} disabled={!reviewEditable} value={r.development} onChange={e => setRev({ ...r, development: e.target.value })} /></Field>
           <Field label="Recommendation"><select className="input" disabled={!reviewEditable} value={r.recommendation} onChange={e => setRev({ ...r, recommendation: e.target.value })}><option value="">—</option>{Object.entries(REC).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>

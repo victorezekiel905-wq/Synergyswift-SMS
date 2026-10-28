@@ -73,6 +73,15 @@ function FamilyCase({ f, currency, onDone }: { f: Family; currency: string; onDo
   const [contact, setContact] = useState({ kind: "call", body: "", follow: "" });
   const [promise, setPromise] = useState({ amount: String(f.balance), by: "", note: "" });
   const [level, setLevel] = useState(f.level);
+  const [note, setNote] = useState("");
+  const [drafting, setDrafting] = useState(false);
+  async function draft() {
+    setDrafting(true); setErr(null);
+    const r = await send<{ message: string }>("/api/ai/draft", { kind: "fee_reminder", guardian_id: f.guardian_id });
+    setDrafting(false);
+    if (!r.ok) return setErr(r.error ?? "failed");
+    setNote(r.data.message);
+  }
   const [err, setErr] = useState<string | null>(null);
   const go = async (body: Record<string, unknown>, text: string) => {
     setErr(null);
@@ -94,6 +103,18 @@ function FamilyCase({ f, currency, onDone }: { f: Family; currency: string; onDo
         </div>
       </div>
       {err && <Alert>{err}</Alert>}
+      <section className="card p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold">Reminder message</h3>
+          <button className="btn btn-outline px-2.5 py-1 text-xs" disabled={drafting} onClick={draft}>{drafting ? "Writing…" : "Write it for me"}</button>
+        </div>
+        <textarea className="input mt-2" rows={3} maxLength={1200} value={note} onChange={e => setNote(e.target.value)}
+          placeholder="Leave empty for the standard reminder, write your own, or press Write it for me for wording that fits this family's situation." />
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <p className="text-xs text-slate-500">Sent by WhatsApp, text or email, with the payment link added below it.</p>
+          <button className="btn btn-primary" onClick={() => go({ action: "remind", guardian_id: f.guardian_id, message: note.trim() || null }, "Reminder sent.")}>Send reminder</button>
+        </div>
+      </section>
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="card p-3">
           <h3 className="font-semibold">Log a contact</h3>

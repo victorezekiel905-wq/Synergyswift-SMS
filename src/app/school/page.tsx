@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useApi, Page, PageHeader, Stat, Alert } from "@/components/ui";
 import KpiBoard from "@/components/school/KpiBoard";
+import HeadSummary from "@/components/school/HeadSummary";
 
 type Overview = {
   school: string; term: string | null; roles: string[];
@@ -35,6 +36,7 @@ export default function SchoolHome() {
         <div className="mb-5"><Alert tone="amber">No current term is set. Go to <Link className="font-semibold underline" href="/school/setup">School setup</Link> to create a session and mark a term as current.</Alert></div>
       )}
       <KpiBoard />
+      {data?.roles?.some(r => ["school_admin", "principal", "platform_admin"].includes(r)) && <HeadSummary />}
       <h2 className="mb-3 text-lg font-semibold">Right now</h2>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
         <Stat label="Students" value={c.students ?? "…"} />

@@ -30,7 +30,7 @@ const Body = z.discriminatedUnion("action", [
     follow_up_at: z.string().datetime({ offset: true }).nullish() }),
   z.object({ action: z.literal("level"), guardian_id: z.string().uuid(), level: z.number().int().min(0).max(4), owner_id: z.string().uuid().nullish(),
     next_action_at: z.string().datetime({ offset: true }).nullish(), note: z.string().trim().max(1000).nullish() }),
-  z.object({ action: z.literal("remind"), guardian_id: z.string().uuid() })
+  z.object({ action: z.literal("remind"), guardian_id: z.string().uuid(), message: z.string().trim().max(1200).nullish() })
 ]);
 
 export async function POST(req: NextRequest) {
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       const cur = s?.currency ?? "NGN";
       const sent = await notifyContact(svc, { tenantId: tid, name: g.full_name, email: g.email, phone: g.whatsapp_phone ?? g.phone, kind: "fees", refId: g.id,
         build: br => admissionNote(br, { name: g.full_name, subject: "School fees reminder",
-          lines: [`The school fees balance for ${f.children.map(c => c.name.split(" ")[0]).join(" and ")} is ${money(f.balance, cur)}${f.oldest_due ? `, due since ${new Date(`${f.oldest_due}T12:00:00Z`).toLocaleDateString("en-GB", { dateStyle: "long" })}` : ""}.`,
+          lines: b.message ? b.message.split(/\n+/).map(l => l.trim()).filter(Boolean) : [`The school fees balance for ${f.children.map(c => c.name.split(" ")[0]).join(" and ")} is ${money(f.balance, cur)}${f.oldest_due ? `, due since ${new Date(`${f.oldest_due}T12:00:00Z`).toLocaleDateString("en-GB", { dateStyle: "long" })}` : ""}.`,
             "You can pay online with the link below, or speak to the bursar if you would like to agree a payment date."],
           link: f.pay_token ? `${appUrl(req)}/pay/${f.pay_token}` : null, linkLabel: "Pay now" }) });
       await ctx.sb.from("crm_interactions").insert({ tenant_id: tid, guardian_id: g.id, kind: "whatsapp", actor_id: ctx.userId, occurred_at: now, body: `Fees reminder sent (${money(f.balance, cur)}).` });

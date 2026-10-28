@@ -478,10 +478,21 @@ function Marking({ exam, reload: reloadExam }: { exam: Exam; reload: () => void 
   const [sel, setSel] = useState<string | null>(null);
   const [marks, setMarks] = useState<Record<string, { points: string; feedback: string }>>({});
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // AI marking help (14q): a suggested mark, feedback and the reasons, per question. The teacher decides.
+  const [hints, setHints] = useState<Record<string, { busy?: boolean; reasons?: string[]; error?: string }>>({});
   const attempt = data?.attempts.find(a => a.id === sel);
+  async function suggest(qid: string) {
+    if (!attempt) return;
+    setHints(h => ({ ...h, [qid]: { busy: true } }));
+    const r = await send<{ points: number; max: number; feedback: string; reasons: string[] }>("/api/ai/draft", { kind: "essay_mark", exam_id: exam.id, attempt_id: attempt.id, question_id: qid });
+    if (!r.ok) return setHints(h => ({ ...h, [qid]: { error: r.error ?? "Please try again." } }));
+    setMarks(m => ({ ...m, [qid]: { points: String(r.data.points), feedback: r.data.feedback } }));
+    setHints(h => ({ ...h, [qid]: { reasons: r.data.reasons } }));
+  }
   useEffect(() => {
     if (!attempt) return;
     setMarks(Object.fromEntries(Object.entries(attempt.marks ?? {}).map(([k, m]) => [k, { points: m.points === null ? "" : String(m.points), feedback: m.feedback ?? "" }])));
+    setHints({});
   }, [sel, attempt?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function saveMarks() {
@@ -541,7 +552,17 @@ function Marking({ exam, reload: reloadExam }: { exam: Exam; reload: () => void 
                     <Field label={`Points (max ${q.points})`}><input className={"input w-24 " + (m?.points === null ? "border-amber-400 bg-amber-50" : "")} type="number" min={0} max={q.points} step="any"
                       value={marks[q.id]?.points ?? ""} onChange={e => setMarks({ ...marks, [q.id]: { points: e.target.value, feedback: marks[q.id]?.feedback ?? "" } })} /></Field>
                     <div className="min-w-[240px] flex-1"><Field label="Feedback"><input className="input" value={marks[q.id]?.feedback ?? ""} onChange={e => setMarks({ ...marks, [q.id]: { points: marks[q.id]?.points ?? "", feedback: e.target.value } })} /></Field></div>
+                    {["essay", "short_answer", "math"].includes(q.type) && m?.auto === false && (
+                      <button type="button" className="btn btn-outline" disabled={hints[q.id]?.busy} onClick={() => suggest(q.id)}>{hints[q.id]?.busy ? "Reading the answer…" : "Suggest a mark"}</button>
+                    )}
                   </div>
+                  {hints[q.id]?.error && <p className="mt-2 text-xs text-rose-700">{hints[q.id]!.error}</p>}
+                  {hints[q.id]?.reasons && (
+                    <div className="mt-2 rounded-md bg-slate-50 p-2.5 text-xs text-slate-700">
+                      <p className="font-medium text-slate-900">Why this mark (AI suggestion; check it and change it if you disagree)</p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4">{hints[q.id]!.reasons!.map((x, k) => <li key={k}>{x}</li>)}</ul>
+                    </div>
+                  )}
                 </div>
               );
             })}
