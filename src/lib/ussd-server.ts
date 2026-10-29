@@ -10,7 +10,10 @@ import { pinHash } from "@/lib/result-pins-server";
 import { localDate } from "@/lib/staff-time";
 import { sendSms, smsConfigured } from "@/lib/messaging/providers";
 import { money } from "@/lib/notify";
-import type { UssdChild, UssdData, ResultReply } from "@/lib/ussd";
+import type { UssdChild, UssdData, ResultReply, ExeatReply } from "@/lib/ussd";
+import { createPickupCode } from "@/lib/gate";
+import { requestAbsence } from "@/lib/attendance-server";
+import { consentExeat } from "@/lib/family";
 
 const phoneKey = (phone: string) => `ussd:${createHash("sha256").update(`ussd:${phone.replace(/\D/g, "").slice(-10)}`).digest("hex").slice(0, 24)}`;
 const time = (iso: string, tz: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz }).replace(" ", "");
@@ -87,6 +90,45 @@ export function ussdData(svc: any, base: string): UssdData {
       if (outs.length && (!ins.length || outs[outs.length - 1].at > ins[ins.length - 1].at)) parts.push(`left ${time(outs[outs.length - 1].at, c.timezone)}`);
       const reg = mark?.status ? `Register: ${mark.status}.` : "The register is not taken yet.";
       return `${c.firstName} today: ${parts.length ? `${parts.join(", ")}. ` : ""}${reg}`;
+    },
+
+    async pickup(c) {
+      try {
+        const r = await createPickupCode(svc, { tenantId: c.tenantId, timezone: c.timezone, guardianId: c.guardianId, studentId: c.studentId });
+        return `Pickup code for ${c.firstName}: ${r.code}, until ${time(r.expires_at, c.timezone)}. Show it at the gate. It works once.`;
+      } catch (e) {
+        const m = (e as Error).message;
+        return /authorised/.test(m) ? `The school has not listed you to collect ${c.firstName}. Please call the school.` : "We couldn't make a code just now. Please try again or call the school.";
+      }
+    },
+
+    async absence(c, reason) {
+      const today = localDate(new Date(), c.timezone);
+      try {
+        await requestAbsence(svc, { tenantId: c.tenantId, guardianId: c.guardianId, studentId: c.studentId, kind: reason, startsOn: today, endsOn: today,
+          reason: "Reported by phone (USSD).", timezone: c.timezone, baseUrl: base });
+        return `Thank you. The school knows ${c.firstName} is away today.`;
+      } catch (e) {
+        return (e as Error).message.length < 140 ? (e as Error).message : "We couldn't record it. Please call the school.";
+      }
+    },
+
+    async exeat(c): Promise<ExeatReply> {
+      const { data } = await svc.from("exeat_requests").select("id,leave_at,return_by").eq("tenant_id", c.tenantId).eq("student_id", c.studentId).eq("status", "awaiting_parent")
+        .order("leave_at").limit(1);
+      const e = data?.[0];
+      if (!e) return { kind: "none", text: `No exeat for ${c.firstName} is waiting for your answer.` };
+      const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", hour: "numeric", minute: "2-digit", hour12: true, timeZone: c.timezone });
+      return { kind: "ask", id: e.id, text: `Exeat for ${c.firstName}: leave ${when(e.leave_at)}, back ${when(e.return_by)}.` };
+    },
+
+    async answerExeat(c, id, approve) {
+      try {
+        await consentExeat(svc, { tenantId: c.tenantId, guardianId: c.guardianId, id, approve });
+        return approve ? `Approved. The boarding house has been told about ${c.firstName}'s exeat.` : `Declined. ${c.firstName} stays in school.`;
+      } catch (e) {
+        return (e as Error).message.length < 140 ? (e as Error).message : "We couldn't record your answer. Please call the school.";
+      }
     },
 
     async bus(c) {
