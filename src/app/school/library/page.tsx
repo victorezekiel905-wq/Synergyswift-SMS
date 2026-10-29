@@ -3,10 +3,12 @@ import { useCallback, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, fmtDate, money, rolesOf, type Me } from "@/components/ui";
 import ScanInput from "@/components/library/ScanInput";
 import { loanState } from "@/lib/library";
+import { OPEN_LIBRARY } from "@/lib/open-library";
 
 type Book = { id: string; isbn: string | null; barcode: string | null; title: string; author: string | null; publisher: string | null; category: string | null; shelf: string | null; total_copies: number;
   available_copies: number; format: string; cover_url: string | null; description: string | null; year: number | null; edition: string | null; language: string | null; price: number | null;
-  access: string; views: number; has_file: boolean; digital_url?: string | null; waiting: number; held: number };
+  access: string; views: number; has_file: boolean; digital_url?: string | null; waiting: number; held: number;
+  download_url?: string | null; licence?: string | null; levels?: string | null; curricula?: string[] | null };
 type Loan = { id: string; issued_at: string; due_at: string; returned_at: string | null; fine_amount: number; fine_status: string; renewals: number; lost_at: string | null; borrower: string; library_books: { title: string } | null };
 type Tab = "desk" | "catalogue" | "loans" | "overdue" | "fines" | "reservations" | "history" | "mine" | "settings";
 const FORMAT: Record<string, string> = { print: "Book", ebook: "E-book", audio: "Audiobook", video: "Video", link: "Online" };
@@ -78,8 +80,13 @@ function Catalogue({ lib, reader }: { lib: boolean; reader: boolean }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <input className="input max-w-sm" placeholder="Search title, author, ISBN, subject" value={q} onChange={e => setQ(e.target.value)} aria-label="Search books" />
-        <select className="input w-auto" value={fmt} onChange={e => setFmt(e.target.value)} aria-label="Format"><option value="">Everything</option><option value="print">Books on the shelf</option><option value="digital">E-library</option></select>
-        {lib && <button className="btn btn-primary ml-auto" onClick={() => setEdit({ total_copies: 1, format: "print", access: "everyone" })}>+ Add a title</button>}
+        <select className="input w-auto" value={fmt} onChange={e => setFmt(e.target.value)} aria-label="Format"><option value="">Everything</option><option value="print">Books on the shelf</option><option value="digital">E-library</option><option value="free">Free collection</option></select>
+        {lib && <button className="btn btn-outline ml-auto" title="Classic novels, inspirational books, open textbooks for every subject, and free learning sites. All can be read online; books can be downloaded." onClick={async () => {
+          const r = await send<{ added: number; total: number }>("/api/library", { action: "add_open_collection" });
+          setMsg({ ok: r.ok, text: r.ok ? (r.data.added ? `Added ${r.data.added} free titles to read and download.` : "The free collection is already in your library.") : r.error ?? "failed" });
+          if (r.ok) { setFmt("free"); books.reload(); }
+        }}>Add the free collection ({OPEN_LIBRARY.length})</button>}
+        {lib && <button className="btn btn-primary" onClick={() => setEdit({ total_copies: 1, format: "print", access: "everyone" })}>+ Add a title</button>}
       </div>
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
       {!books.data?.length ? <Empty>No titles found.</Empty> : (
@@ -94,10 +101,12 @@ function Catalogue({ lib, reader }: { lib: boolean; reader: boolean }) {
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">{b.title}</p>
                 <p className="text-xs text-slate-500">{[b.author, b.year, b.category].filter(Boolean).join(" · ")}</p>
+                {b.levels && <p className="text-[11px] text-slate-500">{b.levels}{b.curricula?.length ? ` · ${b.curricula.map(c => ({ NG: "Nigerian", UK: "British", US: "American" } as Record<string, string>)[c] ?? c).join(", ")}` : ""}{b.licence ? ` · ${b.licence}` : ""}</p>}
                 {b.format === "print" ? <p className="mt-1"><Badge tone={free ? "green" : "red"}>{free} of {b.total_copies} on the shelf</Badge>{b.waiting ? <span className="ml-1 text-xs text-amber-700">{b.waiting} waiting</span> : null}{b.shelf && <span className="ml-1 text-xs text-slate-500">shelf {b.shelf}</span>}</p>
                   : <p className="mt-1"><Badge tone="blue">{FORMAT[b.format]}</Badge>{b.access !== "everyone" && <span className="ml-1 text-xs text-slate-500">{b.access} only</span>}</p>}
                 <div className="mt-1 flex flex-wrap gap-1">
-                  {b.format !== "print" && b.has_file && <a className="btn btn-primary px-2 py-1 text-xs" href={`/api/library?open=${b.id}`} target="_blank" rel="noreferrer">Open</a>}
+                  {b.format !== "print" && b.has_file && <a className="btn btn-primary px-2 py-1 text-xs" href={`/api/library?open=${b.id}`} target="_blank" rel="noreferrer">{b.download_url || b.format === "ebook" ? "Read" : "Open"}</a>}
+                  {b.download_url && <a className="btn btn-outline px-2 py-1 text-xs" href={b.download_url} target="_blank" rel="noreferrer" download>Download</a>}
                   {b.format === "print" && reader && !lib && <button className="btn btn-outline px-2 py-1 text-xs" onClick={async () => { const r = await send<{ status: string }>("/api/library", { action: "reserve", book_id: b.id }); setMsg({ ok: r.ok, text: r.ok ? (r.data.status === "ready" ? "A copy is being kept for you at the library." : "Reserved. You will be told when a copy is waiting for you.") : r.error ?? "" }); books.reload(); }}>Reserve</button>}
                   {lib && b.format === "print" && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setIssue(b)}>Lend</button>}
                   {lib && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setEdit(b)}>Edit</button>}

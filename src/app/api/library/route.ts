@@ -4,6 +4,7 @@ import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { studentName } from "@/lib/school";
 import { classifyScan, parseOpenLibrary, canOpen, toIsbn13 } from "@/lib/library";
+import { OPEN_LIBRARY } from "@/lib/open-library";
 
 export const dynamic = "force-dynamic";
 
@@ -66,13 +67,15 @@ export async function GET(req: NextRequest) {
 
   if (view === "catalogue") {
     const q = (u.get("q") ?? "").replace(/[%,()]/g, " ").trim();
-    let query = sb.from("library_books").select("id,isbn,barcode,title,author,publisher,category,shelf,total_copies,available_copies,format,cover_url,description,year,edition,language,price,access,views,digital_url,digital_path")
+    // Every column, so the catalogue still loads before migration 8500 adds the free-collection fields.
+    let query = sb.from("library_books").select("*")
       .eq("tenant_id", tid).order("title").limit(300);
     if (q) {
       const isbn = toIsbn13(q);
       query = isbn ? query.eq("isbn", isbn) : query.or(`title.ilike.%${q}%,author.ilike.%${q}%,isbn.ilike.%${q}%,category.ilike.%${q}%,barcode.eq.${q}`);
     }
     if (u.get("format") === "digital") query = query.neq("format", "print");
+    if (u.get("format") === "free") query = query.not("source_key", "is", null);
     if (u.get("format") === "print") query = query.eq("format", "print");
     const { data, error } = await query;
     if (error) return jsonError(error.message);
@@ -142,6 +145,7 @@ const Book = z.object({
   access: z.enum(["everyone", "staff", "students"]).default("everyone")
 });
 const Body = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("add_open_collection") }),
   z.object({ action: z.literal("save_book"), book: Book }),
   z.object({ action: z.literal("issue"), book_id: z.string().uuid().optional(), book_code: z.string().trim().max(60).optional(), borrower_code: z.string().trim().min(1).max(80), days: z.number().int().min(1).max(365).optional() }),
   z.object({ action: z.literal("return"), loan_id: z.string().uuid().optional(), book_code: z.string().trim().max(60).optional() }),
@@ -167,6 +171,17 @@ export async function POST(req: NextRequest) {
   const { data: settings } = await sb.from("tenant_settings").select("library_loan_days,library_fine_per_day").eq("tenant_id", tid).maybeSingle();
 
   switch (b.action) {
+    case "add_open_collection": {
+      // The free collection (lib/open-library.ts): read online and download; added once, never twice.
+      const rows = OPEN_LIBRARY.map(o => ({
+        tenant_id: tid, title: o.title, author: o.author, publisher: o.source, category: o.subject, format: o.kind === "Learning site" ? "link" : "ebook",
+        description: `${o.kind}. ${o.levels}. Curricula: ${o.curricula.join(", ")}.`, language: "English", access: "everyone", total_copies: 0, available_copies: 0,
+        digital_url: o.read_url, download_url: o.download_url, licence: o.licence, levels: o.levels, curricula: o.curricula, source_key: o.key
+      }));
+      const { data, error } = await sb.from("library_books").upsert(rows, { onConflict: "tenant_id,source_key", ignoreDuplicates: true }).select("id");
+      if (error) return fail(/source_key|download_url|licence|levels|curricula/.test(error.message) ? "The free collection needs the database update (migration 20260101008500)." : error.message);
+      return NextResponse.json({ added: data?.length ?? 0, total: rows.length });
+    }
     case "save_book": {
       const { id, ...book } = b.book;
       if (book.format !== "print") book.total_copies = 0;
