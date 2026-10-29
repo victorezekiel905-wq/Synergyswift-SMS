@@ -268,32 +268,39 @@ function OrderingInput({ items, order, onChange, disabled }: { items: Item[]; or
   );
 }
 
+/**
+ * Sorting items into groups. On a phone: tap an item, then tap its group (drag and drop
+ * does not work on touch screens). With a mouse, items can also be dragged. × takes one back.
+ */
 function CategorizeInput({ items, categories, placements, onChange, disabled }: {
   items: Item[]; categories: Item[]; placements: Record<string, string>; onChange: (p: Record<string, string>) => void; disabled?: boolean;
 }) {
-  const [dragging, setDragging] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
   const unplaced = items.filter((i) => !placements[i.id]);
-  const place = (itemId: string, cat: string) => onChange({ ...placements, [itemId]: cat });
-  const chip = (it: Item) => (
-    <span key={it.id} draggable={!disabled} onDragStart={() => setDragging(it.id)}
-      className="inline-flex cursor-grab items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-sm shadow-sm">
-      {it.label}
-      <select aria-label={`Category for ${it.label}`} disabled={disabled} className="ml-1 rounded border-0 bg-transparent text-xs text-ink-500"
-        value={placements[it.id] ?? ""} onChange={(e) => place(it.id, e.target.value)}>
-        <option value="">—</option>
-        {categories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-      </select>
+  const place = (itemId: string, cat: string) => { onChange({ ...placements, [itemId]: cat }); setPicked(null); };
+  const unplace = (itemId: string) => { const next = { ...placements }; delete next[itemId]; onChange(next); };
+  const chip = (it: Item, placed: boolean) => (
+    <span key={it.id} draggable={!disabled} onDragStart={(e) => { e.dataTransfer.setData("text/plain", it.id); setPicked(it.id); }}
+      className={cn("inline-flex items-center gap-1 rounded-lg border bg-white text-sm shadow-sm",
+        picked === it.id ? "border-brand-600 ring-2 ring-brand-600/30" : "border-ink-200")}>
+      <button type="button" disabled={disabled} aria-pressed={picked === it.id} onClick={() => setPicked(picked === it.id ? null : it.id)}
+        className="px-2.5 py-1.5 font-medium">{it.label}</button>
+      {placed && !disabled && <button type="button" onClick={() => unplace(it.id)} aria-label={`Take ${it.label} out`} className="pr-2 text-ink-400 hover:text-ink-700">×</button>}
     </span>
   );
   return (
     <div className="space-y-3">
-      <div className="flex min-h-[3rem] flex-wrap gap-2 rounded-lg bg-ink-100 p-2">{unplaced.length ? unplaced.map(chip) : <span className="text-xs text-ink-500">All items placed.</span>}</div>
+      <p className="hint">{picked ? `Now tap the group for “${items.find((i) => i.id === picked)?.label}”.` : "Tap an item, then tap its group."}</p>
+      <div className="flex min-h-[3rem] flex-wrap gap-2 rounded-lg bg-ink-100 p-2">{unplaced.length ? unplaced.map((it) => chip(it, false)) : <span className="text-xs text-ink-500">All items placed.</span>}</div>
       <div className="grid gap-3 sm:grid-cols-2">
         {categories.map((c) => (
-          <div key={c.id} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragging) place(dragging, c.id); setDragging(null); }}
-            className="min-h-[6rem] rounded-xl border-2 border-dashed border-brand-200 bg-brand-50/50 p-2">
+          <div key={c.id} role="button" tabIndex={picked ? 0 : -1} aria-label={`Put the chosen item in ${c.label}`}
+            onClick={() => { if (picked && !disabled) place(picked, c.id); }}
+            onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && picked && !disabled) { e.preventDefault(); place(picked, c.id); } }}
+            onDragOver={(e) => e.preventDefault()} onDrop={(e) => { const id = e.dataTransfer.getData("text/plain") || picked; if (id && !disabled) place(id, c.id); }}
+            className={cn("min-h-[6rem] rounded-xl border-2 border-dashed p-2 transition-colors", picked ? "cursor-pointer border-brand-500 bg-brand-50" : "border-brand-200 bg-brand-50/50")}>
             <p className="mb-2 text-[13px] font-semibold text-ink-700">{c.label}</p>
-            <div className="flex flex-wrap gap-2">{items.filter((i) => placements[i.id] === c.id).map(chip)}</div>
+            <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>{items.filter((i) => placements[i.id] === c.id).map((it) => chip(it, true))}</div>
           </div>
         ))}
       </div>
@@ -301,23 +308,30 @@ function CategorizeInput({ items, categories, placements, onChange, disabled }: 
   );
 }
 
+/** A photo or document as the answer: a clear button, not the browser's bare file box. */
 function FileAnswer({ value, onChange, disabled, prefix }: { value: Answer; onChange: (v: Answer) => void; disabled?: boolean; prefix?: string }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const off = disabled || busy || !prefix;
   return (
     <div className="space-y-2">
-      {value.name ? <p className="text-sm">Attached: <strong>{String(value.name)}</strong></p> : null}
-      <input type="file" aria-label="Attach your file" disabled={disabled || busy || !prefix} onChange={async (e) => {
-        const f = e.target.files?.[0];
-        if (!f || !prefix) return;
-        if (f.size > 50 * 1024 * 1024) { setErr("Files must be under 50 MB."); return; }
-        setBusy(true); setErr(null);
-        const path = `${prefix}/${crypto.randomUUID()}-${f.name.replace(/[^A-Za-z0-9._-]+/g, "_")}`;
-        const { error } = await createClient().storage.from("live-submissions").upload(path, f);
-        setBusy(false);
-        if (error) setErr(error.message); else onChange({ path, name: f.name, bytes: f.size });
-      }} />
-      {busy && <p className="text-xs text-ink-500">Uploading…</p>}
+      <label className={cn("flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-ink-300 bg-white p-4 hover:border-brand-500", off && "pointer-events-none opacity-60")}>
+        <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xl text-brand-700">+</span>
+        <span className="min-w-0">
+          <span className="block font-semibold text-ink-900">{busy ? "Uploading…" : value.name ? "Change the file" : "Add a photo or file"}</span>
+          <span className="block truncate text-sm text-ink-500">{value.name ? `Attached: ${String(value.name)}` : "Take a photo of your work, or choose a file (up to 50 MB)."}</span>
+        </span>
+        <input type="file" className="sr-only" aria-label="Attach your file" accept="image/*,application/pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt" disabled={off} onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file || !prefix) return;
+          if (file.size > 50 * 1024 * 1024) { setErr("Files must be under 50 MB."); return; }
+          setBusy(true); setErr(null);
+          const path = `${prefix}/${crypto.randomUUID()}-${file.name.replace(/[^A-Za-z0-9._-]+/g, "_")}`;
+          const { error } = await createClient().storage.from("live-submissions").upload(path, file);
+          setBusy(false);
+          if (error) setErr(error.message); else onChange({ path, name: file.name, bytes: file.size });
+        }} />
+      </label>
       {err && <p className="text-xs text-rose-600">{err}</p>}
     </div>
   );
