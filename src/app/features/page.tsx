@@ -50,6 +50,7 @@ export default function FeaturesPage() {
             </div>
             <div className="flex flex-wrap gap-3">
               <Link href="/tour" className="btn bg-white px-5 py-2.5 text-[15px] text-navy no-underline hover:bg-white/90">Take a tour</Link>
+              <Link href="/guide" className="btn border border-white/35 px-5 py-2.5 text-[15px] text-white no-underline hover:bg-white/10">Read the guide</Link>
               <Link href="/onboard" className="btn border border-white/35 px-5 py-2.5 text-[15px] text-white no-underline hover:bg-white/10">Sign up your school</Link>
             </div>
           </div>

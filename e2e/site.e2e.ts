@@ -82,6 +82,18 @@ test.describe("features", () => {
       await expect(page.getByRole("heading", { name: t })).toBeVisible();
     await check();
   });
+
+  test("the product guide: the complete list, then every tour screen with its steps", async ({ page }) => {
+    const check = await healthy(page);
+    await page.goto("/guide");
+    await expect(page.locator("#list li[class*=grid]")).toHaveCount(99);
+    await expect(page.locator("#guide article")).toHaveCount(40);
+    await expect(page.locator("#screen-setup")).toContainText("What it gives the school");
+    await page.getByRole("navigation", { name: "Guide areas" }).getByRole("link", { name: "Safety and welfare" }).click();
+    await expect(page.locator("section#safety h3")).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+    await check();
+  });
 });
 
 test.describe("onboarding a school", () => {

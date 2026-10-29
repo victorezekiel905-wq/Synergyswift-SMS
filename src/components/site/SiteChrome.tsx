@@ -47,7 +47,7 @@ export function SiteHeader({ current }: { current?: string }) {
 
 export function SiteFooter() {
   const cols: [string, [string, string][]][] = [
-    ["Product", [["/features", "Features"], ["/tour", "Take a tour"], ["/demo", "Book a walk-through"]]],
+    ["Product", [["/features", "Features"], ["/tour", "Take a tour"], ["/guide", "Product guide"], ["/demo", "Book a walk-through"]]],
     ["Schools", [["/onboard", "Sign up your school"], ["/login", "Sign in"]]],
     ["Students and parents", [["/live/join", "Join a class as a guest"], ["/student/join", "Student account"], ["/login", "Parent sign-in"]]]
   ];
