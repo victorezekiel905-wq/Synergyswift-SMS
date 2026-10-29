@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const APP_PAGES = /^\/(dashboard|school|platform|parent|teacher|exams|forums|calendar|group|vote|account)(\/|$)|^\/student(\/(?!join$)|$)|^\/alumni\/me$/;
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
   const supabase = createServerClient(
@@ -21,7 +23,18 @@ export async function middleware(request: NextRequest) {
   );
   // Refreshes the session cookie when it is about to expire. getClaims checks the token locally when the
   // project uses asymmetric signing keys (no call to Supabase Auth on every page and API request).
-  await supabase.auth.getClaims();
+  const { data: auth } = await supabase.auth.getClaims();
+  // Signed-out visitors (or an expired session) on an app page go to sign in, and come back afterwards,
+  // instead of seeing the app's frame with nothing in it. Joining by code and the alumni sign-up stay open.
+  const path = request.nextUrl.pathname;
+  if (!auth?.claims && APP_PAGES.test(path)) {
+    const to = request.nextUrl.clone();
+    to.pathname = "/login";
+    to.search = `?next=${encodeURIComponent(path + request.nextUrl.search)}`;
+    const redirect = NextResponse.redirect(to);
+    response.cookies.getAll().forEach(c => redirect.cookies.set(c));
+    return redirect;
+  }
   // A long-lived random id for this browser, used when a school only lets staff in from approved devices.
   if (!request.cookies.get("ecf_dev")) {
     const id = Array.from(crypto.getRandomValues(new Uint8Array(20)), b => b.toString(16).padStart(2, "0")).join("");

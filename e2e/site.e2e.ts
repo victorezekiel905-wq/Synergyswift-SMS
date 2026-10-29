@@ -129,6 +129,18 @@ test.describe("onboarding a school", () => {
 });
 
 test.describe("signing in", () => {
+  test("signed-out visitors to the app are sent to sign in and brought back; joining pages stay open", async ({ page }) => {
+    for (const p of ["/school/fees", "/platform", "/parent", "/student", "/teacher", "/alumni/me"]) {
+      await page.goto(p);
+      await expect(page, p).toHaveURL(new RegExp(`/login\\?next=${encodeURIComponent(p).replace(/[/]/g, "\\/")}$`));
+    }
+    await expect(page.getByText("unauthenticated")).toHaveCount(0);
+    for (const p of ["/student/join", "/live/join", "/alumni/join/test", "/features"]) {
+      await page.goto(p);
+      await expect(page, p).toHaveURL(new RegExp(`${p.replace(/[/]/g, "\\/")}$`));
+    }
+  });
+
   test("Forgot password sends the link through Synergy Swift", async ({ page }) => {
     let asked: Record<string, unknown> | null = null;
     await page.route("**/api/auth/email", r => { asked = JSON.parse(r.request().postData() ?? "{}"); return r.fulfill({ json: { ok: true, message: "If this email has an account, a link to choose a new password is on its way." } }); });

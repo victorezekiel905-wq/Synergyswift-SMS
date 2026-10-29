@@ -53,8 +53,8 @@ async function pollCommands(deviceUid) {
   return Array.isArray(rows) ? rows : [];
 }
 
-async function ackCommand(cmdId) {
-  return rpc("device_ack_command", { p_id: cmdId });
+async function ackCommand(deviceUid, cmdId) {
+  return rpc("device_ack_command", { p_id: cmdId, p_device_uid: deviceUid });
 }
 
 globalThis.__agentApi = { rpc, lookupSession, heartbeat, postEvent, postSnapshot, pollCommands, ackCommand };

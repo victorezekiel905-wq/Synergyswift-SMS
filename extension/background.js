@@ -45,7 +45,7 @@ async function pollAndDispatch() {
   const cmds = await api.pollCommands(cfg.DEVICE_UID);
   for (const cmd of cmds) {
     await execute(cmd);
-    await api.ackCommand(cmd.id);
+    await api.ackCommand(cfg.DEVICE_UID, cmd.id);
   }
 }
 

@@ -122,6 +122,15 @@ for (const [role, label, sql] of CASES) {
 // The platform's own view across every school.
 { const a = performance.now(); await db.query(`select * from platform_customer_metrics()`); results.push({ role: "platform", label: "Super admin: customer health (all schools)", rows: SCHOOLS, median_ms: Math.round(performance.now() - a), worst_ms: null, sql: null }); }
 log("platform_customer_metrics", results[results.length - 1].median_ms, "ms");
+// --platform-plan: where that time goes (the function's query, analysed), written to out/platform-plan.txt.
+if (process.argv.includes("--platform-plan")) {
+  const src = fs.readdirSync(MIG).sort().map(f => fs.readFileSync(path.join(MIG, f), "utf8")).join("\n");
+  const body = [...src.matchAll(/create or replace function public\.platform_customer_metrics\(\)[\s\S]*?as \$\$([\s\S]*?)\$\$;/g)].at(-1)[1];
+  const p = await db.query(`explain (analyze, costs off) ${body}`);
+  fs.mkdirSync(fileURLToPath(new URL("./out/", import.meta.url)), { recursive: true });
+  fs.writeFileSync(fileURLToPath(new URL("./out/platform-plan.txt", import.meta.url)), p.rows.map(r => r["QUERY PLAN"]).join("\n"));
+  log("platform plan written");
+}
 
 // Plans for the slowest three under RLS.
 const slow = [...results].filter(r => r.sql).sort((a, b) => b.median_ms - a.median_ms).slice(0, 3);
