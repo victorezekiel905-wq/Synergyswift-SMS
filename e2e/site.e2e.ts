@@ -77,7 +77,7 @@ test.describe("features", () => {
   test("lists everything the system does, in eight areas", async ({ page }) => {
     const check = await healthy(page);
     await page.goto("/features");
-    await expect(page.getByRole("heading", { level: 2 })).toHaveCount(9);   // eight areas and the closing band
+    for (const id of ["core", "results", "exams", "learning", "money", "safety", "families", "leadership"]) await expect(page.locator(`section#${id} h2`)).toBeVisible();
     for (const t of ["Gate sign-in and sign-out", "Basic phones by USSD", "Your assessment pattern", "Library and e-books", "Class discussions"])
       await expect(page.getByRole("heading", { name: t })).toBeVisible();
     await check();
@@ -155,7 +155,7 @@ test.describe("paying a Synergy Swift invoice", () => {
       ? r.fulfill({ json: { school: "Greenfield College", email: "bursar@gf.ng", number: "SS-2026-0007", status: "open", kind: "renewal", amount: 900000, currency: "NGN",
           lines: [{ label: "Complete: one year", amount: 900000 }], period_start: "2027-01-01", period_end: "2027-12-31", due_at: null, paid_at: null, pay_online: true,
           company: "Synergy Swift Technologies Limited", bank_details: null } })
-      : r.fulfill({ json: { url: "/how-it-works?paystack=1" } }));
+      : r.fulfill({ json: { url: "/features?paystack=1" } }));
     await page.goto("/billing/0123456789abcdef0123456789abcdef.AAAAAAAAAAAAAAAAAAAAAA");
     await expect(page.getByRole("heading", { name: "Greenfield College" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Pay ₦900,000" })).toBeVisible();
