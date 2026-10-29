@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BrandMark } from "@/components/BrandMark";
 
 /** The public site's few menus. "Join a class" is for students with a lesson code: no account needed. */
-const NAV: [string, string][] = [["/#product", "Product"], ["/how-it-works", "How it works"], ["/#pricing", "Pricing"], ["/live/join", "Join a class"]];
+const NAV: [string, string][] = [["/features", "Features"], ["/tour", "Take a tour"], ["/live/join", "Join a class"]];
 
 /** The logo as on the brand sheet: the mark, then the name in Plex Serif. */
 export function Wordmark({ onDark = false, small = false }: { onDark?: boolean; small?: boolean }) {
@@ -27,9 +27,7 @@ export function SiteHeader({ current }: { current?: string }) {
         </nav>
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <Link href="/login" className="btn btn-ghost hidden px-3 text-[13.5px] no-underline sm:inline-flex">Sign in</Link>
-          <Link href="/onboard" className="btn bg-navy px-3.5 text-[13.5px] text-white no-underline hover:bg-brand-900">
-            <span className="sm:hidden">Onboard</span><span className="hidden sm:inline">Onboard your school</span>
-          </Link>
+          <Link href="/onboard" className="btn bg-navy px-4 text-[13.5px] text-white no-underline hover:bg-brand-900">Sign up</Link>
           {/* Phones: the same menus in a drawer that works without JavaScript. */}
           <details className="ss-menu group relative lg:hidden">
             <summary className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 [&::-webkit-details-marker]:hidden" aria-label="Menu">
@@ -49,8 +47,8 @@ export function SiteHeader({ current }: { current?: string }) {
 
 export function SiteFooter() {
   const cols: [string, [string, string][]][] = [
-    ["Product", [["/#product", "What it does"], ["/how-it-works", "How it works"], ["/#pricing", "Pricing"]]],
-    ["Schools", [["/onboard", "Onboard your school"], ["/demo", "Book a walk-through"], ["/login", "Sign in"]]],
+    ["Product", [["/features", "Features"], ["/tour", "Take a tour"], ["/demo", "Book a walk-through"]]],
+    ["Schools", [["/onboard", "Sign up your school"], ["/login", "Sign in"]]],
     ["Students and parents", [["/live/join", "Join a class as a guest"], ["/student/join", "Student account"], ["/login", "Parent sign-in"]]]
   ];
   return (

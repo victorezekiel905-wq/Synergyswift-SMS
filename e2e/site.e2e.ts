@@ -24,12 +24,15 @@ test.describe("welcome page", () => {
     await expect(page.getByRole("img", { name: /Synergy Swift mark at the centre of a dial/ })).toBeVisible();
     if (isMobile) {
       await page.getByLabel("Menu").click();
-      await expect(page.getByRole("navigation", { name: "Main" }).last().getByRole("link", { name: "How it works" })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Main" }).last().getByRole("link", { name: "Take a tour" })).toBeVisible();
     } else {
-      for (const name of ["Product", "How it works", "Pricing", "Join a class"]) await expect(page.getByRole("banner").getByRole("link", { name })).toBeVisible();
+      for (const name of ["Features", "Take a tour", "Join a class", "Sign in"]) await expect(page.getByRole("banner").getByRole("link", { name })).toBeVisible();
     }
+    await expect(page.getByRole("banner").getByRole("link", { name: "Sign up" })).toHaveAttribute("href", "/onboard");
     await expect(page.getByRole("heading", { name: "One record. Six offices. Nothing typed twice." })).toBeVisible();
-    await expect(page.locator("#pricing")).toContainText("a year");
+    await expect(page.locator("#features")).toContainText("Everything your school runs on.");
+    await expect(page.locator("#pricing")).toHaveCount(0);
+    await expect(page.getByText("a year")).toHaveCount(0);
     await check();
   });
 
@@ -43,21 +46,40 @@ test.describe("welcome page", () => {
   });
 });
 
-test.describe("how it works", () => {
-  test("plays by itself, pauses, steps and jumps", async ({ page }) => {
+test.describe("take a tour", () => {
+  test("plays like a screen recording: the cursor clicks, the screen answers; pause, step, jump", async ({ page }) => {
     const check = await healthy(page);
-    await page.goto("/how-it-works");
+    await page.goto("/tour");
     const caption = page.locator("p[aria-live=polite]");
     await expect(caption).toContainText("1.1");
-    await expect(caption).toContainText("1.2", { timeout: 6000 });
+    await expect(caption).toContainText("1.2", { timeout: 7000 });
     await page.getByRole("button", { name: "Pause" }).click();
     const paused = await caption.textContent();
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(3000);
     await expect(caption).toHaveText(paused!);
-    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Forward one step" }).click();
     await expect(caption).toContainText("1.3");
-    await page.getByRole("button", { name: /Examine and report/ }).click();
-    await expect(page.getByText("Exams and results · Greenfield College")).toBeVisible();
+    await page.getByRole("button", { name: /Pickup, bus and boarding/ }).first().click();
+    await expect(page.getByText("app.synergyswift.ng/school/gate")).toBeVisible();
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByText("482-913")).toBeVisible();
+    await check();
+  });
+
+  test("the old How it works address leads to the tour", async ({ page }) => {
+    await page.goto("/how-it-works");
+    await expect(page).toHaveURL(/\/tour$/);
+  });
+});
+
+test.describe("features", () => {
+  test("lists everything the system does, in eight areas", async ({ page }) => {
+    const check = await healthy(page);
+    await page.goto("/features");
+    await expect(page.getByRole("heading", { level: 2 })).toHaveCount(9);   // eight areas and the closing band
+    for (const t of ["Gate sign-in and sign-out", "Basic phones by USSD", "Your assessment pattern", "Library and e-books", "Class discussions"])
+      await expect(page.getByRole("heading", { name: t })).toBeVisible();
     await check();
   });
 });

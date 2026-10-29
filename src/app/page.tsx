@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui";
-import { DEFAULT_PLANS } from "@/lib/saas";
+import { FEATURES } from "@/lib/features";
 import { SiteHeader, SiteFooter, SectionTitle } from "@/components/site/SiteChrome";
 import { BrandDial } from "@/components/site/BrandDial";
 import { ExamPicture, LessonPicture, PhonePicture } from "@/components/site/Pictures";
@@ -38,8 +38,6 @@ const TRUST: { icon: IconName; title: string; text: string }[] = [
   { icon: "check", title: "Data protection", text: "Built to the Nigeria Data Protection Act 2023, with consent and data requests handled in the app." }
 ];
 
-const naira = (n: number) => `₦${n.toLocaleString("en-NG")}`;
-
 /** The welcome page. Signed-in visitors are taken to their dashboard by the app shell. */
 export default function Home() {
   return (
@@ -59,9 +57,9 @@ export default function Home() {
                 the bursary sees every payment, and parents know how their child is doing, the moment it happens.
               </p>
               <div className="ss-rise mt-9 flex flex-wrap gap-3" style={{ ["--d" as string]: ".24s" }}>
-                <Link href="/onboard" className="btn bg-navy px-5 py-2.5 text-[15px] text-white no-underline hover:bg-brand-900">Onboard your school</Link>
-                <Link href="/how-it-works" className="btn btn-outline px-5 py-2.5 text-[15px] no-underline">
-                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 text-brass-600" aria-hidden><path d="M4 2.5v11l9-5.5z" fill="currentColor" /></svg>See how it works
+                <Link href="/onboard" className="btn bg-navy px-5 py-2.5 text-[15px] text-white no-underline hover:bg-brand-900">Sign up your school</Link>
+                <Link href="/tour" className="btn btn-outline px-5 py-2.5 text-[15px] no-underline">
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 text-brass-600" aria-hidden><path d="M4 2.5v11l9-5.5z" fill="currentColor" /></svg>Take a tour
                 </Link>
               </div>
               {/* Students: straight into a lesson, no account. Works without JavaScript. */}
@@ -118,7 +116,7 @@ export default function Home() {
           <div className="mx-auto max-w-6xl px-5 py-24 sm:px-8">
             <div className="flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
               <SectionTitle onDark label="A day at school" title="From the gate at dawn to the head's desk at five." />
-              <Link href="/how-it-works" className="btn self-start border border-white/30 px-5 py-2.5 text-white no-underline hover:bg-white/10 lg:self-auto">Watch the whole tour</Link>
+              <Link href="/tour" className="btn self-start border border-white/30 px-5 py-2.5 text-white no-underline hover:bg-white/10 lg:self-auto">Watch the whole tour</Link>
             </div>
             <ol className="relative mt-16 grid gap-10 sm:grid-cols-2 lg:grid-cols-6 lg:gap-6">
               <span aria-hidden className="absolute left-0 right-0 top-[5px] hidden h-px bg-white/20 lg:block" />
@@ -181,22 +179,22 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Pricing */}
-        <section id="pricing" className="scroll-mt-20 border-t border-slate-200 bg-canvas">
+        {/* Features */}
+        <section id="features" className="scroll-mt-20 border-t border-slate-200 bg-canvas">
           <div className="mx-auto max-w-6xl px-5 py-24 sm:px-8">
             <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
-              <SectionTitle label="Pricing" title="One yearly price, set by the size of your school."
-                text="Priced by the number of students. Staff and parents are free. Prices below are for schools of up to 100 students; we send an exact quote for yours." />
-              <Link href="/demo" className="btn btn-outline self-start bg-white px-5 py-2.5 no-underline lg:self-auto">Get a quote</Link>
+              <SectionTitle label="Features" title="Everything your school runs on."
+                text={`${FEATURES.reduce((n, g) => n + g.items.length, 0)} things in eight areas, all working from the same record.`} />
+              <Link href="/features" className="btn btn-outline self-start bg-white px-5 py-2.5 no-underline lg:self-auto">See every feature</Link>
             </div>
-            <div className="mt-12 grid gap-4 lg:grid-cols-3">
-              {DEFAULT_PLANS.filter(p => (p.prices?.[0] ?? 0) > 0).slice(0, 3).map((p, i) => (
-                <article key={p.code} className={`flex flex-col rounded-xl border bg-white p-7 ${i === 2 ? "border-navy ring-1 ring-navy" : "border-slate-200"}`}>
-                  <div className="flex items-center justify-between"><h3 className="text-lg font-semibold text-navy">{p.name}</h3>{i === 2 && <span className="rounded-full bg-brass-100 px-2.5 py-0.5 text-xs font-medium text-brass-700 ring-1 ring-inset ring-brass-500/30">Most chosen</span>}</div>
-                  <p className="mt-2 min-h-[48px] text-sm leading-relaxed text-slate-600">{p.blurb}</p>
-                  <p className="mt-6"><span className="text-[13px] text-slate-500">from </span><span className="font-serif text-3xl font-semibold tabular-nums text-navy">{naira((p.prices ?? [0])[0]!)}</span><span className="text-[13px] text-slate-500"> a year</span></p>
-                  <Link href="/demo" className={`btn mt-6 justify-center py-2.5 no-underline ${i === 2 ? "bg-navy text-white hover:bg-brand-900" : "btn-outline"}`}>Talk to us</Link>
-                </article>
+            <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {FEATURES.map((g, i) => (
+                <Link key={g.id} href={`/features#${g.id}`} className="group flex flex-col rounded-xl border border-slate-200 bg-white p-5 no-underline transition-colors hover:border-navy">
+                  <span className="font-mono text-[11px] text-brass-700">0{i + 1}</span>
+                  <span className="mt-2 font-semibold text-navy">{g.title}</span>
+                  <span className="mt-1 flex-1 text-[13.5px] leading-relaxed text-slate-600">{g.intro}</span>
+                  <span className="mt-4 text-[12.5px] text-slate-500 group-hover:text-navy">{g.items.length} features →</span>
+                </Link>
               ))}
             </div>
           </div>
@@ -207,10 +205,10 @@ export default function Home() {
           <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 px-5 py-20 sm:px-8 lg:flex-row lg:items-center">
             <div>
               <h2 className="font-serif text-[32px] font-semibold leading-tight tracking-[-0.015em]">Ready when your school is.</h2>
-              <p className="mt-3 max-w-xl leading-relaxed text-white/70">Have an onboarding code from us? Set up your school now; it takes about five minutes. No code yet? Book a 30-minute walk-through and we will set up a trial with your own classes and fees.</p>
+              <p className="mt-3 max-w-xl leading-relaxed text-white/70">Have an onboarding code from us? Sign up your school now; it takes about five minutes. No code yet? Book a 30-minute walk-through and we will set up a trial with your own classes and fees.</p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link href="/onboard" className="btn bg-white px-5 py-2.5 text-[15px] text-navy no-underline hover:bg-white/90">Onboard your school</Link>
+              <Link href="/onboard" className="btn bg-white px-5 py-2.5 text-[15px] text-navy no-underline hover:bg-white/90">Sign up your school</Link>
               <Link href="/demo" className="btn border border-white/35 px-5 py-2.5 text-[15px] text-white no-underline hover:bg-white/10">Book a walk-through</Link>
             </div>
           </div>

@@ -140,3 +140,6 @@ html.readable .live-root h1, html.readable .live-root h2, html.readable .live-ro
 .ss-menu > summary { list-style: none; }
 .ss-menu > summary::before { content: none; display: none; }
 .ss-menu > summary::-webkit-details-marker, .ss-menu > summary::marker { display: none; content: ""; }
+/* Take a tour: the cursor's click. */
+@keyframes tour-click { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.7); opacity: 0; } }
+.tour-click { animation: tour-click .6s ease-out forwards; }
