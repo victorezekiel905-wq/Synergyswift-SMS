@@ -126,9 +126,12 @@ export function TourPlayer() {
               <button type="button" className="btn btn-outline h-9 w-9 p-0" onClick={next} aria-label="Forward one step"><svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg></button>
               <div className="relative h-1.5 flex-1 rounded-full bg-slate-200" role="slider" aria-label="Tour position" aria-valuemin={0} aria-valuemax={totalSteps} aria-valuenow={Math.round((elapsed / TOTAL_MS) * totalSteps)}>
                 <div className="absolute inset-y-0 left-0 rounded-full bg-brass-500 transition-[width] duration-700" style={{ width: `${(elapsed / TOTAL_MS) * 100}%` }} />
-                {CHAPTERS.map((c, i) => {
+                {/* One marker per area (eight), so they stay big enough to tap; the chapter list jumps to any chapter. */}
+                {GROUPS.map(g => {
+                  const i = CHAPTERS.findIndex(c => c.group === g.id);
+                  if (i < 0) return null;
                   const at = CHAPTERS.slice(0, i).reduce((n, x) => n + x.steps.length * STEP_MS + END_MS, 0) / TOTAL_MS;
-                  return <button key={c.id} type="button" title={c.title} aria-label={`Jump to ${c.title}`} onClick={() => go(i)} className="absolute -top-1 h-3.5 w-1.5 -translate-x-1/2 rounded-sm bg-slate-400 hover:bg-navy" style={{ left: `${at * 100}%` }} />;
+                  return <button key={g.id} type="button" title={g.title} aria-label={`Jump to ${g.title}`} onClick={() => go(i)} className="absolute -top-[5px] h-4 w-2.5 -translate-x-1/2 rounded-sm bg-slate-400 hover:bg-navy" style={{ left: `${at * 100}%` }} />;
                 })}
               </div>
               <span className="w-[88px] text-right font-mono text-[12px] tabular-nums text-slate-500">{mmss(elapsed)} / {mmss(TOTAL_MS)}</span>

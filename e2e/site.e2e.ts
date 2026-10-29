@@ -59,7 +59,7 @@ test.describe("take a tour", () => {
     await expect(caption).toHaveText(paused!);
     await page.getByRole("button", { name: "Forward one step" }).click();
     await expect(caption).toContainText("1.3");
-    await page.getByRole("button", { name: /Pickup and drop-off/ }).first().click();
+    await page.getByRole("navigation", { name: "Chapters" }).getByRole("button", { name: /Pickup and drop-off/ }).click();
     await expect(page.getByText("app.synergyswift.ng/school/gate")).toBeVisible();
     await page.keyboard.press("ArrowRight");
     await page.keyboard.press("ArrowRight");
