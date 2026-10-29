@@ -13,7 +13,7 @@ export default function TourPage() {
         <section className="border-b border-slate-200 bg-paper">
           <div className="mx-auto max-w-6xl px-5 pb-16 pt-14 sm:px-8 sm:pt-20">
             <SectionTitle label="Take a tour" title="Watch a school run on Synergy Swift."
-              text="Twelve short chapters, played like a screen recording: what to click, what happens, and what it gives your school. Pause any time, step through, or jump to a chapter." />
+              text="Forty short chapters covering everything the system does, played like a screen recording: what to click, what happens, and what it gives your school. Pause any time, step through, or jump to a chapter." />
             <div className="mt-10"><TourPlayer /></div>
           </div>
         </section>

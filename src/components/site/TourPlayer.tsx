@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BrandMark } from "@/components/BrandMark";
-import { CHAPTERS, type Done } from "@/components/site/tour-scenes";
+import type { Done } from "@/components/site/tour-scenes";
+import { CHAPTERS, GROUPS } from "@/components/site/tour-chapters";
 
 /**
  * "Take a tour": the whole system played like a screen recording. A cursor moves
@@ -14,7 +15,7 @@ const MOVE_MS = 900;     // cursor travel, then the click
 const STEP_MS = 2600;    // one step in all
 const END_MS = 3200;     // the benefit card at the end of a chapter
 
-const SIDEBAR = ["Home", "Students", "Attendance", "Teaching", "Exams", "Results", "Fees", "Safety", "Families", "Settings"];
+const SIDEBAR = ["Home", "Students", "Attendance", "Teaching", "Exams", "Results", "Fees", "Office", "Safety", "Families", "Settings"];
 const totalSteps = CHAPTERS.reduce((n, c) => n + c.steps.length + 1, 0);
 const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
 const TOTAL_MS = CHAPTERS.reduce((n, c) => n + c.steps.length * STEP_MS + END_MS, 0);
@@ -31,6 +32,7 @@ export function TourPlayer() {
   const step = C.steps[Math.min(s, C.steps.length - 1)];
 
   useEffect(() => { if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) setPlaying(false); }, []);
+  useEffect(() => { document.querySelector<HTMLElement>('nav[aria-label="Chapters"] [aria-current="step"]')?.scrollIntoView({ block: "nearest", inline: "nearest" }); }, [ch]);
 
   // Move the cursor to this step's target.
   useLayoutEffect(() => {
@@ -134,18 +136,27 @@ export function TourPlayer() {
           </div>
         </div>
 
-        {/* Chapters */}
-        <ol className="-mx-5 flex gap-2 overflow-x-auto px-5 lg:mx-0 lg:block lg:space-y-1 lg:overflow-visible lg:px-0" aria-label="Chapters">
-          {CHAPTERS.map((c, i) => (
-            <li key={c.id} className="shrink-0">
-              <button type="button" onClick={() => go(i)} aria-current={i === ch ? "step" : undefined}
-                className={`flex w-full items-baseline gap-2.5 rounded-lg border px-3 py-2 text-left text-[13px] ${i === ch ? "border-navy bg-white font-medium text-navy" : "border-transparent text-slate-600 hover:bg-white"}`}>
-                <span className={`font-mono text-[11px] tabular-nums ${i === ch ? "text-brass-700" : "text-slate-400"}`}>{String(i + 1).padStart(2, "0")}</span>
-                <span className="whitespace-nowrap lg:whitespace-normal">{c.title}</span>
-              </button>
-            </li>
-          ))}
-        </ol>
+        {/* Chapters, by area, as on the Features page */}
+        <nav aria-label="Chapters" className="-mx-5 overflow-x-auto px-5 lg:mx-0 lg:max-h-[620px] lg:overflow-y-auto lg:px-0 lg:pr-1">
+          <ol className="flex gap-2 lg:block lg:space-y-3">
+            {GROUPS.map(g => (
+              <li key={g.id} className="contents lg:block">
+                <p className="hidden px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400 lg:block">{g.title}</p>
+                <ol className="contents lg:block lg:space-y-0.5">
+                  {CHAPTERS.map((c, i) => c.group !== g.id ? null : (
+                    <li key={c.id} className="shrink-0">
+                      <button type="button" onClick={() => go(i)} aria-current={i === ch ? "step" : undefined}
+                        className={`flex w-full items-baseline gap-2.5 rounded-lg border px-3 py-1.5 text-left text-[13px] ${i === ch ? "border-navy bg-white font-medium text-navy" : "border-transparent text-slate-600 hover:bg-white"}`}>
+                        <span className={`font-mono text-[11px] tabular-nums ${i === ch ? "text-brass-700" : "text-slate-400"}`}>{String(i + 1).padStart(2, "0")}</span>
+                        <span className="whitespace-nowrap lg:whitespace-normal">{c.title}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              </li>
+            ))}
+          </ol>
+        </nav>
       </div>
     </div>
   );

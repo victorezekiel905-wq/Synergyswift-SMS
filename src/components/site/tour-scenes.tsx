@@ -6,20 +6,22 @@
  */
 export type Done = (n: number) => boolean;
 type Step = { at: string; say: string };
-export type Chapter = { id: string; title: string; area: string; path: string; benefit: string; steps: Step[]; Scene: (p: { done: Done; step: number }) => React.ReactElement };
+export type Chapter = { id: string; title: string; area: string; path: string; benefit: string;
+  /** Which Features-page area it belongs to, and the features it shows (lib/features.ts). */
+  group?: string; features?: string[]; steps: Step[]; Scene: (p: { done: Done; step: number }) => React.ReactElement };
 
-const show = (on: boolean) => `transition-all duration-500 ${on ? "opacity-100 translate-y-0" : "pointer-events-none opacity-0 translate-y-1"}`;
-const H = ({ children, sub }: { children: React.ReactNode; sub?: string }) => (
+export const show = (on: boolean) => `transition-all duration-500 ${on ? "opacity-100 translate-y-0" : "pointer-events-none opacity-0 translate-y-1"}`;
+export const H = ({ children, sub }: { children: React.ReactNode; sub?: string }) => (
   <div className="mb-3"><p className="font-serif text-[18px] font-semibold text-navy">{children}</p>{sub && <p className="text-[12px] text-slate-500">{sub}</p>}</div>
 );
-const B = ({ at, children, primary, pressed }: { at: string; children: React.ReactNode; primary?: boolean; pressed?: boolean }) => (
+export const B = ({ at, children, primary, pressed }: { at?: string; children: React.ReactNode; primary?: boolean; pressed?: boolean }) => (
   <span data-tour={at} className={`inline-flex items-center rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors duration-300 ${primary ? "bg-navy text-white" : "border border-slate-300 bg-white text-slate-800"} ${pressed ? "ring-2 ring-brass-500/60" : ""}`}>{children}</span>
 );
-const Tag = ({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "green" | "amber" | "navy" }) => (
+export const Tag = ({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "green" | "amber" | "navy" }) => (
   <span className={`inline-flex rounded-full px-2 py-0.5 text-[10.5px] font-medium ${{ slate: "bg-slate-100 text-slate-600", green: "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-600/20", amber: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-600/20", navy: "bg-navy text-white" }[tone]}`}>{children}</span>
 );
-const Box = ({ children, className = "", at }: { children: React.ReactNode; className?: string; at?: string }) => <div data-tour={at} className={`rounded-lg border border-slate-200 bg-white p-3 ${className}`}>{children}</div>;
-const Bar = ({ v }: { v: number }) => <div className="h-1.5 rounded-full bg-slate-100"><div className="h-1.5 rounded-full bg-navy transition-[width] duration-700" style={{ width: `${v}%` }} /></div>;
+export const Box = ({ children, className = "", at }: { children: React.ReactNode; className?: string; at?: string }) => <div data-tour={at} className={`rounded-lg border border-slate-200 bg-white p-3 ${className}`}>{children}</div>;
+export const Bar = ({ v }: { v: number }) => <div className="h-1.5 rounded-full bg-slate-100"><div className="h-1.5 rounded-full bg-navy transition-[width] duration-700" style={{ width: `${v}%` }} /></div>;
 
 export const CHAPTERS: Chapter[] = [
   { id: "setup", title: "Set up your school", area: "Settings", path: "school/setup", benefit: "Your own assessment pattern and grading, set once, used everywhere.",
@@ -177,7 +179,7 @@ export const CHAPTERS: Chapter[] = [
         <div className="mt-2"><B at="pay" primary>{done(1) ? "Paid" : "Pay with Paystack"}</B></div>
         <p data-tour="receipt" className={`mt-2 text-[11.5px] text-emerald-800 ${show(done(2))}`}>Receipt RCT-88104 sent</p></Box>
     </div>) },
-  { id: "safety", title: "Pickup, bus and boarding", area: "Safety", path: "school/gate", benefit: "No child leaves with the wrong adult, and every boarder is accounted for.",
+  { id: "safety", title: "Pickup and drop-off", area: "Safety", path: "school/gate", benefit: "No child leaves with the wrong adult, and every boarder is accounted for.",
     steps: [
       { at: "code", say: "Uncle Tunde is collecting today. Mum makes a one-time pickup code in the app (or by USSD on a basic phone)." },
       { at: "kiosk", say: "At the gate, the code shows Ada's photo and who may collect her." },
