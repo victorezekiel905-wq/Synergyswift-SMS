@@ -53,6 +53,14 @@ export default async function ({ db, q, as, expectRows, check, U, T }) {
     where schemaname in ('public', 'live') and (coalesce(qual, '') || ' ' || coalesce(with_check, '')) ~* '(?<!select )(?<![a-z_.])auth\\.(uid|jwt|role)\\(\\)'`);
   check("no policy calls auth.uid(), auth.jwt() or auth.role() once per row", perRow.length === 0, perRow.slice(0, 5).map(r => r.p));
 
+  console.log("\nEvery link between tables has an index behind it (migration 8800)");
+  const bare = await q(`select c.conrelid::regclass::text || ' ' || c.conname l from pg_constraint c
+    join pg_class t on t.oid = c.conrelid and t.relkind = 'r' join pg_namespace n on n.oid = t.relnamespace
+    where c.contype = 'f' and n.nspname in ('public', 'live') and not exists (
+      select 1 from pg_index i where i.indrelid = c.conrelid and i.indpred is null
+        and (i.indkey::int2[])[0:cardinality(c.conkey) - 1] @> c.conkey and (i.indkey::int2[])[0:cardinality(c.conkey) - 1] <@ c.conkey)`);
+  check("no foreign key without an index", bare.length === 0, bare.slice(0, 5).map(r => r.l));
+
   await db.exec(`delete from students where id = '${kid}'; delete from class_groups where id = '${cls}';
     delete from teacher_commands where id = '${cmdB}'; delete from devices where id = '${devB}';
     delete from class_sessions where id = '${sesB}'; delete from classes where id = '${clsB}';`);
