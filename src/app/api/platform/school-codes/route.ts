@@ -12,9 +12,10 @@ export async function GET() {
   const gate = await requirePlatformAdmin();
   if (gate instanceof NextResponse) return gate;
   const svc = createServiceClient();
-  const { data, error } = await svc.from("school_signup_codes")
-    .select("id,hint,label,lead_id,plan_code,created_at,expires_at,used_at,revoked_at,tenant_id,for_tenant_id,school:tenants!school_signup_codes_tenant_id_fkey(name),for_school:tenants!school_signup_codes_for_tenant_id_fkey(name),sales_leads(school_name)")
-    .order("created_at", { ascending: false }).limit(500);
+  const list = (cols: string) => svc.from("school_signup_codes").select(cols).order("created_at", { ascending: false }).limit(500);
+  let { data, error } = await list("id,hint,label,lead_id,plan_code,created_at,expires_at,used_at,revoked_at,tenant_id,for_tenant_id,school:tenants!school_signup_codes_tenant_id_fkey(name),for_school:tenants!school_signup_codes_for_tenant_id_fkey(name),sales_leads(school_name)");
+  // Before migration 8900 codes have no for_tenant_id: list them as before.
+  if (error && /for_tenant/.test(error.message)) ({ data, error } = await list("id,hint,label,lead_id,plan_code,created_at,expires_at,used_at,revoked_at,tenant_id,school:tenants(name),sales_leads(school_name)"));
   if (error) return jsonError(error.message.includes("school_signup_codes") || error.message.includes("for_tenant") ? "School codes need the database update (migration 20260101008900)." : error.message);
   return NextResponse.json({ owner: gate.role === "owner", codes: (data ?? []).map((c: any) => ({ ...c, status: codeStatus(c),
     school: c.school?.name ?? null, for_school: c.for_school?.name ?? null, lead: c.sales_leads?.school_name ?? null, sales_leads: undefined })) });
