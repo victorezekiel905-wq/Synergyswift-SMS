@@ -133,7 +133,7 @@ describe("the confirm button", () => {
 describe("onboarding a school with a one-time code", () => {
   it("checks the code first, and tells the school who it was made for and when it runs out", async () => {
     const ok = await checkCode(post("/api/auth/school-code", { code: "ssc abcd efgh jkmn" }));
-    expect(await ok.json()).toEqual({ ok: true, school: "Greenfield College", expires_at: "2099-01-01T00:00:00Z" });
+    expect(await ok.json()).toEqual({ ok: true, school: "Greenfield College", expires_at: "2099-01-01T00:00:00Z", fixed: false });
     const bad = await checkCode(post("/api/auth/school-code", { code: "SSC-AAAA-BBBB-CCCC" }));
     expect(bad.status).toBe(404);
     expect(db.calls.find(c => c.table === "auth_mail_log" && c.op === "insert")?.payload).toMatchObject({ kind: "code_miss" });

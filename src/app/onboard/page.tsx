@@ -27,6 +27,8 @@ export default function OnboardPage() {
   const [expires, setExpires] = useState<string | null>(null);
   const [f, setF] = useState({ school_name: "", full_name: "", email: "", password: "" });
   const [pending, setPending] = useState<"sent" | "waiting" | null>(null);
+  // The code is for a school Synergy Swift already set up: its name is shown, not asked for.
+  const [fixed, setFixed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -41,7 +43,8 @@ export default function OnboardPage() {
     setBusy(false);
     if (!r.ok) return setErr(j.error ?? "That code didn't work. Please try again.");
     setExpires(j.expires_at); setNow(Date.now());
-    setF(v => ({ ...v, school_name: v.school_name || j.school || "" }));
+    setFixed(Boolean(j.fixed));
+    setF(v => ({ ...v, school_name: j.fixed ? j.school : v.school_name || j.school || "" }));
     setStep(1);
   }
 
@@ -114,11 +117,13 @@ export default function OnboardPage() {
                   {left ? `Code good for ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : "Code expired"}
                 </p>
               </div>
-              <h2 className="mt-2 font-serif text-[26px] font-semibold tracking-[-0.01em] text-navy">Your school and you</h2>
-              <p className="mt-2 text-[14.5px] leading-relaxed text-slate-600">You will be the school&apos;s first administrator. You can invite your staff once you are in.</p>
+              <h2 className="mt-2 font-serif text-[26px] font-semibold tracking-[-0.01em] text-navy">{fixed ? "Your account" : "Your school and you"}</h2>
+              <p className="mt-2 text-[14.5px] leading-relaxed text-slate-600">{fixed
+                ? <>This code is for <b className="text-navy">{f.school_name}</b>. You will be its administrator: set up classes, staff and students once you are in.</>
+                : <>You will be the school&apos;s first administrator. You can invite your staff once you are in.</>}</p>
               <div className="mt-7 space-y-4">
-                <div><label htmlFor="ob-school" className="label">School name</label>
-                  <input id="ob-school" className="input" required minLength={2} maxLength={120} placeholder="e.g. Greenfield College, Ibadan" value={f.school_name} onChange={e => setF({ ...f, school_name: e.target.value })} /></div>
+                {!fixed && <div><label htmlFor="ob-school" className="label">School name</label>
+                  <input id="ob-school" className="input" required minLength={2} maxLength={120} placeholder="e.g. Greenfield College, Ibadan" value={f.school_name} onChange={e => setF({ ...f, school_name: e.target.value })} /></div>}
                 <div><label htmlFor="ob-name" className="label">Your full name</label>
                   <input id="ob-name" className="input" required maxLength={120} autoComplete="name" value={f.full_name} onChange={e => setF({ ...f, full_name: e.target.value })} /></div>
                 <div><label htmlFor="ob-email" className="label">Your email</label>
@@ -128,7 +133,7 @@ export default function OnboardPage() {
                   <p className="mt-1.5 text-xs text-slate-500">At least 8 characters.</p></div>
               </div>
               {err && <p className="mt-4 text-sm text-rose-700">{err}</p>}
-              <button className="btn mt-6 h-11 w-full bg-navy text-[15px] text-white hover:bg-brand-900" disabled={busy || !left}>{busy ? "Creating your school…" : "Create the school"}</button>
+              <button className="btn mt-6 h-11 w-full bg-navy text-[15px] text-white hover:bg-brand-900" disabled={busy || !left}>{busy ? (fixed ? "Creating your account…" : "Creating your school…") : (fixed ? "Create my account" : "Create the school")}</button>
               <p className="mt-4 text-center text-[12.5px] leading-relaxed text-slate-500">By creating the school you agree to the Synergy Swift Terms of Service and Privacy Notice.</p>
               <button type="button" className="mt-3 w-full text-center text-[13px] text-slate-500 hover:text-navy" onClick={() => { setStep(0); setErr(null); }}>Use a different code</button>
             </form>
@@ -138,7 +143,9 @@ export default function OnboardPage() {
             <div>
               <p className="font-mono text-[12px] text-brass-700">Step 03</p>
               <h2 className="mt-2 font-serif text-[26px] font-semibold tracking-[-0.01em] text-navy">Confirm your email</h2>
-              <p className="mt-2 text-[14.5px] leading-relaxed text-slate-600">Your code is used and <b>{f.school_name}</b> is reserved for you. The school opens the first time you sign in.</p>
+              <p className="mt-2 text-[14.5px] leading-relaxed text-slate-600">{fixed
+                ? <>Your code is used and your account for <b>{f.school_name}</b> is ready. You become its administrator the first time you sign in.</>
+                : <>Your code is used and <b>{f.school_name}</b> is reserved for you. The school opens the first time you sign in.</>}</p>
               <PendingConfirm email={f.email.trim()} status={pending} />
             </div>
           )}

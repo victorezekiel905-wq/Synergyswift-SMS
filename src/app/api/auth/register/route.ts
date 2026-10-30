@@ -65,6 +65,16 @@ export async function POST(req: NextRequest) {
     return jsonError("We couldn't create the account just now. Please try again.", 502);
   }
   const user = link.user;
+  // The email already had an invitation nobody has opened (the school was set up for them on the
+  // owner console): Supabase keeps that account and drops the password typed here. With a one-time
+  // school code that is a school's own sign-up, so the password is saved. A class code is shared
+  // too widely to let it take over someone's pending invitation.
+  const pendingInvite = Boolean(user.invited_at && !user.last_sign_in_at && !user.email_confirmed_at);
+  if (pendingInvite) {
+    if (b.as !== "school") return jsonError("This email already has an invitation from the school. Open that invitation, or ask the school to send it again.", 409);
+    const { error: pErr } = await svc.auth.admin.updateUserById(user.id, { password: b.password, user_metadata: { ...(user.user_metadata ?? {}), ...meta } });
+    if (pErr) { console.error("[register] invitation password:", pErr.message); return jsonError("We couldn't create the account just now. Please try again.", 502); }
+  }
   // The school code is used up now, while it is still inside its 20 minutes; the school itself
   // is created at the first sign-in (/api/auth/setup), which finds the code by this account.
   if (b.as === "school") {

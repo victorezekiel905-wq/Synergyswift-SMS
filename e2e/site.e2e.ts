@@ -122,6 +122,26 @@ test.describe("onboarding a school", () => {
     await check();
   });
 
+  test("a code for a school Synergy Swift already created: the school is named, and the person becomes its admin", async ({ page }) => {
+    const check = await healthy(page);
+    let registered: Record<string, unknown> | null = null;
+    await page.route("**/api/auth/school-code", r => r.fulfill({ json: { ok: true, school: "Corona Day Secondary School", fixed: true, expires_at: new Date(Date.now() + 19 * 60_000).toISOString() } }));
+    await page.route("**/api/auth/register", r => { registered = JSON.parse(r.request().postData() ?? "{}"); return r.fulfill({ json: { ok: true, status: "waiting", email: "head@corona.ng" } }); });
+    await page.goto("/onboard");
+    await page.getByLabel("Onboarding code").fill("SSCABCDEFGHJKMN");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByRole("heading", { name: "Your account" })).toBeVisible();
+    await expect(page.getByText("This code is for Corona Day Secondary School")).toBeVisible();
+    await expect(page.getByLabel("School name")).toHaveCount(0);
+    await page.getByLabel("Your full name").fill("Ada Head");
+    await page.getByLabel("Your email").fill("head@corona.ng");
+    await page.getByLabel("Choose a password").fill("longenough1");
+    await page.getByRole("button", { name: "Create my account" }).click();
+    await expect(page.getByText(/your account for Corona Day Secondary School is ready/)).toBeVisible();
+    expect(registered).toMatchObject({ as: "school", school_name: "Corona Day Secondary School", email: "head@corona.ng" });
+    await check();
+  });
+
   test("the old sign-up address leads to onboarding", async ({ page }) => {
     await page.goto("/signup");
     await expect(page).toHaveURL(/\/onboard$/);

@@ -5,6 +5,7 @@ import { useApi, send, Page, PageHeader, Alert, Field, Loading } from "@/compone
 import PlatformNav from "@/components/platform/PlatformNav";
 import PlanPicker, { emptyChoice, type PlanChoice, type PlanOption } from "@/components/platform/PlanPicker";
 import ModulesEditor, { effectiveOf, type Draft, type ModuleRowView } from "@/components/platform/ModulesEditor";
+import { MadeCode, type MadeCodeData } from "@/components/platform/SchoolCode";
 import { resolveModules, planModules, moduleLabel, naira } from "@/lib/saas";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -27,6 +28,9 @@ export default function NewSchool() {
   const [usePlan, setUsePlan] = useState(true);
   const [draft, setDraft] = useState<Draft>({});
   const [roles, setRoles] = useState<string[] | null>(null);
+  // How the school's administrator gets in: a one-time code they sign up with, or an email invitation.
+  const [adminBy, setAdminBy] = useState<"code" | "email">("code");
+  const [created, setCreated] = useState<{ id: string; code: MadeCodeData | null } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // From the sales CRM: /platform/new?lead=<id> fills in the school, its contact and the quoted plan.
@@ -56,7 +60,8 @@ export default function NewSchool() {
 
   function next() {
     setErr(null);
-    if (step === 0 && (!f.name.trim() || !f.admin_name.trim() || !/\S+@\S+\.\S+/.test(f.admin_email))) return setErr("Enter the school's name and its first admin's name and email.");
+    if (step === 0 && !f.name.trim()) return setErr("Enter the school's name.");
+    if (step === 0 && adminBy === "email" && (!f.admin_name.trim() || !/\S+@\S+\.\S+/.test(f.admin_email))) return setErr("Enter the first admin's name and email, or choose an onboarding code instead.");
     if (step === 1 && usePlan && (plan.band === null || !chosen?.prices) && plan.custom_annual == null) return setErr("Enter the agreed yearly price.");
     setStep(s => Math.min(STEPS.length - 1, s + 1));
   }
@@ -64,14 +69,29 @@ export default function NewSchool() {
   async function create() {
     setBusy(true); setErr(null);
     const overrides = Object.entries(draft).filter(([, d]) => d.mode !== "inherit").map(([module, d]) => ({ module, mode: d.mode, expires_at: d.expires_at ? new Date(`${d.expires_at}T23:59:59`).toISOString() : null, note: d.note || null }));
-    const r = await send<{ id: string; invoice: { number: string } | null }>("/api/platform/tenants", {
-      ...f, slug, student_limit: f.student_limit ? Number(f.student_limit) : null, overrides, allowed_roles: roles, ...(leadId ? { lead_id: leadId } : {}),
+    const { admin_name, admin_email, ...school } = f;
+    const r = await send<{ id: string; name: string; invoice: { number: string } | null; code: { code: string; expires_at: string } | null }>("/api/platform/tenants", {
+      ...school, ...(adminBy === "email" ? { admin_name, admin_email } : {}),
+      slug, student_limit: f.student_limit ? Number(f.student_limit) : null, overrides, allowed_roles: roles, ...(leadId ? { lead_id: leadId } : {}),
       subscription: usePlan ? { ...plan, notes: plan.notes || null, custom_annual: plan.custom_annual } : undefined
     });
     setBusy(false);
     if (!r.ok) return setErr(r.error);
-    router.push(`/platform/${r.data.id}?created=1`);
+    if (adminBy === "email") return router.push(`/platform/${r.data.id}?created=1`);
+    setCreated({ id: r.data.id, code: r.data.code ? { ...r.data.code, label: r.data.name, forSchool: true } : null });
   }
+
+  if (created) return (
+    <Page wide>
+      <PlatformNav />
+      <PageHeader eyebrow="Onboarding" title={`${f.name} is created`} subtitle="Give the school this code. They sign up at /onboard with their own name, email and password and become its administrator, then set up classes, staff and students themselves." />
+      <div className="space-y-4">
+        {created.code ? <MadeCode made={created.code} /> : <Alert tone="amber">The school is created, but its code couldn&apos;t be made. Open the school and use Make an onboarding code.</Alert>}
+        <p className="text-sm text-slate-600">If the code runs out before they use it, make another on the school&apos;s page. Only the newest unused code matters; each works once.</p>
+        <button type="button" className="btn btn-outline" onClick={() => router.push(`/platform/${created.id}`)}>Open the school&apos;s page</button>
+      </div>
+    </Page>
+  );
 
   if (!catalog) return <Page wide><PlatformNav /><Loading /></Page>;
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF(p => ({ ...p, [k]: e.target.value }));
@@ -92,9 +112,18 @@ export default function NewSchool() {
             <Field label="Short name for links" hint={`Becomes ${slug || "school-name"}. Leave blank to use the name.`}><input className="input" value={f.slug} onChange={set("slug")} /></Field>
             <Field label="Country"><input className="input" value={f.country} onChange={set("country")} /></Field>
             <Field label="Time zone"><input className="input" value={f.timezone} onChange={set("timezone")} /></Field>
-            <Field label="First admin's name"><input className="input" value={f.admin_name} onChange={set("admin_name")} /></Field>
-            <Field label="First admin's email" hint="They get an invitation to set a password."><input className="input" type="email" value={f.admin_email} onChange={set("admin_email")} /></Field>
             <Field label="Student limit (optional)"><input className="input" type="number" min={1} value={f.student_limit} onChange={set("student_limit")} /></Field>
+            <fieldset className="space-y-2 md:col-span-2">
+              <legend className="label">How does the school&apos;s administrator get in?</legend>
+              <label className="flex items-start gap-2 text-sm"><input type="radio" name="admin-by" className="mt-1" checked={adminBy === "code"} onChange={() => setAdminBy("code")} />
+                <span><b>Give them an onboarding code</b> (recommended). You get a one-time code when the school is created; they sign up with it, choose their own password and become the administrator.</span></label>
+              <label className="flex items-start gap-2 text-sm"><input type="radio" name="admin-by" className="mt-1" checked={adminBy === "email"} onChange={() => setAdminBy("email")} />
+                <span><b>Email them an invitation.</b> Needs the email service set up on the server; otherwise the invitation is not sent.</span></label>
+            </fieldset>
+            {adminBy === "email" && <>
+              <Field label="First admin's name"><input className="input" value={f.admin_name} onChange={set("admin_name")} /></Field>
+              <Field label="First admin's email" hint="They get an invitation to set a password."><input className="input" type="email" value={f.admin_email} onChange={set("admin_email")} /></Field>
+            </>}
           </div>
         )}
         {step === 1 && (
@@ -129,7 +158,7 @@ export default function NewSchool() {
               <p className="label">School</p>
               <p className="text-base font-semibold">{f.name}</p>
               <p>{f.country} · {f.timezone} · link name {slug}</p>
-              <p>First admin: {f.admin_name} ({f.admin_email})</p>
+              <p>{adminBy === "email" ? `First admin: ${f.admin_name} (${f.admin_email}), invited by email` : "Administrator: signs up with the onboarding code you get next"}</p>
               <p className="label pt-3">Plan</p>
               {usePlan && chosen ? <p>{chosen.name}{plan.add_on_groups.length ? ` + ${plan.add_on_groups.join(", ")}` : ""}, {plan.cycle === "annual" ? "yearly" : "termly"}{plan.status === "trial" ? ", 30-day trial" : ""}{plan.discount_pct ? `, ${plan.discount_pct}% off` : ""}{plan.custom_annual ? `, agreed ${naira(plan.custom_annual)} a year` : ""}{plan.issue_invoice && plan.status !== "trial" ? ". First invoice sent on creation." : "."}</p> : <p>No plan yet: every module on, no bill.</p>}
               <p className="label pt-3">Roles</p>

@@ -6,6 +6,7 @@ import { useApi, send, Page, PageHeader, Badge, statusTone, Alert, Field, Tabs, 
 import { LANGUAGES } from "@/lib/languages";
 import PlatformNav from "@/components/platform/PlatformNav";
 import { PlanTab, ModulesTab, RolesCeiling } from "@/components/platform/TenantPlan";
+import { MakeCodeForSchool } from "@/components/platform/SchoolCode";
 
 const ROLE_LABELS: Record<string, string> = {
   school_admin: "School admin", principal: "Principal", teacher: "Teacher", it_admin: "IT admin", bursar: "Bursar", librarian: "Librarian",
@@ -97,6 +98,10 @@ function Overview({ data, patch }: { data: Detail; patch: Patch }) {
         <Stat label="Student logins" value={data.family_logins.students} />
         <Stat label="Parent logins" value={data.family_logins.parents} />
       </div>
+      <section className={`card p-5 ${data.admins.some(a => a.active) ? "" : "border-brand-300"}`}>
+        <h2 className="mb-2 font-semibold">{data.admins.some(a => a.active) ? "Onboarding code" : "This school has no administrator yet"}</h2>
+        <MakeCodeForSchool tenantId={t.id} schoolName={t.name} />
+      </section>
       <div className="grid gap-5 lg:grid-cols-2">
         <StatusControl key={`${t.status}-${t.status_message}`} t={t} patch={patch} />
         <section className="card p-5">

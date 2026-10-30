@@ -111,6 +111,27 @@ export async function POST(req: NextRequest) {
     codeId = claimed as string;
   }
 
+  // A code made for a school already created on the console (migration 8900): its holder becomes
+  // that school's administrator. Before that migration the column is missing and every code makes a school.
+  const { data: codeRow } = await svc.from("school_signup_codes").select("for_tenant_id").eq("id", codeId).maybeSingle();
+  const forTenant = (codeRow as { for_tenant_id?: string | null } | null)?.for_tenant_id ?? null;
+  if (forTenant) {
+    try {
+      const { data: school } = await svc.from("tenants").select("id,name,contact_email").eq("id", forTenant).maybeSingle();
+      if (!school) throw new Error("this school no longer exists");
+      const { error: uErr } = await svc.from("users").insert({ id: user.id, tenant_id: school.id, email: user.email ?? "", full_name: fullName, role: "school_admin" });
+      if (uErr) throw new Error(uErr.message);
+      await svc.from("staff").insert({ tenant_id: school.id, user_id: user.id, staff_no: `ADMIN-${user.id.slice(0, 6).toUpperCase()}`, full_name: fullName, email: user.email, position: "School administrator" });
+      if (!school.contact_email) await svc.from("tenants").update({ contact_email: user.email }).eq("id", school.id);
+      await svc.from("school_signup_codes").update({ tenant_id: school.id }).eq("id", codeId);
+      await svc.from("audit_logs").insert({ tenant_id: school.id, actor_id: user.id, action: "tenant.admin_joined_with_code", meta: { code_id: codeId } });
+    } catch (e) {
+      if (!held) await svc.rpc("release_school_code", { p_id: codeId });
+      return NextResponse.json({ error: `Your account couldn't be added to the school: ${(e as Error).message}. Your code still works; sign in again to retry.` }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true, role: "school_admin", next: "/school" });
+  }
+
   // The code is used up. If creating the school fails, the prospect can try again.
   const tenantName = String(body.tenant_name ?? meta.school_name ?? "").trim().slice(0, 120) || "My School";
   try {

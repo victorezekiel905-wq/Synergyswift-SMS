@@ -7,6 +7,7 @@ import { provisionUser } from "@/lib/provision";
 import { appUrl } from "@/lib/school";
 import { SubscriptionBody, OverrideBody } from "@/lib/saas-schemas";
 import { saveSubscription, refreshTenantModules } from "@/lib/saas-server";
+import { makeSchoolCode } from "@/lib/school-codes-server";
 
 /** Super-admin: list every tenant with usage counts. Tenants never see this. */
 export async function GET() {
@@ -44,8 +45,9 @@ const CreateTenant = z.object({
   country: z.string().trim().max(60).optional(),
   timezone: z.string().trim().max(60).default("Africa/Lagos"),
   student_limit: z.number().int().positive().nullable().optional(),
-  admin_name: z.string().trim().min(2).max(120),
-  admin_email: z.string().trim().email(),
+  /** The first admin, invited by email. Leave both out to get an onboarding code for the school instead. */
+  admin_name: z.string().trim().min(2).max(120).optional(),
+  admin_email: z.string().trim().email().optional(),
   /** The plan the school has paid for; without it every module stays on (as for older schools). */
   subscription: SubscriptionBody.optional(),
   overrides: z.array(OverrideBody).max(60).default([]),
@@ -66,17 +68,18 @@ export async function POST(req: NextRequest) {
   const parsed = CreateTenant.safeParse(await readJson(req));
   if (!parsed.success) return jsonError(parsed.error.issues.map(i => i.message).join("; "));
   const b = parsed.data;
+  if (Boolean(b.admin_name) !== Boolean(b.admin_email)) return jsonError("Give the first admin's name and email, or neither (the school then gets an onboarding code).");
   const svc = createServiceClient();
   let invoice: { number: string } | null = null;
 
   const { data: tenant, error } = await svc.from("tenants").insert({
     name: b.name, slug: b.slug, country: b.country ?? null, timezone: b.timezone,
-    contact_email: b.admin_email, student_limit: b.student_limit ?? null, allowed_roles: b.allowed_roles ?? null
+    contact_email: b.admin_email ?? null, student_limit: b.student_limit ?? null, allowed_roles: b.allowed_roles ?? null
   }).select("id,name,slug").single();
   if (error) return jsonError(error.message.includes("duplicate") ? "that slug is already taken" : error.message);
 
   try {
-    await svc.from("tenant_settings").insert({ tenant_id: tenant.id, school_name: b.name, sender_name: b.name, email: b.admin_email });
+    await svc.from("tenant_settings").insert({ tenant_id: tenant.id, school_name: b.name, sender_name: b.name, email: b.admin_email ?? null });
     const { data: scheme, error: sErr } = await svc.from("grading_schemes").insert({
       tenant_id: tenant.id, name: DEFAULT_SCHEME.name, is_default: true, pass_mark: DEFAULT_SCHEME.pass_mark
     }).select("id").single();
@@ -84,11 +87,13 @@ export async function POST(req: NextRequest) {
     await svc.from("grading_components").insert(DEFAULT_SCHEME.components.map(c => ({ ...c, scheme_id: scheme.id })));
     await svc.from("grade_bands").insert(DEFAULT_SCHEME.bands.map(bd => ({ ...bd, scheme_id: scheme.id })));
 
-    const { userId } = await provisionUser(svc, {
-      tenantId: tenant.id, email: b.admin_email, fullName: b.admin_name, role: "school_admin",
-      redirectTo: `${appUrl(req)}/auth/welcome?next=/school`, createdBy: gate.userId
-    });
-    await svc.from("staff").insert({ tenant_id: tenant.id, user_id: userId, staff_no: "ADMIN-001", full_name: b.admin_name, email: b.admin_email, position: "School administrator" });
+    if (b.admin_name && b.admin_email) {
+      const { userId } = await provisionUser(svc, {
+        tenantId: tenant.id, email: b.admin_email, fullName: b.admin_name, role: "school_admin",
+        redirectTo: `${appUrl(req)}/auth/welcome?next=/school`, createdBy: gate.userId
+      });
+      await svc.from("staff").insert({ tenant_id: tenant.id, user_id: userId, staff_no: "ADMIN-001", full_name: b.admin_name, email: b.admin_email, position: "School administrator" });
+    }
 
     const overrides = b.overrides.filter(o => o.mode !== "inherit");
     if (overrides.length) {
@@ -112,5 +117,11 @@ export async function POST(req: NextRequest) {
     await svc.from("sales_leads").update({ tenant_id: tenant.id, stage: "won", score: 100, stage_changed_at: now, updated_at: now }).eq("id", b.lead_id);
     await svc.from("sales_activities").insert({ lead_id: b.lead_id, kind: "system", body: `School created: ${b.name}.`, actor_id: gate.userId });
   }
-  return NextResponse.json({ ...tenant, invoice }, { status: 201 });
+  // No admin given: a one-time code makes whoever signs up with it this school's administrator.
+  let code: { code: string; expires_at: string } | null = null;
+  if (!b.admin_email) {
+    try { const made = await makeSchoolCode(svc, { label: tenant.name, createdBy: gate.userId, forTenantId: tenant.id, leadId: b.lead_id ?? null }); code = { code: made.code, expires_at: made.expires_at }; }
+    catch { /* the school stands; a code can be made on its page */ }
+  }
+  return NextResponse.json({ ...tenant, invoice, code }, { status: 201 });
 }
