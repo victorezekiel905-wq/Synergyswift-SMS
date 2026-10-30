@@ -6,7 +6,7 @@ import PlatformNav from "@/components/platform/PlatformNav";
 import PlanPicker, { emptyChoice, type PlanChoice, type PlanOption } from "@/components/platform/PlanPicker";
 import ModulesEditor, { effectiveOf, type Draft, type ModuleRowView } from "@/components/platform/ModulesEditor";
 import { MadeCode, type MadeCodeData } from "@/components/platform/SchoolCode";
-import { resolveModules, planModules, moduleLabel, naira } from "@/lib/saas";
+import { resolveModules, planModules, moduleLabel, naira, BANDS } from "@/lib/saas";
 
 const ROLE_LABELS: Record<string, string> = {
   school_admin: "School admin", principal: "Principal", teacher: "Teacher", it_admin: "IT admin", bursar: "Bursar", librarian: "Librarian",
@@ -50,6 +50,12 @@ export default function NewSchool() {
     }).catch(() => {});
   }, []);
   const chosen = catalog?.plans.find(p => p.code === plan.plan_code);
+  // Every plan is priced by students, so the limit is required; only the Custom plan may go without one.
+  const limitRequired = !(usePlan && plan.plan_code === "custom");
+  const [limitTyped, setLimitTyped] = useState(false);
+  useEffect(() => {
+    if (!limitTyped && !f.student_limit && usePlan && plan.band !== null) setF(cur => ({ ...cur, student_limit: String(BANDS[plan.band!]) }));
+  }, [limitTyped, f.student_limit, usePlan, plan.band]);
 
   const rows: ModuleRowView[] = useMemo(() => {
     const mods = usePlan && chosen ? planModules(chosen.groups, plan.add_on_groups) : null;
@@ -63,6 +69,7 @@ export default function NewSchool() {
     if (step === 0 && !f.name.trim()) return setErr("Enter the school's name.");
     if (step === 0 && adminBy === "email" && (!f.admin_name.trim() || !/\S+@\S+\.\S+/.test(f.admin_email))) return setErr("Enter the first admin's name and email, or choose an onboarding code instead.");
     if (step === 1 && usePlan && (plan.band === null || !chosen?.prices) && plan.custom_annual == null) return setErr("Enter the agreed yearly price.");
+    if (step === 1 && limitRequired && !(Number(f.student_limit) >= 1)) return setErr("Enter the student limit. Only the Custom plan may go without one.");
     setStep(s => Math.min(STEPS.length - 1, s + 1));
   }
 
@@ -112,7 +119,6 @@ export default function NewSchool() {
             <Field label="Short name for links" hint={`Becomes ${slug || "school-name"}. Leave blank to use the name.`}><input className="input" value={f.slug} onChange={set("slug")} /></Field>
             <Field label="Country"><input className="input" value={f.country} onChange={set("country")} /></Field>
             <Field label="Time zone"><input className="input" value={f.timezone} onChange={set("timezone")} /></Field>
-            <Field label="Student limit (optional)"><input className="input" type="number" min={1} value={f.student_limit} onChange={set("student_limit")} /></Field>
             <fieldset className="space-y-2 md:col-span-2">
               <legend className="label">How does the school&apos;s administrator get in?</legend>
               <label className="flex items-start gap-2 text-sm"><input type="radio" name="admin-by" className="mt-1" checked={adminBy === "code"} onChange={() => setAdminBy("code")} />
@@ -129,7 +135,16 @@ export default function NewSchool() {
         {step === 1 && (
           <div className="space-y-4">
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={usePlan} onChange={e => setUsePlan(e.target.checked)} /> Put this school on a plan now (untick for a school still deciding: every module stays on, no bill)</label>
-            {usePlan && <PlanPicker plans={catalog.plans} groupPrices={catalog.group_prices} value={plan} onChange={setPlan} />}
+            {usePlan && <PlanPicker plans={catalog.plans} groupPrices={catalog.group_prices} value={plan} onChange={p => {
+              // The student limit follows the band chosen, until it is typed in by hand.
+              if (!limitTyped && p.band !== null && p.band !== plan.band) setF(cur => ({ ...cur, student_limit: String(BANDS[p.band!]) }));
+              setPlan(p);
+            }} />}
+            <div className="max-w-xs">
+              <Field label={limitRequired ? "Student limit" : "Student limit (optional on the Custom plan)"} hint={limitRequired ? "Most students the school may have on Synergy Swift." : "Leave blank for no limit."}>
+                <input className="input" type="number" min={1} required={limitRequired} value={f.student_limit} onChange={e => { setLimitTyped(true); set("student_limit")(e); }} />
+              </Field>
+            </div>
           </div>
         )}
         {step === 2 && (
@@ -158,6 +173,7 @@ export default function NewSchool() {
               <p className="label">School</p>
               <p className="text-base font-semibold">{f.name}</p>
               <p>{f.country} · {f.timezone} · link name {slug}</p>
+              <p>Student limit: {f.student_limit ? Number(f.student_limit).toLocaleString("en-NG") : "none (Custom plan)"}</p>
               <p>{adminBy === "email" ? `First admin: ${f.admin_name} (${f.admin_email}), invited by email` : "Administrator: signs up with the onboarding code you get next"}</p>
               <p className="label pt-3">Plan</p>
               {usePlan && chosen ? <p>{chosen.name}{plan.add_on_groups.length ? ` + ${plan.add_on_groups.join(", ")}` : ""}, {plan.cycle === "annual" ? "yearly" : "termly"}{plan.status === "trial" ? ", 30-day trial" : ""}{plan.discount_pct ? `, ${plan.discount_pct}% off` : ""}{plan.custom_annual ? `, agreed ${naira(plan.custom_annual)} a year` : ""}{plan.issue_invoice && plan.status !== "trial" ? ". First invoice sent on creation." : "."}</p> : <p>No plan yet: every module on, no bill.</p>}

@@ -69,6 +69,8 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return jsonError(parsed.error.issues.map(i => i.message).join("; "));
   const b = parsed.data;
   if (Boolean(b.admin_name) !== Boolean(b.admin_email)) return jsonError("Give the first admin's name and email, or neither (the school then gets an onboarding code).");
+  // Plans are priced by students, so every school has a student limit; only the Custom plan may go without.
+  if (!b.student_limit && b.subscription?.plan_code !== "custom") return jsonError("Enter the student limit. Only the Custom plan may go without one.");
   const svc = createServiceClient();
   let invoice: { number: string } | null = null;
 
