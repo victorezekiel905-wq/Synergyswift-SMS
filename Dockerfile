@@ -1,12 +1,15 @@
 # syntax=docker/dockerfile:1.7
+# Debian, not Alpine, in every stage (as SwiftCipher's image): the live-lessons slide import
+# needs LibreOffice, whose Alpine build aborts on many PowerPoint files, and native modules
+# (@napi-rs/canvas, which draws PDF pages) must be built for the same C library they run on.
 # ---- deps ----
-FROM node:22-alpine AS deps
+FROM node:22-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci || npm install
 
 # ---- build ----
-FROM node:22-alpine AS builder
+FROM node:22-bookworm-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -30,11 +33,20 @@ RUN test -n "$NEXT_PUBLIC_SUPABASE_URL" && test -n "$NEXT_PUBLIC_SUPABASE_ANON_K
 RUN npm run build
 
 # ---- runtime ----
-FROM node:22-alpine AS runner
+FROM node:22-bookworm-slim AS runner
 WORKDIR /app
+# LibreOffice turns PowerPoint (and Word) uploads into PDF, so an imported deck becomes a picture
+# of each slide exactly as designed. Liberation and Carlito/Caladea have the same letter widths
+# as Arial, Times and Calibri/Cambria, so text wraps as it does in PowerPoint.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libreoffice-impress libreoffice-writer fontconfig \
+      fonts-liberation2 fonts-crosextra-carlito fonts-crosextra-caladea fonts-dejavu-core fonts-noto-core \
+ && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN addgroup -S app && adduser -S app -G app
+# svp: LibreOffice's headless drawing backend (no X server or desktop libraries needed).
+ENV SAL_USE_VCLPLUGIN=svp
+RUN groupadd --system app && useradd --system --gid app --create-home app
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=app:app /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules

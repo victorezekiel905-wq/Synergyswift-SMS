@@ -11,7 +11,8 @@ const LINKS = [
   { href: "/platform/billing", label: "Billing & requests" },
   { href: "/platform/plans", label: "Plans & prices" },
   { href: "/platform/team", label: "Platform team" },
-  { href: "/platform/groups", label: "School groups" }
+  { href: "/platform/groups", label: "School groups" },
+  { href: "/platform/server", label: "Server check" }
 ];
 
 /** Sections of the Synergy Swift platform console. */
