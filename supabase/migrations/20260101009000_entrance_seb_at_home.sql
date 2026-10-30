@@ -1,0 +1,11 @@
+-- =========================================================================
+-- Safe Exam Browser for entrance tests taken at home (the school decides).
+--  * entrance_plans.seb_at_home: the intake's online tests only open inside
+--    Safe Exam Browser. Each applicant gets their own SEB file from their
+--    private test link, which starts SEB straight on their test. Off by
+--    default: SEB runs on Windows, Mac and iPad, not on Android phones or
+--    Chromebooks, so a school turns it on for intakes whose families have one.
+--    Camera checks can run alongside it.
+-- Idempotent. Apply after 20260101008900.
+-- =========================================================================
+alter table public.entrance_plans add column if not exists seb_at_home boolean not null default false;

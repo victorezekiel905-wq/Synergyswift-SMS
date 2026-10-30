@@ -4,7 +4,7 @@ import { useApi, send, Alert, Empty, Modal, Field, Badge, Loading, Stat, Tabs, f
 
 type Plan = {
   id: string; name: string; level: string; intake: string; exam_id: string | null; status: "draft" | "open" | "closed";
-  assign_on: "submitted" | "fee_paid" | "manual"; where_mode: "online" | "centre" | "choice"; face_check: boolean; seb_at_centre: boolean;
+  assign_on: "submitted" | "fee_paid" | "manual"; where_mode: "online" | "centre" | "choice"; face_check: boolean; seb_at_centre: boolean; seb_at_home?: boolean;
   test_weight: number; interview_weight: number; report_weight: number; pass_mark: number; section_pass_marks: Record<string, number>;
   borderline_band: number; interview_for: "none" | "borderline" | "passed" | "everyone"; decision_mode: "auto" | "approve"; waitlist_size: number;
   release_at: string | null; show_scores: boolean; offer_valid_days: number | null; acceptance_fee: number | null; class_group_id: string | null;
@@ -31,7 +31,7 @@ const DECISION: Record<string, { label: string; tone: "green" | "amber" | "red" 
 const STATUS: Record<string, string> = { new: "New", reviewing: "Reviewing", assessment: "Test", interview: "Interview", offered: "Offered", accepted: "Accepted", enrolled: "Enrolled",
   rejected: "Not offered", withdrawn: "Withdrawn", waitlisted: "Waiting list", declined: "Declined", expired: "Offer expired" };
 const BLANK: Omit<Plan, "id"> = {
-  name: "", level: "", intake: "", exam_id: null, status: "open", assign_on: "fee_paid", where_mode: "online", face_check: false, seb_at_centre: true,
+  name: "", level: "", intake: "", exam_id: null, status: "open", assign_on: "fee_paid", where_mode: "online", face_check: false, seb_at_centre: true, seb_at_home: false,
   test_weight: 100, interview_weight: 0, report_weight: 0, pass_mark: 50, section_pass_marks: {}, borderline_band: 5, interview_for: "borderline",
   decision_mode: "approve", waitlist_size: 10, release_at: null, show_scores: false, offer_valid_days: null, acceptance_fee: null, class_group_id: null
 };
@@ -90,7 +90,7 @@ export default function Entrance({ onOpenLead }: { onOpenLead: (id: string) => v
               <p className="text-sm text-slate-600">{plan.level}{plan.intake ? ` · ${plan.intake}` : ""} · test: {plan.exams?.title ?? <b className="text-amber-700">not chosen yet</b>}</p>
               <p className="mt-1 text-xs text-slate-500">
                 {plan.assign_on === "submitted" ? "Test sent when the application arrives" : plan.assign_on === "fee_paid" ? "Test sent when the form fee is paid" : "Tests assigned by hand"} ·{" "}
-                {plan.where_mode === "online" ? "online at home" : plan.where_mode === "centre" ? "at a test centre with a PIN" : "families choose online or a centre"}{plan.face_check ? " · camera check at home" : ""} ·{" "}
+                {plan.where_mode === "online" ? "online at home" : plan.where_mode === "centre" ? "at a test centre with a PIN" : "families choose online or a centre"}{plan.face_check ? " · camera check at home" : ""}{plan.seb_at_home && plan.where_mode !== "centre" ? " · Safe Exam Browser at home" : ""} ·{" "}
                 pass mark {plan.pass_mark}{plan.interview_for !== "none" ? ` · interview: ${plan.interview_for}` : ""} ·{" "}
                 {plan.decision_mode === "auto" ? "decisions sent automatically" : "decisions need your approval"} ·{" "}
                 {released ? `results released ${fmtDate(plan.release_at!)}` : plan.release_at ? `results out ${fmtDate(plan.release_at, true)}` : "results go out as candidates finish"}
@@ -269,6 +269,8 @@ function PlanForm({ plan, exams, classes, levels, onCancel, onSaved }: {
           <option value="online">Online at home</option><option value="centre">At a test centre (PIN on the school&apos;s computer)</option><option value="choice">Family chooses online or a centre</option></select></Field>
         {p.where_mode !== "centre" && <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5" checked={Boolean(p.face_check)} onChange={e => set({ face_check: e.target.checked })} />
           <span>Camera check at home: a photo every minute, flagged when no face or two faces are seen</span></label>}
+        {p.where_mode !== "centre" && <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5" checked={Boolean(p.seb_at_home)} onChange={e => set({ seb_at_home: e.target.checked })} />
+          <span>Safe Exam Browser at home: the test opens only in Safe Exam Browser, which locks the device until it is submitted. Each family gets its own file from the test link. Works on Windows, Mac and iPad, not on Android phones or Chromebooks.</span></label>}
         {p.where_mode !== "online" && <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5" checked={p.seb_at_centre !== false} onChange={e => set({ seb_at_centre: e.target.checked })} />
           <span>Centre computers must use Safe Exam Browser (download its file from each sitting)</span></label>}
       </fieldset>

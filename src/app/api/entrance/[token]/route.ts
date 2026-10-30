@@ -6,7 +6,8 @@ import { buildAttemptLayout, toPublicQuestion, markAttempt, questionsForAttempt,
 import { loadQuestions, markCodeQuestions, GRACE_MS, VIOLATION_KINDS } from "@/lib/exams/server";
 import { refreshScore } from "@/lib/admissions-crm";
 import { examTools } from "@/lib/exams/tools";
-import { absoluteRequestUrl, verifySeb } from "@/lib/exams/seb";
+import { absoluteRequestUrl, verifySeb, buildSebConfig, isSebUserAgent, sebLaunchUrl } from "@/lib/exams/seb";
+import { appUrl } from "@/lib/school";
 import { sectionScores } from "@/lib/entrance";
 
 export const dynamic = "force-dynamic";
@@ -70,11 +71,25 @@ async function finish(svc: any, at: any, questions: Question[]) {
   return done;
 }
 
-export async function GET(_req: NextRequest, props: { params: Promise<{ token: string }> }) {
-  const r = await load((await props.params).token);
+/** At home, when the intake asks for it (migration 9000): the test opens only in Safe Exam Browser. */
+const sebAtHome = (sitting: any | null, plan: any | null) => sitting?.kind !== "centre" && Boolean(plan?.seb_at_home);
+
+export async function GET(req: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const token = (await props.params).token;
+  const r = await load(token);
   if (!r) return jsonError("This entrance test link is not valid.", 404);
   let { at } = r;
   const { svc } = r;
+  // ?seb=1: this applicant's own Safe Exam Browser file, which opens SEB straight on their test.
+  if (new URL(req.url).searchParams.get("seb") === "1") {
+    const { sitting, plan } = await setting(svc, at);
+    if (!sebAtHome(sitting, plan)) return jsonError("This test doesn't use Safe Exam Browser at home.", 404);
+    const base = appUrl(req);
+    const settings = at.exams?.settings ?? {};
+    const xml = buildSebConfig({ startUrl: `${base}/entrance/${token}`, quitUrl: `${base}/entrance/${token}?done=1`, title: at.exams?.title ?? "Entrance test",
+      quit_password: settings.seb_quit_password ?? settings.quit_password, allow_spellcheck: false });
+    return new NextResponse(xml, { headers: { "Content-Type": "application/seb", "Content-Disposition": `attachment; filename="entrance-test.seb"`, "Cache-Control": "no-store" } });
+  }
   const questions = await loadQuestions(svc, at.exam_id);
   if (at.status === "in_progress" && Date.now() > new Date(at.deadline_at).getTime() + GRACE_MS) at = await finish(svc, at, questions);
   const { data: s } = await svc.from("tenant_settings").select("school_name,logo_url,brand_color").eq("tenant_id", at.tenant_id).maybeSingle();
@@ -82,7 +97,9 @@ export async function GET(_req: NextRequest, props: { params: Promise<{ token: s
   const centre = sitting?.kind === "centre" ? { name: sitting.centre, address: sitting.address, starts_at: sitting.starts_at, ends_at: sitting.ends_at, checked_in: Boolean(at.checked_in_at) } : null;
   const info = { title: at.exams?.title, instructions: at.exams?.instructions, duration_minutes: at.exams?.duration_minutes, child: at.applications?.first_name,
     window: windowState(at, sitting), opens_at: centre ? centre.starts_at : at.opens_at, closes_at: centre ? centre.ends_at : at.closes_at, status: at.status,
-    centre, face_check: Boolean(plan?.face_check) && !centre, school: { name: s?.school_name ?? at.applications?.tenants?.name, logo_url: s?.logo_url, brand_color: s?.brand_color },
+    centre, face_check: Boolean(plan?.face_check) && !centre,
+    seb: sebAtHome(sitting, plan) ? { required: true, in_seb: isSebUserAgent(req.headers.get("user-agent")), file_url: `/api/entrance/${token}?seb=1`, launch_url: sebLaunchUrl(`${appUrl(req)}/api/entrance/${token}?seb=1`) } : null,
+    school: { name: s?.school_name ?? at.applications?.tenants?.name, logo_url: s?.logo_url, brand_color: s?.brand_color },
     tools: examTools(at.exams?.settings), reference_text: examTools(at.exams?.settings).includes("reference_sheet") ? (at.exams?.settings?.reference_text ?? null) : null };
   if (at.status !== "in_progress") return NextResponse.json({ info });
   const byId = new Map(questions.map(q => [q.id, q]));
@@ -121,6 +138,14 @@ export async function POST(req: NextRequest, props: { params: Promise<{ token: s
           await svc.from("entrance_events").insert({ tenant_id: at.tenant_id, attempt_id: at.id, kind: "seb_refused", meta: { reason: check.reason } });
           return jsonError(check.reason ?? "This test must be taken in Safe Exam Browser.", 403);
         }
+      }
+    } else if (sebAtHome(sitting, plan)) {
+      // Each applicant's SEB file has its own start page, so there is no single Config Key to check:
+      // SEB is recognised by its browser signature. Camera checks can run alongside.
+      const check = verifySeb(absoluteRequestUrl(req), req.headers, { require_seb: true });
+      if (!check.ok) {
+        await svc.from("entrance_events").insert({ tenant_id: at.tenant_id, attempt_id: at.id, kind: "seb_refused", meta: { reason: check.reason ?? "not in SEB", where: "home" } });
+        return jsonError("This test opens only in Safe Exam Browser. Use the Open in Safe Exam Browser button on this page.", 403);
       }
     }
     if (!questions.length) return jsonError("the school has not finished setting this test", 409);

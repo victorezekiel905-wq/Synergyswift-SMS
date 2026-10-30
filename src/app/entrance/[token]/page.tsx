@@ -10,7 +10,9 @@ type Info = { title: string; instructions: string | null; duration_minutes: numb
   /** Taken at a centre (with a PIN on the school's computer), and whether the candidate has checked in there. */
   centre?: { name: string; address: string | null; starts_at: string; ends_at: string; checked_in: boolean } | null;
   /** The camera checks the right person is taking the test at home. */
-  face_check?: boolean };
+  face_check?: boolean;
+  /** The school asks for Safe Exam Browser at home: whether this page is open in it, and the applicant's own SEB file. */
+  seb?: { required: boolean; in_seb: boolean; file_url: string; launch_url: string } | null };
 type Attempt = { deadline_at: string; server_now: string; answers: Record<string, unknown>; questions: PublicQuestion[] };
 
 async function api(token: string, body?: unknown) {
@@ -59,9 +61,14 @@ export default function EntrancePage(props: { params: Promise<{ token: string }>
     const r = await api(token, { action: "submit", answers: dirty.current });
     submitting.current = false;
     dirty.current = {};
-    if (r.ok) { setAttempt(null); load(); if (kiosk) setTimeout(() => { window.location.href = "/entrance/pin?done=1"; }, 6000); }
+    if (r.ok) {
+      setAttempt(null); load();
+      if (kiosk) setTimeout(() => { window.location.href = "/entrance/pin?done=1"; }, 6000);
+      // In Safe Exam Browser at home, the quit page closes SEB once the thank-you has been read.
+      else if (info?.seb?.in_seb) setTimeout(() => { window.location.href = `/entrance/${token}?done=1`; }, 8000);
+    }
     else setErr(r.data.error ?? "Could not submit; check your connection and try again.");
-  }, [token, load, kiosk]);
+  }, [token, load, kiosk, info?.seb?.in_seb]);
   const report = useCallback((kind: string, meta?: Record<string, unknown>) => { void api(token, { action: "event", kind, meta: meta ?? null }); }, [token]);
 
   useEffect(() => {
@@ -95,6 +102,7 @@ export default function EntrancePage(props: { params: Promise<{ token: string }>
           {info.centre && !info.centre.checked_in ? (
             <p className="mt-4 rounded-lg bg-slate-50 p-3">This test is taken at <b>{info.centre.name}</b>{info.centre.address ? `, ${info.centre.address}` : ""}, {new Date(info.centre.starts_at).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" })}. {info.child} types the test PIN on the school&apos;s computer there.</p>
           ) : info.window !== "open" ? <p className="mt-4 rounded-lg bg-amber-50 p-3">{info.window === "not_open" ? `This test opens ${info.opens_at ? new Date(info.opens_at).toLocaleString() : "later"}.` : "This test has closed."}</p>
+            : info.seb?.required && !info.seb.in_seb ? <SebAtHome seb={info.seb} child={info.child} color={color} />
             : (<>
               {info.face_check && (
                 <label className="mt-4 flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm">
@@ -142,5 +150,25 @@ export default function EntrancePage(props: { params: Promise<{ token: string }>
         {err && <p role="alert" className="mt-3 text-sm text-rose-600">{err}</p>}
       </main>
     </div>
+  );
+}
+
+/** The school asks for Safe Exam Browser at home: how to get it, then open this test in it. */
+function SebAtHome({ seb, child, color }: { seb: NonNullable<Info["seb"]>; child: string; color: string }) {
+  return (
+    <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+      <h2 className="text-base font-semibold">This test opens in Safe Exam Browser</h2>
+      <p className="mt-1 text-slate-600">The school asks for {child}&apos;s test to be taken in Safe Exam Browser, a free app that locks the computer to the test until it is submitted. It works on a Windows or Mac computer, or an iPad (not on Android phones or Chromebooks).</p>
+      <ol className="mt-3 list-decimal space-y-1.5 pl-5">
+        <li>Install Safe Exam Browser: <a className="underline" href="https://safeexambrowser.org/download_en.html" target="_blank" rel="noreferrer">Windows or Mac</a>, or <a className="underline" href="https://apps.apple.com/app/safeexambrowser/id1155002964" target="_blank" rel="noreferrer">iPad (App Store)</a>.</li>
+        <li>Come back to this page on the same device and press the button below. Safe Exam Browser opens on the test.</li>
+        <li>Press <b>Start the test</b> there. When it is submitted, Safe Exam Browser closes by itself.</li>
+      </ol>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <a className="btn px-5 py-2.5 text-white no-underline" style={{ background: color }} href={seb.launch_url}>Open in Safe Exam Browser</a>
+        <a className="text-sm underline" href={seb.file_url}>Or download the test file and open it</a>
+      </div>
+      <p className="mt-3 text-xs text-slate-500">If nothing happens, check Safe Exam Browser is installed, then press the button again. Keep this link private: it is {child}&apos;s own test.</p>
+    </section>
   );
 }

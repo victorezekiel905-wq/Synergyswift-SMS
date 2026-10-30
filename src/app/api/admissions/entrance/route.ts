@@ -106,7 +106,7 @@ const Plan = z.object({
   name: z.string().trim().min(1).max(120), level: z.string().trim().min(1).max(60), intake: z.string().trim().max(60).default(""),
   exam_id: z.string().uuid().nullish(), status: z.enum(["draft", "open", "closed"]).default("open"),
   assign_on: z.enum(["submitted", "fee_paid", "manual"]), where_mode: z.enum(["online", "centre", "choice"]),
-  face_check: z.boolean().default(false), seb_at_centre: z.boolean().default(true),
+  face_check: z.boolean().default(false), seb_at_centre: z.boolean().default(true), seb_at_home: z.boolean().default(false),
   test_weight: z.number().int().min(1).max(100), interview_weight: z.number().int().min(0).max(100), report_weight: z.number().int().min(0).max(100),
   pass_mark: pct, section_pass_marks: z.record(z.string().trim().min(1).max(80), pct).default({}), borderline_band: z.number().min(0).max(50),
   interview_for: z.enum(["none", "borderline", "passed", "everyone"]), decision_mode: z.enum(["auto", "approve"]),
@@ -142,7 +142,9 @@ export async function POST(req: NextRequest) {
   try {
     switch (b.action) {
       case "save_plan": {
-        const { action: _a, id, ...row } = b;
+        const { action: _a, id, seb_at_home, ...rest } = b;
+        // Sent only when on, or when an intake that had it is switched off, so intakes save before migration 9000 too.
+        const row = seb_at_home || id ? { ...rest, seb_at_home } : rest;
         if (!weightsValid(row)) return jsonError("The test, interview and report weights must add up to 100, and the test must count.");
         if (row.exam_id) {
           const { data: ex } = await ctx.sb.from("exams").select("id").eq("tenant_id", tid).eq("id", row.exam_id).maybeSingle();
@@ -155,7 +157,13 @@ export async function POST(req: NextRequest) {
         const values = { ...row, tenant_id: tid, release_at: row.release_at ?? null, offer_valid_days: row.offer_valid_days ?? null, acceptance_fee: row.acceptance_fee ?? null,
           class_group_id: row.class_group_id ?? null, exam_id: row.exam_id ?? null, updated_at: new Date().toISOString() };
         const q = id ? ctx.sb.from("entrance_plans").update(values).eq("tenant_id", tid).eq("id", id) : ctx.sb.from("entrance_plans").insert({ ...values, created_by: ctx.userId });
-        const { data, error } = await q.select("*").single();
+        let { data, error } = await q.select("*").single();
+        // Before migration 9000 there is no seb_at_home column: an intake that doesn't use it still saves.
+        if (error && /seb_at_home/.test(error.message)) {
+          if (seb_at_home) return jsonError("Safe Exam Browser at home needs the database update (migration 20260101009000).");
+          const { seb_at_home: _s, ...old } = values as typeof values & { seb_at_home?: boolean };
+          ({ data, error } = await (id ? ctx.sb.from("entrance_plans").update(old).eq("tenant_id", tid).eq("id", id) : ctx.sb.from("entrance_plans").insert({ ...old, created_by: ctx.userId })).select("*").single());
+        }
         if (error) return jsonError(error.message.includes("entrance_plans_intake") ? "There is already an entrance plan for that class and intake." : error.message);
         return NextResponse.json({ ok: true, plan: data });
       }
