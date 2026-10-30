@@ -55,4 +55,7 @@ COPY --from=builder /app/supabase ./supabase
 USER app
 EXPOSE 3000
 ENV PORT=3000
-CMD ["npx","next","start"]
+# Started by node itself, not through npx: npx runs the command through /bin/sh, and Debian's sh
+# drops settings whose names aren't shell names (Render's "Service-Role-Key", for example), so the
+# app would never see them. lib/env-aliases.ts then maps those names onto the ones the app reads.
+CMD ["node","node_modules/next/dist/bin/next","start"]
