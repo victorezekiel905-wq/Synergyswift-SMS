@@ -24,7 +24,8 @@ export default function StudentsPage() {
     <Page wide>
       <PageHeader eyebrow="Student information" title="Students & parents"
         subtitle="Every student record, their guardians and how parents are reached. Guardians get results, sign-in alerts and pickup codes on WhatsApp and email."
-        actions={<><button className="btn btn-outline" onClick={() => setImp(true)}>Import CSV</button><button className="btn btn-primary" onClick={() => setAdd(true)}>+ Add student</button></>} />
+        actions={<><Link href="/school/data?entity=students" className="btn btn-outline no-underline" title="CSV, Excel or PDF, with each class as a heading: classes are created, students placed and numbered for you">Upload the school&apos;s student list</Link>
+          <button className="btn btn-outline" onClick={() => setImp(true)}>Quick CSV import</button><button className="btn btn-primary" onClick={() => setAdd(true)}>+ Add student</button></>} />
       <div className="mb-4 flex flex-wrap gap-2">
         <input className="input max-w-xs" placeholder="Search name or admission no" value={q} onChange={e => setQ(e.target.value)} aria-label="Search students" />
         <select className="input max-w-[200px]" value={cg} onChange={e => setCg(e.target.value)} aria-label="Class">

@@ -9,8 +9,20 @@ export type Table = { headers: string[]; rows: string[][] };
 
 /** Parses CSV, semicolon- or tab-separated text (whichever the first line uses). */
 export function parseDelimited(text: string): Table {
+  const out = parseGrid(text);
+  if (!out.length) return { headers: [], rows: [] };
+  const headers = out[0].map(h => h.trim());
+  return { headers, rows: out.slice(1).map(r => headers.map((_, i) => (r[i] ?? "").trim())) };
+}
+
+/**
+ * Every non-empty row as it is in the file (rows keep their own length). The separator is
+ * the one used by the first line that has any, so a file can start with a title or a
+ * class heading on its own.
+ */
+export function parseGrid(text: string): string[][] {
   const s = text.replace(/^﻿/, "");
-  const first = s.split(/\r?\n/, 1)[0] ?? "";
+  const first = s.split(/\r?\n/).slice(0, 50).find(l => /[,;\t]/.test(l)) ?? "";
   const counts = [",", ";", "\t"].map(d => [d, first.split(d).length] as const).sort((a, b) => b[1] - a[1]);
   const delim = counts[0][1] > 1 ? counts[0][0] : ",";
   const out: string[][] = [];
@@ -32,9 +44,7 @@ export function parseDelimited(text: string): Table {
   }
   row.push(cell);
   if (row.some(x => x.trim() !== "")) out.push(row);
-  if (!out.length) return { headers: [], rows: [] };
-  const headers = out[0].map(h => h.trim());
-  return { headers, rows: out.slice(1).map(r => headers.map((_, i) => (r[i] ?? "").trim())) };
+  return out;
 }
 
 export function toCsv(t: Table): string {
@@ -70,6 +80,14 @@ export function excelDate(serial: number): string {
 
 /** Reads the first worksheet of an .xlsx file. Date columns come back as YYYY-MM-DD. */
 export async function readXlsx(data: ArrayBuffer | Uint8Array): Promise<Table> {
+  const grid = await readXlsxGrid(data);
+  if (!grid.length) return { headers: [], rows: [] };
+  const headers = grid[0].map(h => h.trim());
+  return { headers, rows: grid.slice(1).map(r => headers.map((_, i) => r[i] ?? "")) };
+}
+
+/** Every non-empty row of the first sheet as it is (rows keep their own length). */
+export async function readXlsxGrid(data: ArrayBuffer | Uint8Array): Promise<string[][]> {
   const zip = await JSZip.loadAsync(data);
   const wb = await zip.file("xl/workbook.xml")?.async("string");
   if (!wb) throw new Error("this is not an Excel .xlsx file");
@@ -111,9 +129,7 @@ export async function readXlsx(data: ArrayBuffer | Uint8Array): Promise<Table> {
     for (let i = 0; i < cells.length; i++) if (cells[i] === undefined) cells[i] = "";
     if (cells.some(x => x !== "")) grid.push(cells);
   }
-  if (!grid.length) return { headers: [], rows: [] };
-  const headers = grid[0].map(h => h.trim());
-  return { headers, rows: grid.slice(1).map(r => headers.map((_, i) => r[i] ?? "")) };
+  return grid;
 }
 
 /** A one-sheet .xlsx file. Every cell is text so admission numbers keep their leading zeros. */

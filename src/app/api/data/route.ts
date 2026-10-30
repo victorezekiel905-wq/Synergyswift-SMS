@@ -6,9 +6,17 @@ import { appUrl } from "@/lib/school";
 import { entity, ENTITIES } from "@/lib/importers";
 import { readTable, runImport, exportTable } from "@/lib/importers-server";
 import { toCsv, writeXlsx } from "@/lib/spreadsheet";
+import { fillAdmissionNumbers, type Existing } from "@/lib/admission-numbers";
+import { fetchAll } from "@/lib/results";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+/** The school's students, for giving admission numbers to a list without them. */
+async function fetchAllRows(sb: any, tid: string): Promise<Existing[]> {
+  const rows = await fetchAll<any>(() => sb.from("students").select("admission_no,first_name,last_name,class_groups(name)").eq("tenant_id", tid).order("admission_no"));
+  return rows.map(s => ({ admission_no: s.admission_no ?? "", first_name: s.first_name ?? "", last_name: s.last_name ?? "", class_name: s.class_groups?.name ?? null }));
+}
 
 const MAX_ROWS = 5000;
 const allowed = (ctx: any, key: string) => {
@@ -55,6 +63,22 @@ export async function POST(req: NextRequest) {
   const b = parsed.data;
   if (!allowed(ctx, b.entity)) return jsonError("you cannot import this", 403);
   const e = entity(b.entity)!;
+  // Student lists without admission numbers: each student gets one (an existing student keeps theirs).
+  let numbered: { reused: number; made: number } | null = null;
+  if (b.entity === "students") {
+    const col = (k: string) => b.map[k] ?? -1;
+    if (col("first_name") >= 0 && col("last_name") >= 0) {
+      const cell = (r: string[], k: string) => (col(k) >= 0 ? (r[col(k)] ?? "").trim() : "");
+      if (b.rows.some(r => !cell(r, "admission_no"))) {
+        const existing = await fetchAllRows(ctx.sb, ctx.tenant.id);
+        const filled = fillAdmissionNumbers(b.rows.map(r => ({ admission_no: cell(r, "admission_no"), first_name: cell(r, "first_name"), last_name: cell(r, "last_name"), class_name: cell(r, "class") })), existing, new Date().getFullYear());
+        let at = col("admission_no");
+        if (at < 0) { at = b.headers.length; b.headers.push("Admission number (given by Synergy Swift)"); b.map.admission_no = at; }
+        b.rows = b.rows.map((r, i) => { const x = [...r]; while (x.length <= at) x.push(""); x[at] = filled.numbers[i]; return x; });
+        numbered = { reused: filled.reused, made: filled.made };
+      }
+    }
+  }
   const missing = e.fields.filter(f => f.required && (b.map[f.key] ?? -1) < 0).map(f => f.label);
   if (missing.length) return jsonError(`choose the column for: ${missing.join(", ")}`);
   if (b.create_logins && !hasAny(ctx, ROLES.admin)) return jsonError("only school admins can create sign-in accounts", 403);
@@ -63,6 +87,6 @@ export async function POST(req: NextRequest) {
     const result = await runImport(ctx.sb, ctx.tenant.id, b.entity, rows, { dryRun: b.dry_run, createLogins: b.create_logins, baseUrl: appUrl(req), userId: ctx.userId, svc: createServiceClient() });
     if (!b.dry_run) await ctx.sb.from("audit_logs").insert({ tenant_id: ctx.tenant.id, actor_id: ctx.userId, action: "data.imported",
       meta: { entity: b.entity, rows: result.rows, created: result.created, updated: result.updated, skipped: result.skipped, invited: result.invited } });
-    return NextResponse.json({ ...result, errors: result.errors.slice(0, 500), more_errors: Math.max(0, result.errors.length - 500) });
+    return NextResponse.json({ ...result, numbered, errors: result.errors.slice(0, 500), more_errors: Math.max(0, result.errors.length - 500) });
   } catch (err) { return jsonError((err as Error).message); }
 }
