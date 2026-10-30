@@ -47,7 +47,15 @@ export default function PlansPage() {
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           {d.plans.map(p => (
             <div key={p.code} className="rounded-lg border border-slate-200 p-3">
-              <p className="mb-1 font-semibold">{p.name}: what it includes</p>
+              <div className="mb-1 flex items-baseline justify-between gap-2">
+                <p className="font-semibold">{p.name}: what it includes</p>
+                {!readOnly && (
+                  <span className="flex gap-2 text-xs">
+                    <button type="button" className="text-navy hover:underline" onClick={() => setPlan(p.code, { groups: MODULE_GROUPS.map(g => g.key) })}>Tick all</button>
+                    <button type="button" className="text-slate-600 hover:underline" onClick={() => setPlan(p.code, { groups: MODULE_GROUPS.filter(g => g.key === "core").map(g => g.key) })}>Untick all</button>
+                  </span>
+                )}
+              </div>
               <div className="mb-2 flex flex-wrap gap-3 text-sm">
                 {MODULE_GROUPS.map(g => <label key={g.key} className="flex items-center gap-1"><input type="checkbox" disabled={readOnly || g.key === "core"} checked={p.groups.includes(g.key)} onChange={e => setPlan(p.code, { groups: e.target.checked ? [...p.groups, g.key] : p.groups.filter(x => x !== g.key) })} /> {g.label}</label>)}
               </div>
