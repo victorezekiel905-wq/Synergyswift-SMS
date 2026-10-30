@@ -7,12 +7,33 @@ import { activeHref, type NavGroup, type NavLink } from "@/lib/nav";
 const read = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
 const write = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } };
 
+/** Big menus are split into modules across the top bar; short ones (parents, students, the platform) stay one list. */
+export const tabbedNav = (groups: NavGroup[]) => groups.length > 1 && groups.reduce((n, g) => n + g.links.length, 0) > 12;
+
+/** Module tabs across the top bar. Choosing one shows its pages in the side menu; it doesn't leave the page. */
+export function ModuleBar({ groups, selected, here, onSelect }: { groups: NavGroup[]; selected: string; here: string | null; onSelect: (id: string) => void }) {
+  return (
+    <nav aria-label="Modules" className="flex gap-1 overflow-x-auto px-3 sm:px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {groups.map(g => {
+        const on = g.id === selected;
+        return (
+          <button key={g.id} type="button" onClick={() => onSelect(g.id)} aria-pressed={on} aria-current={g.id === here ? "true" : undefined}
+            className={"relative shrink-0 whitespace-nowrap px-3 py-2.5 text-[13.5px] transition-colors " + (on
+              ? "font-semibold text-slate-900 after:absolute after:inset-x-3 after:bottom-0 after:h-[2px] after:rounded-full after:bg-brand-600"
+              : "text-slate-600 hover:text-slate-900")}>
+            {g.title}{g.id === here && !on && <span aria-hidden className="ml-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-brand-600" />}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 /**
- * The side menu: pinned pages first, then the areas. Only the area you are in
- * is open; the others show just their name until clicked. People with a short
- * menu (parents, students) see everything open.
+ * The side menu. With the module bar, it shows the chosen module's pages, then
+ * any pinned pages. Without it (short menus), every area is listed open.
  */
-export default function SideNav({ groups, path, userKey }: { groups: NavGroup[]; path: string; userKey: string }) {
+export default function SideNav({ groups, path, userKey, module }: { groups: NavGroup[]; path: string; userKey: string; module?: string }) {
   const pinKey = `ss-pins:${userKey}`, openKey = `ss-open:${userKey}`;
   const [pins, setPins] = useState<string[]>([]);
   const [opened, setOpened] = useState<string[]>([]);
@@ -25,6 +46,7 @@ export default function SideNav({ groups, path, userKey }: { groups: NavGroup[];
   const toggle = (id: string) => { const n = opened.includes(id) ? opened.filter(x => x !== id) : [...opened, id]; setOpened(n); write(openKey, n); };
   const togglePin = (href: string) => { const n = pins.includes(href) ? pins.filter(x => x !== href) : [...pins, href].slice(-8); setPins(n); write(pinKey, n); };
   const pinned = pins.map(h => links.find(l => l.href === h)).filter(Boolean) as NavLink[];
+  const chosen = module ? groups.find(g => g.id === module) : undefined;
 
   const row = (l: NavLink, inPins = false) => {
     const on = l.href === current;
@@ -46,6 +68,20 @@ export default function SideNav({ groups, path, userKey }: { groups: NavGroup[];
       </li>
     );
   };
+
+  if (chosen) return (
+    <nav aria-label="Main" className="space-y-1">
+      <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{chosen.title}</p>
+      <ul className="space-px">{chosen.links.map(l => row(l))}</ul>
+      {pinned.length > 0 && (
+        <div className="mt-6 border-t border-slate-100 pt-4">
+          <p className="mb-1 px-3 text-xs font-medium text-slate-400">Pinned</p>
+          <ul className="space-px">{pinned.map(l => row(l, true))}</ul>
+        </div>
+      )}
+      <p className="px-3 pt-4 text-[11px] leading-4 text-slate-400">Pick a module at the top. Ctrl K jumps to any page; the star pins a page here.</p>
+    </nav>
+  );
 
   return (
     <nav aria-label="Main" className="space-y-1">

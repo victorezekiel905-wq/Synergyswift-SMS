@@ -9,8 +9,8 @@ import { EmergencyBanner } from "@/components/comms/NoticeBoard";
 import NativeBridge, { forgetDevice } from "@/components/NativeBridge";
 import { claimDevice } from "@/components/offline";
 
-import { NAV, PLATFORM_NAV, visibleNav, bottomBar, type NavGroup } from "@/lib/nav";
-import SideNav, { BottomBar } from "@/components/SideNav";
+import { NAV, PLATFORM_NAV, visibleNav, bottomBar, activeHref, type NavGroup } from "@/lib/nav";
+import SideNav, { BottomBar, ModuleBar, tabbedNav } from "@/components/SideNav";
 import { BrandMark } from "@/components/BrandMark";
 
 // Pages that render without the app chrome (public links, kiosk, exam lockdown).
@@ -23,6 +23,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [open, setOpen] = useState(false);
+  // The module chosen on the top bar; cleared when you go to another page, so the menu follows the page.
+  const [picked, setPicked] = useState<string | null>(null);
   const [idleWarn, setIdleWarn] = useState(false);
   const lastActive = useRef(Date.now());
   // The public home page has its own header; signed-in visitors are sent on to their dashboard.
@@ -59,7 +61,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bare]);
-  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => { setOpen(false); setPicked(null); }, [pathname]);
   // Keep the session's access grant fresh while the page is open (schools that restrict staff access).
   useEffect(() => {
     if (bare || !me?.profile) return;
@@ -114,7 +116,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     ? [{ id: "group", title: "Group", links: [{ href: "/group", label: "All branches", roles: [] }] }]
     : visibleNav(roles, modules, NAV);
   const closedState = me?.account?.state === "paused" || me?.account?.state === "suspended" ? me.account.state : me?.tenant?.status !== "active" && me?.tenant ? me.tenant.status : null;
-  const nav = <SideNav groups={groups} path={pathname} userKey={me?.user?.id ?? "anon"} />;
+  // Main modules across the top; the side menu shows the chosen one's pages (it follows the page you are on).
+  const tabbed = tabbedNav(groups);
+  const here = groups.find(g => g.links.some(l => l.href === activeHref(groups, pathname)))?.id ?? null;
+  const activeModule = (picked && groups.some(g => g.id === picked) ? picked : here) ?? groups[0]?.id;
+  const nav = <SideNav groups={groups} path={pathname} userKey={me?.user?.id ?? "anon"} module={tabbed ? activeModule : undefined} />;
   const quick = me?.profile && !me.platform ? bottomBar(roles, modules) : [];
   const initials = (me?.profile?.full_name ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join("");
 
@@ -143,10 +149,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button onClick={signOut} className="btn btn-ghost px-2.5 text-[13px] text-slate-600" title="Sign out"><Icon name="logout" className="h-4 w-4" /><span className="hidden md:inline">Sign out</span></button>
           </div>
         </div>
+        {tabbed && activeModule && <div className="border-t border-slate-100"><ModuleBar groups={groups} selected={activeModule} here={here} onSelect={id => { setPicked(id); if (!window.matchMedia("(min-width: 1024px)").matches) setOpen(true); }} /></div>}
       </header>
       <div className="flex">
         {open && <div className="fixed inset-0 z-10 bg-slate-950/30 lg:hidden" aria-hidden onClick={() => setOpen(false)} />}
-        <aside className={(open ? "fixed inset-y-0 left-0 z-20 block pt-[72px] shadow-pop" : "hidden") + " w-60 shrink-0 overflow-y-auto border-r border-slate-200 bg-white px-2.5 pb-24 pt-5 lg:sticky lg:pb-5 lg:top-14 lg:block lg:h-[calc(100vh-3.5rem)] lg:pt-6"}>
+        <aside className={(open ? `fixed inset-y-0 left-0 z-20 block ${tabbed ? "pt-[116px]" : "pt-[72px]"} shadow-pop` : "hidden") + " w-60 shrink-0 overflow-y-auto border-r border-slate-200 bg-white px-2.5 pb-24 pt-5 lg:sticky lg:pb-5 lg:block lg:pt-6 " + (tabbed ? "lg:top-[6.25rem] lg:h-[calc(100vh-6.25rem)]" : "lg:top-14 lg:h-[calc(100vh-3.5rem)]")}>
           {nav}
         </aside>
         <div className="min-w-0 flex-1">

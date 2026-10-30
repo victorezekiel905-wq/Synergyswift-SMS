@@ -218,7 +218,7 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
   }, [local, selected, activityMap]);
 
   return (
-    <div className="flex min-h-[calc(100dvh-3.5rem)] lg:min-h-[calc(100dvh-4rem)] flex-col">
+    <div className="flex min-h-[calc(100dvh-6.25rem)] flex-col">
       <div className="flex flex-wrap items-center gap-3 border-b border-ink-200 bg-white px-4 py-2.5">
         <Link href="/live/teacher/lessons" className="text-sm">← Lessons</Link>
         <input className="min-w-[12rem] flex-1 rounded-md border border-transparent px-2 py-1 text-lg font-bold hover:border-ink-200 focus:border-brand-500 focus:outline-none"
@@ -252,7 +252,7 @@ export function LessonEditor({ lesson: initial, canEdit, userId, rubrics, classe
       {!canEdit && <div className="px-4 pt-3"><Alert>You're viewing a colleague's published lesson. Make a copy to edit it.</Alert></div>}
 
       <div className="grid flex-1 grid-cols-[minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="border-r border-ink-200 bg-ink-50 p-3 lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto">
+        <aside className="border-r border-ink-200 bg-ink-50 p-3 lg:max-h-[calc(100dvh-9.75rem)] lg:overflow-y-auto">
           <ol className="flex gap-3 overflow-x-auto pb-1 lg:block lg:space-y-3 lg:overflow-visible lg:pb-0" aria-label="Slides">
             {local.map((s, i) => (
               <li key={s.id} className={cn("relative w-40 shrink-0 lg:w-auto", dropAt === i && dragging !== s.id && "before:absolute before:-top-2 before:inset-x-0 before:h-1 before:rounded-full before:bg-brand-500")}

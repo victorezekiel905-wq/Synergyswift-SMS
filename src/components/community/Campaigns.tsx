@@ -79,7 +79,7 @@ function Editor({ c, list, onDone }: { c: Partial<Campaign>; list: ListData; onD
   // Refresh the recipient count and preview a moment after edits stop.
   useEffect(() => {
     const t = setTimeout(async () => {
-      const r = await send<any>("/api/community/campaigns", { action: "preview", audience: a, channels: d.channels, kind: d.kind, subject: d.subject ?? "", body: d.body ?? "", blocks: (d.blocks ?? []).map(cleanBlock) });
+      const r = await send<any>("/api/community/campaigns", { action: "preview", audience: a, channels: d.channels, kind: d.kind, subject: d.subject ?? "", body: d.body ?? "", blocks: (d.blocks ?? []).map(cleanBlock) }, "POST", { quiet: true });
       if (r.ok) setPreview(r.data);
     }, 600);
     return () => clearTimeout(t);

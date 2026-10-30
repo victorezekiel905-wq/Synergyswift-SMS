@@ -143,7 +143,7 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-3.5rem)] lg:min-h-[calc(100dvh-4rem)] flex-col">
+    <div className="flex min-h-[calc(100dvh-6.25rem)] flex-col">
       <ControlBar state={s} sessionId={sessionId} joined={joined} timer={timer} skew={skew} monitoring={mon}
         onControl={(a, args) => void control(a, args)} onEnd={() => void end()}
         onLockdown={async () => {
@@ -167,7 +167,7 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
       )}
 
       <div className={cn("grid flex-1 grid-cols-[minmax(0,1fr)]", mon ? "lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[230px_minmax(0,1fr)_300px]" : "xl:grid-cols-[minmax(0,1fr)_300px]")}>
-        {mon && <aside className="min-w-0 border-b border-ink-200 bg-white p-3 lg:sticky lg:top-16 lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto lg:border-b-0 lg:border-r" aria-label="Student screens">
+        {mon && <aside className="min-w-0 border-b border-ink-200 bg-white p-3 lg:sticky lg:top-[6.25rem] lg:max-h-[calc(100dvh-9.75rem)] lg:overflow-y-auto lg:border-b-0 lg:border-r" aria-label="Student screens">
           <ScreenRail state={s} screens={screens} focus={focus} onFocus={setFocus} onChanged={() => void state.reload()} />
         </aside>}
         <section className="min-w-0 p-4">

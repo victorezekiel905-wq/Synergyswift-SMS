@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { notify, noticeFor } from "@/components/Toaster";
 
 /** Fetch JSON with loading / error state. `reload()` re-fetches. */
 export function useApi<T>(url: string | null, deps: unknown[] = []) {
@@ -24,15 +25,26 @@ export function useApi<T>(url: string | null, deps: unknown[] = []) {
 }
 
 /** POST/PUT/PATCH/DELETE JSON; returns { ok, data, error }. */
-export async function send<T = any>(url: string, body?: unknown, method = "POST"): Promise<{ ok: boolean; data: T; error: string | null }> {
+/**
+ * Calls an API. Every change also tells the person whether it worked ("Saved" /
+ * "Not saved: …", see Toaster); { quiet: true } for calls made in the background.
+ */
+export async function send<T = any>(url: string, body?: unknown, method = "POST", opts: { quiet?: boolean } = {}): Promise<{ ok: boolean; data: T; error: string | null }> {
+  const say = method === "GET" || opts.quiet ? null : noticeFor(method, body);
   try {
     const r = await fetch(url, {
       method, headers: body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body)
     });
     const j = await r.json().catch(() => ({}));
-    return { ok: r.ok, data: j as T, error: r.ok ? null : (j.error ?? `Request failed (${r.status})`) };
+    const error = r.ok ? null : (j.error ?? `Request failed (${r.status})`);
+    if (say) {
+      if (error) notify({ tone: "error", text: `${say.failed}: ${error}` });
+      else if (!say.quietWhenOk) notify({ tone: "ok", text: `${say.done}.` });
+    }
+    return { ok: r.ok, data: j as T, error };
   } catch (e) {
+    if (say) notify({ tone: "error", text: `${say.failed}: no connection. Check the internet and try again.` });
     return { ok: false, data: {} as T, error: (e as Error).message };
   }
 }
