@@ -10,8 +10,9 @@ type Office = { installed: boolean; bin?: string; version?: string | null; advic
 
 /** Is the server set up right: the Supabase service key, and PowerPoint imports keeping their design. */
 export default function ServerCheck() {
-  const { data, error } = useApi<{ key: Key; office: null }>("/api/platform/server-check");
+  const { data, error } = useApi<{ key: Key; office: null; ai: { providers: string[]; test: null } }>("/api/platform/server-check");
   const [office, setOffice] = useState<Office | null>(null);
+  const [ai, setAi] = useState<{ ok: boolean; seconds: number; error: string | null } | null>(null);
   const [running, setRunning] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   async function run() {
@@ -21,13 +22,14 @@ export default function ServerCheck() {
     setRunning(false);
     if (!r.ok) return setErr(j.error ?? "The check didn't finish. Try again.");
     setOffice(j.office);
+    setAi(j.ai?.test ?? null);
   }
   const slow = office?.conversion?.ok && office.conversion.seconds > 20;
   return (
     <Page wide>
       <PlatformNav />
       <PageHeader eyebrow="Synergy Swift platform" title="Server check" subtitle="Whether the server's Supabase key works, and whether PowerPoint slide imports keep their design."
-        actions={<button className="btn btn-primary" disabled={running} onClick={run}>{running ? "Checking (up to a minute)…" : office ? "Check PowerPoint import again" : "Check PowerPoint import"}</button>} />
+        actions={<button className="btn btn-primary" disabled={running} onClick={run}>{running ? "Checking (up to a minute)…" : office ? "Run the checks again" : "Check AI and PowerPoint import"}</button>} />
       {error && <Alert>{error}</Alert>}
       {!data && !error && <Loading />}
       {data && (
@@ -37,6 +39,18 @@ export default function ServerCheck() {
           <p className="mt-1 text-xs text-slate-500">Type: {data.key.kind}. The key itself is never shown.</p>
           {data.key.problem && <div className="mt-3"><Alert>{data.key.problem}</Alert></div>}
           {data.key.detail && <p className="mt-2 text-xs text-amber-800">{data.key.detail}</p>}
+        </section>
+      )}
+      {data && (
+        <section className="card mb-4 p-5 text-sm">
+          <h2 className="mb-1 font-semibold">AI (slides, drafts, the assistant)</h2>
+          <p>{data.ai.providers.length
+            ? <>Set up: <b>{data.ai.providers.join(", ")}</b>, tried in that order until one answers.</>
+            : "No AI service is set up. Add a Gemini, Groq or OpenRouter key on Render (Environment)."}</p>
+          {ai && (ai.ok
+            ? <div className="mt-3"><Alert tone="green">AI answered in {ai.seconds} s. Slides, drafts and the assistant can work.</Alert></div>
+            : <div className="mt-3"><Alert>AI didn&apos;t answer ({ai.seconds} s): {ai.error ?? "no reply"}. Check the keys on Render, or the service&apos;s own dashboard for usage limits.</Alert></div>)}
+          {!ai && data.ai.providers.length > 0 && <p className="mt-1 text-xs text-slate-500">Press the button above to send a tiny test question.</p>}
         </section>
       )}
       {err && <Alert>{err}</Alert>}

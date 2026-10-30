@@ -16,7 +16,9 @@ describe("sign-in", () => {
     expect(readState("secret", s, 1_000_000 + 60_000)).toEqual({ userId: "u1", provider: "google" });
     expect(readState("other", s, 1_000_000)).toBeNull();
     expect(readState("secret", s, 1_000_000 + 11 * 60_000)).toBeNull();
-    expect(readState("secret", s.slice(0, -2) + "xx", 1_000_000)).toBeNull();
+    // Tampered: the signature's first character changed (always a different one).
+    const [body, sig] = s.split(".");
+    expect(readState("secret", `${body}.${sig[0] === "A" ? "B" : "A"}${sig.slice(1)}`, 1_000_000)).toBeNull();
     expect(readState("secret", "nonsense", 1_000_000)).toBeNull();
   });
 });
