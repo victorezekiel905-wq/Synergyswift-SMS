@@ -20,7 +20,7 @@ export default function BehaviourPage() {
   return (
     <Page wide>
       <PageHeader eyebrow="Pastoral" title="Behaviour & houses"
-        subtitle="Award points and log concerns in two taps. Rules trigger follow-up actions automatically (for example three concerns in two weeks), and parents hear about the things that matter." />
+        subtitle="Give merits and demerits in two taps. Rules act on them automatically (for example three demerits in two weeks means a detention, ten merit points a commendation), and parents hear about the things that matter." />
       {error && <Alert>{error}</Alert>}
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "record", label: "Record" }, { id: "incidents", label: "Incidents" }, { id: "detentions", label: "Detentions" }, { id: "actions", label: `Follow-ups${data?.actions.length ? ` (${data.actions.length})` : ""}` }, { id: "houses", label: "Houses" }, ...(admin ? [{ id: "setup" as const, label: "Setup" }] : [])]} />
       {data && tab === "record" && <Record data={data} reload={reload} />}
@@ -142,7 +142,7 @@ function Setup({ data, reload }: { data: Data; reload: () => void }) {
         <ul className="mb-3 space-y-1 text-sm">{data.categories.map(x => <li key={x.id} className="flex justify-between"><span>{x.name}{x.notify_parent ? " · tells parents" : ""}</span><Badge tone={x.kind === "positive" ? "green" : "red"}>{x.points}</Badge></li>)}</ul>
         <form className="grid grid-cols-2 gap-2" onSubmit={async e => { e.preventDefault(); if (await act({ action: "save_category", ...c, points: Number(c.points) })) setC({ ...c, name: "" }); }}>
           <input className="input col-span-2" placeholder="Name" required value={c.name} onChange={e => setC({ ...c, name: e.target.value })} aria-label="Category name" />
-          <select className="input" value={c.kind} onChange={e => setC({ ...c, kind: e.target.value })} aria-label="Kind"><option value="positive">Positive</option><option value="negative">Negative</option></select>
+          <select className="input" value={c.kind} onChange={e => setC({ ...c, kind: e.target.value })} aria-label="Kind"><option value="positive">Merit (adds points)</option><option value="negative">Demerit (takes points)</option></select>
           <input className="input" type="number" min={1} max={100} value={c.points} onChange={e => setC({ ...c, points: Number(e.target.value) })} aria-label="Points" />
           <label className="col-span-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={c.notify_parent} onChange={e => setC({ ...c, notify_parent: e.target.checked })} /> Tell parents every time</label>
           <button className="btn btn-primary col-span-2">Add category</button>
@@ -150,10 +150,10 @@ function Setup({ data, reload }: { data: Data; reload: () => void }) {
       </section>
       <section className="card p-5">
         <h2 className="mb-3 font-semibold">Automatic rules</h2>
-        <ul className="mb-3 space-y-1 text-sm">{data.rules.map(x => <li key={x.id}>{x.name}: {x.threshold} {x.measure === "count" ? `${x.kind} records` : `${x.kind} points`} in {x.window_days} days → <b>{x.action}</b>{x.notify_parent ? " + parents told" : ""}</li>)}</ul>
+        <ul className="mb-3 space-y-1 text-sm">{data.rules.map(x => <li key={x.id}>{x.name}: {x.threshold} {x.kind === "positive" ? "merit" : "demerit"} {x.measure === "count" ? "records" : "points"} in {x.window_days} days → <b>{x.action}</b>{x.notify_parent ? " + parents told" : ""}</li>)}</ul>
         <form className="grid grid-cols-2 gap-2" onSubmit={async e => { e.preventDefault(); if (await act({ action: "save_rule", ...r, threshold: Number(r.threshold), window_days: Number(r.window_days) })) setR({ ...r, name: "", action_text: "" }); }}>
           <input className="input col-span-2" placeholder="Rule name" required value={r.name} onChange={e => setR({ ...r, name: e.target.value })} aria-label="Rule name" />
-          <select className="input" value={r.kind} onChange={e => setR({ ...r, kind: e.target.value })} aria-label="Kind"><option value="negative">Negative</option><option value="positive">Positive</option></select>
+          <select className="input" value={r.kind} onChange={e => setR({ ...r, kind: e.target.value })} aria-label="Kind"><option value="negative">Demerits</option><option value="positive">Merits</option></select>
           <select className="input" value={r.measure} onChange={e => setR({ ...r, measure: e.target.value })} aria-label="Measure"><option value="count">Number of records</option><option value="points">Total points</option></select>
           <input className="input" type="number" min={1} value={r.threshold} onChange={e => setR({ ...r, threshold: Number(e.target.value) })} aria-label="Threshold" />
           <input className="input" type="number" min={1} max={365} value={r.window_days} onChange={e => setR({ ...r, window_days: Number(e.target.value) })} aria-label="Within days" />
