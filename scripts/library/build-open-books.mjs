@@ -90,7 +90,7 @@ const WORDS = /\b(sex|sexual|erotic|lust|harlot|prostitut|brothel|courtesan|mist
 }
 
 // ---------- StoryWeaver (illustrated storybooks, CC BY) ----------
-const read = f => { if (!fs.existsSync(path.join(src, f))) return []; const j = JSON.parse(fs.readFileSync(path.join(src, f), "utf8")); return Array.isArray(j) ? j : j.items ?? j.data ?? []; };
+const read = f => { if (!fs.existsSync(path.join(src, f))) return []; const j = JSON.parse(fs.readFileSync(path.join(src, f), "utf8")); return Array.isArray(j) ? j : j.items ?? j.data ?? j.books ?? []; };
 for (const b of read("storyweaver.json")) {
   add({ id: `storyweaver:${b.id}`, source: "storyweaver", section: "storybooks", title: b.title, authors: b.authors, description: b.description,
     subjects: [...new Set(["Literature", "English Language", ...subjectsOf(`${b.title} ${b.description}`)])].slice(0, 4),
@@ -99,7 +99,8 @@ for (const b of read("storyweaver.json")) {
 }
 
 // ---------- Open Textbook Library ----------
-const SECONDARY = /\b(intro|introduct|elementary|basic|fundamental|beginning|pre-?algebra|prealgebra|high school|ap |essentials|principles of|college algebra|arithmetic|foundations)\b/i;
+// Suitable for senior secondary (and A-level): introductory and general courses, as well as school-level books.
+const SECONDARY = /\b(intro\w*|elementary|basic|fundamentals?|beginning|beginner\w*|pre-?algebra|prealgebra|pre-?calculus|high school|secondary|k-?12|ap|a-?level|gcse|igcse|essentials|principles of|college algebra|arithmetic|foundations?|general (chemistry|biology|physics|science)|(physics|chemistry|biology|calculus) (i|1)|survey of|concepts of|conceptual)\b/i;
 for (const b of read("otl.json")) {
   if (b.language && !/^en/.test(b.language)) continue;
   const pdf = (b.formats ?? []).find(f => /pdf/i.test(f.type) && /^https:\/\//.test(f.url ?? ""));
@@ -121,6 +122,35 @@ for (const b of read("openstax.json")) {
     level: /\b(high school|ap|k-?12|prealgebra|elementary)\b/i.test(`${b.title} ${JSON.stringify(b.book_categories ?? "")}`) ? "secondary" : "tertiary",
     read_url: readUrl, download_url: /^https:\/\//.test(b.high_resolution_pdf_url ?? "") ? b.high_resolution_pdf_url : null,
     cover_url: /^https:\/\//.test(b.cover_url ?? "") ? b.cover_url : null, licence: "CC BY 4.0 (OpenStax)" });
+}
+
+// ---------- LibreTexts (open textbooks; only those with a clear open licence) ----------
+const OPEN = /^(ccby|ccbysa|ccbync|ccbyncsa|ccbynd|ccbyncnd|publicdomain|gnufdl|gnu|ck12)$/;
+const LIBRARY = { bio: "Biology", chem: "Chemistry", phys: "Physics", math: "Mathematics", stats: "Mathematics", geo: "Geography", biz: "Business Studies",
+  eng: "Computer Studies", med: "Physical & Health Education", workforce: "Business Studies" };
+const lt = read("libretexts.json");
+for (const b of lt) {
+  if (!OPEN.test(b.license ?? "") || b.library === "espanol") continue;
+  const text = `${b.title} ${b.subject ?? ""} ${b.summary ?? ""}`;
+  if (WORDS.test(`${b.title} ${b.subject ?? ""}`) || /\b(sexuality|sexual health|reproductive health|human sexuality)\b/i.test(b.title)) continue;
+  const online = b.links?.online;
+  if (!/^https:\/\//.test(online ?? "")) continue;
+  const subjects = [...new Set([LIBRARY[b.library], ...subjectsOf(text)].filter(Boolean))].slice(0, 4);
+  add({ id: `libretexts:${b.bookID}`, source: "libretexts", section: "textbooks", title: b.title, authors: b.author, description: b.summary,
+    subjects: subjects.length ? subjects : ["General reading"], level: b.library === "k12" || SECONDARY.test(b.title) ? "secondary" : "tertiary",
+    read_url: online, download_url: /^https:\/\//.test(b.links?.pdf ?? "") ? b.links.pdf : null,
+    cover_url: /^https:\/\//.test(b.thumbnail ?? "") ? b.thumbnail : null, licence: (b.license ?? "").toUpperCase().replace(/^CC/, "CC ").replace("PUBLICDOMAIN", "Public domain") });
+}
+
+// ---------- Wikibooks (finished books on school subjects only) ----------
+for (const b of read("wikibooks.json")) {
+  const subjects = subjectsOf(b.title);
+  if (!subjects.length || WORDS.test(b.title)) continue;
+  const page = encodeURIComponent(b.title.replace(/ /g, "_")).replace(/%2F/g, "/");
+  add({ id: `wikibooks:${b.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 120)}`, source: "wikibooks", section: "textbooks", title: b.title, authors: "Wikibooks contributors",
+    description: b.kind === "completed" ? "A completed Wikibooks textbook." : "A Wikibooks textbook with a print version.",
+    subjects, level: SECONDARY.test(b.title) ? "secondary" : "all",
+    read_url: `https://en.wikibooks.org/wiki/${b.print ? `${page}/Print_version` : page}`, download_url: null, cover_url: null, licence: "CC BY-SA (Wikibooks)" });
 }
 
 // ---------- write, in files of 5,000 ----------

@@ -35,7 +35,8 @@ export async function POST() {
     const rows = JSON.parse(zlib.gunzipSync(await fs.readFile(path.join(DIR, f))).toString("utf8")) as Record<string, unknown>[];
     for (let i = 0; i < rows.length; i += 1000) {
       const { error } = await svc.from("open_books").upsert(rows.slice(i, i + 1000).map(r => ({ ...r, updated_at: now })), { onConflict: "id" });
-      if (error) return jsonError(/open_books/.test(error.message) ? "The free library needs the database update (migration 20260101009100)." : `Stopped after ${loaded} books: ${error.message}`);
+      if (error) return jsonError(/source_check/.test(error.message) ? `Loaded ${loaded} books, then stopped: the extra textbooks need the second database update (migration 20260101009110).`
+        : /open_books/.test(error.message) ? "The free library needs the database update (migration 20260101009100)." : `Stopped after ${loaded} books: ${error.message}`);
       loaded += Math.min(1000, rows.length - i);
     }
   }

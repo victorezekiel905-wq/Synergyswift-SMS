@@ -15,7 +15,7 @@ const LEVELS: [string, string][] = [["", "Any level"], ["early_years", "Early ye
 const SUBJECTS = ["Mathematics", "English Language", "Literature", "Biology", "Chemistry", "Physics", "Basic Science", "Agriculture", "Geography", "History",
   "Economics", "Civic Education", "Business Studies", "Computer Studies", "Fine Arts", "Music", "Physical & Health Education", "Home Economics", "Languages",
   "Psychology & Life Skills", "Philosophy"];
-const SOURCE: Record<string, string> = { gutenberg: "Project Gutenberg", storyweaver: "StoryWeaver", open_textbook_library: "Open Textbook Library", openstax: "OpenStax" };
+const SOURCE: Record<string, string> = { gutenberg: "Project Gutenberg", storyweaver: "StoryWeaver", open_textbook_library: "Open Textbook Library", openstax: "OpenStax", libretexts: "LibreTexts", wikibooks: "Wikibooks" };
 const LEVEL: Record<string, string> = { early_years: "Early years", primary: "Primary", secondary: "Secondary", tertiary: "Advanced", all: "All levels" };
 
 /**

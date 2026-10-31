@@ -1,10 +1,12 @@
 {
-  "total": 46846,
+  "total": 50239,
   "bySource": {
     "gutenberg": 34994,
     "storyweaver": 10000,
     "open_textbook_library": 1765,
-    "openstax": 87
+    "openstax": 87,
+    "libretexts": 3067,
+    "wikibooks": 326
   },
   "bySection": {
     "history": 7775,
@@ -16,7 +18,7 @@
     "science": 3080,
     "poetry": 2122,
     "storybooks": 10000,
-    "textbooks": 1852
+    "textbooks": 5245
   },
   "built": "2026-10-31"
 }
