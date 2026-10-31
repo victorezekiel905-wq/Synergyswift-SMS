@@ -69,7 +69,7 @@ export default function ResultsPage() {
           {tab === "approvals" && <Approvals termId={termId} cg={cg} />}
           {tab === "traits" && <Traits termId={termId} cg={cg} isAdmin={isAdmin} />}
           {tab === "scores" && <ScoreEntry termId={termId} cg={cg} structure={structure} myId={me?.profile?.id} isAdmin={isAdmin} />}
-          {tab === "cards" && <ReportCards termId={termId} cg={cg} isAdmin={isAdmin} isFormTeacher={structure?.class_groups.find(g => g.id === cg)?.form_teacher_id === me?.profile?.id} />}
+          {tab === "cards" && <ReportCards termId={termId} cg={cg} classes={structure?.class_groups ?? []} isAdmin={isAdmin} isFormTeacher={structure?.class_groups.find(g => g.id === cg)?.form_teacher_id === me?.profile?.id} />}
         </>
       )}
     </Page>
@@ -317,7 +317,7 @@ function SubjectNotes({ termId, cg, subject, students, canEdit, bands }: { termI
   );
 }
 
-function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; cg: string; isAdmin: boolean; isFormTeacher: boolean }) {
+function ReportCards({ termId, cg, classes, isAdmin, isFormTeacher }: { termId: string; cg: string; classes: { id: string; name: string }[]; isAdmin: boolean; isFormTeacher: boolean }) {
   const [kind, setKind] = useState<"term" | "midterm">("term");
   const { data, error, reload } = useApi<Card[]>(`/api/results/report-cards?term_id=${termId}&class_group_id=${cg}&kind=${kind}`, [termId, cg, kind]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -358,6 +358,25 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
     setMsg({ ok: r.ok, text: r.ok ? `Drafted ${r.data.drafted} comments${r.data.note ? ` (${r.data.note})` : ""}. Read and edit them before publishing.` : r.error ?? "failed" });
     if (r.ok) reload();
   }
+  /**
+   * The principal's comments for every class in the school, one class at a time (each class is its own
+   * request, so a large school never times out), with progress shown as it goes.
+   */
+  const [progress, setProgress] = useState<string | null>(null);
+  async function draftWholeSchool() {
+    if (!classes.length) return;
+    if (!confirm(`Write the principal's comment on every unpublished ${kind === "term" ? "end-of-term" : "mid-term"} report card in all ${classes.length} classes?${style.overwrite ? " Comments already written will be rewritten." : " Comments already written are kept."}`)) return;
+    setBusy("draft_school"); setMsg(null);
+    let total = 0, failed = 0;
+    for (const [i, g] of classes.entries()) {
+      setProgress(`${g.name}: writing… (class ${i + 1} of ${classes.length}, ${total} comments so far)`);
+      const r = await send("/api/results/draft-comments", { term_id: termId, class_group_id: g.id, role: "principal", kind, tone: style.tone, length: style.length, overwrite: style.overwrite }, "POST", { quiet: true });
+      if (r.ok) total += r.data.drafted ?? 0; else failed++;
+    }
+    setProgress(null); setBusy(null);
+    setMsg({ ok: failed === 0, text: `Wrote ${total} principal's comments across ${classes.length - failed} of ${classes.length} classes.${failed ? ` ${failed} classes stopped (no report cards yet, or AI was busy): try them again.` : ""} Read and edit them before publishing.` });
+    reload();
+  }
   /** A fresh draft for one student, shown in the form and saved only when the teacher saves. */
   async function writeOne(card: Card, role: "form_teacher" | "principal"): Promise<string | null> {
     const r = await send("/api/results/draft-comments", { term_id: termId, class_group_id: cg, role, kind, tone: style.tone, length: style.length, student_id: card.student_id, preview: true });
@@ -391,9 +410,11 @@ function ReportCards({ termId, cg, isAdmin, isFormTeacher }: { termId: string; c
         {isAdmin && <button className="btn btn-primary" disabled={busy !== null || !data?.length} onClick={() => publish(false)}>{busy === "publish" ? "Publishing and sending…" : "Publish & send to parents"}</button>}
         {isAdmin && <button className="btn btn-ghost" disabled={busy !== null} onClick={() => publish(true)}>Resend</button>}
         {(isAdmin || isFormTeacher) && <button className="btn btn-outline" disabled={busy !== null || !data?.length} onClick={() => draftComments("form_teacher")}>{busy === "draft_form_teacher" ? "Drafting comments…" : "Draft teacher comments"}</button>}
-        {isAdmin && <button className="btn btn-outline" disabled={busy !== null || !data?.length} onClick={() => draftComments("principal")}>{busy === "draft_principal" ? "Drafting comments…" : "Draft principal comments"}</button>}
+        {isAdmin && <button className="btn btn-outline" disabled={busy !== null || !data?.length} onClick={() => draftComments("principal")}>{busy === "draft_principal" ? "Writing comments…" : "Principal comments: this class"}</button>}
+        {isAdmin && classes.length > 1 && <button className="btn btn-outline" disabled={busy !== null} onClick={draftWholeSchool}>{busy === "draft_school" ? "Writing for the whole school…" : "Principal comments: whole school"}</button>}
         <a className="btn btn-ghost ml-auto" href={`/api/results/report-cards?term_id=${termId}&class_group_id=${cg}&kind=${kind}&format=csv`}>Download broadsheet (CSV)</a>
       </div>
+      {progress && <p className="mb-3 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-900" role="status">{progress}</p>}
       {(isAdmin || isFormTeacher) && (data?.length ?? 0) > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
           <span className="font-medium text-slate-700">Comment style</span>

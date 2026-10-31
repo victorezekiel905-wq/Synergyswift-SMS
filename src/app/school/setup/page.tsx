@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Field, Badge, Empty, Icon } from "@/components/ui";
+import { notify } from "@/components/Toaster";
 import { LANGUAGES } from "@/lib/languages";
 import { CURRENCIES } from "@/lib/currency";
 import Sections from "@/components/admin/Sections";
@@ -133,10 +134,12 @@ function Profile() {
         <Field label="Address"><input className="input" {...text("address")} /></Field>
         <Field label="Phone"><input className="input" {...text("phone")} /></Field>
         <Field label="Email"><input className="input" type="email" {...text("email")} /></Field>
-        <Field label="Logo URL" hint="Public https image URL."><input className="input" {...text("logo_url")} /></Field>
         <Field label="Principal / head teacher"><input className="input" {...text("principal_name")} /></Field>
-        <Field label="Principal's signature (image URL)" hint="A transparent PNG prints best. Shown on published report cards."><input className="input" {...text("principal_signature_url")} /></Field>
-        <Field label="School stamp (image URL)"><input className="input" {...text("stamp_url")} /></Field>
+        <div className="grid gap-4 sm:grid-cols-3 md:col-span-2">
+          <ImageUpload kind="logo" label="School logo" hint="Shown on report cards, emails and payment pages." value={s.logo_url} onChange={v => setS(x => ({ ...x, logo_url: v }))} />
+          <ImageUpload kind="signature" label="Principal's signature" hint="Sign on white paper and photograph it, or use a transparent PNG. Printed on report cards." value={s.principal_signature_url} onChange={v => setS(x => ({ ...x, principal_signature_url: v }))} />
+          <ImageUpload kind="stamp" label="School stamp" hint="Printed beside the signature on report cards." value={s.stamp_url} onChange={v => setS(x => ({ ...x, stamp_url: v }))} />
+        </div>
         <div className="md:col-span-2"><Field label="Report card footer" hint="For example the school's fees reminder or contact line."><textarea className="input h-16" {...text("report_footer")} /></Field></div>
         <Field label="Brand colour"><input className="input h-10" type="color" value={s.brand_color ?? "#2f4f8f"} onChange={e => setS({ ...s, brand_color: e.target.value })} /></Field>
         <Field label="Message sender name"><input className="input" {...text("sender_name")} /></Field>
@@ -458,6 +461,40 @@ function Classes() {
           </table></div>
         </section>
       )}
+    </div>
+  );
+}
+
+/** Upload the logo, the principal's signature or the stamp as an image; saved at once, and shown as it will print. */
+function ImageUpload({ kind, label, hint, value, onChange }: { kind: "logo" | "signature" | "stamp"; label: string; hint: string; value?: string | null; onChange: (v: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  async function upload(f: File) {
+    setBusy(true); setErr(null);
+    const form = new FormData(); form.append("kind", kind); form.append("file", f);
+    const r = await fetch("/api/school/branding", { method: "POST", body: form });
+    const j = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) { setErr(j.error ?? "The image couldn't be uploaded."); notify({ tone: "error", text: `Not saved: ${j.error ?? "the image couldn't be uploaded"}` }); return; }
+    onChange(j.url);
+    notify({ tone: "ok", text: `${label} saved.` });
+  }
+  return (
+    <div className="rounded-lg border border-slate-200 p-3">
+      <p className="text-sm font-medium text-slate-800">{label}</p>
+      <div className="my-2 flex h-20 items-center justify-center rounded bg-slate-50">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {value ? <img src={value} alt={label} className="max-h-16 max-w-full object-contain" /> : <span className="text-xs text-slate-400">No image yet</span>}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="btn btn-outline btn-sm cursor-pointer">
+          {busy ? "Uploading…" : value ? "Replace image" : "Upload image"}
+          <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={busy} onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) upload(f); }} />
+        </label>
+        {value && <button type="button" className="text-xs text-rose-700 hover:underline" onClick={() => onChange("")}>Remove</button>}
+      </div>
+      <p className="mt-1.5 text-xs text-slate-500">{hint} PNG, JPG or WebP, up to 2 MB.{value === "" ? " Press Save to remove it." : ""}</p>
+      {err && <p className="mt-1 text-xs text-rose-700" role="alert">{err}</p>}
     </div>
   );
 }

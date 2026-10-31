@@ -13,7 +13,7 @@ export const tabbedNav = (groups: NavGroup[]) => groups.length > 1 && groups.red
 /** Module tabs across the top bar. Choosing one shows its pages in the side menu; it doesn't leave the page. */
 export function ModuleBar({ groups, selected, here, onSelect }: { groups: NavGroup[]; selected: string; here: string | null; onSelect: (id: string) => void }) {
   return (
-    <nav aria-label="Modules" className="flex gap-1 overflow-x-auto px-3 sm:px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <nav aria-label="Modules" className="flex gap-1 overflow-x-auto px-3 sm:px-4 [justify-content:safe_center] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {groups.map(g => {
         const on = g.id === selected;
         return (
