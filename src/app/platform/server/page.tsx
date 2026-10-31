@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useApi, Page, PageHeader, Alert, Loading } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Loading } from "@/components/ui";
 import PlatformNav from "@/components/platform/PlatformNav";
 
 type Key = { ok: boolean; kind: string; problem: string | null; detail: string | null };
@@ -53,6 +53,7 @@ export default function ServerCheck() {
           {!ai && data.ai.providers.length > 0 && <p className="mt-1 text-xs text-slate-500">Press the button above to send a tiny test question.</p>}
         </section>
       )}
+      <FreeLibraryCard />
       {err && <Alert>{err}</Alert>}
       {office && (
         <section className="card space-y-3 p-5 text-sm">
@@ -70,5 +71,29 @@ export default function ServerCheck() {
         </section>
       )}
     </Page>
+  );
+}
+
+/** The free library every school sees: how many books are loaded, and loading or refreshing it. */
+function FreeLibraryCard() {
+  const { data, reload } = useApi<{ loaded: number | null; missing_table: boolean; shipped: { total: number; bySource: Record<string, number>; built: string } | null }>("/api/platform/open-books");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  if (!data) return null;
+  async function load() {
+    setBusy(true); setMsg(null);
+    const r = await send<{ loaded: number }>("/api/platform/open-books", {});
+    setBusy(false);
+    setMsg({ ok: r.ok, text: r.ok ? `${r.data.loaded.toLocaleString("en-NG")} books loaded. Every school sees them now.` : r.error ?? "Loading stopped." });
+    reload();
+  }
+  return (
+    <section className="card mb-4 space-y-2 p-5 text-sm">
+      <h2 className="font-semibold">Free library</h2>
+      <p>{data.missing_table ? "Needs the database update (migration 20260101009100) first." : `${(data.loaded ?? 0).toLocaleString("en-NG")} books loaded. Every school sees them in Library → Free library.`}</p>
+      {data.shipped && <p className="text-xs text-slate-500">This version ships {data.shipped.total.toLocaleString("en-NG")} books ({Object.entries(data.shipped.bySource).map(([s, n]) => `${s.replace(/_/g, " ")} ${n.toLocaleString("en-NG")}`).join(", ")}), chosen for schools.</p>}
+      <button className="btn btn-primary" disabled={busy || data.missing_table} onClick={load}>{busy ? "Loading (a minute or two)…" : data.loaded ? "Refresh the free library" : "Load the free library"}</button>
+      {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
+    </section>
   );
 }

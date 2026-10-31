@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useState } from "react";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, fmtDate, money, rolesOf, type Me } from "@/components/ui";
+import FreeLibrary from "@/components/library/FreeLibrary";
 import ScanInput from "@/components/library/ScanInput";
 import { loanState } from "@/lib/library";
 import { OPEN_LIBRARY } from "@/lib/open-library";
@@ -10,7 +11,7 @@ type Book = { id: string; isbn: string | null; barcode: string | null; title: st
   access: string; views: number; has_file: boolean; digital_url?: string | null; waiting: number; held: number;
   download_url?: string | null; licence?: string | null; levels?: string | null; curricula?: string[] | null };
 type Loan = { id: string; issued_at: string; due_at: string; returned_at: string | null; fine_amount: number; fine_status: string; renewals: number; lost_at: string | null; borrower: string; library_books: { title: string } | null };
-type Tab = "desk" | "catalogue" | "loans" | "overdue" | "fines" | "reservations" | "history" | "mine" | "settings";
+type Tab = "desk" | "free" | "catalogue" | "loans" | "overdue" | "fines" | "reservations" | "history" | "mine" | "settings";
 const FORMAT: Record<string, string> = { print: "Book", ebook: "E-book", audio: "Audiobook", video: "Video", link: "Online" };
 
 export default function LibraryPage() {
@@ -21,15 +22,16 @@ export default function LibraryPage() {
   const reader = roles.has("student") || [...roles].some(r => !["parent", "alumni"].includes(r));
   const [tab, setTab] = useState<Tab | null>(null);
   const tabs: { id: Tab; label: string }[] = lib
-    ? [{ id: "desk", label: "Desk" }, { id: "catalogue", label: "Catalogue" }, { id: "loans", label: "On loan" }, { id: "overdue", label: "Overdue" }, { id: "fines", label: "Fines" },
+    ? [{ id: "desk", label: "Desk" }, { id: "free", label: "Free library" }, { id: "catalogue", label: "Our books" }, { id: "loans", label: "On loan" }, { id: "overdue", label: "Overdue" }, { id: "fines", label: "Fines" },
        { id: "reservations", label: "Reservations" }, { id: "history", label: "Returned" }, ...(admin ? [{ id: "settings" as Tab, label: "Settings" }] : [])]
-    : [{ id: "catalogue", label: "Catalogue & e-library" }, ...(reader ? [{ id: "mine" as Tab, label: "My books" }] : [])];
+    : [{ id: "free", label: "Free library" }, { id: "catalogue", label: "Our books & e-library" }, ...(reader ? [{ id: "mine" as Tab, label: "My books" }] : [])];
   const active = tab && tabs.some(t => t.id === tab) ? tab : tabs[0].id;
   return (
     <Page wide>
       <PageHeader eyebrow="Library" title="Library" subtitle="Scan a reader's card and a book's barcode to lend or return. Reservations queue up and the next reader is told when a copy is waiting. E-books, audiobooks and videos open online. Overdue readers and their parents are reminded." />
       <Tabs value={active} onChange={setTab} tabs={tabs} />
       {active === "desk" && <Desk />}
+      {active === "free" && <FreeLibrary />}
       {active === "catalogue" && <Catalogue lib={lib} reader={reader} />}
       {["loans", "overdue", "fines", "history"].includes(active) && <Loans view={active} />}
       {active === "reservations" && <Reservations />}
