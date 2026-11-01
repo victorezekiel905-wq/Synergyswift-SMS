@@ -317,11 +317,11 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
 
               <Step n={3} title="Grades" hint={'A total gets the grade whose "from" mark it reaches. The remark prints on the report card. Points are optional: fill them in and each report card shows a GPA (the average points across subjects).'}>
                 <div className="space-y-1.5">
-                  <div className="grid grid-cols-[4.5rem_4.5rem_4.5rem_minmax(0,1fr)_auto] gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                  <div className="grid grid-cols-[4.5rem_5.5rem_5.5rem_minmax(0,1fr)_auto] gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
                     <span>Grade</span><span>From</span><span>To</span><span className="flex gap-2"><span className="flex-1">Remark</span><span className="w-16">Points</span></span><span />
                   </div>
                   {bands.map((b, i) => (
-                    <div key={i} className="grid grid-cols-[4.5rem_4.5rem_4.5rem_minmax(0,1fr)_auto] items-center gap-2">
+                    <div key={i} className="grid grid-cols-[4.5rem_5.5rem_5.5rem_minmax(0,1fr)_auto] items-center gap-2">
                       <input className="input py-1.5" value={b.grade} maxLength={12} onChange={e => setBand(i, { grade: e.target.value })} aria-label="Grade" />
                       <input className="input py-1.5" type="number" step="any" min={0} max={100} value={b.min_score} onChange={e => setBand(i, { min_score: e.target.value })} aria-label={`${b.grade} from`} />
                       <input className="input py-1.5" type="number" step="any" min={0} max={100} value={b.max_score} onChange={e => setBand(i, { max_score: e.target.value })} aria-label={`${b.grade} to`} />
