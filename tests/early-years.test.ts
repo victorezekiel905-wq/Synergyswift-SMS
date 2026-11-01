@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { earlyYearsSettings, checkEyScale, areaSummary, EY_FRAMEWORKS, EY_SCALE_PRESETS, DEFAULT_EY_OPTIONS } from "@/lib/early-years";
-import { GRADING_PRESETS, STAGES, bandGaps, classStage, checkPreset } from "@/lib/grading-presets";
+import { GRADING_PRESETS, STAGES, addNumberedPart, bandGaps, classStage, checkPreset } from "@/lib/grading-presets";
 import { compileClassResults } from "@/lib/results";
 import { commentInputFor } from "@/lib/comment-input";
 import { GRADING } from "@/lib/curricula";
@@ -105,6 +105,21 @@ describe("grading systems per stage", () => {
   it("warns about gaps between grades, not about the usual .99 steps", () => {
     expect(bandGaps(GRADING_PRESETS[0].bands)).toEqual([]);
     expect(bandGaps([{ grade: "A", min_score: 70, max_score: 100 }, { grade: "F", min_score: 0, max_score: 49 }])[0]).toMatch(/49 to 70.*F/);
+  });
+  it("numbers repeated parts: CAT, then CAT 1 and CAT 2, then CAT 3", () => {
+    const cat = { name: "CAT", max_score: 15, weight: 15 };
+    let parts = addNumberedPart([{ name: "HW", max_score: 10, weight: 10 }], cat);
+    expect(parts.map(p => p.name)).toEqual(["HW", "CAT"]);
+    parts = addNumberedPart(parts, cat);
+    expect(parts.map(p => p.name)).toEqual(["HW", "CAT 1", "CAT 2"]);
+    parts = addNumberedPart(parts, cat);
+    expect(parts.map(p => p.name)).toEqual(["HW", "CAT 1", "CAT 2", "CAT 3"]);
+    // "CA" is not "CAT", and the marks and weights of earlier parts are kept.
+    expect(addNumberedPart(parts, { name: "CA", max_score: 10, weight: 10 }).map(p => p.name)).toEqual(["HW", "CAT 1", "CAT 2", "CAT 3", "CA"]);
+    expect(parts[0]).toMatchObject({ max_score: 10, weight: 10 });
+    // A pattern's "CAT 1, CAT 2" carries on from 3.
+    const preset = GRADING_PRESETS.find(p => p.id === "cat-exam")!.parts;
+    expect(addNumberedPart(preset, { name: "CAT", max_score: 15, weight: 15 }).map(p => p.name)).toEqual(["CAT 1", "CAT 2", "Exam", "CAT 3"]);
   });
   it("puts each class in its stage, from its section or its name", () => {
     expect(classStage("Year 7 Red", "secondary")).toBe("secondary");

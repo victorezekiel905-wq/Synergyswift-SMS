@@ -68,6 +68,21 @@ export const GRADING_PRESETS: GradingPreset[] = [
 ];
 
 /**
+ * Adds a part, numbering repeats: adding a CAT when there is one makes them
+ * "CAT 1" and "CAT 2"; the next is "CAT 3". Other parts are left alone.
+ */
+export function addNumberedPart<T extends { name: string }>(parts: T[], part: T): T[] {
+  const base = part.name.trim();
+  const esc = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const same = new RegExp(`^${esc}(?:\\s+(\\d+))?$`, "i");
+  const taken = parts.map(q => same.exec(q.name.trim())).filter((m): m is RegExpExecArray => m !== null);
+  if (!taken.length) return [...parts, { ...part }];
+  const next = Math.max(...taken.map(m => Number(m[1] ?? 1))) + 1;
+  const renamed = parts.map(q => (q.name.trim().toLowerCase() === base.toLowerCase() ? { ...q, name: `${base} 1` } : q));
+  return [...renamed, { ...part, name: `${base} ${next}` }];
+}
+
+/**
  * Gaps between grade bands. A score takes the band with the highest "from" at or
  * below it, so a score in a gap quietly gets the grade below: worth a warning.
  */

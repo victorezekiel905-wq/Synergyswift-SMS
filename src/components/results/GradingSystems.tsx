@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApi, send, Page, PageHeader, Alert, Badge, Empty, Field, Icon, Loading } from "@/components/ui";
 import { validateScheme } from "@/lib/grading";
-import { GRADING_PRESETS, STAGES, bandGaps, classStage, type SchoolStage, type GradingPreset } from "@/lib/grading-presets";
+import { GRADING_PRESETS, STAGES, addNumberedPart, bandGaps, classStage, type SchoolStage, type GradingPreset } from "@/lib/grading-presets";
 
 type Layout = "nigerian" | "british" | "american" | "early_years";
 type Part = { id?: string; name: string; max_score: number | string; weight: number | string; midterm?: boolean };
@@ -24,9 +24,10 @@ const LAYOUTS: { id: Exclude<Layout, "early_years">; label: string; hint: string
   { id: "american", label: "American", hint: "Percentages, letter grades, grade points and GPA." }
 ];
 const QUICK_PARTS: { label: string; part: Part }[] = [
+  { label: "CA", part: { name: "CA", max_score: 10, weight: 10, midterm: true } },
+  { label: "CAT", part: { name: "CAT", max_score: 15, weight: 15, midterm: true } },
   { label: "Classwork", part: { name: "Classwork", max_score: 10, weight: 10, midterm: true } },
   { label: "Homework", part: { name: "Homework", max_score: 10, weight: 10, midterm: true } },
-  { label: "CA", part: { name: "CA", max_score: 10, weight: 10, midterm: true } },
   { label: "Test", part: { name: "Test", max_score: 20, weight: 20, midterm: true } },
   { label: "Project", part: { name: "Project", max_score: 20, weight: 20 } },
   { label: "Exam", part: { name: "Exam", max_score: 60, weight: 60 } }
@@ -230,7 +231,9 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
   const weight = parts.reduce((n, p) => n + (Number(p.weight) || 0), 0);
   const setPart = (i: number, patch: Partial<Part>) => setS(x => ({ ...x, grading_components: parts.map((p, j) => (j === i ? { ...p, ...patch } : p)) }));
   const setBand = (i: number, patch: Partial<BandRow>) => setS(x => ({ ...x, grade_bands: bands.map((b, j) => (j === i ? { ...b, ...patch } : b)) }));
-  const presets = GRADING_PRESETS.filter(p => !stage || p.stages.includes(stage));
+  // Every pattern stays available (as on the old Grading page); the ones for this stage come first.
+  const presets = stage ? [...GRADING_PRESETS.filter(p => p.stages.includes(stage)), ...GRADING_PRESETS.filter(p => !p.stages.includes(stage))] : GRADING_PRESETS;
+  const forStage = (p: GradingPreset) => !stage || p.stages.includes(stage);
 
   function chooseStage(next: SchoolStage) {
     if (next === stage) return;
@@ -249,10 +252,7 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
     scaled[scaled.length - 1] += 100 - scaled.reduce((a, b) => a + b, 0);
     setS(x => ({ ...x, grading_components: parts.map((p, i) => ({ ...p, weight: scaled[i] })) }));
   }
-  const addPart = (p: Part) => setS(x => {
-    const same = parts.filter(q => q.name.replace(/\s*\d+$/, "") === p.name).length;
-    return { ...x, grading_components: [...parts, { ...p, name: same ? `${p.name} ${same + 1}` : p.name }] };
-  });
+  const addPart = (p: Part) => setS(x => ({ ...x, grading_components: addNumberedPart(parts, p) }));
 
   const numBands = bands.map(b => ({ grade: b.grade, remark: b.remark, min_score: Number(b.min_score), max_score: Number(b.max_score),
     grade_point: b.grade_point === null || b.grade_point === "" ? null : Number(b.grade_point) }));
@@ -267,6 +267,9 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
   async function save(go: boolean) {
     if (!s.name.trim()) { setError("Give the grading system a name."); return; }
     if (!stage) { setError("Say which stage it is for."); return; }
+    if (!early && parts.some(p => !p.name.trim())) { setError("Give every part a name, e.g. CAT 1 or HW."); return; }
+    if (!early && new Set(parts.map(p => p.name.trim().toLowerCase())).size !== parts.length) { setError("Two parts have the same name. Give each its own, e.g. CAT 1 and CAT 2."); return; }
+    if (!early && bands.some(b => !b.grade.trim())) { setError("Every grade needs a name, e.g. A or B2."); return; }
     if (problems.length) { setError(problems[0]); return; }
     setBusy(true); setError(null);
     const r = await send("/api/school/grading", {
@@ -306,11 +309,11 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
             </Field>
             {!early && presets.length > 0 && (
               <div>
-                <p className="mb-1.5 text-xs font-medium text-slate-600">Start from a pattern (everything stays editable)</p>
+                <p className="mb-1.5 text-xs font-medium text-slate-600">Start from a pattern (fills the marks and grades below; everything stays editable)</p>
                 <div className="flex flex-wrap gap-1.5">
                   {presets.map(p => (
                     <button key={p.id} type="button" title={p.hint} onClick={() => applyPreset(p)}
-                      className="rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-700 hover:border-brand-600 hover:text-brand-800">{p.name}</button>
+                      className={"rounded-md border px-2.5 py-1 text-xs hover:border-brand-600 hover:text-brand-800 " + (forStage(p) ? "border-slate-200 text-slate-700" : "border-dashed border-slate-200 text-slate-500")}>{p.name}</button>
                   ))}
                 </div>
               </div>
@@ -333,17 +336,20 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
             </Step>
           ) : (
             <>
-              <Step n={2} title="How marks add up" hint="Each part can be marked out of any number. It counts for its share: a test marked out of 30 that counts for 20% adds score ÷ 30 × 20.">
+              <Step n={2} title="How marks add up" hint="Add each test, CA, CAT, homework, project or exam. Each part can be marked out of any number and counts for its share: a test marked out of 30 that counts for 20% adds score ÷ 30 × 20. Tick “On mid-term reports” for the parts that appear on mid-term progress reports (usually the CAs and tests).">
                 <div className="flex flex-wrap gap-1.5" aria-label="Add a part">
                   {QUICK_PARTS.map(q => (
                     <button key={q.label} type="button" onClick={() => addPart(q.part)} className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium uppercase tracking-wide text-slate-700 hover:border-slate-300">+ {q.label}</button>
                   ))}
+                  <button type="button" onClick={() => setS(x => ({ ...x, grading_components: [...parts, { name: "", max_score: 10, weight: 10 }] }))}
+                    className="rounded-md border border-dashed border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-400">+ Another part (name it yourself)</button>
                 </div>
+                {!parts.length && <p className="text-sm text-slate-500">No parts yet. Add them with the buttons above, or start from a pattern in step 1.</p>}
                 <div className="space-y-2">
                   {parts.map((p, i) => (
                     <div key={i} className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-md border border-slate-200 p-3 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
                       <div className="col-span-2 sm:col-span-1">
-                        <Field label="Part"><input className="input" value={p.name} onChange={e => setPart(i, { name: e.target.value })} /></Field>
+                        <Field label="Part"><input className="input" value={p.name} maxLength={40} placeholder="e.g. CAT 1, HW, Mid-term test" onChange={e => setPart(i, { name: e.target.value })} /></Field>
                         <label className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-600"><input type="checkbox" checked={Boolean(p.midterm)} onChange={e => setPart(i, { midterm: e.target.checked })} /> On mid-term reports</label>
                       </div>
                       <div>
@@ -366,19 +372,19 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
                 </div>
               </Step>
 
-              <Step n={3} title="Grades" hint={'A total gets the grade whose "from" mark it reaches. The remark prints on the report card.'}>
+              <Step n={3} title="Grades" hint={'A total gets the grade whose "from" mark it reaches. The remark prints on the report card. Points are optional: fill them in and each report card shows a GPA (the average points across subjects).'}>
                 <div className="space-y-1.5">
                   <div className="grid grid-cols-[4.5rem_4.5rem_4.5rem_minmax(0,1fr)_auto] gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                    <span>Grade</span><span>From</span><span>To</span><span>Remark{s.template === "american" ? " · points" : ""}</span><span />
+                    <span>Grade</span><span>From</span><span>To</span><span className="flex gap-2"><span className="flex-1">Remark</span><span className="w-16">Points</span></span><span />
                   </div>
                   {bands.map((b, i) => (
                     <div key={i} className="grid grid-cols-[4.5rem_4.5rem_4.5rem_minmax(0,1fr)_auto] items-center gap-2">
-                      <input className="input py-1.5" value={b.grade} onChange={e => setBand(i, { grade: e.target.value })} aria-label="Grade" />
-                      <input className="input py-1.5" type="number" step="any" value={b.min_score} onChange={e => setBand(i, { min_score: e.target.value })} aria-label={`${b.grade} from`} />
-                      <input className="input py-1.5" type="number" step="any" value={b.max_score} onChange={e => setBand(i, { max_score: e.target.value })} aria-label={`${b.grade} to`} />
+                      <input className="input py-1.5" value={b.grade} maxLength={12} onChange={e => setBand(i, { grade: e.target.value })} aria-label="Grade" />
+                      <input className="input py-1.5" type="number" step="any" min={0} max={100} value={b.min_score} onChange={e => setBand(i, { min_score: e.target.value })} aria-label={`${b.grade} from`} />
+                      <input className="input py-1.5" type="number" step="any" min={0} max={100} value={b.max_score} onChange={e => setBand(i, { max_score: e.target.value })} aria-label={`${b.grade} to`} />
                       <div className="flex gap-2">
-                        <input className="input min-w-0 flex-1 py-1.5" value={b.remark ?? ""} onChange={e => setBand(i, { remark: e.target.value })} aria-label={`${b.grade} remark`} />
-                        {s.template === "american" && <input className="input w-16 py-1.5" type="number" step="any" value={b.grade_point ?? ""} onChange={e => setBand(i, { grade_point: e.target.value })} aria-label={`${b.grade} grade points`} />}
+                        <input className="input min-w-0 flex-1 py-1.5" value={b.remark ?? ""} maxLength={60} onChange={e => setBand(i, { remark: e.target.value })} aria-label={`${b.grade} remark`} />
+                        <input className="input w-16 py-1.5" type="number" step="any" min={0} max={10} placeholder="–" value={b.grade_point ?? ""} onChange={e => setBand(i, { grade_point: e.target.value })} aria-label={`${b.grade} grade points (optional)`} />
                       </div>
                       <button type="button" className="btn btn-ghost px-2 text-rose-600" onClick={() => setS({ ...s, grade_bands: bands.filter((_, j) => j !== i) })} aria-label={`Remove grade ${b.grade}`}><Icon name="x" className="h-4 w-4" /></button>
                     </div>
@@ -400,7 +406,8 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
                   </div>
                   <div>
                     <p className="mb-1 text-sm font-medium text-slate-700">Decimal places</p>
-                    <div className="flex gap-1.5">{[0, 1, 2].map(d => <Chip key={d} on={Number(s.decimals) === d} onClick={() => setS({ ...s, decimals: d })}>{d}</Chip>)}</div>
+                    <div className="flex gap-1.5">{[0, 1, 2, 3].map(d => <Chip key={d} on={Number(s.decimals) === d} onClick={() => setS({ ...s, decimals: d })}>{d}</Chip>)}</div>
+                    <p className="mt-1 text-xs text-slate-500">For totals and averages, e.g. {(72.456).toFixed(Number(s.decimals) || 0)}.</p>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 text-sm">
@@ -451,6 +458,7 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
 
         <footer className="border-t border-slate-200 bg-white px-5 py-3 sm:px-6">
           {error && <p role="alert" className="mb-2 text-sm text-rose-700">{error}</p>}
+          {s.id && !early && <p className="mb-2 text-xs text-slate-500">Report cards already made keep their old figures until you press <b>Compile report cards</b> again (Results → Report cards &amp; publishing).</p>}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-slate-700">{plural(ticked.length, "class", "classes")}, {plural(children, "child", "children")}</p>
             <div className="flex gap-2">
