@@ -290,7 +290,7 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
         className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-pop sm:max-h-[calc(100dvh-4rem)]">
         <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:px-6">
           <div>
-            <h2 id={titleId} className="text-xl font-semibold leading-snug">{s.id ? "Edit" : "New"} <span className="text-brass-600">grading system</span></h2>
+            <h2 id={titleId} className="font-serif text-xl font-semibold leading-snug">{s.id ? "Edit" : "New"} <span className="text-brand-700">grading system</span></h2>
             <p className="mt-0.5 text-sm text-slate-500">Say who it&apos;s for, how marks add up and what each grade means. Tick the classes that use it, and save.</p>
           </div>
           <button type="button" onClick={onClose} className="btn btn-ghost -mr-2 border border-slate-200 p-1.5" aria-label="Close"><Icon name="x" /></button>
