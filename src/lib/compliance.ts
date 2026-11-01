@@ -95,7 +95,7 @@ export const FRAMEWORKS: Framework[] = [
       ] },
       { id: "information", title: "Part 6: Provision of information", items: [
         R("information.published", "Key information and policies available to parents (safeguarding, behaviour, complaints, curriculum, admissions)", "Policies shared with parents in the library", "/school/compliance"),
-        R("information.reports", "An annual written report of each pupil's progress to parents", "Published report cards", "/school/results")
+        R("information.reports", "An annual written report of each pupil's progress to parents", "Published report cards", "/school/results/report-cards")
       ] },
       { id: "complaints", title: "Part 7: Complaints", items: [
         R("complaints.procedure", "Written complaints procedure with informal, formal and panel stages and time limits", "Complaints procedure", "/school/support"),

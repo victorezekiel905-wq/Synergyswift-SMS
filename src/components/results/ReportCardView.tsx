@@ -13,13 +13,17 @@ export type ReportCard = {
   status: string; total: number | string | null; average: number | string | null; position: number | null; class_size: number | null;
   teacher_comment: string | null; principal_comment: string | null; published_at: string | null; kind?: string | null;
   data: {
-    kind?: string; template?: "nigerian" | "british" | "american"; student_name?: string; admission_no?: string; class_name?: string; form_teacher?: string | null;
+    kind?: string; template?: "nigerian" | "british" | "american" | "early_years"; student_name?: string; admission_no?: string; class_name?: string; form_teacher?: string | null;
     term_label?: string; next_term_begins?: string | null; gpa?: number | null; days_present?: number | null; days_absent?: number | null; days_opened?: number | null;
     scheme?: { name?: string; pass_mark?: number; show_position?: boolean; show_class_average?: boolean; bands?: Band[] };
     components?: { id: string; name: string; max_score: number }[]; subjects?: Subject[];
     cumulative?: { terms: { id: string; label: string }[]; average: number | null; position: number | null } | null;
     traits?: { domain: string; name: string; rating: number | null }[];
     trait_scale?: ScaleItem[];
+    // Preschool (early_years) cards: the checklist instead of subjects.
+    areas?: { id: string; name: string; comment: string | null; typical: string | null; items: { text: string; rating: number | null }[] }[];
+    ey_scale?: ScaleItem[];
+    ey_options?: { show_key?: boolean };
   };
 };
 export type SchoolBrand = {
@@ -34,6 +38,7 @@ const cell = "border border-slate-300 p-1.5";
  *  - nigerian: assessment columns, total, grade, subject position, class average, remark
  *  - british:  attainment, effort, target and predicted grades, a comment per subject; no positions
  *  - american: percentage, letter grade, grade points and GPA
+ *  - early_years: preschool areas of learning, what the child can do, a comment per area; no scores
  * Shared by the parent link (/r/…) and the whole-class print page.
  */
 export default function ReportCardView({ card, school, studentPhoto, verifyUrl, verification, tenantName }: {
@@ -42,6 +47,7 @@ export default function ReportCardView({ card, school, studentPhoto, verifyUrl, 
 }) {
   const d = card.data ?? {};
   const template = d.template ?? "nigerian";
+  const early = template === "early_years";
   const midterm = (card.kind ?? d.kind) === "midterm";
   const comps = d.components ?? [];
   const subjects = (d.subjects ?? []).filter(s => s.total !== null);
@@ -68,7 +74,7 @@ export default function ReportCardView({ card, school, studentPhoto, verifyUrl, 
           <h1 className="text-2xl font-bold uppercase tracking-wide" style={{ color }}>{school?.school_name ?? tenantName}</h1>
           {school?.motto && <p className="text-sm italic text-slate-600">{school.motto}</p>}
           {school?.address && <p className="text-xs text-slate-600">{school.address}{school.phone ? ` · ${school.phone}` : ""}{school.email ? ` · ${school.email}` : ""}</p>}
-          <p className="mt-2 text-sm font-bold uppercase tracking-widest">{midterm ? "Mid-term progress report" : template === "american" ? "Report card" : template === "british" ? "School report" : "Report card"}: {d.term_label}</p>
+          <p className="mt-2 text-sm font-bold uppercase tracking-widest">{early ? "Early years report" : midterm ? "Mid-term progress report" : template === "american" ? "Report card" : template === "british" ? "School report" : "Report card"}: {d.term_label}</p>
         </div>
         {studentPhoto && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -80,17 +86,19 @@ export default function ReportCardView({ card, school, studentPhoto, verifyUrl, 
         <Info label="Name" value={d.student_name} />
         <Info label="Admission no" value={d.admission_no} />
         <Info label="Class" value={d.class_name} />
-        <Info label={template === "british" ? "Attendance" : "Days present"} value={d.days_opened ? (template === "british" ? `${Math.round(((d.days_present ?? 0) / d.days_opened) * 100)}%` : `${d.days_present} of ${d.days_opened}`) : d.days_present ?? "—"} />
-        {template !== "british" && <Info label="Total" value={card.total ?? "—"} />}
-        <Info label="Average" value={card.average !== null ? `${card.average}%` : "—"} />
-        {showPos && <Info label="Position" value={card.position ? `${ordinal(card.position)} of ${card.class_size}` : "—"} />}
+        {!(early && d.days_present == null) && <Info label={template === "british" ? "Attendance" : "Days present"} value={d.days_opened ? (template === "british" ? `${Math.round(((d.days_present ?? 0) / d.days_opened) * 100)}%` : `${d.days_present} of ${d.days_opened}`) : d.days_present ?? "—"} />}
+        {!early && template !== "british" && <Info label="Total" value={card.total ?? "—"} />}
+        {!early && <Info label="Average" value={card.average !== null ? `${card.average}%` : "—"} />}
+        {showPos && !early && <Info label="Position" value={card.position ? `${ordinal(card.position)} of ${card.class_size}` : "—"} />}
         {(template === "american" || (d.gpa !== null && d.gpa !== undefined)) && <Info label="GPA" value={d.gpa ?? "—"} />}
         {cum && <Info label="Session average" value={cum.average !== null ? `${cum.average}%` : "—"} />}
         {cum && showPos && cum.position && <Info label="Session position" value={`${ordinal(cum.position)} of ${card.class_size}`} />}
-        {d.form_teacher && <Info label={template === "british" ? "Form tutor" : "Form teacher"} value={d.form_teacher} />}
+        {d.form_teacher && <Info label={early ? "Class teacher" : template === "british" ? "Form tutor" : "Form teacher"} value={d.form_teacher} />}
       </section>
 
-      <div className="mt-4 overflow-x-auto">
+      {early && <EarlyYearsAreas areas={d.areas ?? []} scale={d.ey_scale ?? []} color={color} />}
+
+      <div className={"mt-4 overflow-x-auto" + (early ? " hidden" : "")}>
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="text-white" style={head}>
@@ -158,11 +166,11 @@ export default function ReportCardView({ card, school, studentPhoto, verifyUrl, 
 
       <section className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
         <div className="rounded border border-slate-300 p-3">
-          <p className="text-xs font-bold uppercase text-slate-500">{template === "british" ? "Form tutor's comment" : "Form teacher's comment"}</p>
+          <p className="text-xs font-bold uppercase text-slate-500">{early ? "Class teacher's comment" : template === "british" ? "Form tutor's comment" : "Form teacher's comment"}</p>
           <p className="mt-1 min-h-[2.5rem]">{card.teacher_comment || "—"}</p>
         </div>
         <div className="rounded border border-slate-300 p-3">
-          <p className="text-xs font-bold uppercase text-slate-500">{template === "british" ? "Head's comment" : "Principal's comment"}</p>
+          <p className="text-xs font-bold uppercase text-slate-500">{early ? "Head teacher's comment" : template === "british" ? "Head's comment" : "Principal's comment"}</p>
           <p className="mt-1 min-h-[2.5rem]">{card.principal_comment || "—"}</p>
           <div className="mt-2 flex items-end gap-3">
             {school?.principal_signature_url && (
@@ -180,8 +188,13 @@ export default function ReportCardView({ card, school, studentPhoto, verifyUrl, 
 
       <section className="mt-4 flex flex-wrap items-end gap-4 text-xs text-slate-600">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold">Grading key</p>
-          <p>{(d.scheme?.bands ?? []).map(b => `${b.grade}: ${b.min_score}–${b.max_score}${b.remark ? ` (${b.remark})` : ""}${template === "american" && b.grade_point !== null && b.grade_point !== undefined ? ` = ${b.grade_point}` : ""}`).join(" · ")}</p>
+          {early ? (d.ey_options?.show_key !== false && (d.ey_scale ?? []).length > 0 && <>
+            <p className="font-semibold">What the ratings mean</p>
+            <p>{(d.ey_scale ?? []).map(s => `${s.short}: ${s.label}`).join(" · ")}. Children develop at different rates; this is a picture of where your child is now, not a test.</p>
+          </>) : <>
+            <p className="font-semibold">Grading key</p>
+            <p>{(d.scheme?.bands ?? []).map(b => `${b.grade}: ${b.min_score}–${b.max_score}${b.remark ? ` (${b.remark})` : ""}${template === "american" && b.grade_point !== null && b.grade_point !== undefined ? ` = ${b.grade_point}` : ""}`).join(" · ")}</p>
+          </>}
           {template === "british" && <p className="mt-1">Effort: 1 Excellent · 2 Good · 3 Satisfactory · 4 Cause for concern. Predicted grades are a forecast from this year&apos;s work so far.</p>}
           {midterm && <p className="mt-1">Mid-term figures cover only the assessments taken so far this term.</p>}
           {d.next_term_begins && <p className="mt-1">Next term begins: <b>{new Date(d.next_term_begins).toLocaleDateString(undefined, { dateStyle: "long" })}</b></p>}
@@ -196,6 +209,34 @@ export default function ReportCardView({ card, school, studentPhoto, verifyUrl, 
         )}
       </section>
     </article>
+  );
+}
+
+/** Preschool: each area of learning, what the child can do, and the teacher's words. */
+function EarlyYearsAreas({ areas, scale, color }: { areas: NonNullable<ReportCard["data"]["areas"]>; scale: ScaleItem[]; color: string }) {
+  const word = (v: number | null) => (v == null ? "Not yet assessed" : scale.find(s => s.value === v)?.label ?? String(v));
+  return (
+    <section className="mt-4 grid gap-3 text-sm sm:grid-cols-2 print:grid-cols-2">
+      {areas.map(a => (
+        <div key={a.id} className="break-inside-avoid rounded border border-slate-300">
+          <div className="flex items-baseline justify-between gap-2 px-3 py-1.5 text-white" style={{ background: color }}>
+            <p className="font-semibold">{a.name}</p>
+            {a.typical && <p className="text-xs opacity-90">Mostly: {a.typical}</p>}
+          </div>
+          <table className="w-full border-collapse">
+            <tbody>
+              {a.items.map(i => (
+                <tr key={i.text} className="odd:bg-slate-50">
+                  <td className="border-t border-slate-200 px-3 py-1">{i.text}</td>
+                  <td className={"w-28 border-t border-slate-200 px-2 py-1 text-right text-xs font-semibold" + (i.rating == null ? " text-slate-400" : "")}>{word(i.rating)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {a.comment && <p className="border-t border-slate-200 px-3 py-2 text-[13px] italic text-slate-700">{a.comment}</p>}
+        </div>
+      ))}
+    </section>
   );
 }
 

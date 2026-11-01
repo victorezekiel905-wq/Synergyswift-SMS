@@ -26,7 +26,7 @@ export const Bar = ({ v }: { v: number }) => <div className="h-1.5 rounded-full 
 export const CHAPTERS: Chapter[] = [
   { id: "setup", title: "Set up your school", area: "Settings", path: "school/setup", benefit: "Your own assessment pattern and grading, set once, used everywhere.",
     steps: [
-      { at: "tab-grading", say: "School setup → Grading. Every school assesses differently, so this is yours to decide." },
+      { at: "tab-grading", say: "Results → Grading systems. Every school assesses differently, so this is yours to decide." },
       { at: "pattern", say: "Start from a ready pattern: here, Nigerian secondary with two CAs, a test and the exam." },
       { at: "add-cat", say: "Add your own parts too, like a CAT, with its marks and weight." },
       { at: "save", say: "Save. Score sheets, report cards and positions all follow this pattern from now on." }

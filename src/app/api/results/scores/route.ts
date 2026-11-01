@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const tid = ctx.tenant.id;
 
   const scheme = await schemeFor(ctx.sb, tid, cg);
-  if (!scheme) return jsonError("no grading scheme configured; set one up under School setup → Grading");
+  if (!scheme) return jsonError("no grading scheme configured; set one up under Results → Grading systems");
   const [{ data: students }, { data: offering }, { data: group }] = await Promise.all([
     ctx.sb.from("students").select("id,admission_no,first_name,last_name,other_names")
       .eq("tenant_id", tid).eq("class_group_id", cg).eq("status", "active").order("last_name").order("first_name"),

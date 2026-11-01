@@ -5,22 +5,20 @@ import { notify } from "@/components/Toaster";
 import { LANGUAGES } from "@/lib/languages";
 import { CURRENCIES } from "@/lib/currency";
 import Sections from "@/components/admin/Sections";
-import { GRADING_PRESETS } from "@/lib/grading-presets";
 
-type Tab = "profile" | "academic" | "sections" | "grading" | "classes" | "departments";
+type Tab = "profile" | "academic" | "sections" | "classes" | "departments";
 
 export default function SetupPage() {
   const [tab, setTab] = useState<Tab>("profile");
   return (
     <Page wide>
-      <PageHeader eyebrow="Administration" title="School setup" subtitle="Branding, calendar, your own grading rules, classes and subjects. Only school admins can change these." />
+      <PageHeader eyebrow="Administration" title="School setup" subtitle="Branding, calendar, sections, classes and subjects. Grading systems and preschool settings are under Results. Only school admins can change these." />
       <Tabs value={tab} onChange={setTab} tabs={[
         { id: "profile", label: "Profile & notifications" }, { id: "academic", label: "Sessions & terms" }, { id: "sections", label: "Sections & curriculum" },
-        { id: "grading", label: "Grading" }, { id: "classes", label: "Classes & subjects" }, { id: "departments", label: "Departments & approval" }]} />
+        { id: "classes", label: "Classes & subjects" }, { id: "departments", label: "Departments & approval" }]} />
       {tab === "profile" && <Profile />}
       {tab === "academic" && <Academic />}
       {tab === "sections" && <Sections />}
-      {tab === "grading" && <Grading />}
       {tab === "classes" && <Classes />}
       {tab === "departments" && <Departments />}
     </Page>
@@ -237,123 +235,13 @@ function TermRow({ t, onSave, onCurrent }: { t: Session["terms"][number]; onSave
   );
 }
 
-/* ---------------- Grading ---------------- */
+/* ---------------- Grading systems are edited under Results → Grading systems ---------------- */
 type Scheme = {
   id?: string; name: string; is_default: boolean; pass_mark: number; show_position: boolean; show_class_average: boolean;
   cumulative_mode: string; decimals: number; template?: "nigerian" | "british" | "american";
   grading_components?: { id?: string; name: string; max_score: number; weight: number; midterm?: boolean }[];
   grade_bands?: { grade: string; min_score: number; max_score: number; remark: string | null; grade_point: number | null }[];
 };
-function Grading() {
-  const { data, reload } = useApi<Scheme[]>("/api/school/grading");
-  const [edit, setEdit] = useState<Scheme | null>(null);
-  const { flash, node } = useFlash();
-  useEffect(() => { if (data) setEdit(e => e ?? data[0] ?? null); }, [data]);
-
-  async function save() {
-    if (!edit) return;
-    const r = await send("/api/school/grading", {
-      id: edit.id, name: edit.name, is_default: edit.is_default, pass_mark: Number(edit.pass_mark), show_position: edit.show_position,
-      show_class_average: edit.show_class_average, cumulative_mode: edit.cumulative_mode, decimals: Number(edit.decimals), report_layout: edit.template ?? "nigerian",
-      components: (edit.grading_components ?? []).map(c => ({ ...c, max_score: Number(c.max_score), weight: Number(c.weight), midterm: Boolean(c.midterm) })),
-      bands: (edit.grade_bands ?? []).map(b => ({ ...b, min_score: Number(b.min_score), max_score: Number(b.max_score), grade_point: b.grade_point === null || (b.grade_point as unknown) === "" ? null : Number(b.grade_point) }))
-    }, "PUT");
-    flash(r.ok, r.ok ? "Grading scheme saved. Recompile results to apply it." : r.error ?? "failed");
-    if (r.ok) { setEdit(null); reload(); }
-  }
-  const comps = edit?.grading_components ?? [];
-  const bands = edit?.grade_bands ?? [];
-  const weight = comps.reduce((a, c) => a + Number(c.weight || 0), 0);
-  const setComp = (i: number, k: string, v: string | boolean) => setEdit(e => e && ({ ...e, grading_components: comps.map((c, j) => j === i ? { ...c, [k]: v } : c) }));
-  const setBand = (i: number, k: string, v: string) => setEdit(e => e && ({ ...e, grade_bands: bands.map((b, j) => j === i ? { ...b, [k]: v } : b) }));
-
-  return (
-    <div className="space-y-5">
-      {node}
-      <div className="flex flex-wrap items-center gap-2">
-        {(data ?? []).map(s => (
-          <button key={s.id} className={"btn " + (edit?.id === s.id ? "btn-primary" : "btn-ghost border border-slate-200")} onClick={() => setEdit(s)}>
-            {s.name} {s.is_default && "· default"}
-          </button>
-        ))}
-        <button className="btn btn-ghost border border-dashed border-slate-300" onClick={() => setEdit({ name: "New scheme", is_default: false, pass_mark: 40, show_position: true, show_class_average: true, cumulative_mode: "average", decimals: 1, grading_components: [{ name: "Exam", max_score: 100, weight: 100 }], grade_bands: [{ grade: "A", min_score: 70, max_score: 100, remark: "Excellent", grade_point: 5 }, { grade: "F", min_score: 0, max_score: 69.99, remark: "Fail", grade_point: 0 }] })}>+ New scheme</button>
-      </div>
-      <div className="card flex flex-wrap items-center gap-2 p-3 text-sm">
-        <span className="text-slate-600">Start from a pattern:</span>
-        {GRADING_PRESETS.map(p => (
-          <button key={p.id} className="btn btn-outline px-2.5 py-1 text-xs" title={p.hint} onClick={() => setEdit(e => ({ ...(e && !e.id ? e : { is_default: !(data ?? []).length, show_position: true, show_class_average: true, cumulative_mode: "average", decimals: 1 }),
-            id: undefined, name: p.name, template: p.template, pass_mark: p.pass_mark, grading_components: p.parts.map(x => ({ ...x })), grade_bands: p.bands.map(x => ({ ...x })) } as Scheme))}>{p.name}</button>
-        ))}
-        <span className="text-xs text-slate-500">Fills a new scheme you can change: add a CAT, a project, or your own marks and weights.</span>
-      </div>
-      {edit && (
-        <div className="grid gap-5 xl:grid-cols-2">
-          <section className="card space-y-4 p-5">
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Scheme name"><input className="input" value={edit.name} onChange={e => setEdit({ ...edit, name: e.target.value })} /></Field>
-              <Field label="Pass mark (%)"><input className="input" type="number" value={edit.pass_mark} onChange={e => setEdit({ ...edit, pass_mark: e.target.value as unknown as number })} /></Field>
-              <Field label="Decimal places"><input className="input" type="number" min={0} max={3} value={edit.decimals} onChange={e => setEdit({ ...edit, decimals: e.target.value as unknown as number })} /></Field>
-              <Field label="Session result"><select className="input" value={edit.cumulative_mode} onChange={e => setEdit({ ...edit, cumulative_mode: e.target.value })}><option value="average">Average of terms</option><option value="none">No cumulative</option></select></Field>
-              <div className="col-span-2"><Field label="Report card layout" hint="Nigerian: CA columns, positions and class averages. British: attainment, effort, target and predicted grades with a comment per subject. American: percentages, letter grades and GPA.">
-                <select className="input" value={edit.template ?? "nigerian"} onChange={e => setEdit({ ...edit, template: e.target.value as Scheme["template"] })}>
-                  <option value="nigerian">Nigerian (WAEC-style)</option><option value="british">British (UK / IGCSE)</option><option value="american">American (letter grades and GPA)</option>
-                </select>
-              </Field></div>
-            </div>
-            <div className="flex flex-wrap gap-4 text-sm">
-              <label className="flex items-center gap-2"><input type="checkbox" checked={edit.is_default} onChange={e => setEdit({ ...edit, is_default: e.target.checked })} /> Default for classes without a scheme</label>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={edit.show_position} onChange={e => setEdit({ ...edit, show_position: e.target.checked })} /> Show positions</label>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={edit.show_class_average} onChange={e => setEdit({ ...edit, show_class_average: e.target.checked })} /> Show class average</label>
-            </div>
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <h3 className="font-semibold">Assessment components</h3>
-                <span className={"text-xs font-semibold " + (Math.abs(weight - 100) < 0.001 ? "text-emerald-600" : "text-rose-600")}>Weights total {weight}% (must be 100)</span>
-              </div>
-              <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
-                <thead className="text-left text-[13px] text-slate-500"><tr><th>Name</th><th>Max score</th><th>Weight %</th><th title="Counts on mid-term progress reports">Mid-term</th><th /></tr></thead>
-                <tbody>
-                  {comps.map((c, i) => (
-                    <tr key={i}>
-                      <td className="pr-2 py-1"><input className="input py-1" value={c.name} onChange={e => setComp(i, "name", e.target.value)} aria-label="Component name" /></td>
-                      <td className="pr-2"><input className="input py-1" type="number" value={c.max_score} onChange={e => setComp(i, "max_score", e.target.value)} aria-label="Max score" /></td>
-                      <td className="pr-2"><input className="input py-1" type="number" value={c.weight} onChange={e => setComp(i, "weight", e.target.value)} aria-label="Weight" /></td>
-                      <td className="pr-2 text-center"><input type="checkbox" checked={Boolean(c.midterm)} onChange={e => setComp(i, "midterm", e.target.checked)} aria-label="Counts for mid-term" /></td>
-                      <td><button type="button" className="btn btn-ghost px-2 text-rose-600" onClick={() => setEdit({ ...edit, grading_components: comps.filter((_, j) => j !== i) })} aria-label="Remove component"><Icon name="x" className="h-4 w-4" /></button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table></div>
-              <button className="btn btn-ghost mt-2 text-xs" onClick={() => setEdit({ ...edit, grading_components: [...comps, { name: `CA ${comps.length + 1}`, max_score: 10, weight: 10 }] })}>+ Add component</button>
-              <p className="mt-2 text-xs text-slate-500">Each component can have any max score. Its contribution is score ÷ max × weight, so a 30-mark test worth 20% works as expected. Tick <b>Mid-term</b> for the assessments that appear on mid-term progress reports (usually the CAs).</p>
-            </div>
-          </section>
-          <section className="card p-5">
-            <h3 className="mb-2 font-semibold">Grade bands</h3>
-            <div className="overflow-x-auto print:overflow-visible"><table className="w-full text-sm">
-              <thead className="text-left text-[13px] text-slate-500"><tr><th>Grade</th><th>From</th><th>To</th><th>Remark</th><th>Points</th><th /></tr></thead>
-              <tbody>
-                {bands.map((b, i) => (
-                  <tr key={i}>
-                    <td className="pr-1 py-1"><input className="input w-16 py-1" value={b.grade} onChange={e => setBand(i, "grade", e.target.value)} aria-label="Grade" /></td>
-                    <td className="pr-1"><input className="input w-20 py-1" type="number" step="any" value={b.min_score} onChange={e => setBand(i, "min_score", e.target.value)} aria-label="From" /></td>
-                    <td className="pr-1"><input className="input w-20 py-1" type="number" step="any" value={b.max_score} onChange={e => setBand(i, "max_score", e.target.value)} aria-label="To" /></td>
-                    <td className="pr-1"><input className="input py-1" value={b.remark ?? ""} onChange={e => setBand(i, "remark", e.target.value)} aria-label="Remark" /></td>
-                    <td className="pr-1"><input className="input w-16 py-1" type="number" step="any" value={b.grade_point ?? ""} onChange={e => setBand(i, "grade_point", e.target.value)} aria-label="Grade point" /></td>
-                    <td><button type="button" className="btn btn-ghost px-2 text-rose-600" onClick={() => setEdit({ ...edit, grade_bands: bands.filter((_, j) => j !== i) })} aria-label="Remove band"><Icon name="x" className="h-4 w-4" /></button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table></div>
-            <button className="btn btn-ghost mt-2 text-xs" onClick={() => setEdit({ ...edit, grade_bands: [...bands, { grade: "", min_score: 0, max_score: 0, remark: "", grade_point: null }] })}>+ Add band</button>
-            <div className="mt-5 flex gap-2"><button className="btn btn-primary" onClick={save}>Save scheme</button></div>
-          </section>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ---------------- Classes & subjects ---------------- */
 type Structure = {
   class_groups: { id: string; name: string; level: string | null; form_teacher_id: string | null; scheme_id: string | null; students: number }[];

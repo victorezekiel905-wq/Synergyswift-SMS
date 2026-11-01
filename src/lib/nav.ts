@@ -1,5 +1,5 @@
 /**
- * The app's menu: eight areas in plain words, each link shown only to the
+ * The app's menu: nine areas in plain words, each link shown only to the
  * roles that use it and only when the school has its module. Pure, unit
  * tested (the shell renders it).
  */
@@ -59,14 +59,23 @@ export const NAV: NavGroup[] = [
     { href: "/school/classroom-sync", label: "Google Classroom & Teams", roles: TEACH },
     { href: "/teacher/guard", label: "Classroom device control", roles: [...TEACH, "it_admin"], module: "lms" }
   ] },
-  { id: "exams", title: "Exams & results", links: [
-    { href: "/school/results", label: "Results & report cards", roles: ACADEMIC, module: "results" },
+  // The results portal: everything from marks to the report card in parents' hands.
+  { id: "results", title: "Results", links: [
+    { href: "/school/results", label: "Score entry", roles: ACADEMIC, module: "results" },
+    { href: "/school/results/early-years", label: "Preschool assessment", roles: ACADEMIC, module: "results", hint: "Early years checklist and comments" },
+    { href: "/school/results/skills", label: "Character & skills", roles: ACADEMIC, module: "results" },
+    { href: "/school/results/approvals", label: "Mark sheet approvals", roles: ACADEMIC, module: "results" },
+    { href: "/school/results/report-cards", label: "Report cards & publishing", roles: ACADEMIC, module: "results" },
+    { href: "/school/result-pins", label: "Result checker PINs", roles: [...ADMIN, "bursar", "exam_officer"], module: "results", hint: "Scratch cards for checking results online" },
+    { href: "/school/insights", label: "Results analysis & returns", roles: [...TEACH, "qa_officer", "bursar", "admissions_officer"], module: "analytics" },
+    { href: "/school/results/grading", label: "Grading systems", roles: ADMIN, module: "results", hint: "Primary, secondary and sixth form marks and grades" },
+    { href: "/school/results/preschool-settings", label: "Preschool settings", roles: ADMIN, module: "results", hint: "Early years checklist and scale" }
+  ] },
+  { id: "exams", title: "Exams", links: [
     { href: "/school/exams-office", label: "Exams office", roles: ["exam_officer", ...ADMIN], module: "exams", hint: "Live papers, marking, requests, arrangements" },
     { href: "/exams", label: "Secure exams (CBT)", roles: [...TEACH, "exam_officer"], module: "exams" },
     { href: "/exams/bank", label: "Question bank", roles: [...TEACH, "exam_officer"], module: "exams" },
     { href: "/school/exam-planner", label: "Exam timetable & halls", roles: [...TEACH, "exam_officer"], module: "exams" },
-    { href: "/school/result-pins", label: "Result checker PINs", roles: [...ADMIN, "bursar", "exam_officer"], module: "results", hint: "Scratch cards for checking results online" },
-    { href: "/school/insights", label: "Results analysis & returns", roles: [...TEACH, "qa_officer", "bursar", "admissions_officer"], module: "analytics" },
     { href: "/school/reports", label: "Report builder", roles: STAFF.filter(r => !["gate_officer", "cashier", "transport_officer", "nurse", "hostel_warden"].includes(r)) }
   ] },
   { id: "students", title: "Students & welfare", links: [

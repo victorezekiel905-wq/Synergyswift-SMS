@@ -4,8 +4,8 @@ import { NAV, visibleNav, activeHref, bottomBar } from "@/lib/nav";
 const R = (...r: string[]) => new Set(r);
 
 describe("menu", () => {
-  it("has eight plain areas and no page twice", () => {
-    expect(NAV.map(g => g.title)).toEqual(["Home", "Teaching", "Exams & results", "Students & welfare", "Safety & gate", "Messages & families", "Money", "School office"]);
+  it("has nine plain areas and no page twice", () => {
+    expect(NAV.map(g => g.title)).toEqual(["Home", "Teaching", "Results", "Exams", "Students & welfare", "Safety & gate", "Messages & families", "Money", "School office"]);
     const hrefs = visibleNav(R("school_admin", "teacher", "bursar", "student"), {}).flatMap(g => g.links.map(l => l.href));
     expect(new Set(hrefs).size).toBe(hrefs.length);
   });
@@ -29,6 +29,16 @@ describe("menu", () => {
     expect(activeHref(g, "/exams/123")).toBe("/exams");
     expect(activeHref(g, "/school")).toBe("/school");
     expect(activeHref(g, "/school/fees/x")).toBe("/school/fees");
+    expect(activeHref(g, "/school/results/report-cards")).toBe("/school/results/report-cards");
+    expect(activeHref(g, "/school/results/print")).toBe("/school/results");
+  });
+  it("gathers everything about results and report cards in one module", () => {
+    const results = visibleNav(R("school_admin"), {}).find(x => x.id === "results")!.links.map(l => l.href);
+    expect(results).toEqual(expect.arrayContaining(["/school/results", "/school/results/report-cards", "/school/results/grading",
+      "/school/results/preschool-settings", "/school/results/early-years", "/school/result-pins", "/school/insights"]));
+    const teacher = visibleNav(R("teacher"), {}).find(x => x.id === "results")!.links.map(l => l.href);
+    expect(teacher).toContain("/school/results/early-years");
+    expect(teacher).not.toContain("/school/results/grading");
   });
   it("gives each person a phone bar of everyday places", () => {
     expect(bottomBar(R("parent"), {}).map(i => i.href)).toEqual(["/parent", "/calendar", "/account/security"]);

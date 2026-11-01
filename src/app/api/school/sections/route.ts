@@ -86,14 +86,25 @@ export async function POST(req: NextRequest) {
   const schemeId = new Map<string, string>();
   if (b.grading) {
     const { data: schemes } = await sb.from("grading_schemes").select("id,name").eq("tenant_id", tid);
+    const KIND_STAGE: Record<string, string> = { nursery: "preschool", primary: "primary", secondary: "secondary", sixth_form: "sixth_form" };
     for (const key of plan.grading) {
       const g = GRADING[key];
       const found = (schemes ?? []).find((s: any) => s.name === g.name);
       if (found) { schemeId.set(key, found.id); continue; }
-      const { data: sc, error } = await sb.from("grading_schemes").insert({ tenant_id: tid, name: g.name, pass_mark: g.pass_mark, template: g.template, show_position: g.show_position }).select("id").single();
-      if (error) return jsonError(error.message);
-      await sb.from("grading_components").insert(g.components.map((c, i) => ({ ...c, scheme_id: sc.id, position: i + 1 })));
-      await sb.from("grade_bands").insert(g.bands.map(x => ({ ...x, scheme_id: sc.id })));
+      // The stage it is for, when every stage using it is the same kind (Key Stages 1–3 spans primary and secondary).
+      const kinds = [...new Set(b.stages.filter(k => stage(k)!.stage.grading === key).map(k => stage(k)!.stage.kind))];
+      const row: Record<string, unknown> = { tenant_id: tid, name: g.name, pass_mark: g.pass_mark, template: g.template, show_position: g.show_position,
+        ...(g.template === "early_years" ? { show_class_average: false, cumulative_mode: "none" } : {}) };
+      let { data: sc, error } = await sb.from("grading_schemes").insert({ ...row, stage: kinds.length === 1 ? KIND_STAGE[kinds[0]] : null }).select("id").single();
+      // Before migration 9200 there is no stage column and no early-years layout: fall back to a marked scheme.
+      const old = Boolean(error && /stage|template_check/.test(error.message));
+      if (old) ({ data: sc, error } = await sb.from("grading_schemes").insert({ ...row, template: g.template === "early_years" ? "british" : g.template }).select("id").single());
+      if (error || !sc) return jsonError(error?.message ?? "could not add the grading system");
+      // Preschool is rated against the early-years checklist, so it needs no marks or grade bands.
+      if (g.template !== "early_years" || old) {
+        await sb.from("grading_components").insert(g.components.map((c, i) => ({ ...c, scheme_id: sc.id, position: i + 1 })));
+        await sb.from("grade_bands").insert(g.bands.map(x => ({ ...x, scheme_id: sc.id })));
+      }
       schemeId.set(key, sc.id);
     }
   }

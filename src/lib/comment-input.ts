@@ -13,8 +13,28 @@ export type CardForComment = {
   data: {
     student_name?: string; subjects?: Subject[]; scheme?: { pass_mark?: number; show_position?: boolean };
     days_present?: number | null; days_opened?: number | null; traits?: { domain?: string; name: string; rating: number | null }[];
+    // Preschool (early_years) cards: the checklist instead of subjects.
+    template?: string; areas?: { name: string; items: { text: string; rating: number | null }[] }[]; ey_scale?: { value: number; label: string }[];
   } | null;
 };
+
+/** Preschool: the areas a child is most and least secure in, from their checklist ratings. */
+function earlyYearsFacts(c: CardForComment) {
+  const scale = c.data?.ey_scale ?? [];
+  const top = Math.max(0, ...scale.map(s => s.value));
+  const word = (v: number) => scale.find(s => s.value === v)?.label ?? String(v);
+  const areas = (c.data?.areas ?? []).map(a => {
+    const r = a.items.map(i => i.rating).filter((v): v is number => typeof v === "number");
+    return { name: a.name, mean: r.length ? r.reduce((x, y) => x + y, 0) / r.length : null, items: a.items };
+  }).filter(a => a.mean !== null) as { name: string; mean: number; items: { text: string; rating: number | null }[] }[];
+  const sorted = [...areas].sort((a, b) => b.mean - a.mean);
+  const strongest = sorted.slice(0, 2).map(a => `${a.name} (mostly ${word(Math.round(a.mean))})`);
+  const weakest = sorted.slice(-2).reverse().filter(a => a.mean < top).map(a => {
+    const next = a.items.filter(i => i.rating !== null && i.rating < top).slice(0, 1).map(i => `: next step "${i.text}"`).join("");
+    return `${a.name} (mostly ${word(Math.round(a.mean))}${next})`;
+  });
+  return { strongest, weakest: sorted.length > 2 ? weakest : [] };
+}
 type PrevCard = { average: number | string | null; data: { subjects?: Subject[] } | null } | null;
 
 const num = (v: number | string | null | undefined) => (v === null || v === undefined || v === "" ? null : Number(v));
@@ -40,6 +60,7 @@ export function commentInputFor(c: CardForComment, prev: PrevCard, gender: strin
   const traits = [...rated].sort((a, b) => b.rating - a.rating);
   const notable = traits.length > 4 ? [...traits.slice(0, 2), ...traits.slice(-2)] : traits;
   const effort = subs.filter(s => s.effort).slice(0, 4).map(s => `${s.subject}: effort ${s.effort}`);
+  const early = c.data?.template === "early_years" ? earlyYearsFacts(c) : null;
 
   return {
     student_id: c.student_id,
@@ -48,8 +69,8 @@ export function commentInputFor(c: CardForComment, prev: PrevCard, gender: strin
     average: avg,
     position: c.data?.scheme?.show_position ? c.position : null,
     class_size: c.class_size ?? 0,
-    strongest: subs.slice(0, 2).map(s => `${s.subject} (${s.total}${s.grade ? `, ${s.grade}` : ""})`),
-    weakest: subs.slice(-2).reverse().filter(s => (s.total ?? 0) < pass + 15).map(s => `${s.subject} (${s.total}${s.grade ? `, ${s.grade}` : ""})`),
+    strongest: early ? early.strongest : subs.slice(0, 2).map(s => `${s.subject} (${s.total}${s.grade ? `, ${s.grade}` : ""})`),
+    weakest: early ? early.weakest : subs.slice(-2).reverse().filter(s => (s.total ?? 0) < pass + 15).map(s => `${s.subject} (${s.total}${s.grade ? `, ${s.grade}` : ""})`),
     attendance_rate: present !== null && opened ? Math.round((present / opened) * 100) : null,
     trend: before === null || avg === null ? "new" : avg - before >= 3 ? "up" : before - avg >= 3 ? "down" : "steady",
     previous_average: before,

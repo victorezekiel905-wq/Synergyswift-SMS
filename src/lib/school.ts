@@ -36,7 +36,7 @@ export async function termLabel(sb: any, tenantId: string, termId: string) {
 }
 
 /** Scheme for a class group: its own scheme, else the tenant default, else the first one. */
-export async function schemeFor(sb: any, tenantId: string, classGroupId: string | null): Promise<(Scheme & { id: string; name: string; show_class_average: boolean; template: "nigerian" | "british" | "american"; show_cumulative: boolean }) | null> {
+export async function schemeFor(sb: any, tenantId: string, classGroupId: string | null): Promise<(Scheme & { id: string; name: string; show_class_average: boolean; template: "nigerian" | "british" | "american" | "early_years"; show_cumulative: boolean }) | null> {
   let schemeId: string | null = null;
   if (classGroupId) {
     const { data: g } = await sb.from("class_groups").select("scheme_id").eq("tenant_id", tenantId).eq("id", classGroupId).maybeSingle();

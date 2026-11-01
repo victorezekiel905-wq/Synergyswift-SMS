@@ -5,7 +5,7 @@
  */
 
 export type Band = { grade: string; min_score: number; max_score: number; remark: string; grade_point?: number | null };
-export type GradingTemplate = { key: string; name: string; pass_mark: number; template: "nigerian" | "british" | "american"; show_position: boolean;
+export type GradingTemplate = { key: string; name: string; pass_mark: number; template: "nigerian" | "british" | "american" | "early_years"; show_position: boolean;
   components: { name: string; max_score: number; weight: number }[]; bands: Band[] };
 export type Stage = { key: string; name: string; kind: "nursery" | "primary" | "secondary" | "sixth_form"; levels: string[]; subjects: string[]; grading: string; exam?: string };
 export type Framework = { key: string; name: string; summary: string; stages: Stage[] };
@@ -19,10 +19,10 @@ export const GRADING: Record<string, GradingTemplate> = {
     ["C6", 50, 54.99, "Credit", 2.5], ["D7", 45, 49.99, "Pass", 2], ["E8", 40, 44.99, "Pass", 1], ["F9", 0, 39.99, "Fail", 0]]) },
   bece: { key: "bece", name: "BECE / basic (A–F)", pass_mark: 40, template: "nigerian", show_position: true, components: CA_EXAM, bands: step([
     ["A", 70, 100, "Distinction"], ["B", 60, 69.99, "Upper credit"], ["C", 50, 59.99, "Lower credit"], ["D", 45, 49.99, "Pass"], ["E", 40, 44.99, "Weak pass"], ["F", 0, 39.99, "Fail"]]) },
-  ng_early: { key: "ng_early", name: "Nursery (developmental)", pass_mark: 40, template: "nigerian", show_position: false,
+  ng_early: { key: "ng_early", name: "Nursery (developmental)", pass_mark: 40, template: "early_years", show_position: false,
     components: [{ name: "Classwork", max_score: 40, weight: 40 }, { name: "End of term", max_score: 60, weight: 60 }], bands: step([
     ["A", 80, 100, "Excellent"], ["B", 65, 79.99, "Very good"], ["C", 50, 64.99, "Good"], ["D", 40, 49.99, "Fair"], ["E", 0, 39.99, "Needs support"]]) },
-  eyfs: { key: "eyfs", name: "EYFS (Emerging / Expected / Exceeding)", pass_mark: 50, template: "british", show_position: false,
+  eyfs: { key: "eyfs", name: "EYFS (Emerging / Expected / Exceeding)", pass_mark: 50, template: "early_years", show_position: false,
     components: [{ name: "Observation", max_score: 100, weight: 100 }], bands: step([["Exceeding", 80, 100, "Beyond the early learning goal"], ["Expected", 50, 79.99, "Meeting the early learning goal"], ["Emerging", 0, 49.99, "Not yet at the expected level"]]) },
   uk_progress: { key: "uk_progress", name: "Key Stages 1–3 (working towards / expected / greater depth)", pass_mark: 60, template: "british", show_position: false,
     components: [{ name: "Classwork", max_score: 40, weight: 40 }, { name: "Assessment", max_score: 60, weight: 60 }], bands: step([
