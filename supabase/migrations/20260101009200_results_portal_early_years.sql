@@ -8,6 +8,9 @@
 --    scale, with a short comment per area. A grading system with the
 --    'early_years' layout turns this on for the classes that use it.
 --  - tenant_settings.early_years holds the scale and report options.
+--  - Subject teachers can set the parts for their own subject in a class
+--    (CAT 1, CAT 2, HW, Test, Exam…) when the school's grading system
+--    allows it. Grades, pass mark and report layout stay the school's.
 -- Idempotent. Apply after 20260101009110.
 -- =========================================================================
 
@@ -115,5 +118,47 @@ end $$;
 
 revoke all on public.early_years_areas, public.early_years_items, public.early_years_ratings, public.early_years_comments from anon;
 grant select, insert, update, delete on public.early_years_areas, public.early_years_items, public.early_years_ratings, public.early_years_comments to authenticated;
+
+-- ---------- Subject teachers set their subject's own parts ----------
+-- The school decides per grading system whether its subject teachers may.
+alter table public.grading_schemes add column if not exists subject_parts boolean not null default false;
+
+-- A part belongs either to a grading system (the school's parts for its classes)
+-- or to one subject in one class (that subject's own parts).
+alter table public.grading_components add column if not exists offering_id uuid references public.subject_offerings(id) on delete cascade;
+alter table public.grading_components alter column scheme_id drop not null;
+alter table public.grading_components drop constraint if exists grading_components_owner_check;
+alter table public.grading_components add constraint grading_components_owner_check check (num_nonnulls(scheme_id, offering_id) = 1);
+create index if not exists grading_components_offering on public.grading_components(offering_id, position);
+
+-- Admins always; the subject's teacher when the class's grading system (or the school
+-- default, for a class without one) lets subject teachers set their own parts.
+create or replace function public.can_set_subject_parts(p_offering uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.subject_offerings o
+    join public.class_groups g on g.id = o.class_group_id
+    where o.id = p_offering and o.tenant_id = public.my_tenant_id()
+      and (public.is_school_admin() or (
+        o.teacher_id = (select auth.uid()) and coalesce(
+          (select s.subject_parts from public.grading_schemes s where s.id = g.scheme_id),
+          (select s.subject_parts from public.grading_schemes s where s.tenant_id = o.tenant_id order by s.is_default desc, s.created_at limit 1),
+          false)))
+  );
+$$;
+revoke all on function public.can_set_subject_parts(uuid) from public, anon;
+grant execute on function public.can_set_subject_parts(uuid) to authenticated;
+
+drop policy if exists grading_components_read on public.grading_components;
+create policy grading_components_read on public.grading_components for select using (
+  exists (select 1 from public.grading_schemes s where s.id = grading_components.scheme_id and s.tenant_id = public.my_tenant_id())
+  or exists (select 1 from public.subject_offerings o where o.id = grading_components.offering_id and o.tenant_id = public.my_tenant_id()));
+drop policy if exists grading_components_write on public.grading_components;
+create policy grading_components_write on public.grading_components for all using (
+  (public.is_school_admin() and exists (select 1 from public.grading_schemes s where s.id = grading_components.scheme_id and s.tenant_id = public.my_tenant_id()))
+  or (grading_components.offering_id is not null and public.can_set_subject_parts(grading_components.offering_id))
+) with check (
+  (public.is_school_admin() and exists (select 1 from public.grading_schemes s where s.id = grading_components.scheme_id and s.tenant_id = public.my_tenant_id()))
+  or (grading_components.offering_id is not null and public.can_set_subject_parts(grading_components.offering_id)));
 
 select public.attach_change_log();

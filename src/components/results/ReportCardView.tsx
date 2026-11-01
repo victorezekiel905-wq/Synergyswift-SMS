@@ -8,6 +8,7 @@ type Subject = {
   remark: string | null; grade_point?: number | null; position: number | null; class_average: number | null; highest: number | null; lowest: number | null;
   comment?: string | null; effort?: string | null; target_grade?: string | null; predicted_grade?: string | null; predicted_score?: number | null;
   cumulative?: { totals: (number | null)[]; average: number | null } | null;
+  own_parts?: { id: string; name: string; max_score: number }[];   // the subject teacher's own parts (9200)
 };
 export type ReportCard = {
   status: string; total: number | string | null; average: number | string | null; position: number | null; class_size: number | null;
@@ -51,6 +52,9 @@ export default function ReportCardView({ card, school, studentPhoto, verifyUrl, 
   const midterm = (card.kind ?? d.kind) === "midterm";
   const comps = d.components ?? [];
   const subjects = (d.subjects ?? []).filter(s => s.total !== null);
+  // Part columns (Nigerian layout): the school's parts; a subject with its own parts lists them across those columns.
+  const anyOwn = subjects.some(s => s.own_parts?.length);
+  const partCols = Math.max(1, comps.length);
   const showPos = Boolean(d.scheme?.show_position) && template !== "british";
   const showAvg = d.scheme?.show_class_average !== false;
   const cum = d.cumulative && d.cumulative.terms?.length > 1 ? d.cumulative : null;
@@ -103,7 +107,8 @@ export default function ReportCardView({ card, school, studentPhoto, verifyUrl, 
           <thead>
             <tr className="text-white" style={head}>
               <th className={cell + " text-left"}>Subject</th>
-              {template === "nigerian" && comps.map(c => <th key={c.id} className={cell + " text-center"}>{c.name}<div className="text-[10px] font-normal">/{c.max_score}</div></th>)}
+              {template === "nigerian" && (comps.length ? comps.map(c => <th key={c.id} className={cell + " text-center"}>{c.name}<div className="text-[10px] font-normal">/{c.max_score}</div></th>)
+                : anyOwn && <th className={cell + " text-center"}>Parts</th>)}
               {template === "british" ? <>
                 <th className={cell}>Attainment</th><th className={cell}>Grade</th><th className={cell}>Effort</th><th className={cell}>Target</th>{!midterm && <th className={cell}>Predicted</th>}
               </> : template === "american" ? <>
@@ -122,7 +127,10 @@ export default function ReportCardView({ card, school, studentPhoto, verifyUrl, 
             {subjects.map(s => (
               <tr key={s.subject_id} className="odd:bg-slate-50">
                 <td className={cell + " font-medium"}>{s.subject}</td>
-                {template === "nigerian" && comps.map(c => <td key={c.id} className={cell + " text-center tabular-nums"}>{s.components?.[c.id] ?? "—"}</td>)}
+                {template === "nigerian" && (s.own_parts?.length
+                  ? <td colSpan={partCols} className={cell + " text-center text-[12px]"}>{s.own_parts.map(p => `${p.name} ${s.components?.[p.id] ?? "—"}/${p.max_score}`).join(" · ")}</td>
+                  : comps.length ? comps.map(c => <td key={c.id} className={cell + " text-center tabular-nums"}>{s.components?.[c.id] ?? "—"}</td>)
+                  : anyOwn && <td className={cell + " text-center"}>—</td>)}
                 {template === "british" ? <>
                   <td className={cell + " text-center tabular-nums"}>{s.total}%</td>
                   <td className={cell + " text-center font-bold"}>{s.grade}</td>

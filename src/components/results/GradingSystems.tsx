@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApi, send, Page, PageHeader, Alert, Badge, Empty, Field, Icon, Loading } from "@/components/ui";
 import { validateScheme } from "@/lib/grading";
-import { GRADING_PRESETS, STAGES, addNumberedPart, bandGaps, classStage, type SchoolStage, type GradingPreset } from "@/lib/grading-presets";
+import { GRADING_PRESETS, STAGES, bandGaps, classStage, type SchoolStage, type GradingPreset } from "@/lib/grading-presets";
+import PartsEditor, { PARTS_HINT, Quick, partsProblem, type Part } from "./PartsEditor";
 
 type Layout = "nigerian" | "british" | "american" | "early_years";
-type Part = { id?: string; name: string; max_score: number | string; weight: number | string; midterm?: boolean };
 type BandRow = { grade: string; min_score: number | string; max_score: number | string; remark: string | null; grade_point: number | string | null };
 type Scheme = {
   id?: string; name: string; is_default: boolean; pass_mark: number | string; show_position: boolean; show_class_average: boolean;
-  cumulative_mode: string; decimals: number; template?: Layout; stage?: SchoolStage | null;
+  cumulative_mode: string; decimals: number; template?: Layout; stage?: SchoolStage | null; subject_parts?: boolean;
   grading_components?: Part[]; grade_bands?: BandRow[];
 };
 type ClassRow = { id: string; name: string; level: string | null; scheme_id: string | null; students: number };
@@ -23,16 +23,6 @@ const LAYOUTS: { id: Exclude<Layout, "early_years">; label: string; hint: string
   { id: "british", label: "British", hint: "Attainment, effort, target and predicted grades, with a comment per subject. No positions." },
   { id: "american", label: "American", hint: "Percentages, letter grades, grade points and GPA." }
 ];
-const QUICK_PARTS: { label: string; part: Part }[] = [
-  { label: "CA", part: { name: "CA", max_score: 10, weight: 10, midterm: true } },
-  { label: "CAT", part: { name: "CAT", max_score: 15, weight: 15, midterm: true } },
-  { label: "Classwork", part: { name: "Classwork", max_score: 10, weight: 10, midterm: true } },
-  { label: "Homework", part: { name: "Homework", max_score: 10, weight: 10, midterm: true } },
-  { label: "Test", part: { name: "Test", max_score: 20, weight: 20, midterm: true } },
-  { label: "Project", part: { name: "Project", max_score: 20, weight: 20 } },
-  { label: "Exam", part: { name: "Exam", max_score: 60, weight: 60 } }
-];
-
 const plural = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const stageLabel = (s: SchoolStage | null | undefined) => STAGES.find(x => x.id === s)?.label ?? "Not sorted yet";
 
@@ -155,6 +145,7 @@ function SchemeCard({ s, users, isFallback, onEdit, onDelete }: { s: Scheme; use
             {parts.map(p => <span key={p.id ?? p.name} className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs"><b className="font-medium">{p.name}</b> <span className="text-slate-500">/{p.max_score} · {p.weight}%</span></span>)}
           </div>
           <p className="text-xs text-slate-600">Grades: {bands.map(b => b.grade).join(" · ")}</p>
+          {s.subject_parts && <p className="text-xs text-slate-600">Subject teachers set their own parts; these are the starting point.</p>}
         </>
       )}
       <p className="text-xs text-slate-500">{users.length ? `${plural(users.length, "class", "classes")}, ${plural(children, "child", "children")}: ${users.slice(0, 5).map(c => c.name).join(", ")}${users.length > 5 ? "…" : ""}` : "No classes use it yet."}</p>
@@ -187,17 +178,6 @@ function Chip({ on, onClick, children, title }: { on: boolean; onClick: () => vo
     </button>
   );
 }
-function Quick({ values, onPick, current, suffix = "" }: { values: number[]; onPick: (v: number) => void; current: number | string; suffix?: string }) {
-  return (
-    <div className="mt-1.5 flex flex-wrap gap-1">
-      {values.map(v => (
-        <button key={v} type="button" onClick={() => onPick(v)}
-          className={"rounded border px-1.5 py-0.5 text-[11px] tabular-nums " + (Number(current) === v ? "border-brand-600 bg-brand-50 text-brand-800" : "border-slate-200 text-slate-600 hover:border-slate-300")}>{v}{suffix}</button>
-      ))}
-    </div>
-  );
-}
-
 function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, onClose, onSaved }: {
   initial: Scheme; initialClasses: string[]; classes: (ClassRow & { section: string | null; stage: SchoolStage | null })[]; schemes: Scheme[]; hasOthers: boolean;
   onClose: () => void; onSaved: () => void;
@@ -228,8 +208,6 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
 
   const parts = s.grading_components ?? [];
   const bands = s.grade_bands ?? [];
-  const weight = parts.reduce((n, p) => n + (Number(p.weight) || 0), 0);
-  const setPart = (i: number, patch: Partial<Part>) => setS(x => ({ ...x, grading_components: parts.map((p, j) => (j === i ? { ...p, ...patch } : p)) }));
   const setBand = (i: number, patch: Partial<BandRow>) => setS(x => ({ ...x, grade_bands: bands.map((b, j) => (j === i ? { ...b, ...patch } : b)) }));
   // Every pattern stays available (as on the old Grading page); the ones for this stage come first.
   const presets = stage ? [...GRADING_PRESETS.filter(p => p.stages.includes(stage)), ...GRADING_PRESETS.filter(p => !p.stages.includes(stage))] : GRADING_PRESETS;
@@ -246,14 +224,6 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
   function applyPreset(p: GradingPreset) {
     setS(x => ({ ...fromPreset(p, { id: x.id, is_default: x.is_default, show_position: x.show_position, show_class_average: x.show_class_average, cumulative_mode: x.cumulative_mode, decimals: x.decimals }), stage: x.stage, name: named ? x.name : p.name }));
   }
-  function fitTo100() {
-    if (!weight) return;
-    const scaled = parts.map(p => Math.round(((Number(p.weight) || 0) / weight) * 100));
-    scaled[scaled.length - 1] += 100 - scaled.reduce((a, b) => a + b, 0);
-    setS(x => ({ ...x, grading_components: parts.map((p, i) => ({ ...p, weight: scaled[i] })) }));
-  }
-  const addPart = (p: Part) => setS(x => ({ ...x, grading_components: addNumberedPart(parts, p) }));
-
   const numBands = bands.map(b => ({ grade: b.grade, remark: b.remark, min_score: Number(b.min_score), max_score: Number(b.max_score),
     grade_point: b.grade_point === null || b.grade_point === "" ? null : Number(b.grade_point) }));
   const problems = early ? [] : validateScheme({ components: parts.map((p, i) => ({ id: String(i), name: p.name, max_score: Number(p.max_score), weight: Number(p.weight) })), bands: numBands });
@@ -267,13 +237,13 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
   async function save(go: boolean) {
     if (!s.name.trim()) { setError("Give the grading system a name."); return; }
     if (!stage) { setError("Say which stage it is for."); return; }
-    if (!early && parts.some(p => !p.name.trim())) { setError("Give every part a name, e.g. CAT 1 or HW."); return; }
-    if (!early && new Set(parts.map(p => p.name.trim().toLowerCase())).size !== parts.length) { setError("Two parts have the same name. Give each its own, e.g. CAT 1 and CAT 2."); return; }
+    const partIssue = early ? null : partsProblem(parts);
+    if (partIssue) { setError(partIssue); return; }
     if (!early && bands.some(b => !b.grade.trim())) { setError("Every grade needs a name, e.g. A or B2."); return; }
     if (problems.length) { setError(problems[0]); return; }
     setBusy(true); setError(null);
     const r = await send("/api/school/grading", {
-      id: s.id, name: s.name.trim(), is_default: Boolean(s.is_default), stage, report_layout: s.template ?? "nigerian",
+      id: s.id, name: s.name.trim(), is_default: Boolean(s.is_default), stage, report_layout: s.template ?? "nigerian", subject_parts: Boolean(s.subject_parts),
       pass_mark: Number(s.pass_mark) || 0, show_position: s.show_position, show_class_average: s.show_class_average,
       cumulative_mode: s.cumulative_mode, decimals: Number(s.decimals) || 0,
       components: parts.map(p => ({ id: p.id, name: p.name.trim(), max_score: Number(p.max_score), weight: Number(p.weight), midterm: Boolean(p.midterm) })),
@@ -336,40 +306,13 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
             </Step>
           ) : (
             <>
-              <Step n={2} title="How marks add up" hint="Add each test, CA, CAT, homework, project or exam. Each part can be marked out of any number and counts for its share: a test marked out of 30 that counts for 20% adds score ÷ 30 × 20. Tick “On mid-term reports” for the parts that appear on mid-term progress reports (usually the CAs and tests).">
-                <div className="flex flex-wrap gap-1.5" aria-label="Add a part">
-                  {QUICK_PARTS.map(q => (
-                    <button key={q.label} type="button" onClick={() => addPart(q.part)} className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium uppercase tracking-wide text-slate-700 hover:border-slate-300">+ {q.label}</button>
-                  ))}
-                  <button type="button" onClick={() => setS(x => ({ ...x, grading_components: [...parts, { name: "", max_score: 10, weight: 10 }] }))}
-                    className="rounded-md border border-dashed border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-400">+ Another part (name it yourself)</button>
-                </div>
-                {!parts.length && <p className="text-sm text-slate-500">No parts yet. Add them with the buttons above, or start from a pattern in step 1.</p>}
-                <div className="space-y-2">
-                  {parts.map((p, i) => (
-                    <div key={i} className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-md border border-slate-200 p-3 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
-                      <div className="col-span-2 sm:col-span-1">
-                        <Field label="Part"><input className="input" value={p.name} maxLength={40} placeholder="e.g. CAT 1, HW, Mid-term test" onChange={e => setPart(i, { name: e.target.value })} /></Field>
-                        <label className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-600"><input type="checkbox" checked={Boolean(p.midterm)} onChange={e => setPart(i, { midterm: e.target.checked })} /> On mid-term reports</label>
-                      </div>
-                      <div>
-                        <Field label="Marked out of"><input className="input" type="number" min={1} inputMode="decimal" value={p.max_score} onChange={e => setPart(i, { max_score: e.target.value })} /></Field>
-                        <Quick values={[10, 20, 25, 50, 100]} current={p.max_score} onPick={v => setPart(i, { max_score: v })} />
-                      </div>
-                      <div>
-                        <Field label="Counts for (%)"><input className="input" type="number" min={0} max={100} inputMode="decimal" value={p.weight} onChange={e => setPart(i, { weight: e.target.value })} /></Field>
-                        <Quick values={[10, 20, 40, 60]} current={p.weight} suffix="%" onPick={v => setPart(i, { weight: v })} />
-                      </div>
-                      <div className="col-span-2 flex justify-end sm:col-span-1 sm:items-start sm:pt-6">
-                        <button type="button" className="btn btn-ghost px-2 text-rose-600" onClick={() => setS({ ...s, grading_components: parts.filter((_, j) => j !== i) })} aria-label={`Remove ${p.name || "part"}`}><Icon name="x" className="h-4 w-4" /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className={"flex flex-wrap items-center justify-between gap-2 rounded-md px-3 py-2 text-sm " + (Math.abs(weight - 100) < 0.001 ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-950")}>
-                  <span>{Math.abs(weight - 100) < 0.001 ? "The parts add up to 100%." : weight < 100 ? `The parts add up to ${weight}%: ${100 - weight}% still to give.` : `The parts add up to ${weight}%: ${weight - 100}% too many.`}</span>
-                  {Math.abs(weight - 100) >= 0.001 && weight > 0 && <button type="button" className="text-xs font-semibold underline" onClick={fitTo100}>Fit to 100%</button>}
-                </div>
+              <Step n={2} title="How marks add up" hint={PARTS_HINT}>
+                <PartsEditor parts={parts} onChange={next => setS(x => ({ ...x, grading_components: next }))} />
+                <label className="flex items-start gap-2 rounded-md border border-slate-200 p-3 text-sm">
+                  <input type="checkbox" className="mt-0.5" checked={Boolean(s.subject_parts)} onChange={e => setS({ ...s, subject_parts: e.target.checked })} />
+                  <span><span className="font-medium">Subject teachers may set their own parts</span>
+                    <span className="block text-xs text-slate-500">Each subject teacher can choose the parts for their own subject in these classes (for example CAT 1, CAT 2, HW, Test, Exam for Maths, and Classwork, Project, Exam for English) from Score entry. The parts above are the starting point for every subject. Grades, pass mark and the report card stay as set here.</span></span>
+                </label>
               </Step>
 
               <Step n={3} title="Grades" hint={'A total gets the grade whose "from" mark it reaches. The remark prints on the report card. Points are optional: fill them in and each report card shows a GPA (the average points across subjects).'}>

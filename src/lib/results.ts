@@ -4,8 +4,8 @@
  */
 import { traitScale } from "./traits";
 import { earlyYearsSettings, areaSummary } from "./early-years";
-import { computeClassResults, midtermScheme, projectScore, cumulativeResults, gradeFor } from "./grading";
-import { schemeFor, termLabel, studentName } from "./school";
+import { computeClassResults, midtermScheme, midtermParts, projectScore, cumulativeResults, gradeFor } from "./grading";
+import { schemeFor, subjectPartsFor, termLabel, studentName } from "./school";
 import { signPublishedCards } from "./report-sign";
 
 const PAGE = 1000;
@@ -146,8 +146,19 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
     if (kind === "midterm") throw new Error("preschool classes have one report each term, not a mid-term report");
     return compileEarlyYears(sb, tenantId, termId, classGroupId, opts);
   }
-  const scheme = kind === "midterm" ? midtermScheme(fullScheme) : fullScheme;
-  if (!scheme) throw new Error("mark which assessments count for mid-term reports under Results → Grading systems first");
+  // Subjects whose teacher set their own parts; the rest use the grading system's.
+  const ownParts = await subjectPartsFor(sb, tenantId, classGroupId);
+  const ownFor = (subjectId: string) => {
+    const p = ownParts.get(subjectId);
+    if (!p) return null;
+    return kind === "midterm" ? midtermParts(p) ?? [] : p;
+  };
+  const midSchool = kind === "midterm" ? midtermScheme(fullScheme) : null;
+  if (kind === "midterm" && !midSchool && ![...ownParts.values()].some(p => midtermParts(p))) {
+    throw new Error("mark which assessments count for mid-term reports under Results → Grading systems first");
+  }
+  // On a mid-term report, a subject using the school's parts with none marked mid-term has no figure yet.
+  const scheme = kind === "midterm" ? midSchool ?? { ...fullScheme, components: [] } : fullScheme;
 
   const [{ data: students }, { data: offerings }, { data: group }, { data: term }] = await Promise.all([
     sb.from("students").select("id,first_name,last_name,other_names,admission_no")
@@ -161,7 +172,7 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
   const studentIds: string[] = (students ?? []).map((s: { id: string }) => s.id);
   if (!studentIds.length) return { computed: 0, skipped_published: 0 };
 
-  const componentIds = new Set(scheme.components.map(c => c.id));
+  const componentIds = new Set([...scheme.components, ...[...ownParts.keys()].flatMap(k => ownFor(k) ?? [])].map(c => c.id));
   const scores = (await fetchAll<{ student_id: string; subject_id: string; component_id: string; score: number | null }>(() =>
     sb.from("score_entries").select("id,student_id,subject_id,component_id,score")
       .eq("tenant_id", tenantId).eq("term_id", termId).in("student_id", studentIds).order("id")))
@@ -178,7 +189,7 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
   }
   subjects.sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-  const results = computeClassResults({ studentIds, subjects, scores, scheme });
+  const results = computeClassResults({ studentIds, subjects, scores, scheme, partsFor: ownFor });
   const d = scheme.decimals ?? 1;
 
   const attendance = await termAttendance(sb, tenantId, term as TermRow, studentIds);
@@ -263,7 +274,9 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
               comment: note?.comment ?? null, effort: note?.effort ?? null, target_grade: note?.target_grade ?? null,
               predicted_grade: note?.predicted_grade ?? (projected === null ? null : gradeFor(projected, scheme.bands)?.grade ?? null),
               predicted_score: projected,
-              cumulative: cum?.subjects[s.subject_id] ?? null
+              cumulative: cum?.subjects[s.subject_id] ?? null,
+              // The subject's own parts (its teacher's), so the card can show them instead of the school's columns.
+              own_parts: ownParts.has(s.subject_id) ? (ownFor(s.subject_id) ?? []).map(c => ({ id: c.id, name: c.name, max_score: c.max_score })) : undefined
             };
           }),
           gpa: r.gpa, subjects_taken: r.subjects_taken, subjects_passed: r.subjects_passed,

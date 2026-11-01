@@ -3,7 +3,7 @@
  * explicit tenantId and filters on it, so it is safe with either the
  * RLS-bound client or the service client.
  */
-import type { Scheme } from "./grading";
+import type { Component, Scheme } from "./grading";
 
 export function studentName(s: { first_name?: string | null; last_name?: string | null; other_names?: string | null } | null | undefined) {
   if (!s) return "Student";
@@ -36,27 +36,50 @@ export async function termLabel(sb: any, tenantId: string, termId: string) {
 }
 
 /** Scheme for a class group: its own scheme, else the tenant default, else the first one. */
-export async function schemeFor(sb: any, tenantId: string, classGroupId: string | null): Promise<(Scheme & { id: string; name: string; show_class_average: boolean; template: "nigerian" | "british" | "american" | "early_years"; show_cumulative: boolean }) | null> {
+export async function schemeFor(sb: any, tenantId: string, classGroupId: string | null): Promise<(Scheme & { id: string; name: string; show_class_average: boolean; template: "nigerian" | "british" | "american" | "early_years"; show_cumulative: boolean; subject_parts: boolean }) | null> {
   let schemeId: string | null = null;
   if (classGroupId) {
     const { data: g } = await sb.from("class_groups").select("scheme_id").eq("tenant_id", tenantId).eq("id", classGroupId).maybeSingle();
     schemeId = g?.scheme_id ?? null;
   }
-  let q = sb.from("grading_schemes")
-    .select("id,name,pass_mark,decimals,show_position,show_class_average,is_default,template,cumulative_mode,grade_bands(grade,min_score,max_score,remark,grade_point),grading_components(id,name,max_score,weight,position,midterm)")
-    .eq("tenant_id", tenantId);
-  q = schemeId ? q.eq("id", schemeId) : q.order("is_default", { ascending: false }).order("created_at");
-  const { data } = await q.limit(1);
+  const cols = "id,name,pass_mark,decimals,show_position,show_class_average,is_default,template,cumulative_mode,grade_bands(grade,min_score,max_score,remark,grade_point),grading_components(id,name,max_score,weight,position,midterm)";
+  const query = (select: string) => {
+    const q = sb.from("grading_schemes").select(select).eq("tenant_id", tenantId);
+    return (schemeId ? q.eq("id", schemeId) : q.order("is_default", { ascending: false }).order("created_at")).limit(1);
+  };
+  // subject_parts arrived with migration 9200; before it, read without.
+  let { data, error } = await query(cols + ",subject_parts");
+  if (error && /subject_parts/.test(error.message)) ({ data } = await query(cols));
   const s = data?.[0];
   if (!s) return null;
   return {
     id: s.id, name: s.name, pass_mark: Number(s.pass_mark), decimals: Number(s.decimals),
     show_position: s.show_position, show_class_average: s.show_class_average,
-    template: s.template ?? "nigerian", show_cumulative: s.cumulative_mode !== "none",
+    template: s.template ?? "nigerian", show_cumulative: s.cumulative_mode !== "none", subject_parts: Boolean(s.subject_parts),
     bands: (s.grade_bands ?? []).map((b: any) => ({ ...b, min_score: Number(b.min_score), max_score: Number(b.max_score), grade_point: b.grade_point === null ? null : Number(b.grade_point) })),
     components: (s.grading_components ?? []).map((c: any) => ({ ...c, max_score: Number(c.max_score), weight: Number(c.weight) }))
       .sort((a: any, b: any) => a.position - b.position)
   };
+}
+
+/**
+ * The subjects in a class that set their own parts (migration 9200): subject id →
+ * its parts, in order. Subjects not listed use the class's grading system.
+ */
+export async function subjectPartsFor(sb: any, tenantId: string, classGroupId: string): Promise<Map<string, Component[]>> {
+  const out = new Map<string, Component[]>();
+  const { data: offerings } = await sb.from("subject_offerings").select("id,subject_id").eq("tenant_id", tenantId).eq("class_group_id", classGroupId);
+  if (!offerings?.length) return out;
+  const subjectOf = new Map((offerings as { id: string; subject_id: string }[]).map(o => [o.id, o.subject_id]));
+  const { data, error } = await sb.from("grading_components").select("id,name,max_score,weight,position,midterm,offering_id").in("offering_id", [...subjectOf.keys()]);
+  if (error) return out; // before migration 9200
+  for (const c of (data ?? []) as any[]) {
+    const subject = subjectOf.get(c.offering_id);
+    if (!subject) continue;
+    out.set(subject, [...(out.get(subject) ?? []), { id: c.id, name: c.name, max_score: Number(c.max_score), weight: Number(c.weight), position: c.position, midterm: Boolean(c.midterm) }]);
+  }
+  out.forEach(parts => parts.sort((a, b) => (a.position ?? 0) - (b.position ?? 0)));
+  return out;
 }
 
 /** Is `now` (in the tenant's timezone) later than HH:MM? */

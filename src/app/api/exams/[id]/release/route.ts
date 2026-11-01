@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireCtx, ROLES, readJson, jsonError, denyUnless } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadQuestions, autoSubmitIfExpired } from "@/lib/exams/server";
-import { schemeFor } from "@/lib/school";
+import { schemeFor, subjectPartsFor } from "@/lib/school";
 
 /**
  * Releases results to students and (optionally) pushes each score into the
@@ -33,8 +33,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     }
     if (pending) return jsonError(`${pending} scripts still need manual marking`);
     const scheme = await schemeFor(ctx.sb, ctx.tenant.id, exam.class_group_id);
-    const comp = scheme?.components.find(c => c.id === exam.component_id);
-    if (!comp) return jsonError("the selected result component is not in this class's grading scheme");
+    // The subject's own parts when its teacher set them (9200), else the class's grading system.
+    const own = (await subjectPartsFor(ctx.sb, ctx.tenant.id, exam.class_group_id)).get(exam.subject_id);
+    const comp = (own ?? scheme?.components ?? []).find(c => c.id === exam.component_id);
+    if (!comp) return jsonError(own ? "the selected result component is not one of this subject's parts in this class" : "the selected result component is not in this class's grading scheme");
     const { data: studs } = await svc.from("students").select("id,user_id").eq("tenant_id", ctx.tenant.id).in("user_id", final.map(a => a.student_user_id));
     const byUser = new Map((studs ?? []).map((s: any) => [s.user_id, s.id]));
     const rows = [];

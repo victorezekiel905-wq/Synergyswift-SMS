@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
-import { schemeFor } from "@/lib/school";
+import { schemeFor, subjectPartsFor } from "@/lib/school";
 
 /** Score sheet for one term × class group × subject. */
 export async function GET(req: NextRequest) {
@@ -30,13 +30,18 @@ export async function GET(req: NextRequest) {
 
   const isAdmin = hasAny(ctx, ROLES.admin);
   const teaches = isAdmin || offering?.teacher_id === ctx.userId || group?.form_teacher_id === ctx.userId;
+  // The subject's own parts, when its teacher set them (9200); the grades and pass mark stay the school's.
+  const own = (await subjectPartsFor(ctx.sb, tid, cg)).get(subj) ?? null;
+  const sheetScheme = own ? { ...scheme, components: own } : scheme;
+  const canSetParts = Boolean(offering) && (isAdmin || (offering?.teacher_id === ctx.userId && scheme.subject_parts));
   const [{ data: settings }, { data: sheet }] = await Promise.all([
     ctx.sb.from("tenant_settings").select("require_moderation").eq("tenant_id", tid).maybeSingle(),
     ctx.sb.from("score_sheets").select("id,status,note,submitted_at,hod_at,approved_at").eq("term_id", termId).eq("class_group_id", cg).eq("subject_id", subj).maybeSingle()
   ]);
   const moderation = Boolean(settings?.require_moderation);
   const locked = moderation && ["submitted", "hod_approved", "approved"].includes(sheet?.status ?? "");
-  return NextResponse.json({ scheme, students: students ?? [], scores: grid, can_edit: teaches && (!locked || isAdmin), teaches, moderation, sheet: sheet ?? { status: "draft" }, locked });
+  return NextResponse.json({ scheme: sheetScheme, own_parts: Boolean(own), can_set_parts: canSetParts, school_parts: scheme.components,
+    students: students ?? [], scores: grid, can_edit: teaches && (!locked || isAdmin), teaches, moderation, sheet: sheet ?? { status: "draft" }, locked });
 }
 
 const Put = z.object({
@@ -61,7 +66,8 @@ export async function PUT(req: NextRequest) {
 
   const scheme = await schemeFor(ctx.sb, tid, b.class_group_id);
   if (!scheme) return jsonError("no grading scheme configured");
-  const maxBy = new Map(scheme.components.map(c => [c.id, c.max_score]));
+  const own = (await subjectPartsFor(ctx.sb, tid, b.class_group_id)).get(b.subject_id);
+  const maxBy = new Map((own ?? scheme.components).map(c => [c.id, c.max_score]));
   const { data: students } = await ctx.sb.from("students").select("id").eq("tenant_id", tid).eq("class_group_id", b.class_group_id);
   const inClass = new Set((students ?? []).map((s: { id: string }) => s.id));
 

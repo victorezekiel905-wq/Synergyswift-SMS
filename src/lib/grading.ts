@@ -133,16 +133,22 @@ export function ordinal(n: number | null | undefined): string {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-/** Computes every student's report for one class group and term. */
+/**
+ * Computes every student's report for one class group and term. `partsFor` gives a
+ * subject its own parts (set by its teacher, migration 9200); other subjects use the
+ * scheme's. Grades, pass mark and positions always come from the scheme.
+ */
 export function computeClassResults(input: {
   studentIds: string[];
   subjects: { id: string; name: string }[];
   scores: ScoreRow[];
   scheme: Scheme;
+  partsFor?: (subjectId: string) => Component[] | null | undefined;
 }): StudentResult[] {
   const { studentIds, subjects, scores, scheme } = input;
   const d = scheme.decimals ?? 1;
-  const comps = [...scheme.components].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  const sorted = (list: Component[]) => [...list].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  const schoolParts = sorted(scheme.components);
 
   // student → subject → component → score
   const grid = new Map<string, Map<string, Record<string, number | null>>>();
@@ -157,6 +163,8 @@ export function computeClassResults(input: {
   for (const sid of studentIds) perStudent.set(sid, []);
 
   for (const subj of subjects) {
+    const own = input.partsFor?.(subj.id);
+    const comps = own ? sorted(own) : schoolParts;
     const rows: { id: string; value: number | null }[] = [];
     for (const sid of studentIds) {
       const compScores = grid.get(sid)?.get(subj.id) ?? {};
@@ -218,10 +226,16 @@ export function computeClassResults(input: {
  * percentage of the work assessed so far. Null when none are marked.
  */
 export function midtermScheme<S extends Scheme>(scheme: S): S | null {
-  const comps = scheme.components.filter(c => c.midterm);
+  const comps = midtermParts(scheme.components);
+  return comps ? { ...scheme, components: comps } : null;
+}
+
+/** The mid-term parts of a list, weights scaled to 100. Null when none are marked. */
+export function midtermParts(parts: Component[]): Component[] | null {
+  const comps = parts.filter(c => c.midterm);
   const w = comps.reduce((a, c) => a + Number(c.weight), 0);
   if (!comps.length || w <= 0) return null;
-  return { ...scheme, components: comps.map(c => ({ ...c, weight: (Number(c.weight) / w) * 100 })) };
+  return comps.map(c => ({ ...c, weight: (Number(c.weight) / w) * 100 }));
 }
 
 /**

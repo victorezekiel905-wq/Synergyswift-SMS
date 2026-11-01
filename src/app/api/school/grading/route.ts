@@ -13,11 +13,12 @@ export async function GET() {
   if (ctx instanceof NextResponse) return ctx;
   const q = (cols: string) => ctx.sb.from("grading_schemes").select(cols)
     .eq("tenant_id", ctx.tenant.id).order("is_default", { ascending: false }).order("created_at");
-  let { data, error } = await q(SELECT + ",stage");
-  if (error && /stage/.test(error.message)) ({ data, error } = await q(SELECT));
+  let { data, error } = await q(SELECT + ",stage,subject_parts");
+  if (error && /stage|subject_parts/.test(error.message)) ({ data, error } = await q(SELECT));
   if (error) return jsonError(error.message);
   for (const s of (data ?? []) as any[]) {
     s.stage ??= null;
+    s.subject_parts ??= false;
     s.grade_bands?.sort((a: any, b: any) => b.min_score - a.min_score);
     s.grading_components?.sort((a: any, b: any) => a.position - b.position);
   }
@@ -34,6 +35,8 @@ const SchemeBody = z.object({
   cumulative_mode: z.enum(["average", "weighted", "none"]).default("average"),
   report_layout: z.enum(["nigerian", "british", "american", "early_years"]).default("nigerian"),
   stage: z.enum(["preschool", "primary", "secondary", "sixth_form"]).nullish(),
+  // Let the teachers of each subject set their own parts (9200). Grades, pass mark and layout stay as set here.
+  subject_parts: z.boolean().optional(),
   decimals: z.number().int().min(0).max(3),
   components: z.array(z.object({
     id: z.string().uuid().optional(),
@@ -78,7 +81,8 @@ export async function PUT(req: NextRequest) {
   const fields: Record<string, unknown> = { name: s.name, is_default: earlyYears ? false : s.is_default, pass_mark: s.pass_mark, show_position: s.show_position,
     show_class_average: s.show_class_average, cumulative_mode: s.cumulative_mode, decimals: s.decimals, template: s.report_layout };
   if (s.stage !== undefined) fields.stage = s.stage;
-  const migrationNeeded = (m: string) => /stage|template_check|early_years/.test(m);
+  if (s.subject_parts !== undefined && !earlyYears) fields.subject_parts = s.subject_parts;
+  const migrationNeeded = (m: string) => /stage|subject_parts|template_check|early_years/.test(m);
   let schemeId = s.id;
   if (schemeId) {
     const { error } = await sb.from("grading_schemes").update(fields).eq("tenant_id", tid).eq("id", schemeId);

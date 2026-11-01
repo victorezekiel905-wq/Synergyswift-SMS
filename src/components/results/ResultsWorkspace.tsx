@@ -5,12 +5,14 @@ import { useApi, send, Page, PageHeader, Alert, Badge, statusTone, Empty, Field,
 import { subjectTotal, gradeFor as bandFor, round } from "@/lib/grading";
 import { DEFAULT_SCALE, SCALE_PRESETS, TRAIT_PRESETS, areaTitle, scaleKey, type ScaleItem } from "@/lib/traits";
 import { useResultsPicker, type ResultsStructure as Structure } from "./useResultsPicker";
+import SubjectPartsDialog from "./SubjectPartsDialog";
 type Sheet = {
   scheme: { name: string; components: { id: string; name: string; max_score: number; weight: number }[]; bands: { grade: string; min_score: number; max_score: number }[]; pass_mark: number; decimals: number };
   students: { id: string; admission_no: string; first_name: string; last_name: string; other_names: string | null }[];
   scores: Record<string, Record<string, number | null>>;
   can_edit: boolean;
   teaches: boolean; moderation: boolean; locked: boolean;
+  own_parts?: boolean; can_set_parts?: boolean;
   sheet: { status: string; note?: string | null };
 };
 type SheetStatus = { subject_id: string; subject: string; status: string; note: string | null; i_teach: boolean; i_am_hod: boolean; history: { action: string; note: string | null; at: string; by: string | null }[] };
@@ -78,6 +80,7 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notes, setNotes] = useState(false);
+  const [partsOpen, setPartsOpen] = useState(false);
 
   useEffect(() => {
     if (!data) return;
@@ -141,7 +144,8 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
             {mine.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </Field>
-        {data && <p className="pb-2 text-xs text-slate-500">Scheme: {data.scheme.name}. {comps.map(c => `${c.name} /${c.max_score} (${c.weight}%)`).join(" · ")}</p>}
+        {data && <p className="pb-2 text-xs text-slate-500">{data.own_parts ? "This subject's own parts" : `Scheme: ${data.scheme.name}`}. {comps.map(c => `${c.name} /${c.max_score} (${c.weight}%)`).join(" · ")}</p>}
+        {data?.can_set_parts && <button type="button" className="mb-1 text-xs font-semibold text-brand-700 underline" onClick={() => { if (!dirty || confirm("Discard unsaved scores?")) setPartsOpen(true); }}>Set {mine.find(s => s.id === subject)?.name ?? "this subject"}&apos;s parts</button>}
         <div className="ml-auto flex gap-2 pb-0.5">
           <button className="btn btn-ghost" onClick={() => { if (!dirty || confirm("Discard unsaved scores?")) setNotes(n => !n); }}>{notes ? "Back to scores" : "Comments & targets"}</button>
           {dirty && <span className="self-center text-xs text-amber-600">Unsaved changes</span>}
@@ -149,6 +153,7 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
         </div>
       </div>
       {error && <Alert>{error}</Alert>}
+      {partsOpen && <SubjectPartsDialog cg={cg} subject={subject} onClose={() => setPartsOpen(false)} onSaved={() => { setPartsOpen(false); reload(); }} />}
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
       {data?.moderation && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm">

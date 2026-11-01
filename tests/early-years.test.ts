@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { earlyYearsSettings, checkEyScale, areaSummary, EY_FRAMEWORKS, EY_SCALE_PRESETS, DEFAULT_EY_OPTIONS } from "@/lib/early-years";
 import { GRADING_PRESETS, STAGES, addNumberedPart, bandGaps, classStage, checkPreset } from "@/lib/grading-presets";
 import { compileClassResults } from "@/lib/results";
+import { computeClassResults, midtermParts } from "@/lib/grading";
 import { commentInputFor } from "@/lib/comment-input";
 import { GRADING } from "@/lib/curricula";
 
@@ -138,6 +139,67 @@ describe("grading systems per stage", () => {
     expect(GRADING.eyfs.template).toBe("early_years");
     expect(GRADING.ng_early.template).toBe("early_years");
     expect(GRADING.waec.template).toBe("nigerian");
+  });
+});
+
+describe("a subject's own parts", () => {
+  const ca = { id: "ca", name: "CA", max_score: 40, weight: 40, position: 1, midterm: true }, exam = { id: "ex", name: "Exam", max_score: 60, weight: 60, position: 2 };
+  const mathsParts = [
+    { id: "c1", offering_id: "offM", name: "CAT 1", max_score: 20, weight: 10, position: 1, midterm: true },
+    { id: "c2", offering_id: "offM", name: "CAT 2", max_score: 20, weight: 10, position: 2, midterm: true },
+    { id: "hw", offering_id: "offM", name: "HW", max_score: 10, weight: 10, position: 3, midterm: false },
+    { id: "ts", offering_id: "offM", name: "Test", max_score: 20, weight: 20, position: 4, midterm: true },
+    { id: "me", offering_id: "offM", name: "Exam", max_score: 100, weight: 50, position: 5, midterm: false }
+  ];
+  const sc = (subject_id: string, component_id: string, score: number) => ({ id: `${subject_id}-${component_id}`, tenant_id: T, term_id: TERM, student_id: "s1", subject_id, component_id, score });
+  const db = () => fakeDb({
+    class_groups: [{ id: "c7", tenant_id: T, name: "Year 7 Red", level: "Year 7", scheme_id: "sch", form_teacher_id: null, users: null }],
+    grading_schemes: [{ id: "sch", tenant_id: T, name: "Junior", template: "nigerian", pass_mark: 40, decimals: 1, show_position: true, show_class_average: true,
+      cumulative_mode: "none", is_default: true, subject_parts: true, grade_bands: [{ grade: "A", min_score: 70, max_score: 100, remark: "Excellent", grade_point: null }, { grade: "F", min_score: 0, max_score: 69.99, remark: "Fail", grade_point: null }],
+      grading_components: [ca, exam] }],
+    subject_offerings: [{ id: "offM", tenant_id: T, class_group_id: "c7", subject_id: "maths", subjects: { id: "maths", name: "Mathematics" } },
+      { id: "offE", tenant_id: T, class_group_id: "c7", subject_id: "eng", subjects: { id: "eng", name: "English" } }],
+    grading_components: mathsParts,
+    students: [{ id: "s1", tenant_id: T, class_group_id: "c7", status: "active", first_name: "Ada", last_name: "Obi", other_names: null, admission_no: "1" }],
+    terms: [{ id: TERM, tenant_id: T, session_id: "ses", position: 1, starts_on: null, ends_on: null, next_term_begins: null, name: "First Term", academic_sessions: { name: "2026-2027" } }],
+    // Maths: 18/20, 16/20, 9/10, 15/20, 70/100 → 9 + 8 + 9 + 15 + 35 = 76. English: 30/40, 45/60 → 30 + 45 = 75.
+    score_entries: [sc("maths", "c1", 18), sc("maths", "c2", 16), sc("maths", "hw", 9), sc("maths", "ts", 15), sc("maths", "me", 70),
+      sc("eng", "ca", 30), sc("eng", "ex", 45),
+      sc("maths", "ca", 40)],   // an old mark on the school's part: Maths no longer uses it
+    trait_definitions: [], tenant_settings: [{ tenant_id: T }], report_subject_comments: [], report_cards: []
+  });
+
+  it("totals each subject with its own parts, and the rest with the school's", async () => {
+    const { sb, writes } = db();
+    await compileClassResults(sb, T, TERM, "c7");
+    const card = writes.report_cards[0];
+    const maths = card.data.subjects.find((s: any) => s.subject_id === "maths"), eng = card.data.subjects.find((s: any) => s.subject_id === "eng");
+    expect(maths.total).toBe(76);
+    expect(maths.grade).toBe("A");
+    expect(maths.own_parts.map((p: any) => p.name)).toEqual(["CAT 1", "CAT 2", "HW", "Test", "Exam"]);
+    expect(maths.components).toEqual({ c1: 18, c2: 16, hw: 9, ts: 15, me: 70 });
+    expect(eng.total).toBe(75);
+    expect(eng.own_parts).toBeUndefined();
+    expect(card.data.components.map((c: any) => c.name)).toEqual(["CA", "Exam"]);
+    expect(card.average).toBe(75.5);
+  });
+  it("uses each subject's own mid-term parts on mid-term reports", async () => {
+    const { sb, writes } = db();
+    await compileClassResults(sb, T, TERM, "c7", { kind: "midterm" });
+    const card = writes.report_cards[0];
+    // Maths mid-term: CAT 1, CAT 2 and Test (10 + 10 + 20 = 40%) scaled to 100: (9 + 8 + 15) / 40 × 100 = 80.
+    expect(card.data.subjects.find((s: any) => s.subject_id === "maths").total).toBe(80);
+    // English mid-term: only CA counts: 30/40 = 75.
+    expect(card.data.subjects.find((s: any) => s.subject_id === "eng").total).toBe(75);
+  });
+  it("the pure engine takes per-subject parts too", () => {
+    const r = computeClassResults({ studentIds: ["s"], subjects: [{ id: "a", name: "A" }, { id: "b", name: "B" }],
+      scores: [{ student_id: "s", subject_id: "a", component_id: "x", score: 5 }, { student_id: "s", subject_id: "b", component_id: "ex", score: 30 }],
+      scheme: { pass_mark: 40, decimals: 1, show_position: false, bands: [{ grade: "P", min_score: 0, max_score: 100 }], components: [exam] },
+      partsFor: id => (id === "a" ? [{ id: "x", name: "X", max_score: 10, weight: 100 }] : null) });
+    expect(r[0].subjects.map(s => s.total)).toEqual([50, 30]);   // A: 5/10 of 100%; B uses the school's Exam (30/60 of 60%)
+    expect(midtermParts([ca, exam])).toEqual([{ ...ca, weight: 100 }]);
+    expect(midtermParts([exam])).toBeNull();
   });
 });
 

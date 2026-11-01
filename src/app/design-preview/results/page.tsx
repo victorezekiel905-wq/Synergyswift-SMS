@@ -4,6 +4,8 @@ import EarlyYearsSettings from "@/components/results/EarlyYearsSettings";
 import EarlyYearsAssess from "@/components/results/EarlyYearsAssess";
 import ReportCardView, { type ReportCard } from "@/components/results/ReportCardView";
 import { EY_SCALE_PRESETS } from "@/lib/early-years";
+import SubjectPartsDialog from "@/components/results/SubjectPartsDialog";
+import { useState } from "react";
 
 const sample: ReportCard = {
   status: "published", total: null, average: null, position: null, class_size: 18, published_at: "2026-12-12T10:00:00Z",
@@ -31,12 +33,14 @@ const sample: ReportCard = {
  * data for their APIs). Only available in builds made with NEXT_PUBLIC_DESIGN_PREVIEW=1.
  */
 export default function ResultsPreview() {
+  const [parts, setParts] = useState(false);
   if (process.env.NEXT_PUBLIC_DESIGN_PREVIEW !== "1") return <p className="p-8">Not available.</p>;
   return (
     <div className="min-h-screen space-y-10 bg-canvas p-4 sm:p-6">
       <section id="grading"><GradingSystems /></section>
       <section id="settings"><EarlyYearsSettings /></section>
       <section id="assess"><EarlyYearsAssess /></section>
+      <section id="subject-parts"><button className="btn btn-outline" onClick={() => setParts(true)}>Open Mathematics parts</button>{parts && <SubjectPartsDialog cg="y7Red" subject="maths" onClose={() => setParts(false)} onSaved={() => setParts(false)} />}</section>
       <section id="card" className="bg-white"><ReportCardView card={sample} school={{ school_name: "Corona Day Nursery", motto: "Learning through play", brand_color: "#263f73" }} /></section>
     </div>
   );

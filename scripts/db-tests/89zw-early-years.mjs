@@ -33,6 +33,31 @@ export default async function ({ db, expectRows, expectError, expectOk, U, T }) 
   await expectRows("…and so do students", U.studentA, "select count(*) n from early_years_comments", 0);
   await expectRows("another school sees no ratings", U.adminB, "select count(*) n from early_years_ratings", 0);
 
+  console.log("\nSubject teachers set their subject's own parts");
+  const OFF = `(select id from subject_offerings where class_group_id = 'a2000000-0000-0000-0000-000000000000' and subject_id = 'a3000000-0000-0000-0000-000000000000')`;
+  const PART = "ab000000-0000-0000-0000-000000000001";
+  await expectError("a subject teacher can't set parts until the school allows it", U.teacherA,
+    `insert into grading_components (offering_id, name, max_score, weight) values (${OFF}, 'CAT 1', 20, 10)`, /row-level security/);
+  await expectOk("an admin lets subject teachers set their own parts", U.adminA,
+    "update grading_schemes set subject_parts = true where id = 'a6000000-0000-0000-0000-000000000000'");
+  await expectOk("then the subject's teacher sets a part for their subject in that class", U.teacherA,
+    `insert into grading_components (id, offering_id, name, max_score, weight) values ('${PART}', ${OFF}, 'CAT 1', 20, 10)`);
+  await expectError("…but a teacher who doesn't teach that subject there can't", U.teacherA2,
+    `insert into grading_components (offering_id, name, max_score, weight) values (${OFF}, 'Mine', 10, 10)`, /row-level security/);
+  await expectError("…and a teacher can't add parts to the school's grading system", U.teacherA,
+    "insert into grading_components (scheme_id, name, max_score, weight) values ('a6000000-0000-0000-0000-000000000000', 'Sneaky', 10, 10)", /row-level security/);
+  await expectError("a part belongs to a grading system or to a subject, not both", U.adminA,
+    `insert into grading_components (scheme_id, offering_id, name, max_score, weight) values ('a6000000-0000-0000-0000-000000000000', ${OFF}, 'Both', 10, 10)`, /check constraint/);
+  await expectRows("everyone in the school reads the subject's parts", U.teacherA2, `select count(*) n from grading_components where id = '${PART}'`, 1);
+  await expectRows("another school doesn't", U.adminB, `select count(*) n from grading_components where id = '${PART}'`, 0);
+  await expectOk("the teacher enters marks against the subject's own part", U.teacherA,
+    `insert into score_entries (tenant_id, term_id, student_id, subject_id, component_id, score) values ('${T.A}', '${TERM}', '${S1}', 'a3000000-0000-0000-0000-000000000000', '${PART}', 17)`);
+  await expectOk("when the school stops allowing it, the parts stay", U.adminA,
+    "update grading_schemes set subject_parts = false where id = 'a6000000-0000-0000-0000-000000000000'");
+  await expectRows("…but the teacher can no longer change them", U.teacherA,
+    `with u as (update grading_components set max_score = 30 where id = '${PART}' returning 1) select count(*) n from u`, 0);
+  await db.exec(`delete from score_entries where component_id = '${PART}'; delete from grading_components where id = '${PART}'`);
+
   await db.exec(`delete from early_years_areas where id = '${AREA}'`);
   await expectRows("deleting an area takes its statements and ratings with it", U.adminA,
     "select (select count(*) from early_years_items) + (select count(*) from early_years_ratings) + (select count(*) from early_years_comments) n", 0);

@@ -243,6 +243,8 @@ function Settings({ exam, questions, reload }: { exam: Exam; questions: Question
   const { data: sessions } = useApi<{ id: string; name: string; terms: { id: string; name: string }[] }[]>("/api/school/academic");
   const { data: schemes } = useApi<{ id: string; name: string; grading_components: { id: string; name: string }[] }[]>("/api/school/grading");
   const [e, setE] = useState<Exam>(exam);
+  const { data: subjectParts } = useApi<{ subject: string; class_name: string; own_parts: { id: string; name: string }[] | null }>(
+    e.class_group_id && e.subject_id ? `/api/results/subject-parts?class_group_id=${e.class_group_id}&subject_id=${e.subject_id}` : null, [e.class_group_id, e.subject_id]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   useEffect(() => setE(exam), [exam]);
   const s = e.settings ?? {};
@@ -272,7 +274,9 @@ function Settings({ exam, questions, reload }: { exam: Exam; questions: Question
   for (const q of questions) if (q.section) sections.set(q.section, (sections.get(q.section) ?? 0) + 1);
   const cfgUrl = typeof window !== "undefined" ? `${window.location.origin}/api/exams/${exam.id}/seb` : "";
   const studentUrl = typeof window !== "undefined" ? `${window.location.origin}/exam/${exam.id}` : "";
-  const comps = (schemes ?? []).flatMap(sc => sc.grading_components.map(c => ({ id: c.id, name: `${sc.name}: ${c.name}` })));
+  // The chosen subject's own parts in the chosen class (set by its teacher) come first, then the school's grading systems.
+  const ownParts = (subjectParts?.own_parts ?? []).map(c => ({ id: c.id, name: `${subjectParts?.subject} (${subjectParts?.class_name}): ${c.name}` }));
+  const comps = [...ownParts, ...(schemes ?? []).flatMap(sc => sc.grading_components.map(c => ({ id: c.id, name: `${sc.name}: ${c.name}` })))];
   const check = (k: string, label: string, dflt = false) => (
     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={s[k] === undefined ? dflt : Boolean(s[k])} onChange={ev => setS(k, ev.target.checked)} /> {label}</label>
   );
