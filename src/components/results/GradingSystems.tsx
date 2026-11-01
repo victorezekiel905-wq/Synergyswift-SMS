@@ -352,7 +352,7 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
                       </div>
                       <div>
                         <Field label="Counts for (%)"><input className="input" type="number" min={0} max={100} inputMode="decimal" value={p.weight} onChange={e => setPart(i, { weight: e.target.value })} /></Field>
-                        <Quick values={[10, 20, 30, 40, 60]} current={p.weight} suffix="%" onPick={v => setPart(i, { weight: v })} />
+                        <Quick values={[10, 20, 40, 60]} current={p.weight} suffix="%" onPick={v => setPart(i, { weight: v })} />
                       </div>
                       <div className="col-span-2 flex justify-end sm:col-span-1 sm:items-start sm:pt-6">
                         <button type="button" className="btn btn-ghost px-2 text-rose-600" onClick={() => setS({ ...s, grading_components: parts.filter((_, j) => j !== i) })} aria-label={`Remove ${p.name || "part"}`}><Icon name="x" className="h-4 w-4" /></button>
@@ -433,7 +433,7 @@ function SchemeDialog({ initial, initialClasses, classes, schemes, hasOthers, on
                               <input type="checkbox" checked={on} onChange={e => setPicked(p => { const n = new Set(p); if (e.target.checked) n.add(c.id); else n.delete(c.id); return n; })} />
                               <span>{c.name}</span>
                               <span className="text-xs text-slate-500 tabular-nums">{c.students}</span>
-                              {other && !on && <span className="text-[11px] text-slate-400">· {other}</span>}
+                              {other && !on && <span className="max-w-[9rem] truncate text-[11px] text-slate-400">· now {other}</span>}
                             </label>
                           );
                         })}

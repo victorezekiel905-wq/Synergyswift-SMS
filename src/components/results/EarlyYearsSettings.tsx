@@ -66,7 +66,7 @@ export default function EarlyYearsSettings() {
               className={"rounded-md border px-2.5 py-1 text-xs " + (JSON.stringify(p.scale) === JSON.stringify(scale) ? "border-brand-600 bg-brand-50 text-brand-800" : "border-slate-200 text-slate-700 hover:border-slate-300")}>{p.name}</button>
           ))}
         </div>
-        <div className="space-y-1.5">
+        <div className="max-w-xl space-y-1.5">
           {scale.map((s, i) => (
             <div key={i} className="flex items-center gap-2">
               <input className="input w-20 py-1.5" value={s.short} maxLength={4} aria-label="Short code" onChange={e => setScale(scale.map((x, j) => j === i ? { ...x, short: e.target.value } : x))} />
