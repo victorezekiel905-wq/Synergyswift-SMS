@@ -101,7 +101,7 @@ function Questions({ exam, questions, reload }: { exam: Exam; questions: Questio
       </div>
       <aside className="card h-fit p-4">
         <button className="btn btn-primary mb-2 w-full" disabled={locked} onClick={() => setBank(true)}>Add from question bank</button>
-        <button className="btn btn-outline mb-2 w-full" disabled={locked} onClick={() => setImporting(true)}>Import a paper (PDF, Word)</button>
+        <button className="btn btn-outline mb-2 w-full" disabled={locked} onClick={() => setImporting(true)}>Paste or import questions</button>
         {questions.some(q => !q.bank_question_id) && <button className="btn btn-ghost mb-3 w-full text-xs" onClick={() => toBank(questions.filter(q => !q.bank_question_id).map(q => q.id))}>Save all new questions to the bank</button>}
         <p className="mb-2 text-sm font-semibold">Or write a new question</p>
         <div className="space-y-3">
@@ -120,7 +120,7 @@ function Questions({ exam, questions, reload }: { exam: Exam; questions: Questio
       <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title={editing?.id ? "Edit question" : "New question"} wide>
         {editing && <QuestionEditor key={editing.id ?? editing.type} initial={editing} onSave={save} onCancel={() => setEditing(null)} />}
       </Modal>
-      <Modal open={importing} onClose={() => setImporting(false)} title="Import an exam paper" wide>
+      <Modal open={importing} onClose={() => setImporting(false)} title="Paste or import questions" wide>
         {importing && <PaperImport examId={exam.id} onDone={(added, unfinished) => { setImporting(false); setMsg(`Added ${added} question${added === 1 ? "" : "s"}.${unfinished ? ` ${unfinished} still need an answer or a picture: look for them before publishing.` : ""}`); reload(); }} />}
       </Modal>
       <Modal open={bank} onClose={() => setBank(false)} title="Add from the question bank" wide>

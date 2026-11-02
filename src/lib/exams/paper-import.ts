@@ -1,3 +1,4 @@
+import { tidyPastedQuestions } from "@/lib/question-paste";
 /**
  * Turns an exam paper typed as text (from a PDF, Word file or paste) into
  * draft questions (phase 14j). Pure, unit tested. It understands the usual
@@ -53,7 +54,8 @@ export function parseKey(text: string): Record<number, string> {
 }
 
 export function parsePaper(raw: string, opts: { defaultPoints?: number; theoryPoints?: number } = {}): { questions: DraftQuestion[]; warnings: string[] } {
-  const lines = raw.replace(/\r/g, "").replace(/ /g, " ").split("\n").map(l => l.replace(/\s+$/, ""));
+  // Pasted text is tidied first: options on one line, "Ans B", starred answers, a key at the end, no numbers.
+  const lines = tidyPastedQuestions(raw, { numberUnnumbered: true }).replace(/\r/g, "").replace(/ /g, " ").split("\n").map(l => l.replace(/\s+$/, ""));
   const warnings: string[] = [];
   type Block = { number: number; lines: string[]; section: string | null; theory: boolean };
   const blocks: Block[] = [];

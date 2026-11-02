@@ -1,3 +1,4 @@
+import { tidyPastedQuestions } from "@/lib/question-paste";
 import type { QuestionKind } from "./types";
 
 /*
@@ -368,7 +369,8 @@ function build(b: Block, allowed: QuestionKind[]): ImportedQuestion {
 
 /** Reads every question in the text, for a slide that holds the given kinds. */
 export function parseQuestions(text: string, allowed: QuestionKind[], opts: { paragraphs?: boolean } = {}): ImportedQuestion[] {
-  return splitBlocks(text, opts.paragraphs).map((b) => build(b, allowed));
+  // Pasted text is tidied first (options on one line, "Ans B", a key at the end); Word files keep their bold answers.
+  return splitBlocks(tidyPastedQuestions(text), opts.paragraphs).map((b) => build(b, allowed));
 }
 
 const TYPE_LINE: Partial<Record<QuestionKind, string>> = {

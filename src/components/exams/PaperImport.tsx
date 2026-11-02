@@ -43,12 +43,12 @@ export default function PaperImport({ examId, onDone }: { examId: string; onDone
     : q.type === "short_answer" ? (q.answer.accepted ?? []).join(" / ") || null : null;
   return (
     <div className="space-y-4 text-sm">
-      <p className="text-slate-600">Upload the paper as a PDF or Word file, or paste it below. Questions should be numbered (1., 2., …) with options A–D; an answer key at the end (&quot;ANSWERS 1. B 2. C …&quot;) fills in the answers. Scanned papers have no text: type or paste those.</p>
+      <p className="text-slate-600">Copy the questions from Word, a PDF, WhatsApp or a website and paste them below, or upload the file. They are sorted into questions and options for you: numbered or not, options on their own lines or all on one line (A. / (a) / a)), with the answer as <b>Ans: B</b>, a <b>*</b> or <b>✓</b> after the right option, or an answer key at the end (&quot;ANSWERS 1. B 2. C …&quot;). Check them, then add. Scanned papers have no text: type or paste those.</p>
       <div className="flex flex-wrap items-center gap-2">
         <label className="btn btn-outline cursor-pointer">Upload PDF or Word<input type="file" className="sr-only" accept=".pdf,.docx,.txt" onChange={e => e.target.files?.[0] && upload(e.target.files[0])} /></label>
         {busy && <span className="text-slate-500">Reading…</span>}
       </div>
-      <textarea className="input min-h-40 font-mono text-xs" value={text} onChange={e => setText(e.target.value)} placeholder={"1. What is 2 + 2?\nA. 3\nB. 4\nC. 5\nD. 6\n\nANSWERS\n1. B"} />
+      <textarea className="input min-h-40 font-mono text-xs" value={text} onChange={e => setText(e.target.value)} placeholder={"Paste your questions here, for example:\n\n1. What is 2 + 2?\nA. 3\nB. 4\nC. 5\nD. 6\nAns: B\n\n2. The capital of Nigeria is (a) Lagos (b) Abuja (c) Kano\n\nANSWERS\n2. B"} />
       <button className="btn btn-ghost border border-slate-300" disabled={busy || text.trim().length < 5} onClick={preview}>Read the questions</button>
       {error && <Alert>{error}</Alert>}
       {result && (<>

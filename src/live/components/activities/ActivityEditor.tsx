@@ -127,7 +127,7 @@ export function ActivityEditor({ activity, onChanged, rubrics }: { activity: Act
       ) : (
         <Card title={`Questions (${list.length})`} actions={
           <div className="flex flex-wrap justify-end gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setImportOpen(true)}>Import questions</Button>
+            <Button size="sm" variant="secondary" onClick={() => setImportOpen(true)}>Paste or import questions</Button>
             <Button size="sm" variant="secondary" onClick={() => setBankOpen(true)}>From question bank</Button>
             {allowed.length === 1 ? <Button size="sm" onClick={() => addQuestion(allowed[0]!)}>Add question</Button> : (
               <Select aria-label="Add a question" className="w-auto py-1 text-xs" value="" onChange={(e) => e.target.value && addQuestion(e.target.value as QuestionKind)}>

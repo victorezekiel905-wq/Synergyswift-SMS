@@ -57,7 +57,7 @@ export function ImportQuestions({ allowed, startAt, onClose, onImport }: {
   }
 
   return (
-    <Modal open onClose={onClose} wide title="Import questions"
+    <Modal open onClose={onClose} wide title="Paste or import questions"
       footer={<>
         <span className="mr-auto self-center text-[13px] text-ink-600">
           {parsed.length ? <><b className="text-ink-900">{ready.length} ready</b>{broken ? <span className="text-rose-700"> · {broken} need a fix and won&apos;t be added</span> : null}</> : null}
@@ -87,8 +87,8 @@ export function ImportQuestions({ allowed, startAt, onClose, onImport }: {
             <summary className="cursor-pointer font-semibold text-ink-900">How to write them</summary>
             <ul className="mt-2 list-disc space-y-1 pl-5">
               <li>Start each question with its number (<code>1.</code>, <code>Q1</code>) or leave a blank line between questions. Numbers are redone in order.</li>
-              <li>Put each option on its own line: <code>A.</code> <code>B.</code> <code>C.</code>… or several on one line (<code>A. 2   B. 4</code>).</li>
-              <li>Show the right answer with <code>Answer: B</code> (or <code>Answer: A, C</code> for more than one), or put <code>*</code> after it. In Word, making the right option <b>bold</b>, underlined, highlighted or coloured works too.</li>
+              <li>Put each option on its own line: <code>A.</code> <code>B.</code> <code>C.</code>… or several on one line, even on the question&apos;s line (<code>A. 2   B. 4</code> or <code>(a) H2O (b) CO2</code>).</li>
+              <li>Show the right answer with <code>Answer: B</code> or <code>Ans B</code> (or <code>Answer: A, C</code> for more than one), put <code>*</code> or <code>✓</code> after it, or end with an answer key (<code>ANSWERS</code> then <code>1. B 2. C</code>). In Word, making the right option <b>bold</b>, underlined, highlighted or coloured works too.</li>
               <li>Optional lines: <code>Topic:</code>, <code>Points:</code>, <code>Explanation:</code>. Other kinds use <code>Type:</code> (Matching, Order, Groups, Poll).</li>
               <li>From a PDF: select the questions, copy, and paste them here. Or use <b>Write with AI</b> to draft new questions from the PDF.</li>
             </ul>
