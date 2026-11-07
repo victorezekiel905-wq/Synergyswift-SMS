@@ -4,6 +4,7 @@ import { FEATURES } from "@/lib/features";
 import { SiteHeader, SiteFooter, SectionTitle } from "@/components/site/SiteChrome";
 import { BrandDial } from "@/components/site/BrandDial";
 import { ExamPicture, LessonPicture, PhonePicture } from "@/components/site/Pictures";
+import { COMPANY } from "@/lib/company";
 
 type IconName = Parameters<typeof Icon>[0]["name"];
 
@@ -31,11 +32,25 @@ const PRINCIPLES: [string, string][] = [
   ["Dependable", "Built for slow connections and busy mornings. Registers work offline; exams hold up on results day."]
 ];
 
+// Every line here is something the system does today; keep it that way (no claims we can't show a school).
 const TRUST: { icon: IconName; title: string; text: string }[] = [
-  { icon: "lock", title: "Walled off by school", text: "Each school's records are kept apart from every other school's, down to the database." },
-  { icon: "note", title: "Every change recorded", text: "Grades, fees, registers and settings all keep their history." },
-  { icon: "user", title: "The right people only", text: "Roles per job, two-step sign-in and approved devices for staff." },
-  { icon: "check", title: "Data protection", text: "Built to the Nigeria Data Protection Act 2023, with consent and data requests handled in the app." }
+  { icon: "lock", title: "Walled off by school", text: "Each school's records are kept apart from every other school's, down to the database. More than 1,800 automated checks confirm one school can never read another's." },
+  { icon: "card", title: "Fees go to your account", text: "Parents pay online through Paystack or Flutterwave straight into your school's own account. Receipts are issued at once." },
+  { icon: "note", title: "Every change recorded", text: "Grades, fees, registers and settings keep their history: who changed what, and when. Download it whenever you need it." },
+  { icon: "user", title: "The right people only", text: "Each job has its own role. Two-step sign-in and approved devices for staff, and parents see only their own children." },
+  { icon: "repeat", title: "Nothing lost offline", text: "Registers, exams and lessons keep working when the connection drops. Answers are saved on the device and sent when it's back." },
+  { icon: "send", title: "Your data stays yours", text: "Take any list out as CSV or Excel at any time. Bring your students in from spreadsheets or your old system." },
+  { icon: "check", title: "Data protection", text: "Built to the Nigeria Data Protection Act 2023, with consent and data requests handled in the app." },
+  { icon: "pin", title: "A registered company", text: `${COMPANY.legalName}, RC ${COMPANY.rcNumber}, registered with the Corporate Affairs Commission. Check it on the CAC register.` }
+];
+
+// Honest answers to what schools ask before they sign up.
+const QUESTIONS: [string, React.ReactNode][] = [
+  ["Who is behind Synergy Swift?", <>{COMPANY.legalName}, a company registered in Nigeria with the Corporate Affairs Commission, RC {COMPANY.rcNumber}. Our registered office is in Lekki, Lagos. <Link href="/company">See our company details</Link>.</>],
+  ["Who owns our school's data?", "Your school does. You can export any of it as CSV or Excel whenever you want, and download the full history of changes. Other schools never see it."],
+  ["Where do the fees parents pay go?", "Into your school's own Paystack or Flutterwave account, set up in your school settings. Receipts go to the parent at once, and the payment shows in your books."],
+  ["What happens when the internet goes off?", "Registers, exams and lessons keep working. What staff and students type is kept on the device and sent by itself when the connection returns."],
+  ["How do we start, and how is it priced?", <>Book a 30-minute walk-through and we set up a trial with your own classes and fees. We help bring your students in from spreadsheets or your old system. Prices depend on your school&apos;s size and the parts you need. <Link href="/demo">Book a walk-through</Link>.</>]
 ];
 
 /** The welcome page. Signed-in visitors are taken to their dashboard by the app shell. */
@@ -62,6 +77,12 @@ export default function Home() {
                   <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 text-brass-600" aria-hidden><path d="M4 2.5v11l9-5.5z" fill="currentColor" /></svg>Take a tour
                 </Link>
               </div>
+              {/* Who schools are dealing with: the registered company, checkable on the CAC register. */}
+              <p className="ss-rise mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-slate-500" style={{ ["--d" as string]: ".28s" }}>
+                <Icon name="check" className="h-3.5 w-3.5 text-navy" />
+                <span>A registered Nigerian company: {COMPANY.legalName}, RC {COMPANY.rcNumber}.</span>
+                <Link href="/company" className="text-slate-600 underline underline-offset-2 hover:text-navy">See our details</Link>
+              </p>
               {/* Students: straight into a lesson, no account. Works without JavaScript. */}
               <form action="/live/join" method="get" className="ss-rise mt-10 max-w-md rounded-lg border border-slate-200 bg-white p-3" style={{ ["--d" as string]: ".32s" }}>
                 <label htmlFor="guest-code" className="block px-1 text-[12.5px] text-slate-500">Joining a lesson? Enter the code on your teacher&apos;s screen. No account needed.</label>
@@ -167,15 +188,37 @@ export default function Home() {
 
         {/* Trust */}
         <section className="mx-auto max-w-6xl px-5 py-24 sm:px-8">
-          <SectionTitle label="Safety" title="Children's records deserve care. We built for it from the first line." />
-          <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <SectionTitle label="Why schools trust us" title="Children's records and parents' money deserve care. We built for it from the first line." />
+          <div className="mt-12 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
             {TRUST.map(t => (
               <div key={t.title}>
                 <Icon name={t.icon} className="h-5 w-5 text-navy" />
                 <h3 className="mt-4 font-semibold text-navy">{t.title}</h3>
                 <p className="mt-2 text-[14px] leading-relaxed text-slate-600">{t.text}</p>
+                {t.icon === "pin" && (
+                  <a href={COMPANY.verifyUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[13px] text-brand-700">Open the CAC register →</a>
+                )}
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* Questions */}
+        <section className="border-t border-slate-200 bg-paper">
+          <div className="mx-auto grid max-w-6xl gap-12 px-5 py-24 sm:px-8 lg:grid-cols-[0.8fr_1.2fr]">
+            <SectionTitle label="Questions" title="What schools ask us first."
+              text="Straight answers before you sign anything. Anything else, ask us on a walk-through." />
+            <div className="divide-y divide-slate-200 border-y border-slate-200">
+              {QUESTIONS.map(([q, a]) => (
+                <details key={q} className="group py-4">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium text-navy [&::-webkit-details-marker]:hidden">
+                    {q}
+                    <span aria-hidden className="text-xl leading-none text-slate-400 transition-transform group-open:rotate-45">+</span>
+                  </summary>
+                  <p className="mt-3 text-[14.5px] leading-relaxed text-slate-600 [&_a]:text-brand-700">{a}</p>
+                </details>
+              ))}
+            </div>
           </div>
         </section>
 
