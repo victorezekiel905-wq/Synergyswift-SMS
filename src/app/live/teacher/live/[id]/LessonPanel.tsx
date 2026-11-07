@@ -12,6 +12,8 @@ import { createClient } from "@/live/lib/supabase/client";
 import { useLoader } from "@/live/lib/hooks";
 import { errorText, rpc } from "@/live/lib/rpc";
 import { useSlideNav } from "@/live/lib/slide-nav";
+import { pulseFromSession } from "@/live/lib/live-state";
+import { CollabBoard } from "@/live/components/activities/CollabBoard";
 import type { Me } from "./LiveRoom";
 
 type Payload = { lesson: { id: string; title: string } | null; slides: SlideData[] };
@@ -32,9 +34,22 @@ export function LessonPanel({ state, me, reload, take }: { state: SessionState; 
   const ann = useAnnotations(s.id, nav.slide);
   const slide = slides.find((x) => x.position === nav.slide) ?? slides[0];
   async function update(args: Record<string, unknown>) {
-    try { await rpc("set_session_state", { p_session: s.id, ...args }); await reload(); }
+    try {
+      // The reply is the session row: move this screen now, in step with the students' broadcast.
+      const row = await rpc("set_session_state", { p_session: s.id, ...args });
+      const p = pulseFromSession(row);
+      if (p) take?.(p);
+      await reload();
+    }
     catch (e) { toast(errorText(e), "error"); }
   }
+  // Before the start or while paused the server refuses "go to slide" (and the screen used to jump
+  // there and bounce back with an error); move the lesson's slide directly instead, as the thumbnails do.
+  const running = (s.phase ?? "active") === "active";
+  const moveTo = (to: number) => {
+    const target = Math.max(0, Math.min(to, slides.length - 1));
+    if (running) nav.go(target); else if (target !== s.current_slide) void update({ p_slide: target });
+  };
 
   if (!s.lesson_id) {
     return (
@@ -57,9 +72,9 @@ export function LessonPanel({ state, me, reload, take }: { state: SessionState; 
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Button variant="secondary" disabled={nav.atStart} onClick={nav.prev} title="Previous slide (←)"><Icon name="chevronLeft" className="h-4 w-4" />Prev</Button>
+          <Button variant="secondary" disabled={nav.atStart} onClick={() => moveTo(nav.slide - 1)} title="Previous slide (←)"><Icon name="chevronLeft" className="h-4 w-4" />Prev</Button>
           <span className="text-sm font-medium tabular-nums">Slide {nav.slide + 1} / {slides.length}</span>
-          <Button variant="secondary" disabled={nav.atEnd} onClick={nav.next} title="Next slide (→)">Next<Icon name="chevronRight" className="h-4 w-4" /></Button>
+          <Button variant="secondary" disabled={nav.atEnd} onClick={() => moveTo(nav.slide + 1)} title="Next slide (→)">Next<Icon name="chevronRight" className="h-4 w-4" /></Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select className="w-auto py-1 text-xs" value={s.mode} onChange={(e) => update({ p_mode: e.target.value })} aria-label="Delivery mode">
@@ -96,9 +111,14 @@ export function LessonPanel({ state, me, reload, take }: { state: SessionState; 
         </div>
       )}
 
+      {/* An open class board: run it from here too (Lock / Unlock, hide posts), not only from Responses. */}
+      {launched && slide.activity!.kind === "collab_board" && (
+        <CollabBoard activityId={slide.activity!.id} sessionId={s.id} title={slide.activity!.title} tenantId={me.tenantId} userId={me.id} manage />
+      )}
+
       <div className="flex flex-wrap gap-2 overflow-x-auto pb-1">
         {slides.map((sl) => (
-          <button key={sl.id} onClick={() => (s.phase ?? "active") === "active" ? nav.go(sl.position) : update({ p_slide: sl.position })}
+          <button key={sl.id} onClick={() => moveTo(sl.position)}
             className={`shrink-0 rounded-lg border px-3 py-2 text-left text-xs ${sl.position === nav.slide ? "border-brand-500 bg-brand-50" : "border-ink-200 bg-white"}`}>
             <span className="font-bold text-ink-500">{sl.position + 1}</span> <Badge>{sl.kind}</Badge>
             <span className="mt-1 block max-w-[9rem] truncate">{sl.activity?.title ?? sl.content.heading ?? ""}</span>

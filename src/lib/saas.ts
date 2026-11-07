@@ -35,6 +35,8 @@ export const MODULE_CATALOGUE = [
   { key: "homework", label: "Homework", group: "learning" },
   { key: "lesson_notes", label: "Lesson notes", group: "learning" },
   { key: "live", label: "Live lessons & games", group: "learning" },
+  // Lockdown, students' screens and leave alerts in live lessons. Follows Live lessons unless set (migration 9300).
+  { key: "live_monitoring", label: "Live lesson lockdown & screen monitoring", group: "learning" },
   { key: "classroom", label: "Classroom management (points)", group: "learning" },
   { key: "library", label: "Library", group: "learning" },
   { key: "analytics", label: "Early warning & analytics", group: "learning" },

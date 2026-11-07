@@ -7,13 +7,14 @@ import type { ActivityResults, SessionState } from "@/live/components/live/types
 import { createClient } from "@/live/lib/supabase/client";
 import { useLoader, useRpc } from "@/live/lib/hooks";
 import { errorText, rpc } from "@/live/lib/rpc";
+import { pulseFromSession } from "@/live/lib/live-state";
 import { pct } from "@/live/lib/utils";
 import type { Me } from "./LiveRoom";
 import { ThinkingInsights, type Insight } from "./ThinkingInsights";
 import { Icon } from "@/live/components/Icon";
 import { WordCloud, useWordCloud } from "@/live/components/game/WordCloud";
 
-export function ResponsesPanel({ state, me, reload }: { state: SessionState; me: Me; reload: () => Promise<void> }) {
+export function ResponsesPanel({ state, me, reload, take }: { state: SessionState; me: Me; reload: () => Promise<void>; take?: (r: unknown) => void }) {
   const toast = useToast();
   const s = state.session;
   const [picked, setPicked] = useState<string>(s.active_activity_id ?? "");
@@ -41,7 +42,13 @@ export function ResponsesPanel({ state, me, reload }: { state: SessionState; me:
   const r = results.data;
 
   async function launch(id: string | null) {
-    try { await rpc("set_session_state", id ? { p_session: s.id, p_activity: id } : { p_session: s.id, p_clear_activity: true }); await reload(); }
+    try {
+      const row = await rpc("set_session_state", id ? { p_session: s.id, p_activity: id } : { p_session: s.id, p_clear_activity: true });
+      // Shows as open (or closed) here at once, as it does on the students' screens.
+      const p = pulseFromSession(row);
+      if (p) take?.(p);
+      await reload();
+    }
     catch (e) { toast(errorText(e), "error"); }
   }
 

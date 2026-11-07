@@ -17,7 +17,7 @@ export default async function NewLive(props: { searchParams: Promise<{ class?: s
       <PageHeader title="Start a live class" subtitle="Students join with the code you'll get on the next screen." />
       <StartSessionForm classes={(classes as { id: string; name: string; students: number }[]) ?? []} lessons={lessons ?? []} envs={envs ?? []}
         defaultClass={searchParams.class} defaultLesson={searchParams.lesson}
-        monitoring={!!me.settings?.monitoring_enabled} />
+        monitoring={me.settings?.monitoring_enabled !== false} />
     </div>
   );
 }

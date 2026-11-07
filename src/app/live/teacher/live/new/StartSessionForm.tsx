@@ -19,6 +19,8 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
   const [env, setEnv] = useState(envs.find((e) => e.name.startsWith("Lesson focus"))?.id ?? "");
   const [title, setTitle] = useState("");
   const [monitorGuests, setMonitorGuests] = useState(false);
+  // Asked every time, never assumed: the teacher picks lockdown on or off before going live.
+  const [lockdown, setLockdown] = useState<boolean | null>(null);
   // Lesson settings (live engine): sent once the session exists.
   const [opts, setOpts] = useState({ leaderboard: true, anonymous_names: false, late_join: true, speed_bonus: true, timer: true, auto_reveal: true });
   const [busy, setBusy] = useState(false);
@@ -44,6 +46,20 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
             <option value="front_of_class">Front of class: projector only, students watch</option>
           </Select>
         </Field>
+        {monitoring && (
+          <fieldset className={"rounded-xl border p-4 " + (lockdown === null ? "border-amber-300 bg-amber-50" : "border-ink-200 bg-white")}>
+            <legend className="px-1 text-sm font-semibold text-ink-900">Lockdown for this class <span className="text-rose-600">*</span></legend>
+            <p className="mb-3 text-[13px] text-ink-600">Under lockdown students must stay in the full-screen lesson and share their screen with you; leaving it alerts you straight away. You can change it during the lesson under More.</p>
+            <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Lockdown">
+              {([[true, "Lockdown on", "Students stay in the lesson; you see their screens."], [false, "Lockdown off", "Students take part freely."]] as const).map(([v, label, hint]) => (
+                <label key={label} className={"flex cursor-pointer items-start gap-3 rounded-lg border-2 p-3 " + (lockdown === v ? "border-brand-600 bg-brand-50" : "border-ink-200 bg-white hover:border-brand-300")}>
+                  <input type="radio" name="lockdown" className="mt-1" checked={lockdown === v} onChange={() => setLockdown(v)} />
+                  <span><span className="block text-sm font-semibold text-ink-900">{label}</span><span className="block text-[13px] text-ink-600">{hint}</span></span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
         {monitoring && <Field label="Environment" hint="&quot;Lesson focus&quot; blocks games and social media on school-managed browsers. On any device, leaving the lesson alerts you instantly. You can change it during the session.">
           <Select value={env} onChange={(e) => setEnv(e.target.value)}><option value="">None (monitor only)</option>{envs.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</Select>
         </Field>}
@@ -68,9 +84,12 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
         </div>
         {err && <Alert tone="error">{err}</Alert>}
         <Button size="lg" loading={busy} onClick={async () => {
+          if (monitoring && lockdown === null) { setErr("Choose Lockdown on or Lockdown off first."); return; }
           setBusy(true); setErr(null);
           try {
             const s = await rpc<{ id: string }>("start_session", { p_class: cls || null, p_lesson: lesson || null, p_mode: mode, p_title: title || null, p_environment: monitoring ? env || null : null });
+            // The engine starts a lesson locked when the school has monitoring; apply the teacher's choice.
+            if (monitoring) await rpc("set_session_lockdown", { p_session: s.id, p_on: lockdown === true });
             await rpc("session_control", { p_session: s.id, p_action: "settings", p_args: opts });
             if (monitoring && monitorGuests) await rpc("set_session_guests", { p_session: s.id, p_monitor: true });
             router.push(`/live/teacher/live/${s.id}`);

@@ -26,23 +26,39 @@ export function CollabBoard({ activityId, sessionId, title, tenantId, userId, ma
   const [text, setText] = useState("");
   const [color, setColor] = useState("yellow");
 
+  // In a lesson, the board is ready for whoever opens it first, student or teacher (migration 9310):
+  // students no longer wait for the teacher's Responses tab to create it. Polled, so a teacher's
+  // Lock / Unlock reaches students' screens within a few seconds.
+  const [refresh, setRefresh] = useState(0);
   useEffect(() => {
     let live = true;
     (async () => {
       const sb = createClient();
-      let q = sb.from("collab_boards").select("id,title,locked,anonymous,owner_id").eq("activity_id", activityId);
-      q = sessionId ? q.eq("session_id", sessionId) : q.is("session_id", null);
-      const { data } = await q.maybeSingle();
-      if (data) { if (live) setBoard(data as Board); return; }
+      if (sessionId) {
+        const { data, error } = await sb.rpc("ensure_collab_board", { p_activity: activityId, p_session: sessionId });
+        if (!live) return;
+        if (error) { if (refresh === 0) toast(error.message, "error"); return; }
+        setBoard(data as Board);
+        return;
+      }
+      // Outside a lesson: the oldest board for the activity (never fails on a duplicate).
+      const { data } = await sb.from("collab_boards").select("id,title,locked,anonymous,owner_id")
+        .eq("activity_id", activityId).is("session_id", null).order("created_at").limit(1);
+      if (data?.[0]) { if (live) setBoard(data[0] as Board); return; }
       if (manage) {
         const { data: created, error } = await sb.from("collab_boards")
-          .insert({ tenant_id: tenantId, activity_id: activityId, session_id: sessionId ?? null, owner_id: userId, title })
+          .insert({ tenant_id: tenantId, activity_id: activityId, session_id: null, owner_id: userId, title })
           .select("id,title,locked,anonymous,owner_id").single();
         if (error) toast(error.message, "error"); else if (live) setBoard(created as Board);
       }
     })();
     return () => { live = false; };
-  }, [activityId, sessionId, manage, tenantId, userId, title, toast]);
+  }, [activityId, sessionId, manage, tenantId, userId, title, toast, refresh]);
+  useEffect(() => {
+    if (manage) return;
+    const t = window.setInterval(() => setRefresh((n) => n + 1), 5000);
+    return () => window.clearInterval(t);
+  }, [manage]);
 
   const posts = useLoader(async () => {
     if (!board) return [] as Post[];
@@ -52,7 +68,7 @@ export function CollabBoard({ activityId, sessionId, title, tenantId, userId, ma
   }, [board?.id]);
   useSignal(board ? `board:${board.id}` : null, ["post"], () => void posts.reload(), { minGapMs: 1000 });
 
-  if (!board) return <Alert>{manage ? "Setting up the board…" : "Waiting for your teacher to open the board."}</Alert>;
+  if (!board) return <Alert>{manage || sessionId ? "Opening the board…" : "Waiting for your teacher to open the board."}</Alert>;
 
   async function post() {
     const { error } = await createClient().from("collab_posts").insert({ tenant_id: tenantId, board_id: board!.id, author_id: userId, body: text.trim(), color });
@@ -76,6 +92,12 @@ export function CollabBoard({ activityId, sessionId, title, tenantId, userId, ma
           {manage && <Button size="sm" variant="secondary" onClick={toggleLock}>{board.locked ? "Unlock" : "Lock board"}</Button>}
         </div>
       </div>
+      {board.locked && !manage && (
+        <Alert tone="warn">Your teacher has paused posting on this board. You can still read it; you can post again when they unlock it.</Alert>
+      )}
+      {board.locked && manage && (
+        <p className="hint">Locked: students can read the board but not post. Press Unlock to let them post.</p>
+      )}
       {!board.locked && (
         <div className="flex flex-col gap-2 sm:flex-row">
           <Textarea rows={2} value={text} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Add an idea…" className="flex-1" />

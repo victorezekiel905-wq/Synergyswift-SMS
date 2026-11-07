@@ -181,7 +181,7 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
             ...(FEATURES.messaging ? [{ id: "chat" as Tab, label: "Chat" }] : [])
           ]} />
           {tab === "lesson" && <LessonPanel state={s} me={me} reload={state.reload} take={state.take} />}
-          {tab === "responses" && <ResponsesPanel state={s} me={me} reload={state.reload} />}
+          {tab === "responses" && <ResponsesPanel state={s} me={me} reload={state.reload} take={state.take} />}
           {tab === "screens" && <ScreensPanel state={s} sessionId={sessionId} selected={selected} setSelected={setSelected} reload={state.reload} screens={screens} />}
           {tab === "environment" && <EnvironmentPanel state={s} sessionId={sessionId} envs={envs} scenes={scenes} reload={state.reload} onView={setFocus} />}
           {tab === "chat" && <ChatPanel state={s} me={me} />}

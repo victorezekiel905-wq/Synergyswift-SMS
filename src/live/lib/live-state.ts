@@ -21,6 +21,17 @@ export type Pulse = { v: number; phase?: string; status?: string; slide?: number
   responses_visible?: boolean; revealed?: string | null; show_leaderboard?: boolean;
   leaderboard?: SessionState["session"]["leaderboard"] };
 
+/**
+ * The pulse in a session row (what set_session_state returns), so the teacher's screen moves
+ * on its own reply instead of waiting for the full state, which students never wait for.
+ */
+export function pulseFromSession(row: unknown): Pulse | null {
+  const r = row as Partial<SessionState["session"]> | null;
+  if (!r || typeof r.state_version !== "number") return null;
+  return { v: r.state_version, phase: r.phase, status: r.status, slide: r.current_slide, activity: r.active_activity_id ?? null,
+    mode: r.mode, responses_visible: r.responses_visible };
+}
+
 /** The full state with a newer pulse laid on top. Results of a slide we have left are dropped. */
 export function withPulse(state: SessionState | null, pulse: Pulse | null): SessionState | null {
   if (!state || !pulse) return state;
