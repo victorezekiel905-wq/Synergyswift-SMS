@@ -2,6 +2,7 @@
 import { Suspense, use, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Wordmark } from "@/components/site/SiteChrome";
+import { COMPANY, registeredAddress } from "@/lib/company";
 
 type Inv = { school: string; email: string; number: string; status: string; kind: string; amount: number; currency: string; lines: { label: string; amount: number }[];
   period_start: string | null; period_end: string | null; due_at: string | null; paid_at: string | null; pay_online: boolean; company: string; bank_details: string | null };
@@ -80,7 +81,11 @@ function Billing({ token }: { token: string }) {
                 {inv.bank_details && <p className="mt-5 whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-sm"><b>Or pay by transfer to</b><br />{inv.bank_details}<br /><span className="text-slate-600">Use {inv.number} as the reference.</span></p>}
               </>
             )}
-            <p className="mt-6 text-xs text-slate-500">{inv.company}</p>
+            <p className="mt-6 text-xs leading-relaxed text-slate-500">
+              {inv.company}<br />
+              RC {COMPANY.rcNumber} · TIN {COMPANY.tin}<br />
+              {registeredAddress}
+            </p>
           </div>
         )}
       </div>

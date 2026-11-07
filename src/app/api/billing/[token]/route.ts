@@ -1,3 +1,4 @@
+import { COMPANY } from "@/lib/company";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -18,7 +19,7 @@ export async function GET(_req: NextRequest, props: { params: Promise<{ token: s
   const svc = createServiceClient();
   const inv = await invoiceForPayment(svc, id);
   if (!inv) return jsonError(BAD_LINK, 404);
-  const billing = await platformSetting(svc, "billing", { company: "Synergy Swift Technologies Limited", bank_details: "" } as { company: string; bank_details: string });
+  const billing = await platformSetting(svc, "billing", { company: COMPANY.legalName, bank_details: "" } as { company: string; bank_details: string });
   return NextResponse.json({
     school: inv.tenants?.name ?? "", email: inv.tenants?.contact_email ?? "", number: inv.number, status: inv.status, kind: inv.kind,
     amount: inv.amount_cents / 100, currency: inv.currency ?? "NGN", lines: inv.lines ?? [], period_start: inv.period_start, period_end: inv.period_end,

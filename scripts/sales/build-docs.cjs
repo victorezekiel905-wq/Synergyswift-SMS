@@ -8,6 +8,8 @@ const {
 } = require("docx");
 
 const OUT = process.argv[2];
+// The company as registered with CAC (2 November 2026); keep in step with src/lib/company.ts.
+const CO = { name: "Synergy Swift Technology Limited", rc: "9979873", addr: "23 Joseph Avenue, Lekki, Lagos State 105102, Nigeria" };
 const C = { navy: "1B2A4A", navy2: "2C3E66", teal: "0E8F80", tealLight: "E3F4F1", amber: "E89A2C", amberLight: "FDF1DE", rose: "C2415D", sky: "EAF0FA", ink: "1F2937", grey: "5B6475", line: "D6DCE6", white: "FFFFFF" };
 const FONT = "Segoe UI";
 const W = 9638; // A4 text width at 2 cm margins, in DXA
@@ -79,7 +81,7 @@ const pageBreak = () => new Paragraph({ children: [new PageBreak()] });
 function cover(title, subtitle, lines) {
   const kids = [
     new Paragraph({ children: [run("SYNERGY SWIFT", { bold: true, size: 26, color: C.amber })], spacing: { before: 600, after: 40 } }),
-    new Paragraph({ children: [run("Synergy Swift Technologies Limited (registration in progress)", { size: 18, color: "C9D3E6" })], spacing: { after: 1400 } }),
+    new Paragraph({ children: [run(`${CO.name} · RC ${CO.rc}`, { size: 18, color: "C9D3E6" })], spacing: { after: 1400 } }),
     new Paragraph({ children: [run(title, { bold: true, size: 64, color: C.white })], spacing: { after: 200, line: 260 } }),
     new Paragraph({ children: [run(subtitle, { size: 28, color: "DCE4F2" })], spacing: { after: 1600, line: 320 } }),
     ...lines.map(l => new Paragraph({ children: rich(l, { size: 20, color: C.white }), spacing: { after: 80 } })),
@@ -116,11 +118,11 @@ const GROUPS = [
 ];
 
 const proposal = new Document({
-  creator: "Synergy Swift Technologies Limited", title: "Synergy Swift: proposal for schools",
+  creator: CO.name, title: "Synergy Swift: proposal for schools",
   styles: { default: { document: { run: { font: FONT, size: 21, color: C.ink } } } }, numbering,
   sections: [
     { properties: { page }, children: [cover("One platform for the whole school.", "Results, fees, secure exams, live lessons, safety and families: run from one place, on any phone.", [
-      [{ t: "Proposal for: ", bold: true }, "[School name]"], [{ t: "Prepared by: ", bold: true }, "Synergy Swift Technologies Limited (registration in progress)"],
+      [{ t: "Proposal for: ", bold: true }, "[School name]"], [{ t: "Prepared by: ", bold: true }, `${CO.name} (RC ${CO.rc})`],
       [{ t: "Date: ", bold: true }, "October 2026"], [{ t: "Valid for: ", bold: true }, "60 days"]])] },
     { properties: { page }, footers: { default: footer("Proposal for schools") }, children: [
       ...band("Why schools change", C.navy, "The problem"),
@@ -217,7 +219,7 @@ const proposal = new Document({
       num("Sign the Memorandum of Understanding and choose your start date."),
       num("Go live within four weeks."),
       spacer(),
-      callout("Talk to us", [[{ t: "Synergy Swift Technologies Limited ", bold: true }, "(registration in progress)"], "Phone / WhatsApp: [phone number]", "Email: [email address]", "Website: [website]"], C.sky, C.navy)
+      callout("Talk to us", [[{ t: `${CO.name} `, bold: true }, `(RC ${CO.rc})`], "Phone / WhatsApp: [phone number]", "Email: [email address]", "Website: [website]"], C.sky, C.navy)
     ] }
   ]
 });
@@ -236,16 +238,16 @@ const sign = (who) => new Table({ width: { size: W, type: WidthType.DXA }, colum
     ...["Name", "Position", "Signature", "Date", "Witness"].map(l => new Paragraph({ children: [run(`${l}:`, { size: 19, color: C.grey }), run(" " + "_".repeat(l === "Witness" ? 34 : 36 - l.length), { size: 19, color: "9AA3B2" })], spacing: { after: 320 } }))] })) })] });
 
 const mou = new Document({
-  creator: "Synergy Swift Technologies Limited", title: "Memorandum of Understanding",
+  creator: CO.name, title: "Memorandum of Understanding",
   styles: { default: { document: { run: { font: FONT, size: 20, color: C.ink } } } }, numbering,
   sections: [
     { properties: { page }, children: [cover("Memorandum of Understanding", "For the provision of the Synergy Swift school management platform", [
-      [{ t: "Between: ", bold: true }, "Synergy Swift Technologies Limited (registration in progress)"], [{ t: "And: ", bold: true }, "[School name]"], [{ t: "Date: ", bold: true }, "[date]"]])] },
+      [{ t: "Between: ", bold: true }, `${CO.name} (RC ${CO.rc})`], [{ t: "And: ", bold: true }, "[School name]"], [{ t: "Date: ", bold: true }, "[date]"]])] },
     { properties: { page }, footers: { default: footer("Memorandum of Understanding") }, children: [
       ...band("Memorandum of Understanding", C.navy, "Agreement"),
       P([{ t: "This Memorandum of Understanding (\"MoU\") is made on ", }, { t: "[date]", bold: true }, " between:"]),
       table(["", "Party"], [
-        [{ t: "The Provider", bold: true }, ["Synergy Swift Technologies Limited (registration in progress), of [address], (\"Synergy Swift\"). Until registration is complete, the Provider acts through its promoter, ", { t: "[name]", bold: true }, ", who will assign this MoU to the company on registration."]],
+        [{ t: "The Provider", bold: true }, [`${CO.name}, a company registered in Nigeria with the Corporate Affairs Commission (RC ${CO.rc}), whose registered office is at ${CO.addr} ("Synergy Swift").`]],
         [{ t: "The School", bold: true }, ["[School name], of [address], represented by [name and position] (\"the School\")."]]
       ], [2300, W - 2300], { headFill: C.teal, firstColFill: C.tealLight }),
       spacer(),
@@ -316,7 +318,7 @@ const mou = new Document({
       ]),
       spacer(),
       ...band("Signed by the parties", C.teal),
-      sign(["For Synergy Swift Technologies Limited (registration in progress)", "For the School"]),
+      sign([`For ${CO.name}`, "For the School"]),
       ...band("Schedule 1: package and fees", C.amber, "Schedules", true),
       table(["Item", "Details"], [
         ["Package", "[Essentials / Growth / Complete / Custom]"],

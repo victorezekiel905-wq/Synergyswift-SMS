@@ -1,3 +1,4 @@
+import { COMPANY } from "@/lib/company";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, readJson, jsonError, ROLES } from "@/lib/auth";
@@ -17,7 +18,7 @@ export async function GET() {
     loadSubscription(svc, tid), loadOverrides(svc, tid),
     svc.from("invoices").select("id,number,status,kind,amount_cents,currency,lines,period_start,period_end,due_at,paid_at,created_at").eq("tenant_id", tid).neq("status", "draft").order("created_at", { ascending: false }).limit(30),
     svc.from("module_requests").select("id,module,action,note,status,reply,created_at,handled_at").eq("tenant_id", tid).order("created_at", { ascending: false }).limit(30),
-    platformSetting(svc, "billing", { company: "Synergy Swift Technologies Limited", bank_details: "" } as { company: string; bank_details: string })
+    platformSetting(svc, "billing", { company: COMPANY.legalName, bank_details: "" } as { company: string; bank_details: string })
   ]);
   const { rows } = resolveModules(subscriptionModules(sub, plan), overrides);
   const price = sub && plan ? await priceFor(svc, sub, plan) : null;

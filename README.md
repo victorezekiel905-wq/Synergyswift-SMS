@@ -1,6 +1,6 @@
 # Synergy Swift
 
-Synergy Swift (by Synergy Swift Technologies Limited, formerly "EduClass Fusion") is a multi-tenant school SaaS that fuses **interactive learning** with **classroom device control**, built strictly from the `EduClass_Fusion_SaaS_Blueprint.docx` spec (Aug 2026). Stack: **Next.js 15 (App Router) + React 19 + TypeScript + Tailwind + Supabase** against your live project `zltofhayjsvtktmmlqmh.supabase.co`.
+Synergy Swift (by Synergy Swift Technology Limited, RC 9979873, registered with the Corporate Affairs Commission of Nigeria on 2 November 2026; formerly "EduClass Fusion") is a multi-tenant school SaaS that fuses **interactive learning** with **classroom device control**, built strictly from the `EduClass_Fusion_SaaS_Blueprint.docx` spec (Aug 2026). Stack: **Next.js 15 (App Router) + React 19 + TypeScript + Tailwind + Supabase** against your live project `zltofhayjsvtktmmlqmh.supabase.co`.
 
 > No mocks. Every UI hits real Supabase tables; every screen writes real rows; every leaderboard is live; every device event is persisted.
 

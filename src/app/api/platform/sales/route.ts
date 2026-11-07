@@ -1,3 +1,4 @@
+import { companyLine } from "@/lib/company";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requirePlatformAdmin, readJson, jsonError } from "@/lib/auth";
@@ -168,7 +169,7 @@ export async function POST(req: NextRequest) {
         if (!lead?.email) return jsonError("Add the contact's email to send the quote.");
         const lines = (q.lines as { label: string; amount: number }[]).map(l => `${l.label}: ${naira(l.amount)}`).join("\n");
         await sendEmail({ to: lead.email, subject: `Synergy Swift quote ${q.number} for ${lead.school_name}`,
-          text: `Dear ${lead.contact_name ?? "colleague"},\n\nThank you for your interest in Synergy Swift. Here is your quote:\n\n${lines}\n\nTotal per year: ${naira(Number(q.annual))}${q.cycle === "termly" ? " (billed termly)" : ""}\nValid until ${q.valid_until}.\n\nReply to this email with any questions.\n\nSynergy Swift Technologies Limited` }).catch(() => null);
+          text: `Dear ${lead.contact_name ?? "colleague"},\n\nThank you for your interest in Synergy Swift. Here is your quote:\n\n${lines}\n\nTotal per year: ${naira(Number(q.annual))}${q.cycle === "termly" ? " (billed termly)" : ""}\nValid until ${q.valid_until}.\n\nReply to this email with any questions.\n\n${companyLine}` }).catch(() => null);
       }
       await svc.from("sales_quotes").update({ status: b.status, ...(b.status === "sent" ? { sent_at: now } : { decided_at: now }) }).eq("id", q.id);
       if (lead) {

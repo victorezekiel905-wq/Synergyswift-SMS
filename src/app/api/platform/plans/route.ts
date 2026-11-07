@@ -1,3 +1,4 @@
+import { COMPANY } from "@/lib/company";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requirePlatformAdmin, readJson, jsonError } from "@/lib/auth";
@@ -13,7 +14,7 @@ export async function GET() {
   const { data: plans } = await svc.from("plans").select("id,code,name,groups,prices,blurb,active,sort").not("code", "is", null).order("sort");
   return NextResponse.json({
     plans: plans ?? [], group_prices: await groupPrices(svc),
-    billing: await platformSetting(svc, "billing", { company: "Synergy Swift Technologies Limited", bank_details: "", grace_days: 14 }),
+    billing: await platformSetting(svc, "billing", { company: COMPANY.legalName, bank_details: "", grace_days: 14 }),
     role: gate.role
   });
 }

@@ -198,7 +198,7 @@ test.describe("paying a Synergy Swift invoice", () => {
     await page.route("**/api/billing/*", r => r.request().method() === "GET"
       ? r.fulfill({ json: { school: "Greenfield College", email: "bursar@gf.ng", number: "SS-2026-0007", status: "open", kind: "renewal", amount: 900000, currency: "NGN",
           lines: [{ label: "Complete: one year", amount: 900000 }], period_start: "2027-01-01", period_end: "2027-12-31", due_at: null, paid_at: null, pay_online: true,
-          company: "Synergy Swift Technologies Limited", bank_details: null } })
+          company: "Synergy Swift Technology Limited", bank_details: null } })
       : r.fulfill({ json: { url: "/features?paystack=1" } }));
     await page.goto("/billing/0123456789abcdef0123456789abcdef.AAAAAAAAAAAAAAAAAAAAAA");
     await expect(page.getByRole("heading", { name: "Greenfield College" })).toBeVisible();

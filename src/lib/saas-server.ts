@@ -1,3 +1,4 @@
+import { COMPANY } from "@/lib/company";
 /**
  * Server side of plans, modules and billing: rebuilds each school's effective
  * module map (tenants.modules), issues and settles platform invoices, and runs
@@ -124,7 +125,7 @@ export async function runBilling(svc: Svc, now = new Date(), opts: { force?: boo
     await svc.from("platform_settings").upsert({ key: "billing_last_run", value: { at: now.toISOString() }, updated_at: now.toISOString() });
   }
   const out = { renewals: 0, past_due: 0, suspended: 0, cancelled: 0, modules_expired: 0 };
-  const billing = await platformSetting(svc, "billing", { company: "Synergy Swift Technologies Limited", bank_details: "" } as { company: string; bank_details: string });
+  const billing = await platformSetting(svc, "billing", { company: COMPANY.legalName, bank_details: "" } as { company: string; bank_details: string });
 
   // Module overrides that have run out: remove them (with a record) and rebuild those schools' modules.
   const { data: expired } = await svc.from("tenant_module_overrides").select("tenant_id,module,mode,expires_at").lte("expires_at", now.toISOString()).limit(500);

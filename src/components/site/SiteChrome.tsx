@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/BrandMark";
+import { COMPANY, registeredAddress } from "@/lib/company";
 
 /** The public site's few menus. "Join a class" is for students with a lesson code: no account needed. */
 const NAV: [string, string][] = [["/features", "Features"], ["/tour", "Take a tour"], ["/live/join", "Join a class"]];
@@ -49,11 +50,12 @@ export function SiteFooter() {
   const cols: [string, [string, string][]][] = [
     ["Product", [["/features", "Features"], ["/tour", "Take a tour"], ["/guide", "Product guide"], ["/demo", "Book a walk-through"]]],
     ["Schools", [["/onboard", "Sign up your school"], ["/login", "Sign in"]]],
-    ["Students and parents", [["/live/join", "Join a class as a guest"], ["/student/join", "Student account"], ["/login", "Parent sign-in"]]]
+    ["Students and parents", [["/live/join", "Join a class as a guest"], ["/student/join", "Student account"], ["/login", "Parent sign-in"]]],
+    ["Company", [["/company", "Company details"], ["/demo", "Contact us"]]]
   ];
   return (
     <footer className="border-t border-slate-200 bg-white">
-      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 text-[13px] sm:px-8 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 text-[13px] sm:px-8 md:grid-cols-[1.5fr_1fr_1fr_1fr_1fr]">
         <div>
           <Wordmark small />
           <p className="mt-4 max-w-xs leading-relaxed text-slate-500">School management and learning for primary and secondary schools.</p>
@@ -66,7 +68,13 @@ export function SiteFooter() {
         ))}
       </div>
       <div className="border-t border-slate-200">
-        <p className="mx-auto max-w-6xl px-5 py-6 text-[12px] text-slate-500 sm:px-8">© {new Date().getFullYear()} Synergy Swift Technologies Limited</p>
+        <div className="mx-auto flex max-w-6xl flex-col gap-1.5 px-5 py-6 text-[12px] leading-relaxed text-slate-500 sm:px-8 md:flex-row md:items-center md:justify-between md:gap-6">
+          <p>© {new Date().getFullYear()} {COMPANY.legalName}. Registered in {COMPANY.country}, RC {COMPANY.rcNumber}.</p>
+          <p>
+            Registered office: {registeredAddress}.{" "}
+            <Link href="/company" className="text-slate-500 underline-offset-2 hover:text-navy">Company details</Link>
+          </p>
+        </div>
       </div>
     </footer>
   );

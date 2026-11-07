@@ -1,3 +1,4 @@
+import { COMPANY } from "@/lib/company";
 /**
  * Schools paying their Synergy Swift invoice online (phase 14q), with Paystack.
  *
@@ -56,7 +57,7 @@ export async function confirmInvoicePayment(svc: any, reference: string): Promis
   if (!matchesExpected(v, inv.amount_cents / 100, "NGN")) return { status: v.status === "failed" ? "failed" : "pending", token };
   await markInvoicePaid(svc, inv.id, { method: "paystack", reference }, null);
   if (inv.tenants?.contact_email) {
-    const billing = await platformSetting(svc, "billing", { company: "Synergy Swift Technologies Limited" } as { company: string });
+    const billing = await platformSetting(svc, "billing", { company: COMPANY.legalName } as { company: string });
     await sendEmail({ to: inv.tenants.contact_email, toName: inv.tenants.name, fromName: "Synergy Swift", subject: `Receipt for Synergy Swift invoice ${inv.number}`,
       text: `Thank you. We have received ${naira(inv.amount_cents / 100)} for invoice ${inv.number}${inv.period_start && inv.period_end ? ` (${inv.period_start} to ${inv.period_end})` : ""}.\n\nPaystack reference: ${reference}\n\nYour subscription is up to date.\n\n${billing.company}` }).catch(() => null);
   }
