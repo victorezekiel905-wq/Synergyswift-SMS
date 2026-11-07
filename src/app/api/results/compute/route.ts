@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     if (pending.length) return jsonError(`Scores still awaiting approval: ${pending.join(", ")}. Approve them under Results → Approvals first.`, 409);
   }
   try {
-    const r = await compileClassResults(ctx.sb, ctx.tenant.id, b.term_id, b.class_group_id, { force: b.force, kind: b.kind });
+    const r = await compileClassResults(ctx.sb, ctx.tenant.id, b.term_id, b.class_group_id, { force: b.force, kind: b.kind, timezone: ctx.tenant.timezone });
     return NextResponse.json(r);
   } catch (e) {
     return jsonError((e as Error).message);

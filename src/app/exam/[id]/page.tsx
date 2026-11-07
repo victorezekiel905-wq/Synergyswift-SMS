@@ -15,11 +15,25 @@ type ExamInfo = {
 type AttemptState = { id: string; status: string; started_at: string; deadline_at: string; violations: number; server_now: string; answers: Record<string, any>; questions: PublicQuestion[] };
 type Result = { released: boolean; pending_manual?: boolean; total_score?: number; max_score?: number; per_question?: { id: string; prompt: string; points: number; max: number; feedback: string | null }[] | null };
 
-async function api(id: string, body?: unknown) {
-  const r = await fetch(`/api/student/exams/${id}`, body === undefined ? { cache: "no-store" } : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  return { ok: r.ok, status: r.status, data: j };
+/**
+ * Talks to the exam API. Never throws: no connection (or a request that hangs on a weak
+ * signal) comes back as status 0, so the caller keeps the answers and tries again later.
+ */
+async function api(id: string, body?: unknown): Promise<{ ok: boolean; status: number; data: any }> {
+  try {
+    const signal = typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(20_000) : undefined;
+    const r = await fetch(`/api/student/exams/${id}`, body === undefined
+      ? { cache: "no-store", signal }
+      : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
+    const j = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, data: j };
+  } catch {
+    return { ok: false, status: 0, data: { error: "No connection. Your answers are kept on this device." } };
+  }
 }
+
+/** A server error or no connection: worth retrying, not a refusal. */
+const retryable = (status: number) => status === 0 || status >= 500;
 
 /**
  * Student exam room. Lockdown behaviour (exam.net style): full screen, focus
@@ -46,15 +60,77 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
   const [isFs, setIsFs] = useState(true);
   const [camera, setCamera] = useState<MediaStream | null>(null);
   const [consent, setConsent] = useState(false);
+  // Handed in while offline: sent by itself as soon as the connection is back.
+  const [submitPending, setSubmitPending] = useState(false);
+  // Opened from the copy kept on this device (reloaded without a connection).
+  const [openedOffline, setOpenedOffline] = useState(false);
+  // Answers that reached the school after time was up: kept for the teacher, not counted.
+  const [lateNote, setLateNote] = useState<string | null>(null);
   const dirty = useRef<Record<string, any>>({});
   const offset = useRef(0);
   const statusRef = useRef<string | null>(null);
   statusRef.current = status;
+  const saving = useRef(false);
+  const submitting = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const backupKey = `exam-backup-${id}`;
+  const stateKey = `exam-state-${id}`;
+  const submitKey = `exam-submit-pending-${id}`;
+
+  /** The unsaved answers, kept on this device until the school has them. */
+  const writeBackup = useCallback((attemptId: string | undefined) => {
+    try {
+      if (Object.keys(dirty.current).length) localStorage.setItem(backupKey, JSON.stringify({ attempt: attemptId, answers: dirty.current, at: Date.now() }));
+      else localStorage.removeItem(backupKey);
+    } catch { /* storage full or blocked */ }
+  }, [backupKey]);
+
+  /** The exam and its questions, so a reload without a connection can carry on. Removed once handed in. */
+  const rememberState = useCallback((e: ExamInfo | null, a: AttemptState | null) => {
+    try {
+      if (e && a?.questions) localStorage.setItem(stateKey, JSON.stringify({ exam: e, attempt: a, offset: offset.current }));
+      else localStorage.removeItem(stateKey);
+    } catch { /* storage full or blocked */ }
+  }, [stateKey]);
+
+  /** Answers the school now has, added to the copy kept on this device. */
+  const keepSaved = useCallback((saved: Record<string, any>) => {
+    try {
+      const kept = JSON.parse(localStorage.getItem(stateKey) ?? "null");
+      if (!kept?.attempt) return;
+      kept.attempt.answers = { ...(kept.attempt.answers ?? {}), ...saved };
+      localStorage.setItem(stateKey, JSON.stringify(kept));
+    } catch { /* storage full or blocked */ }
+  }, [stateKey]);
+
+  const forget = useCallback(() => {
+    try { localStorage.removeItem(backupKey); localStorage.removeItem(stateKey); localStorage.removeItem(submitKey); } catch { /* blocked */ }
+  }, [backupKey, stateKey, submitKey]);
 
   const load = useCallback(async () => {
     const r = await api(id);
-    if (r.data.exam) setExam(r.data.exam);
+    if (r.status === 0) {
+      // No connection: carry on from the copy kept on this device, if there is one.
+      try {
+        const kept = JSON.parse(localStorage.getItem(stateKey) ?? "null");
+        if (kept?.exam && kept?.attempt?.questions) {
+          setExam(kept.exam);
+          offset.current = Number(kept.offset) || 0;
+          const b = JSON.parse(localStorage.getItem(backupKey) ?? "null");
+          if (b?.attempt === kept.attempt.id) dirty.current = b.answers ?? {};
+          setAttempt(kept.attempt);
+          setAnswers({ ...(kept.attempt.answers ?? {}), ...dirty.current });
+          setStatus("in_progress");
+          setOpenedOffline(true);
+          if (localStorage.getItem(submitKey) === kept.attempt.id) setSubmitPending(true);
+          return;
+        }
+      } catch { /* nothing usable kept */ }
+      setError("You're offline. The exam opens as soon as you're back online, and anything you typed earlier is still on this device.");
+      return;
+    }
+    setOpenedOffline(false);
+    if (r.data.exam) { setExam(r.data.exam); setError(null); }
     if (!r.ok && !r.data.exam) { setError(r.data.error ?? "Could not load the exam."); return; }
     if (r.data.seb_error) { setError(r.data.seb_error); setStatus(r.data.attempt?.status ?? null); return; }
     const a = r.data.attempt;
@@ -65,13 +141,26 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
       offset.current = new Date(a.server_now).getTime() - Date.now();
       setViolations(a.violations);
       let saved = a.answers ?? {};
-      try { const b = JSON.parse(localStorage.getItem(backupKey) ?? "null"); if (b?.attempt === a.id) { saved = { ...saved, ...b.answers }; dirty.current = b.answers; } } catch { /* ignore */ }
+      try { const b = JSON.parse(localStorage.getItem(backupKey) ?? "null"); if (b?.attempt === a.id) { saved = { ...saved, ...b.answers }; dirty.current = b.answers ?? {}; } } catch { /* ignore */ }
       setAnswers(saved);
-    } else if (r.data.result) {
-      setResult(r.data.result);
+      rememberState(r.data.exam ?? null, { ...a, answers: a.answers ?? {} });
+      try { if (localStorage.getItem(submitKey) === a.id) setSubmitPending(true); } catch { /* blocked */ }
+    } else {
+      // Handed in (perhaps on another device or by the timer): nothing more to keep for the exam itself.
+      // Answers that never reached the school stay in the backup until they have been sent.
+      try { localStorage.removeItem(stateKey); localStorage.removeItem(submitKey); } catch { /* blocked */ }
+      if (r.data.result) setResult(r.data.result);
     }
-  }, [id, backupKey]);
+  }, [id, backupKey, stateKey, submitKey, rememberState]);
   useEffect(() => { load(); }, [load]);
+  // Not loaded because there was no connection: try again as soon as it's back.
+  useEffect(() => {
+    if (exam) return;
+    const retry = () => { void load(); };
+    window.addEventListener("online", retry);
+    const t = setInterval(retry, 15_000);
+    return () => { window.removeEventListener("online", retry); clearInterval(t); };
+  }, [exam, load]);
   useEffect(() => {
     const sync = () => setIsFs(Boolean(document.fullscreenElement));
     sync();
@@ -89,31 +178,63 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
   }, [attempt]);
 
   // ---- autosave ----
+  /** After time ran out or the exam was handed in, answers that arrived late are kept for the teacher. */
+  const noteLate = useCallback((data: any, count: number) => {
+    if (!count) return;
+    setLateNote(data?.late_kept
+      ? `${count} answer${count === 1 ? "" : "s"} reached the school after time was up. They have been kept for your teacher to see.`
+      : `${count} answer${count === 1 ? "" : "s"} could not be handed in after time was up. They are still saved on this device. Tell your teacher.`);
+  }, []);
+
   const flush = useCallback(async () => {
-    const pending = dirty.current;
-    if (!attempt || !Object.keys(pending).length || statusRef.current !== "in_progress") return;
+    const pending = { ...dirty.current };
+    if (saving.current || !attempt || !Object.keys(pending).length || statusRef.current !== "in_progress") return;
+    saving.current = true;
     setSaveState("saving");
     try {
       const r = await api(id, { action: "save", answers: pending });
       if (r.ok) {
-        if (dirty.current === pending) dirty.current = {};
-        else for (const k of Object.keys(pending)) if (dirty.current[k] === pending[k]) delete dirty.current[k];
-        localStorage.removeItem(backupKey);
-        setSaveState("saved");
+        // Only what was sent is done; anything typed while saving stays waiting (and in the backup).
+        const next = { ...dirty.current };
+        for (const k of Object.keys(pending)) if (next[k] === pending[k]) delete next[k];
+        dirty.current = next;
+        writeBackup(attempt.id);
+        keepSaved(pending);
+        setSaveState(Object.keys(next).length ? "idle" : "saved");
+        setOpenedOffline(false);
         if (r.data.deadline_at && r.data.deadline_at !== attempt.deadline_at) setAttempt(a => a && ({ ...a, deadline_at: r.data.deadline_at }));
       } else if (r.status === 423) { setStatus("locked"); setSaveState("idle"); }
-      else if (r.status === 409) { setSaveState("idle"); load(); }
+      else if (r.status === 409) {
+        noteLate(r.data, Object.keys(pending).length);
+        if (r.data.late_kept) { dirty.current = {}; writeBackup(attempt.id); }
+        setSaveState("idle");
+        load();
+      }
       else setSaveState("offline");
-    } catch { setSaveState("offline"); }
-  }, [attempt, id, backupKey, load]);
+    } finally { saving.current = false; }
+  }, [attempt, id, load, noteLate, writeBackup, keepSaved]);
+  const flushRef = useRef(flush);
+  flushRef.current = flush;
   useEffect(() => { const t = setInterval(flush, 5000); return () => clearInterval(t); }, [flush]);
+  // Back online: send what was kept straight away (and refresh if the exam was opened offline).
+  useEffect(() => {
+    const onOnline = () => { void flushRef.current().then(() => { if (openedOffline) load(); }); };
+    const onHide = () => { if (document.visibilityState === "hidden") void flushRef.current(); };
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onHide);
+    return () => { window.removeEventListener("online", onOnline); document.removeEventListener("visibilitychange", onHide); };
+  }, [openedOffline, load]);
 
   function answer(qid: string, v: any) {
     setAnswers(a => ({ ...a, [qid]: v }));
     dirty.current = { ...dirty.current, [qid]: v };
-    try { localStorage.setItem(backupKey, JSON.stringify({ attempt: attempt?.id, answers: dirty.current })); } catch { /* storage full */ }
+    // Autosave: on this device at once, to the school 1.5 seconds after typing stops.
+    writeBackup(attempt?.id);
     setSaveState("idle");
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => { void flushRef.current(); }, 1500);
   }
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
 
   // ---- integrity monitoring ----
   const report = useCallback(async (kind: string, meta: Record<string, unknown> = {}) => {
@@ -188,21 +309,50 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
     }
     if (exam?.require_fullscreen && !exam.require_seb) { try { await document.documentElement.requestFullscreen(); } catch { /* user can re-enter */ } }
     const r = await api(id, { action: "start", access_code: code });
-    if (!r.ok) { cam?.getTracks().forEach(t => t.stop()); setCamera(null); setError(r.data.error ?? "Could not start."); return; }
+    if (!r.ok) {
+      cam?.getTracks().forEach(t => t.stop()); setCamera(null);
+      setError(r.status === 0 ? "You're offline. Connect to the internet to start the exam." : r.data.error ?? "Could not start.");
+      return;
+    }
     const a = r.data.attempt as AttemptState;
     offset.current = new Date(a.server_now).getTime() - Date.now();
     setAttempt(a); setAnswers(a.answers ?? {}); setStatus(a.status); setViolations(a.violations);
+    rememberState(exam, a);
   }
 
   async function submit(auto = false) {
     setConfirmSubmit(false);
-    const r = await api(id, { action: "submit", answers: dirty.current });
-    if (r.ok || r.status === 409) {
-      dirty.current = {}; localStorage.removeItem(backupKey);
-      setStatus(r.data.status ?? "submitted"); setResult(r.data.result ?? null); setAttempt(null);
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    } else if (!auto) setError(r.data.error ?? "Submit failed. Check your connection and try again.");
+    if (submitting.current || !attempt) return;
+    submitting.current = true;
+    try {
+      const sent = { ...dirty.current };
+      const r = await api(id, { action: "submit", answers: sent });
+      if (r.ok || r.status === 409) {
+        if (r.status === 409) noteLate(r.data, Object.keys(sent).length);
+        // Keep the backup if the school could not take the late answers, so they are not lost.
+        if (r.ok || r.data.late_kept || !Object.keys(sent).length) { dirty.current = {}; forget(); }
+        else { try { localStorage.removeItem(stateKey); localStorage.removeItem(submitKey); } catch { /* blocked */ } }
+        setSubmitPending(false);
+        setStatus(r.data.status === "in_progress" || !r.data.status ? "submitted" : r.data.status); setResult(r.data.result ?? null); setAttempt(null);
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      } else if (retryable(r.status)) {
+        // No connection: hand in by itself as soon as it's back. Answers stay on this device until then.
+        setSubmitPending(true);
+        try { localStorage.setItem(submitKey, attempt.id); } catch { /* blocked */ }
+      } else if (!auto) setError(r.data.error ?? "Submit failed. Check your connection and try again.");
+    } finally { submitting.current = false; }
   }
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+  // Handing in while offline: try again when the connection is back, and every few seconds.
+  useEffect(() => {
+    if (!submitPending) return;
+    const retry = () => { void submitRef.current(true); };
+    window.addEventListener("online", retry);
+    const t = setInterval(retry, 5000);
+    retry();
+    return () => { window.removeEventListener("online", retry); clearInterval(t); };
+  }, [submitPending]);
 
   // ---------------- render ----------------
   if (error && !exam) return <Shell><p role="alert" className="rounded-lg bg-rose-50 p-4 text-rose-700">{error}</p><Link className="btn btn-ghost mt-4" href="/student">Back</Link></Shell>;
@@ -230,6 +380,7 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
             ? <p className="mt-2 text-lg">Your score: <b>{result.total_score} / {result.max_score}</b></p>
             : <p className="mt-2 text-slate-600">{result?.pending_manual ? "Some answers are marked by your teacher. " : ""}Your teacher will release the results.</p>}
         </div>
+        {lateNote && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{lateNote}</p>}
         {result?.per_question && (
           <ul className="mt-4 space-y-2 text-sm">
             {result.per_question.map((q, i) => <li key={q.id} className="card p-3"><b>Q{i + 1}</b> {q.points}/{q.max}{q.feedback ? <span className="block text-slate-600">{q.feedback}</span> : null}</li>)}
@@ -303,6 +454,12 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
         </div>
       </header>
       {warning && <div role="alert" className="bg-amber-500 px-4 py-2 text-center text-sm font-semibold text-white">{warning}</div>}
+      {(openedOffline || saveState === "offline") && !submitPending && (
+        <div role="status" className="bg-amber-50 px-4 py-2 text-center text-sm text-amber-900">
+          No connection. Keep writing: every answer is saved on this device as you type and sent by itself when you&apos;re back online. Don&apos;t close this page or clear the browser.
+        </div>
+      )}
+      {lateNote && <div role="status" className="bg-amber-50 px-4 py-2 text-center text-sm text-amber-900">{lateNote}</div>}
       <div className="flex flex-1">
         <nav aria-label="Questions" className="hidden w-52 shrink-0 overflow-y-auto border-r border-slate-200 bg-white p-3 md:block">
           <div className="grid grid-cols-5 gap-1.5">
@@ -330,7 +487,8 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
               }}
               onUpload={async (file) => {
                 const fd = new FormData(); fd.set("question_id", q.id); fd.set("file", file);
-                const r = await fetch(`/api/student/exams/${id}/upload`, { method: "POST", body: fd });
+                const r = await fetch(`/api/student/exams/${id}/upload`, { method: "POST", body: fd })
+                  .catch(() => { throw new Error("No connection. Keep the file and upload it again when you're back online."); });
                 const j = await r.json().catch(() => ({}));
                 if (!r.ok) throw new Error(j.error ?? "Upload failed");
                 setAnswers(a => ({ ...a, [q.id]: j }));
@@ -343,7 +501,7 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
               : <button className="btn btn-primary" onClick={() => { flush(); setConfirmSubmit(true); }}>Review and submit</button>}
           </div>
           <div className="mt-6 flex flex-wrap gap-1.5 md:hidden">
-            {attempt.questions.map((x, i) => <button key={x.id} onClick={() => setCurrent(i)} className={"h-8 w-8 rounded text-xs font-semibold " + (answered(x.id) ? "bg-brand-600 text-white" : "bg-white text-slate-700")}>{i + 1}</button>)}
+            {attempt.questions.map((x, i) => <button key={x.id} onClick={() => { flush(); setCurrent(i); }} className={"h-8 w-8 rounded text-xs font-semibold " + (answered(x.id) ? "bg-brand-600 text-white" : "bg-white text-slate-700")}>{i + 1}</button>)}
           </div>
         </main>
       </div>
@@ -356,6 +514,17 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
             <h2 className="text-lg font-semibold">Submit your exam?</h2>
             <p className="mt-2 text-sm text-slate-600">You answered {answeredCount} of {attempt.questions.length} questions{flags.size ? ` and flagged ${flags.size} for review` : ""}. You cannot change answers after submitting.</p>
             <div className="mt-4 flex justify-end gap-2"><button className="btn btn-ghost" onClick={() => setConfirmSubmit(false)}>Keep working</button><button className="btn btn-primary" onClick={() => submit(false)}>Submit</button></div>
+          </div>
+        </div>
+      )}
+
+      {submitPending && status === "in_progress" && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/90 p-6 text-center text-white" role="status">
+          <div className="max-w-md">
+            <p className="text-2xl font-bold">Handing in…</p>
+            <p className="mt-3">There&apos;s no connection right now. Your answers are saved on this device and your exam will be handed in by itself as soon as the connection is back.</p>
+            <p className="mt-3 text-sm opacity-80">Keep this page open. Don&apos;t sign out or clear the browser.</p>
+            <button className="btn btn-primary mt-5" onClick={() => void submit(true)}>Try now</button>
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RichText } from "@/live/components/RichText";
 import { ReadAloud } from "@/live/components/ReadAloud";
 import { Whiteboard } from "@/live/components/slides/Whiteboard";
@@ -245,6 +245,11 @@ function OrderingInput({ items, order, onChange, disabled }: { items: Item[]; or
   const ids = order && order.length === items.length ? order : items.map((i) => i.id);
   const byId = Object.fromEntries(items.map((i) => [i.id, i]));
   const [drag, setDrag] = useState<number | null>(null);
+  // The order the student sees is their answer, even before they move anything
+  // (otherwise an already-right order could never be saved: "Answer the question first").
+  useEffect(() => {
+    if (!disabled && items.length && !(order && order.length === items.length)) onChange(ids);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const move = (from: number, to: number) => {
     if (to < 0 || to >= ids.length) return;
     const next = [...ids];

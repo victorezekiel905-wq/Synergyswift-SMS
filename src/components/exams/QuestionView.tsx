@@ -285,15 +285,19 @@ function DragDrop({ items, zones, value, onChange, disabled }: { items: { id: st
 
 function Hotspot({ image, value, onChange, disabled }: { image: string | null; value: { x: number; y: number } | null; onChange: (v: { x: number; y: number }) => void; disabled?: boolean }) {
   if (!image) return <p className="text-sm text-slate-500">Image missing.</p>;
+  // The click is measured against the image alone (the caption sits outside), so the point
+  // matches the teacher's marked area.
   return (
-    <div className="relative inline-block max-w-full cursor-crosshair" onClick={e => {
-      if (disabled) return;
-      const r = e.currentTarget.getBoundingClientRect();
-      onChange({ x: Math.round(((e.clientX - r.left) / r.width) * 1000) / 10, y: Math.round(((e.clientY - r.top) / r.height) * 1000) / 10 });
-    }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={image} alt="Click the correct area" className="max-h-[460px] max-w-full select-none" draggable={false} />
-      {value && <span className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-rose-600 shadow" style={{ left: `${value.x}%`, top: `${value.y}%` }} />}
+    <div className="inline-block max-w-full">
+      <div className="relative inline-block max-w-full cursor-crosshair align-top" onClick={e => {
+        if (disabled) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        onChange({ x: Math.round(((e.clientX - r.left) / r.width) * 1000) / 10, y: Math.round(((e.clientY - r.top) / r.height) * 1000) / 10 });
+      }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={image} alt="Click the correct area" className="block max-h-[460px] max-w-full select-none" draggable={false} />
+        {value && <span className="pointer-events-none absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-rose-600 shadow" style={{ left: `${value.x}%`, top: `${value.y}%` }} />}
+      </div>
       <p className="mt-1 text-xs text-slate-500">Click on the image to place your answer.</p>
     </div>
   );

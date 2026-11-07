@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { RichText } from "@/live/components/RichText";
 import { Alert, Badge, Button, Spinner, useToast } from "@/live/components/ui";
 import { useNow } from "@/live/lib/hooks";
-import { sendOrQueue, useOfflineQueue } from "@/live/lib/offline-queue";
-import { errorText, rpc } from "@/live/lib/rpc";
+import { loadDrafts, recallStart, rememberStart, saveDrafts, sendOrQueue, useOfflineQueue } from "@/live/lib/offline-queue";
+import { ActionError, errorText, NETWORK, rpc } from "@/live/lib/rpc";
 import type { ActivitySettings, PublicQuestion } from "@/live/lib/types";
 import { cn, LOCALE } from "@/live/lib/utils";
 import { CollabBoard } from "./CollabBoard";
@@ -75,23 +75,73 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
   const liveTimer = live?.timer && live.timer.activity_id === activityId ? live.timer : null;
   const liveLeft = useSecondsLeft(liveTimer, live?.skew ?? 0);
   const timeUp = liveLeft !== null && liveLeft <= 0;
+  // Questions changed since they were last saved (or queued). Kept on the device as drafts while typing.
+  const [unsaved, setUnsaved] = useState<Set<string>>(() => new Set());
+  // No connection and no copy of this activity on the device yet: it opens when the connection is back.
+  const [offlineWait, setOfflineWait] = useState(false);
+  // Opened from the copy kept on this device (no connection at the time).
+  const [openedOffline, setOpenedOffline] = useState(false);
+  // Handed in while offline: the hand-in is queued behind the answers and sent when back online.
+  const [handInQueued, setHandInQueued] = useState(false);
+  const finishing = useRef(false);
+  const dataRef = useRef<Started | null>(null);
+  dataRef.current = data;
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
+  const unsavedRef = useRef(unsaved);
+  unsavedRef.current = unsaved;
+  const scope = `${activityId}:${sessionId ?? ""}:${assignmentId ?? ""}:${shareCode ?? ""}`;
 
   useEffect(() => {
     let live = true;
-    rpc<Started>("start_attempt", { p_activity: activityId, p_session: sessionId ?? null, p_assignment: assignmentId ?? null, p_share: shareCode ?? null })
+    const apply = (d: Started, fresh: boolean) => {
+      setData(d);
+      // Bring back anything typed on this device but not yet saved (reload, crash, no connection).
+      const drafts = loadDrafts<Answer>(d.attempt.id);
+      const restored: Record<string, Answer> = { ...(d.answers ?? {}) };
+      const changed = new Set<string>();
+      for (const [qid, v] of Object.entries(drafts)) {
+        if (d.locked?.[qid]?.revealed) continue; // the answer is final now
+        if (JSON.stringify(restored[qid]) !== JSON.stringify(v)) { restored[qid] = v; changed.add(qid); }
+      }
+      setAnswers(restored);
+      setUnsaved(changed);
+      // Restore which answers are final and which still have their second chance.
+      setFeedback(Object.fromEntries(Object.entries(d.locked ?? {}).map(([id, l]) => [id,
+        l.revealed ? { status: "auto_graded", is_correct: l.is_correct ?? undefined, final: true, tries: l.tries }
+                   : { status: "auto_graded", is_correct: false, second_chance: true, tries: l.tries }])));
+      setSkew(fresh ? new Date(d.attempt.server_now).getTime() - Date.now() : 0);
+      setOpenedOffline(!fresh);
+      setOfflineWait(false);
+      setErr(null);
+    };
+    const start = () => rpc<Started>("start_attempt", { p_activity: activityId, p_session: sessionId ?? null, p_assignment: assignmentId ?? null, p_share: shareCode ?? null }, { timeoutMs: 20_000 })
       .then((d) => {
         if (!live) return;
-        setData(d);
-        setAnswers(d.answers ?? {});
-        // Restore which answers are final and which still have their second chance.
-        setFeedback(Object.fromEntries(Object.entries(d.locked ?? {}).map(([id, l]) => [id,
-          l.revealed ? { status: "auto_graded", is_correct: l.is_correct ?? undefined, final: true, tries: l.tries }
-                     : { status: "auto_graded", is_correct: false, second_chance: true, tries: l.tries }])));
-        setSkew(new Date(d.attempt.server_now).getTime() - Date.now());
+        rememberStart(scope, userId, d);
+        apply(d, true);
       })
-      .catch((e) => live && setErr(errorText(e)));
-    return () => { live = false; };
+      .catch((e) => {
+        if (!live) return;
+        if (e instanceof ActionError && e.code === NETWORK) {
+          // No connection: open the copy kept on this device, or wait for the connection.
+          const kept = recallStart<Started>(scope, userId);
+          if (kept) apply(kept, false); else setOfflineWait(true);
+        } else setErr(errorText(e));
+      });
+    void start();
+    const retry = () => { if (live && !dataRef.current) void start(); };
+    window.addEventListener("online", retry);
+    const t = window.setInterval(retry, 20_000);
+    return () => { live = false; window.removeEventListener("online", retry); window.clearInterval(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activityId, sessionId, assignmentId, shareCode]);
+
+  // Autosave on the device while typing: every change is kept until it has been saved or queued.
+  useEffect(() => {
+    if (!data) return;
+    saveDrafts(data.attempt.id, Object.fromEntries([...unsaved].filter((id) => answers[id] !== undefined).map((id) => [id, answers[id]])));
+  }, [answers, unsaved, data]);
 
   useEffect(() => setShownAt(Date.now()), [index]);
 
@@ -106,6 +156,7 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
   }, [remaining]);
 
   if (err) return <Alert tone="warn">{err}</Alert>;
+  if (!data && offlineWait) return <Alert tone="warn" title="You're offline">This activity opens by itself as soon as you're back online.</Alert>;
   if (!data) return <div className="flex items-center gap-2 p-6 text-sm text-ink-500"><Spinner /> Loading activity…</div>;
 
   if (data.activity.kind === "collab_board") {
@@ -116,17 +167,24 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
   const q = questions[index];
   const settings = data.activity.settings ?? {};
 
-  async function save(question: PublicQuestion, override?: Answer) {
-    const response = override ?? answers[question.id];
-    if (!isAnswered(question, response)) { toast("Answer the question first.", "error"); return false; }
+  /** Marks a question saved, unless it was changed again while the save was on its way. */
+  function markSaved(questionId: string, response: Answer | undefined) {
+    if (JSON.stringify(answersRef.current[questionId]) !== JSON.stringify(response)) return;
+    setUnsaved((s) => { if (!s.has(questionId)) return s; const n = new Set(s); n.delete(questionId); return n; });
+  }
+
+  async function save(question: PublicQuestion, override?: Answer, silent = false) {
+    const response = override ?? answersRef.current[question.id];
+    if (!isAnswered(question, response)) { if (!silent) toast("Answer the question first.", "error"); return false; }
     setSaving(true);
     try {
       const r = await sendOrQueue<Feedback>("submit_answer", {
         p_attempt: data!.attempt.id, p_question: question.id, p_response: response, p_elapsed_ms: Date.now() - shownAt
       });
+      markSaved(question.id, response);
       if ("queued" in r) {
         setFeedback((f) => ({ ...f, [question.id]: { status: "queued", queued: true } }));
-        toast("You're offline. Your answer is saved on this device and will sync.", "info");
+        if (!silent) toast("You're offline. Your answer is saved on this device and will sync.", "info");
       } else {
         setFeedback((f) => ({ ...f, [question.id]: r }));
         if (live && r.is_correct === true) buzz("correct");
@@ -134,7 +192,7 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
       }
       return true;
     } catch (e) {
-      toast(errorText(e), "error");
+      if (!silent) toast(errorText(e), "error");
       return false;
     } finally {
       setSaving(false);
@@ -142,20 +200,50 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
   }
 
   async function finish() {
+    if (finishing.current) return;
+    finishing.current = true;
     setSaving(true);
     try {
-      const before = await rpc<Progress>("my_progress").catch(() => null);
-      const r = await rpc<Finished>("finish_attempt", { p_attempt: data!.attempt.id });
+      // Hand in everything typed but not yet saved first, so nothing is left behind.
+      for (const id of Array.from(unsavedRef.current)) {
+        const qq = data!.questions.find((x) => x.id === id);
+        if (qq && isAnswered(qq, answersRef.current[id], { reasoning: false })) await save(qq, answersRef.current[id], true);
+      }
+      const before = navigator.onLine ? await rpc<Progress>("my_progress", {}, { timeoutMs: 10_000 }).catch(() => null) : null;
+      // Offline (or a connection that never answers): queued behind the answers and sent when back online.
+      const r = await sendOrQueue<Finished>("finish_attempt", { p_attempt: data!.attempt.id });
+      if ("queued" in r) { setHandInQueued(true); onFinished?.(); return; }
       setFinished(r);
-      const after = await rpc<Progress>("my_progress").catch(() => null);
+      const after = await rpc<Progress>("my_progress", {}, { timeoutMs: 10_000 }).catch(() => null);
       if (before && after) {
         const had = new Set(before.badges.map((b) => b.badge));
         setReward({ xp: after.xp - before.xp, level: after.level, levelUp: after.level > before.level,
                     badges: after.badges.map((b) => b.badge).filter((b) => !had.has(b)) });
       }
       onFinished?.();
-    } catch (e) { toast(errorText(e), "error"); }
-    setSaving(false);
+    } catch (e) {
+      finishing.current = false; // the server refused: let the student try again
+      toast(errorText(e), "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (handInQueued) {
+    return (
+      <div className="card card-pad space-y-3">
+        <h3 className="text-lg font-bold">Handed in: {data.activity.title}</h3>
+        {pending > 0 ? (
+          <Alert tone="success" title="Saved on this device">
+            You're offline. Your answers and your hand-in are kept on this device and will be sent by themselves as soon as you're back online.
+            Don't sign out or clear this browser's data until then.
+          </Alert>
+        ) : (
+          <Alert tone="success">Everything has been sent to your teacher.</Alert>
+        )}
+        {pending > 0 && <Badge tone="amber">{pending} waiting to sync</Badge>}
+      </div>
+    );
   }
 
   if (finished) {
@@ -219,9 +307,11 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
     const pickedIds = picked?.option_ids ?? (picked?.option_id ? [picked.option_id] : []);
     const pickedIndex = q.options.findIndex((o) => o.id === pickedIds[0]);
     const pick = async (id: string) => {
+      setUnsaved((s) => new Set(s).add(q.id));
       if (multi) { setAnswers((a) => ({ ...a, [q.id]: { option_ids: pickedIds.includes(id) ? pickedIds.filter((x) => x !== id) : [...pickedIds, id] } })); return; }
       const response = { option_id: id };
       setAnswers((a) => ({ ...a, [q.id]: response }));
+      answersRef.current = { ...answersRef.current, [q.id]: response };
       setFeedback((f) => { const x = { ...f }; if (!x[q.id]?.second_chance) delete x[q.id]; return x; });
       if (await save(q, response) && index < questions.length - 1) window.setTimeout(() => setIndex((i) => Math.min(i + 1, questions.length - 1)), 1400);
     };
@@ -281,13 +371,17 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
           {showTimer && remaining !== null && <Badge tone={remaining < 30 && !supports.calm_mode ? "red" : "gray"}><Icon name="clock" className="h-3.5 w-3.5" /> {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</Badge>}
         </div>
       </div>
+      {openedOffline && (
+        <Alert tone="warn" title="You're offline">Opened from this device. Everything you type is kept here and sent when you're back online.</Alert>
+      )}
       {index === 0 && data.activity.instructions && <RichText text={data.activity.instructions} className="text-sm text-ink-600" />}
 
       <Prompt q={q} readAloud={supports.read_aloud ? "emphasis" : "offer"} />
       {timeUp && !fb && <Alert tone="warn" title="Time's up!">Answers are closed for this question.</Alert>}
-      <QuestionInput q={q} value={answers[q.id]} disabled={locked || (timeUp && !fb)}
+      <QuestionInput key={q.id} q={q} value={answers[q.id]} disabled={locked || (timeUp && !fb)}
         onChange={(v) => {
           setAnswers((a) => ({ ...a, [q.id]: v }));
+          setUnsaved((s) => (s.has(q.id) ? s : new Set(s).add(q.id)));
           // Changing an answer clears "saved"; a pending second chance stays so the retry is counted.
           setFeedback((f) => { if (f[q.id]?.second_chance) return f; const n = { ...f }; delete n[q.id]; return n; });
         }}
@@ -303,6 +397,9 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
       )}
       {fb?.points && !fb.second_chance && <PointsLine p={fb.points} />}
       {fb && (fb.status === "pending_review" || fb.status === "ungraded" || (fb.status === "auto_graded" && fb.is_correct === undefined)) && <Alert tone="success">Answer saved.</Alert>}
+      {unsaved.has(q.id) && !locked && (
+        <p className="hint" role="status">Kept on this device as you type. It's handed in when you press Save answer, Next or Submit.</p>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-2">
@@ -310,9 +407,9 @@ export function ActivityPlayer({ activityId, sessionId, assignmentId, shareCode,
           {!locked && <Button variant="secondary" loading={saving} onClick={() => save(q)}>{fb?.second_chance ? "Try again" : fb ? "Update answer" : "Save answer"}</Button>}
         </div>
         {index < questions.length - 1 ? (
-          <Button onClick={async () => { if (!fb && isAnswered(q, answers[q.id])) await save(q); setIndex(index + 1); }}>Next</Button>
+          <Button onClick={async () => { if (unsaved.has(q.id) && isAnswered(q, answers[q.id])) await save(q); setIndex(index + 1); }}>Next</Button>
         ) : (
-          <Button loading={saving} onClick={async () => { if (!fb && isAnswered(q, answers[q.id]) && !(await save(q))) return; await finish(); }}>
+          <Button loading={saving} onClick={async () => { if (unsaved.has(q.id) && isAnswered(q, answers[q.id]) && !(await save(q))) return; await finish(); }}>
             Submit{settings.attempts_allowed && settings.attempts_allowed > 1 ? ` (attempt ${data.attempt.attempt_no} of ${settings.attempts_allowed})` : ""}
           </Button>
         )}

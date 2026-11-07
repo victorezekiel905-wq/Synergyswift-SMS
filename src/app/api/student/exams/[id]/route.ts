@@ -178,12 +178,30 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     return NextResponse.json({ status: lock ? "locked" : attempt.status, violations, limit });
   }
 
-  if (attempt.status === "submitted" || attempt.status === "graded") return jsonError("this exam has been submitted", 409);
-  if (attempt.status === "locked" && b.action === "save") return NextResponse.json({ status: "locked" }, { status: 423 });
-  if (Date.now() > new Date(attempt.deadline_at).getTime() + GRACE_MS) return jsonError("time is up", 409);
-
   const incoming = (b.action === "save" ? b.answers : b.answers) ?? {};
   const valid = new Set(questionsForAttempt(questions, attempt).map(q => q.id));
+
+  // Answers that arrive after the exam was handed in or time ran out (typically typed
+  // while offline) are not counted, but they are never thrown away: they are kept in the
+  // attempt's log for the teacher to see, and the student is told.
+  const keepLate = async (reason: string) => {
+    const late = Object.fromEntries(Object.entries(incoming).filter(([k]) => valid.has(k)));
+    if (!Object.keys(late).length) return false;
+    const text = JSON.stringify(late);
+    if (text.length > 500_000) return false;
+    const { error } = await svc.from("exam_events").insert({ attempt_id: attempt.id, kind: "late_answers", meta: { reason, answers: late, questions: Object.keys(late).length } });
+    return !error;
+  };
+  if (attempt.status === "submitted" || attempt.status === "graded") {
+    const kept = await keepLate("after_submit");
+    return NextResponse.json({ error: "this exam has been submitted", status: attempt.status, late_kept: kept }, { status: 409 });
+  }
+  if (attempt.status === "locked" && b.action === "save") return NextResponse.json({ status: "locked" }, { status: 423 });
+  if (Date.now() > new Date(attempt.deadline_at).getTime() + GRACE_MS) {
+    const kept = await keepLate("after_time");
+    return NextResponse.json({ error: "time is up", status: attempt.status, late_kept: kept }, { status: 409 });
+  }
+
   const merged: Record<string, unknown> = { ...(attempt.answers ?? {}) };
   for (const [k, v] of Object.entries(incoming)) if (valid.has(k)) merged[k] = v;
   if (JSON.stringify(merged).length > 500_000) return jsonError("answers are too large", 413);

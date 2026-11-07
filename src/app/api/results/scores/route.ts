@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
 import { schemeFor, subjectPartsFor } from "@/lib/school";
+import { fetchAll } from "@/lib/results";
 
 /** Score sheet for one term × class group × subject. */
 export async function GET(req: NextRequest) {
@@ -21,12 +22,14 @@ export async function GET(req: NextRequest) {
     ctx.sb.from("class_groups").select("form_teacher_id").eq("tenant_id", tid).eq("id", cg).maybeSingle()
   ]);
   const ids = (students ?? []).map((s: { id: string }) => s.id);
-  const { data: scores } = ids.length
-    ? await ctx.sb.from("score_entries").select("student_id,component_id,score,source,updated_at")
-        .eq("tenant_id", tid).eq("term_id", termId).eq("subject_id", subj).in("student_id", ids)
-    : { data: [] };
+  // Read in pages: the API returns at most 1,000 rows a request, and a big class can have more.
+  const scores = ids.length
+    ? await fetchAll<{ student_id: string; component_id: string; score: number | null }>(() =>
+        ctx.sb.from("score_entries").select("id,student_id,component_id,score,source,updated_at")
+          .eq("tenant_id", tid).eq("term_id", termId).eq("subject_id", subj).in("student_id", ids).order("id"))
+    : [];
   const grid: Record<string, Record<string, number | null>> = {};
-  for (const s of scores ?? []) (grid[s.student_id] ??= {})[s.component_id] = s.score === null ? null : Number(s.score);
+  for (const s of scores) (grid[s.student_id] ??= {})[s.component_id] = s.score === null ? null : Number(s.score);
 
   const isAdmin = hasAny(ctx, ROLES.admin);
   const teaches = isAdmin || offering?.teacher_id === ctx.userId || group?.form_teacher_id === ctx.userId;

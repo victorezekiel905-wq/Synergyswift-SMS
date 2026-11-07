@@ -29,8 +29,17 @@ export type CardKind = "term" | "midterm";
 
 type TermRow = { id: string; session_id: string; position: number; starts_on: string | null; ends_on: string | null; next_term_begins: string | null };
 
+/** The calendar day (YYYY-MM-DD) a moment falls on in the school's own time zone. */
+function schoolDay(at: string, timezone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(at));
+  } catch {
+    return String(at).slice(0, 10); // unknown time zone: UTC day
+  }
+}
+
 /** Days each child was in school this term: the class register when it was taken, else gate sign-ins. */
-async function termAttendance(sb: any, tenantId: string, term: TermRow, studentIds: string[]) {
+async function termAttendance(sb: any, tenantId: string, term: TermRow, studentIds: string[], timezone = "UTC") {
   const present = new Map<string, number>();
   const register = new Map<string, { present: number; absent: number; opened: number }>();
   if (!term.starts_on) return { present, register, known: false };
@@ -41,7 +50,8 @@ async function termAttendance(sb: any, tenantId: string, term: TermRow, studentI
   const days = new Map<string, Set<string>>();
   for (const e of ev) {
     if (!days.has(e.student_id)) days.set(e.student_id, new Set());
-    days.get(e.student_id)!.add(String(e.at).slice(0, 10));
+    // Counted by the school's day: a 00:30 sign-in in Lagos is that day, not the UTC day before.
+    days.get(e.student_id)!.add(schoolDay(e.at, timezone));
   }
   days.forEach((v, k) => present.set(k, v.size));
   // The class register is the official record when it has been taken: it wins over gate sign-ins.
@@ -67,7 +77,7 @@ const attendanceFor = (a: Awaited<ReturnType<typeof termAttendance>>, sid: strin
  * Preschool report cards (migration 9200): each child's ratings against the school's
  * checklist and a comment per area. No scores, totals or positions.
  */
-async function compileEarlyYears(sb: any, tenantId: string, termId: string, classGroupId: string, opts: { force?: boolean }) {
+async function compileEarlyYears(sb: any, tenantId: string, termId: string, classGroupId: string, opts: { force?: boolean; timezone?: string }) {
   const [{ data: students }, { data: group }, { data: term }, { data: areas, error: aErr }, { data: items }, { data: settings }] = await Promise.all([
     sb.from("students").select("id,first_name,last_name,other_names,admission_no").eq("tenant_id", tenantId).eq("class_group_id", classGroupId).eq("status", "active"),
     sb.from("class_groups").select("id,name,level,form_teacher_id,users!class_groups_form_teacher_id_fkey(full_name)").eq("tenant_id", tenantId).eq("id", classGroupId).maybeSingle(),
@@ -89,7 +99,7 @@ async function compileEarlyYears(sb: any, tenantId: string, termId: string, clas
       .eq("tenant_id", tenantId).eq("term_id", termId).in("student_id", studentIds).order("student_id").order("item_id")),
     fetchAll<{ student_id: string; area_id: string; comment: string }>(() => sb.from("early_years_comments").select("student_id,area_id,comment")
       .eq("tenant_id", tenantId).eq("term_id", termId).in("student_id", studentIds).order("student_id").order("area_id")),
-    termAttendance(sb, tenantId, term as TermRow, studentIds)
+    termAttendance(sb, tenantId, term as TermRow, studentIds, opts.timezone)
   ]);
   const rating = new Map(ratings.map(r => [`${r.student_id}|${r.item_id}`, r.rating]));
   const comment = new Map(comments.map(c => [`${c.student_id}|${c.area_id}`, c.comment]));
@@ -138,7 +148,7 @@ async function compileEarlyYears(sb: any, tenantId: string, termId: string, clas
   return { computed: rows.length, skipped_published: studentIds.length - rows.length };
 }
 
-export async function compileClassResults(sb: any, tenantId: string, termId: string, classGroupId: string, opts: { force?: boolean; kind?: CardKind } = {}) {
+export async function compileClassResults(sb: any, tenantId: string, termId: string, classGroupId: string, opts: { force?: boolean; kind?: CardKind; timezone?: string } = {}) {
   const kind: CardKind = opts.kind ?? "term";
   const fullScheme = await schemeFor(sb, tenantId, classGroupId);
   if (!fullScheme) throw new Error("no grading scheme configured");
@@ -192,7 +202,7 @@ export async function compileClassResults(sb: any, tenantId: string, termId: str
   const results = computeClassResults({ studentIds, subjects, scores, scheme, partsFor: ownFor });
   const d = scheme.decimals ?? 1;
 
-  const attendance = await termAttendance(sb, tenantId, term as TermRow, studentIds);
+  const attendance = await termAttendance(sb, tenantId, term as TermRow, studentIds, opts.timezone);
   // Character and skills ratings for the report card.
   const { data: traitDefs } = await sb.from("trait_definitions").select("id,domain,name,position").eq("tenant_id", tenantId).order("position");
   // The school's own rating scale, kept with each card so old cards still read right if it changes (8400).

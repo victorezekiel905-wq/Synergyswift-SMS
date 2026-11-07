@@ -20,7 +20,9 @@ const keyFor = (url: string) => {
 export function claimDevice(userId: string) {
   try {
     const prev = localStorage.getItem(OWNER_KEY);
-    if (prev && prev !== userId) Object.keys(localStorage).filter(k => k.startsWith(PREFIX)).forEach(k => localStorage.removeItem(k));
+    // Someone else signed in: remove the previous person's offline copies of pages and activities.
+    // (Their unsent answers and drafts stay: they are only sent when that person signs in again.)
+    if (prev && prev !== userId) Object.keys(localStorage).filter(k => k.startsWith(PREFIX) || k.startsWith("sc:started:v1:")).forEach(k => localStorage.removeItem(k));
     localStorage.setItem(OWNER_KEY, userId);
   } catch { /* storage blocked */ }
 }

@@ -14,7 +14,9 @@ const CACHE = "educlass-static-v4";
 // views keep their own copy on the device (removed on sign-out).
 const PAGES = "educlass-pages-v1";
 const OFFLINE_PAGES = ["/school/attendance", "/student", "/teacher", "/parent"];
-const offlinePage = (path) => OFFLINE_PAGES.includes(path) || /^\/g\/[^/]+$/.test(path);
+// The exam room (/exam/<id>) too: its page holds no data, and the exam in progress is kept on the
+// device, so a student who reloads without a connection carries on writing.
+const offlinePage = (path) => OFFLINE_PAGES.includes(path) || /^\/g\/[^/]+$/.test(path) || /^\/exam\/[^/]+$/.test(path);
 const OFFLINE_HTML = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title>
 <style>body{font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#f8fafc;color:#0f172a;text-align:center;padding:24px}</style></head>
 <body><div><h1>You are offline</h1><p>Check your connection and try again. Exam answers you typed are kept on this device and will be sent when you reconnect.</p>

@@ -308,7 +308,7 @@ export function AudioAnswer({ maxSeconds, value, disabled, onUpload, playUrl }: 
     const t = setInterval(() => {
       const s = Math.floor((Date.now() - started.current) / 1000);
       setSecs(s);
-      if (s >= maxSeconds) rec.stop();
+      if (s >= maxSeconds && rec.state !== "inactive") rec.stop();
     }, 250);
     return () => clearInterval(t);
   }, [rec, maxSeconds]);
@@ -345,7 +345,7 @@ export function AudioAnswer({ maxSeconds, value, disabled, onUpload, playUrl }: 
       {!disabled && (
         <div className="flex flex-wrap items-center gap-3">
           {rec
-            ? <button type="button" className="btn bg-rose-600 text-white hover:bg-rose-700" onClick={() => rec.stop()}>Stop recording</button>
+            ? <button type="button" className="btn bg-rose-600 text-white hover:bg-rose-700" onClick={() => { if (rec.state !== "inactive") rec.stop(); }}>Stop recording</button>
             : <button type="button" className="btn btn-primary" disabled={busy} onClick={start}>{value?.name ? "Record again" : "Start recording"}</button>}
           <span className="font-mono text-sm tabular-nums">{rec ? `● ${secs}s / ${maxSeconds}s` : busy ? "Saving…" : value?.name ? "Saved" : `Up to ${maxSeconds} seconds`}</span>
         </div>
