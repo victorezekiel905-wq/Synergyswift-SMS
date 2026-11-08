@@ -435,6 +435,8 @@ export function validateQuestion(q: Pick<Question, "type" | "prompt" | "points" 
     case "mcq_multi":
       if ((d.options ?? []).length < 2) p.push("Add at least two options.");
       if (!(a.correct ?? []).length) p.push("Mark at least one correct option.");
+      // A ticked answer that was then removed would make full marks impossible.
+      if ((a.correct ?? []).some((id: string) => !(d.options ?? []).some((o: Option) => o.id === id))) p.push("A correct answer you ticked has been removed. Tick the correct options again.");
       break;
     case "true_false":
       if (typeof a.correct !== "boolean") p.push("Choose True or False as the answer.");
@@ -443,20 +445,30 @@ export function validateQuestion(q: Pick<Question, "type" | "prompt" | "points" 
       if (!(a.accepted ?? []).filter((x: string) => x.trim()).length) p.push("Add at least one accepted answer.");
       break;
     case "numeric":
-      if (!Number.isFinite(Number(a.value))) p.push("Enter the correct numeric value.");
+      if (a.value === null || a.value === undefined || a.value === "" || !Number.isFinite(Number(a.value))) p.push("Enter the correct numeric value.");
       break;
     case "fill_blanks": {
       const n = countBlanks(d.text ?? "");
       if (!n) p.push("Mark blanks in the text with [[answer]].");
       if ((a.blanks ?? []).length !== n) p.push("Every blank needs accepted answers.");
+      else if ((a.blanks ?? []).some((b: string[]) => !(b ?? []).some(x => String(x).trim()))) p.push("A blank is empty: write the answer inside the brackets, like [[Paris]].");
       break;
     }
-    case "matching":
-      if ((d.left ?? []).length < 2) p.push("Add at least two pairs.");
+    case "matching": {
+      const left: Option[] = d.left ?? [], right: Option[] = d.right ?? [];
+      if (left.length < 2) p.push("Add at least two pairs.");
+      if (left.some(l => !String(l.text ?? "").trim() || !String(right.find(r => r.id === a.pairs?.[l.id])?.text ?? "").trim()))
+        p.push("Fill in both sides of every pair.");
       break;
-    case "ordering":
-      if ((d.items ?? []).length < 2) p.push("Add at least two items.");
+    }
+    case "ordering": {
+      const ids: string[] = (d.items ?? []).map((i: Option) => i.id);
+      if (ids.length < 2) p.push("Add at least two items.");
+      if ((d.items ?? []).some((i: Option) => !String(i.text ?? "").trim())) p.push("Every item needs some text.");
+      const order: string[] = a.order ?? [];
+      if (order.length !== ids.length || ids.some(id => !order.includes(id))) p.push("The correct order is missing an item. Save the question again.");
       break;
+    }
     case "hotspot":
       if (!d.image_url) p.push("Add an image URL.");
       if (!(a.regions ?? []).length) p.push("Draw at least one correct region.");

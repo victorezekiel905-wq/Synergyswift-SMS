@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, denyUnless } from "@/lib/auth";
-import { validateQuestion, countBlanks, QUESTION_TYPES, type QuestionType } from "@/lib/exams/engine";
+import { validateQuestion, QUESTION_TYPES, type QuestionType } from "@/lib/exams/engine";
 import { TOOL_IDS } from "@/lib/exams/tools";
 import { randomToken } from "@/lib/crypto";
 import { isValidIpRule } from "@/lib/net";
@@ -97,8 +97,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const q = parsed.data;
   const { data: exam } = await ctx.sb.from("exams").select("id").eq("tenant_id", ctx.tenant.id).eq("id", params.id).maybeSingle();
   if (!exam) return jsonError("exam not found", 404);
-  if (q.type === "fill_blanks" && (q.answer.blanks ?? []).length !== countBlanks(q.data.text ?? "")) {
-    // derive accepted answers from [[a|b]] markers when the client did not send them
+  if (q.type === "fill_blanks") {
+    // The accepted answers are always read from the [[a|b]] markers in the passage. Re-reading them
+    // only when the number of blanks changed kept the OLD answers after a teacher corrected one.
     const blanks: string[][] = [];
     String(q.data.text ?? "").replace(/\[\[([^\]]*)\]\]/g, (_m, inner: string) => { blanks.push(inner.split("|").map(s => s.trim()).filter(Boolean)); return ""; });
     q.answer = { ...q.answer, blanks };

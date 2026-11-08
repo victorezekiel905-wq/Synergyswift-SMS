@@ -52,7 +52,42 @@ export function blankQuestion(kind: QuestionKind, position = 0): EditableQuestio
 type SaveContext = { tenantId: string; ownerId: string; activityId: string | null };
 const OPTION_KINDS: QuestionKind[] = ["mcq", "multi_select", "true_false", "poll"];
 
-function questionRow(q: EditableQuestion, ctx: SaveContext) {
+const hasText = (x: { label?: string } | undefined) => Boolean(x?.label?.trim());
+
+/**
+ * What is actually saved: empty options, items, pairs and groups are dropped, so students never
+ * see a blank choice, and the answer key only refers to what is left.
+ */
+export function cleanQuestion(q: EditableQuestion): EditableQuestion {
+  const c = { ...q, config: { ...q.config }, answer_key: { ...q.answer_key } };
+  if (q.kind === "mcq" || q.kind === "multi_select" || q.kind === "poll") c.options = q.options.filter((o) => o.label.trim());
+  if (q.kind === "ordering") c.config.items = ((q.config.items as Item[]) ?? []).filter(hasText);
+  if (q.kind === "matching") {
+    const left = (q.config.left as Item[]) ?? [], right = (q.config.right as Item[]) ?? [];
+    const rows = left.map((l, i) => ({ l, r: right[i] ?? { id: `r${l.id}`, label: "" } })).filter((x) => hasText(x.l) || hasText(x.r));
+    c.config.left = rows.map((x) => x.l);
+    c.config.right = rows.map((x) => x.r);
+    c.answer_key = { pairs: Object.fromEntries(rows.map((x) => [x.l.id, x.r.id])) };
+  }
+  if (q.kind === "categorize") {
+    const cats = ((q.config.categories as Item[]) ?? []).filter(hasText);
+    const items = ((q.config.items as Item[]) ?? []).filter(hasText);
+    const placed = (q.answer_key.placements as Record<string, string>) ?? {};
+    c.config.categories = cats;
+    c.config.items = items;
+    c.answer_key = { placements: Object.fromEntries(items.filter((i) => cats.some((k) => k.id === placed[i.id])).map((i) => [i.id, placed[i.id]!])) };
+  }
+  if (q.kind === "fill_blank") {
+    // One list of accepted answers per ___ in the prompt: extra lists (a blank was removed) would make full marks impossible.
+    const n = (q.prompt.match(/_{3,}/g) ?? []).length;
+    const blanks = ((q.answer_key.blanks as string[][] | undefined) ?? []).slice(0, n);
+    c.answer_key = { ...q.answer_key, blanks };
+  }
+  return c;
+}
+
+function questionRow(raw: EditableQuestion, ctx: SaveContext) {
+  const q = cleanQuestion(raw);
   let config = q.config, key = q.answer_key;
   if (q.kind === "ordering") {
     const items = (q.config.items as Item[]) ?? [];
@@ -72,6 +107,7 @@ function questionRow(q: EditableQuestion, ctx: SaveContext) {
 /** Saves many new questions at once (an import): the questions, then all their options. */
 export async function saveQuestions(qs: EditableQuestion[], ctx: SaveContext): Promise<void> {
   if (!qs.length) return;
+  qs = qs.map(cleanQuestion);
   const sb = createClient();
   const { data, error } = await sb.from("questions").insert(qs.map((q) => questionRow(q, ctx))).select("id,position");
   if (error) throw new Error(error.message);
@@ -90,7 +126,8 @@ export async function saveQuestions(qs: EditableQuestion[], ctx: SaveContext): P
 }
 
 /** Persist a question and diff its options so existing answers keep valid option ids. */
-export async function saveQuestion(q: EditableQuestion, ctx: SaveContext): Promise<string> {
+export async function saveQuestion(raw: EditableQuestion, ctx: SaveContext): Promise<string> {
+  const q = cleanQuestion(raw);
   const sb = createClient();
   const row = questionRow(q, ctx);
   const { data, error } = q.id
@@ -115,15 +152,28 @@ export async function saveQuestion(q: EditableQuestion, ctx: SaveContext): Promi
   return qid;
 }
 
-export function validateQuestion(q: EditableQuestion): string | null {
+export function validateQuestion(raw: EditableQuestion): string | null {
+  // Checked as it will be saved (blank options, items and pairs dropped).
+  const q = cleanQuestion(raw);
   if (!q.prompt.trim()) return "Write the question prompt.";
-  if (["mcq", "true_false"].includes(q.kind) && q.options.filter((o) => o.is_correct).length !== 1) return "Mark exactly one correct option.";
-  if (q.kind === "multi_select" && !q.options.some((o) => o.is_correct)) return "Mark at least one correct option.";
-  if (["mcq", "multi_select", "poll"].includes(q.kind) && q.options.filter((o) => o.label.trim()).length < 2) return "Add at least two options.";
-  if (q.kind === "fill_blank" && !/_{3,}/.test(q.prompt)) return "Use ___ (three underscores) in the prompt to mark each blank.";
+  if (["mcq", "multi_select", "poll"].includes(q.kind) && q.options.length < 2) return "Add at least two options.";
+  if (["mcq", "true_false"].includes(q.kind) && q.options.filter((o) => o.is_correct).length !== 1)
+    return raw.options.some((o) => o.is_correct && !o.label.trim()) ? "The option marked correct is empty. Type it, or mark another one." : "Mark exactly one correct option.";
+  if (q.kind === "multi_select" && !q.options.some((o) => o.is_correct)) return "Mark at least one correct option (with some text).";
+  if (q.kind === "fill_blank") {
+    const n = (q.prompt.match(/_{3,}/g) ?? []).length;
+    if (!n) return "Use ___ (three underscores) in the prompt to mark each blank.";
+    const blanks = (q.answer_key.blanks as string[][] | undefined) ?? [];
+    const missing = Array.from({ length: n }, (_, i) => i).find((i) => !(blanks[i] ?? []).some((s) => s.trim()));
+    if (missing !== undefined) return `Give the accepted answer for blank ${missing + 1}.`;
+  }
   const filled = (xs: unknown) => ((xs as Item[] | undefined) ?? []).filter((x) => x.label.trim());
   if (q.kind === "ordering" && filled(q.config.items).length < 2) return "Add at least two items to put in order.";
-  if (q.kind === "matching" && (filled(q.config.left).length < 2 || filled(q.config.right).length < filled(q.config.left).length)) return "Fill in at least two pairs.";
+  if (q.kind === "matching") {
+    const left = (q.config.left as Item[]) ?? [], right = (q.config.right as Item[]) ?? [];
+    if (left.length < 2) return "Fill in at least two pairs.";
+    if (left.some((l, i) => !hasText(l) || !hasText(right[i]))) return "Fill in both sides of every pair.";
+  }
   if (q.kind === "categorize") {
     const items = filled(q.config.items), placed = (q.answer_key.placements as Record<string, string>) ?? {};
     if (filled(q.config.categories).length < 2) return "Name at least two groups.";

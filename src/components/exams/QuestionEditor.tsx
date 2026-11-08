@@ -93,7 +93,12 @@ export default function QuestionEditor({ initial, onSave, onCancel, extra }: { i
       out = { ...q, answer: { ...q.answer, accepted: (q.answer.accepted ?? []).map((s: string) => s.trim()).filter(Boolean) } };
     }
     if (q.type === "mcq_single" || q.type === "mcq_multi") {
-      out = { ...q, data: { options: (q.data.options ?? []).filter((o: { text: string }) => o.text.trim()) } };
+      // Blank options are dropped, and a ticked answer only counts if its option is still there.
+      const options = (q.data.options ?? []).filter((o: { text: string }) => o.text.trim());
+      const has = (id: unknown) => options.some((o: { id: string }) => o.id === id);
+      const correct = q.type === "mcq_single" ? (has(q.answer.correct) ? q.answer.correct : null)
+        : (q.answer.correct ?? []).filter((id: string) => has(id));
+      out = { ...q, data: { options }, answer: { ...q.answer, correct } };
     }
     if (q.type === "math") {
       out = { ...q, answer: { ...q.answer, expression: String(q.answer.expression ?? "").trim(), alternatives: (q.answer.alternatives ?? []).map((s: string) => s.trim()).filter(Boolean) } };
@@ -164,8 +169,9 @@ export default function QuestionEditor({ initial, onSave, onCancel, extra }: { i
 
       {q.type === "numeric" && (
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Correct value"><input className="input" type="number" step="any" value={q.answer.value} onChange={e => setAnswer({ value: Number(e.target.value) })} /></Field>
-          <Field label="Tolerance (±)"><input className="input" type="number" step="any" min={0} value={q.answer.tolerance} onChange={e => setAnswer({ tolerance: Number(e.target.value) })} /></Field>
+          {/* An emptied box means "not set", never 0 (which would make 0 the correct answer). */}
+          <Field label="Correct value"><input className="input" type="number" step="any" value={q.answer.value ?? ""} onChange={e => setAnswer({ value: e.target.value === "" ? null : Number(e.target.value) })} /></Field>
+          <Field label="Tolerance (±)"><input className="input" type="number" step="any" min={0} value={q.answer.tolerance ?? ""} onChange={e => setAnswer({ tolerance: e.target.value === "" ? 0 : Number(e.target.value) })} /></Field>
           <Field label="Unit shown to students"><input className="input" value={q.data.unit ?? ""} onChange={e => setData({ unit: e.target.value })} /></Field>
           <div className="sm:col-span-3"><NumericExtras q={q} setAnswer={setAnswer} /></div>
         </div>
