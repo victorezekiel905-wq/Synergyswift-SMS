@@ -25,10 +25,29 @@ export default async function ({ q, as, expectError, check, U, T }) {
   });
   check("the student can post on it", posted === true, posted);
 
+  // Guests (joined with the code and a name, an anonymous sign-in) use the board like students.
+  const GUEST = "f7000000-0000-0000-0000-0000000000b4", STRANGER = "f7000000-0000-0000-0000-0000000000b5";
+  await q(`insert into auth.users (id, is_anonymous) values ('${GUEST}', true), ('${STRANGER}', true)`);
+  await q(`insert into live.users (id, tenant_id, email, full_name, role) values ('${GUEST}', '${T.A}', '', 'Sam Guest', 'guest'), ('${STRANGER}', '${T.A}', '', 'Not Here', 'guest')`);
+  await q(`insert into live.session_guests (session_id, user_id, tenant_id, display_name) values ('${SESSION}', '${GUEST}', '${T.A}', 'Sam Guest')`);
+  const guestBoard = await call(GUEST);
+  check("a guest in the lesson opens the same board", guestBoard?.id === first.id, guestBoard);
+  const guestPosted = await as(GUEST, async () => {
+    try { await q(`insert into live.collab_posts (tenant_id, board_id, author_id, body) values ('${T.A}', '${first.id}', '${GUEST}', 'A guest idea')`); return true; }
+    catch (e) { return e.message; }
+  });
+  check("…and can post on it", guestPosted === true, guestPosted);
+  const guestSees = await as(GUEST, async () => (await q(`select count(*)::int n from live.collab_posts where board_id = '${first.id}'`))[0].n);
+  check("…and sees everyone's posts", guestSees === 2, guestSees);
+  await expectError("a guest from another lesson cannot open it", STRANGER, `select live.ensure_collab_board('${ACT}', '${SESSION}')`, /not found/i);
+
   await expectError("someone from another school cannot open it", U.adminB, `select live.ensure_collab_board('${ACT}', '${SESSION}')`, /not found/i);
   await expectError("only a collaborative-board activity gets a board", teacher, `select live.ensure_collab_board('${QUIZ}', '${SESSION}')`, /not a collaborative board/);
 
   await q(`delete from live.collab_boards where session_id = '${SESSION}'`);
   await q(`delete from live.activities where id in ('${ACT}', '${QUIZ}')`);
+  await q(`delete from live.session_guests where session_id = '${SESSION}'`);
   await q(`delete from live.class_sessions where id = '${SESSION}'`);
+  await q(`delete from live.users where id in ('${GUEST}', '${STRANGER}')`);
+  await q(`delete from auth.users where id in ('${GUEST}', '${STRANGER}')`);
 }
