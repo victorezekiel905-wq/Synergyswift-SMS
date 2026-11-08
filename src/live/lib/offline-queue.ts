@@ -42,6 +42,11 @@ async function currentUid(): Promise<string | null> {
   try { return (await createClient().auth.getSession()).data.session?.user.id ?? null; } catch { return null; }
 }
 
+/** The last person the app saw signed in on this device (set by the app shell); a fallback when the local session has lapsed. */
+function deviceOwner(): string | null {
+  try { return localStorage.getItem("educlass:owner"); } catch { return null; }
+}
+
 // A request that never reached the server (queue and retry), as opposed to the
 // server refusing it (report). Messages are made human-readable, so use the code.
 function isNetworkError(e: unknown) {
@@ -58,6 +63,9 @@ export function flushQueue(onRejected?: (job: Job, message: string) => void): Pr
     if (!uid) return; // signed out: keep everything until someone signs in
     for (const job of read()) {
       if (job.uid && job.uid !== uid) continue; // another person's work on this device
+      // Saved without knowing who wrote it (older version, or the session had lapsed): only sent
+      // for the person this device belongs to, never for whoever happens to sign in next.
+      if (!job.uid && deviceOwner() !== uid) continue;
       try {
         await rpc(job.fn, job.args, { timeoutMs: SEND_TIMEOUT_MS });
         write(read().filter((j) => j.id !== job.id));
@@ -90,7 +98,7 @@ export async function sendOrQueue<T>(fn: string, args: Record<string, unknown>):
       if (!isNetworkError(e)) throw e;
     }
   }
-  const uid = await currentUid();
+  const uid = (await currentUid()) ?? deviceOwner();
   // Replace an older queued answer to the same question (finish_attempt has no question: one per attempt).
   const key = JSON.stringify([fn, args.p_attempt, args.p_question]);
   const jobs = read().filter((j) => JSON.stringify([j.fn, j.args.p_attempt, j.args.p_question]) !== key);

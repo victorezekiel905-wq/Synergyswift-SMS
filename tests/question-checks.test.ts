@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validateQuestion, markQuestion, type Question } from "@/lib/exams/engine";
+import { tidyPastedQuestions, splitInlineOptions } from "@/lib/question-paste";
 import { cleanQuestion, validateQuestion as validateLive, blankQuestion, type EditableQuestion } from "@/live/components/activities/QuestionEditor";
 
 const q = (over: Partial<Question>): Question => ({ id: "q", type: "mcq_single", prompt: "Q?", points: 2, data: {}, answer: {}, ...over });
@@ -32,6 +33,19 @@ describe("exam questions: an answer key students can actually match", () => {
   it("a numeric question with no correct value is refused, not marked as 0", () => {
     expect(validateQuestion(q({ type: "numeric", answer: { value: null } })).join(" ")).toMatch(/numeric value/);
     expect(validateQuestion(q({ type: "numeric", answer: { value: 0 } }))).toEqual([]);
+  });
+});
+
+describe("pasting questions", () => {
+  it("a star before the right option is removed, so students don't see it", () => {
+    const out = tidyPastedQuestions("1. Which planet is closest to the Sun?\na) Venus\nb) *Mercury\nc) Earth");
+    expect(out).toContain("Answer: B");
+    expect(out).not.toContain("*Mercury");
+    expect(out).toMatch(/b\) Mercury/);
+  });
+  it("a question in parts is not turned into multiple choice", () => {
+    expect(splitInlineOptions("1. Define (a) osmosis (b) diffusion")).toBeNull();
+    expect(splitInlineOptions("How many states does Nigeria have? (a) 30 (b) 36")).not.toBeNull();
   });
 });
 

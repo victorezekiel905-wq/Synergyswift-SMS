@@ -35,6 +35,14 @@ export function CollabBoard({ activityId, sessionId, title, tenantId, userId, ma
     (async () => {
       const sb = createClient();
       if (sessionId) {
+        // Set up once (the first person to open it creates it); after that just re-read the row
+        // for Lock / Unlock, instead of a locking database call from every student every 5 seconds.
+        if (refresh > 0) {
+          const { data } = await sb.from("collab_boards").select("id,title,locked,anonymous,owner_id")
+            .eq("activity_id", activityId).eq("session_id", sessionId).order("created_at").limit(1);
+          if (!live) return;
+          if (data?.[0]) { setBoard(data[0] as Board); return; }
+        }
         const { data, error } = await sb.rpc("ensure_collab_board", { p_activity: activityId, p_session: sessionId });
         if (!live) return;
         if (error) { if (refresh === 0) toast(error.message, "error"); return; }

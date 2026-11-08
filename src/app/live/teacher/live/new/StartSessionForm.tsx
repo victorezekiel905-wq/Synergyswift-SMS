@@ -86,14 +86,18 @@ export function StartSessionForm({ classes, lessons, envs, defaultClass, default
         <Button size="lg" loading={busy} onClick={async () => {
           if (monitoring && lockdown === null) { setErr("Choose Lockdown on or Lockdown off first."); return; }
           setBusy(true); setErr(null);
+          let s: { id: string };
           try {
-            const s = await rpc<{ id: string }>("start_session", { p_class: cls || null, p_lesson: lesson || null, p_mode: mode, p_title: title || null, p_environment: monitoring ? env || null : null });
-            // The engine starts a lesson locked when the school has monitoring; apply the teacher's choice.
-            if (monitoring) await rpc("set_session_lockdown", { p_session: s.id, p_on: lockdown === true });
-            await rpc("session_control", { p_session: s.id, p_action: "settings", p_args: opts });
-            if (monitoring && monitorGuests) await rpc("set_session_guests", { p_session: s.id, p_monitor: true });
-            router.push(`/live/teacher/live/${s.id}`);
-          } catch (e) { setErr(errorText(e)); setBusy(false); }
+            s = await rpc<{ id: string }>("start_session", { p_class: cls || null, p_lesson: lesson || null, p_mode: mode, p_title: title || null, p_environment: monitoring ? env || null : null });
+          } catch (e) { setErr(errorText(e)); setBusy(false); return; }
+          // The lesson now exists: whatever happens next, open it, never leave it running behind this form
+          // (pressing Go live again would start a second one). A setting that didn't apply can be changed there.
+          const notes: string[] = [];
+          // The engine starts a lesson locked when the school has monitoring; apply the teacher's choice.
+          if (monitoring) await rpc("set_session_lockdown", { p_session: s.id, p_on: lockdown === true }).catch((e) => notes.push(`Lockdown: ${errorText(e)}`));
+          await rpc("session_control", { p_session: s.id, p_action: "settings", p_args: opts }).catch((e) => notes.push(errorText(e)));
+          if (monitoring && monitorGuests) await rpc("set_session_guests", { p_session: s.id, p_monitor: true }).catch((e) => notes.push(errorText(e)));
+          router.push(`/live/teacher/live/${s.id}${notes.length ? `?note=${encodeURIComponent(notes.join(" "))}` : ""}`);
         }}>Go live</Button>
       </div>
     </Card>

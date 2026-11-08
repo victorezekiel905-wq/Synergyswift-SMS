@@ -52,6 +52,8 @@ export function splitInlineOptions(line: string): string[] | null {
   const options = run.map((h, i) => line.slice(h.end, run[i + 1]?.at ?? line.length).trim());
   if (options.some(o => !o)) return null;
   const stem = line.slice(0, run[0]!.at).trim();
+  // "1. Define (a) osmosis (b) diffusion" is a question in parts, not a choice of answers.
+  if (run[0]!.style.startsWith("(") && /^\s*(?:\d{1,3}[.)]\s*)?(define|explain|describe|state|list|outline|discuss|differentiate|distinguish|compare|mention|write\s+(?:short\s+)?notes?)\b/i.test(stem) && !/\?\s*$/.test(stem)) return null;
   return [...(stem ? [stem] : []), ...options.map((o, i) => `${String.fromCharCode(65 + i)}. ${o}`)];
 }
 
@@ -101,7 +103,10 @@ export function tidyPastedQuestions(raw: string, opts: { numberUnnumbered?: bool
     if (q.answered) return;
     const keyed = q.number !== null ? key[q.number] : undefined;
     if (q.options && q.starred.length === 1) {
-      out[q.starred[0]!.at] = out[q.starred[0]!.at]!.replace(STAR, "");
+      // Strip the mark from the option's own text: a leading star ("b) *Mercury") sits after the letter,
+      // where a pattern applied to the whole line can't see it.
+      const ln = out[q.starred[0]!.at]!, om = OPTION_LINE.exec(ln);
+      out[q.starred[0]!.at] = om ? ln.slice(0, ln.lastIndexOf(om[3]!)) + om[3]!.replace(STAR, "") : ln.replace(STAR, "");
       out.push(`Answer: ${q.starred[0]!.letter}`);
     } else if (q.options && !q.starred.length && keyed) out.push(`Answer: ${keyed}`);
     else if (!q.options && keyed && !/^[A-H]$/.test(keyed)) out.push(`Answer: ${keyed}`);   // a written answer

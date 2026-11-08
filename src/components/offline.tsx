@@ -22,7 +22,10 @@ export function claimDevice(userId: string) {
     const prev = localStorage.getItem(OWNER_KEY);
     // Someone else signed in: remove the previous person's offline copies of pages and activities.
     // (Their unsent answers and drafts stay: they are only sent when that person signs in again.)
-    if (prev && prev !== userId) Object.keys(localStorage).filter(k => k.startsWith(PREFIX) || k.startsWith("sc:started:v1:")).forEach(k => localStorage.removeItem(k));
+    // The offline copy of an exam paper goes too; unsent exam answers (exam-backup-) stay for their owner.
+    if (prev && prev !== userId) Object.keys(localStorage)
+      .filter(k => k.startsWith(PREFIX) || k.startsWith("sc:started:v1:") || k.startsWith("exam-state-") || k.startsWith("exam-submit-pending-"))
+      .forEach(k => localStorage.removeItem(k));
     localStorage.setItem(OWNER_KEY, userId);
   } catch { /* storage blocked */ }
 }

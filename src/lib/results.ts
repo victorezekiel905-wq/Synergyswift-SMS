@@ -43,15 +43,21 @@ async function termAttendance(sb: any, tenantId: string, term: TermRow, studentI
   const present = new Map<string, number>();
   const register = new Map<string, { present: number; absent: number; opened: number }>();
   if (!term.starts_on) return { present, register, known: false };
-  const end = term.ends_on ? `${term.ends_on}T23:59:59Z` : new Date().toISOString();
+  // The term's days are the school's days. Fetch a day either side in UTC (covers every time zone),
+  // then keep the sign-ins whose school day falls inside the term.
+  const shift = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString();
+  const firstDay = term.starts_on;
+  const lastDay = term.ends_on ?? schoolDay(new Date().toISOString(), timezone);
   const ev = await fetchAll<{ student_id: string; at: string }>(() => sb.from("gate_events").select("id,student_id,at")
     .eq("tenant_id", tenantId).eq("direction", "in").in("student_id", studentIds)
-    .gte("at", `${term.starts_on}T00:00:00Z`).lte("at", end).order("id"));
+    .gte("at", shift(firstDay, -1)).lt("at", shift(lastDay, 2)).order("id"));
   const days = new Map<string, Set<string>>();
   for (const e of ev) {
-    if (!days.has(e.student_id)) days.set(e.student_id, new Set());
     // Counted by the school's day: a 00:30 sign-in in Lagos is that day, not the UTC day before.
-    days.get(e.student_id)!.add(schoolDay(e.at, timezone));
+    const day = schoolDay(e.at, timezone);
+    if (day < firstDay || day > lastDay) continue;
+    if (!days.has(e.student_id)) days.set(e.student_id, new Set());
+    days.get(e.student_id)!.add(day);
   }
   days.forEach((v, k) => present.set(k, v.size));
   // The class register is the official record when it has been taken: it wins over gate sign-ins.

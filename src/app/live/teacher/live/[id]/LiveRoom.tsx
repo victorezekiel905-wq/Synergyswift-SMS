@@ -96,6 +96,14 @@ export function LiveRoom({ sessionId, me, envs, scenes, initialTab = "lesson" }:
     }, out ? 1200 : 600);
   }, [s, timer, timerLeft, sessionId, state]);
 
+  // A setting chosen on the "Go live" form that didn't apply (for example lockdown): say so once.
+  useEffect(() => {
+    const note = new URLSearchParams(window.location.search).get("note");
+    if (!note) return;
+    toast(`${note} Change it here.`, "error");
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [toast]);
+
   // Arrow keys move slides at once (the server catches up in the background).
   const slideNav = useSlideNav(sessionId, s?.session.current_slide ?? 0, 0, state.reload, (e) => toast(errorText(e), "error"), state.take);
   const slideNavRef = useRef(slideNav);

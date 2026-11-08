@@ -245,11 +245,9 @@ function OrderingInput({ items, order, onChange, disabled }: { items: Item[]; or
   const ids = order && order.length === items.length ? order : items.map((i) => i.id);
   const byId = Object.fromEntries(items.map((i) => [i.id, i]));
   const [drag, setDrag] = useState<number | null>(null);
-  // The order the student sees is their answer, even before they move anything
-  // (otherwise an already-right order could never be saved: "Answer the question first").
-  useEffect(() => {
-    if (!disabled && items.length && !(order && order.length === items.length)) onChange(ids);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Only a move, or "This order is my answer", answers the question: just looking at it doesn't,
+  // so a skipped question isn't marked with the shuffled order.
+  const answered = Boolean(order && order.length === items.length);
   const move = (from: number, to: number) => {
     if (to < 0 || to >= ids.length) return;
     const next = [...ids];
@@ -269,6 +267,11 @@ function OrderingInput({ items, order, onChange, disabled }: { items: Item[]; or
           <button type="button" className="btn btn-ghost btn-sm" disabled={disabled || i === ids.length - 1} onClick={() => move(i, i + 1)} aria-label="Move down">↓</button>
         </li>
       ))}
+      {!disabled && !answered && items.length > 1 && (
+        <li className="list-none pt-1">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => onChange(ids)}>This order is my answer</button>
+        </li>
+      )}
     </ol>
   );
 }

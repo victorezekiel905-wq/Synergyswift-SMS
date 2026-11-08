@@ -94,7 +94,7 @@ export default function QuestionView({ q, value, onChange, disabled, spellcheck,
             ))}
           </div>
         )}
-        {q.type === "ordering" && <Ordering items={d.items ?? []} value={Array.isArray(value) && value.length ? value : (d.items ?? []).map((i: { id: string }) => i.id)} onChange={onChange} disabled={disabled} />}
+        {q.type === "ordering" && <Ordering items={d.items ?? []} answered={Array.isArray(value) && value.length > 0} value={Array.isArray(value) && value.length ? value : (d.items ?? []).map((i: { id: string }) => i.id)} onChange={onChange} disabled={disabled} />}
         {q.type === "hotspot" && <Hotspot image={d.image_url ?? q.media_url} value={value} onChange={onChange} disabled={disabled} />}
         {q.type === "math" && <MathInput value={value ?? ""} onChange={onChange} disabled={disabled} hint={d.hint} />}
         {q.type === "drag_drop" && <DragDrop items={d.items ?? []} zones={d.zones ?? []} value={value ?? {}} onChange={onChange} disabled={disabled} />}
@@ -194,9 +194,9 @@ function FillBlanks({ text, value, onChange, disabled, spellcheck }: { text: str
   );
 }
 
-function Ordering({ items, value, onChange, disabled }: { items: { id: string; text: string }[]; value: string[]; onChange: (v: string[]) => void; disabled?: boolean }) {
-  // The order the student sees is their answer, even before they move anything.
-  useEffect(() => { if (!disabled && value.length) onChange(value); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+function Ordering({ items, value, answered, onChange, disabled }: { items: { id: string; text: string }[]; value: string[]; answered: boolean; onChange: (v: string[]) => void; disabled?: boolean }) {
+  // Only a move, or "This order is my answer", answers it: looking at it doesn't, so a skipped
+  // question isn't marked with the shuffled order.
   const byId = new Map(items.map(i => [i.id, i]));
   const move = (i: number, d: number) => { const n = [...value]; const j = i + d; if (j < 0 || j >= n.length) return; [n[i], n[j]] = [n[j], n[i]]; onChange(n); };
   const [dragging, setDragging] = useState<number | null>(null);
@@ -216,6 +216,9 @@ function Ordering({ items, value, onChange, disabled }: { items: { id: string; t
           <button type="button" className="btn btn-ghost px-2 py-1" disabled={disabled || i === value.length - 1} onClick={() => move(i, 1)} aria-label="Move down">↓</button>
         </li>
       ))}
+      {!disabled && !answered && value.length > 1 && (
+        <li className="list-none pt-1"><button type="button" className="btn btn-outline text-sm" onClick={() => onChange(value)}>This order is my answer</button></li>
+      )}
     </ol>
   );
 }

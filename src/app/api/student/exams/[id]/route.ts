@@ -189,6 +189,12 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     if (!Object.keys(late).length) return false;
     const text = JSON.stringify(late);
     if (text.length > 500_000) return false;
+    // At most 10 kept copies per attempt, and never the same answers twice: a device retrying,
+    // or someone calling this in a loop, can't fill the teacher's log.
+    const { data: before } = await svc.from("exam_events").select("meta").eq("attempt_id", attempt.id).eq("kind", "late_answers")
+      .order("at", { ascending: false }).limit(10);
+    if ((before ?? []).some((e: { meta: { answers?: unknown } }) => JSON.stringify(e.meta?.answers ?? null) === text)) return true;
+    if ((before ?? []).length >= 10) return false;
     const { error } = await svc.from("exam_events").insert({ attempt_id: attempt.id, kind: "late_answers", meta: { reason, answers: late, questions: Object.keys(late).length } });
     return !error;
   };

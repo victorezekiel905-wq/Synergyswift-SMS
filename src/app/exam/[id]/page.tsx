@@ -5,6 +5,12 @@ import QuestionView, { type PublicQuestion } from "@/components/exams/QuestionVi
 import ExamTools from "@/components/exams/tools/ExamTools";
 import type { ToolId } from "@/lib/exams/tools";
 import WebcamProctor, { requestCamera } from "@/components/exams/WebcamProctor";
+import { createClient } from "@/lib/supabase/client";
+
+/** Who is signed in on this device, read from the saved sign-in (works offline). */
+async function sessionUid(): Promise<string | null> {
+  try { return (await createClient().auth.getSession()).data.session?.user.id ?? null; } catch { return null; }
+}
 
 type ExamInfo = {
   id: string; title: string; instructions: string | null; duration_minutes: number; opens_at: string | null; closes_at: string | null;
@@ -85,10 +91,14 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
     } catch { /* storage full or blocked */ }
   }, [backupKey]);
 
-  /** The exam and its questions, so a reload without a connection can carry on. Removed once handed in. */
-  const rememberState = useCallback((e: ExamInfo | null, a: AttemptState | null) => {
+  /**
+   * The exam and its questions, so a reload without a connection can carry on. Removed once handed in.
+   * Kept under the signed-in student's id: on a shared device nobody else can open it.
+   */
+  const rememberState = useCallback(async (e: ExamInfo | null, a: AttemptState | null) => {
+    const owner = await sessionUid();
     try {
-      if (e && a?.questions) localStorage.setItem(stateKey, JSON.stringify({ exam: e, attempt: a, offset: offset.current }));
+      if (e && a?.questions && owner) localStorage.setItem(stateKey, JSON.stringify({ exam: e, attempt: a, offset: offset.current, owner, status: a.status }));
       else localStorage.removeItem(stateKey);
     } catch { /* storage full or blocked */ }
   }, [stateKey]);
@@ -103,6 +113,15 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
     } catch { /* storage full or blocked */ }
   }, [stateKey]);
 
+  // The copy kept on this device follows the attempt's status (a lock is kept offline too).
+  useEffect(() => {
+    if (!status) return;
+    try {
+      const kept = JSON.parse(localStorage.getItem(stateKey) ?? "null");
+      if (kept?.attempt && kept.status !== status) { kept.status = status; localStorage.setItem(stateKey, JSON.stringify(kept)); }
+    } catch { /* storage full or blocked */ }
+  }, [status, stateKey]);
+
   const forget = useCallback(() => {
     try { localStorage.removeItem(backupKey); localStorage.removeItem(stateKey); localStorage.removeItem(submitKey); } catch { /* blocked */ }
   }, [backupKey, stateKey, submitKey]);
@@ -113,14 +132,17 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
       // No connection: carry on from the copy kept on this device, if there is one.
       try {
         const kept = JSON.parse(localStorage.getItem(stateKey) ?? "null");
-        if (kept?.exam && kept?.attempt?.questions) {
+        const me = await sessionUid();
+        // Only the student who sat it may carry on from it (shared tablets).
+        if (kept?.exam && kept?.attempt?.questions && me && kept.owner === me) {
           setExam(kept.exam);
           offset.current = Number(kept.offset) || 0;
           const b = JSON.parse(localStorage.getItem(backupKey) ?? "null");
           if (b?.attempt === kept.attempt.id) dirty.current = b.answers ?? {};
           setAttempt(kept.attempt);
           setAnswers({ ...(kept.attempt.answers ?? {}), ...dirty.current });
-          setStatus("in_progress");
+          // A locked attempt stays locked offline.
+          setStatus(kept.status && kept.status !== "in_progress" ? kept.status : "in_progress");
           setOpenedOffline(true);
           if (localStorage.getItem(submitKey) === kept.attempt.id) setSubmitPending(true);
           return;
@@ -339,7 +361,14 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
         // No connection: hand in by itself as soon as it's back. Answers stay on this device until then.
         setSubmitPending(true);
         try { localStorage.setItem(submitKey, attempt.id); } catch { /* blocked */ }
-      } else if (!auto) setError(r.data.error ?? "Submit failed. Check your connection and try again.");
+      } else {
+        // The school refused it (a rule, a lock, a bad request): stop retrying and say why, even when
+        // this was the automatic retry, so the student isn't left behind "Handing in…" for ever.
+        setSubmitPending(false);
+        try { localStorage.removeItem(submitKey); } catch { /* blocked */ }
+        setError(r.data.error ?? "Submit failed. Check your connection and try again.");
+        if (auto) void load();
+      }
     } finally { submitting.current = false; }
   }
   const submitRef = useRef(submit);
