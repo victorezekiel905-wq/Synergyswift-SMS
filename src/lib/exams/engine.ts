@@ -60,6 +60,21 @@ const norm = (s: unknown, caseSensitive = false) => {
   return caseSensitive ? t : t.toLowerCase();
 };
 
+/**
+ * A typed word or phrase for comparing with the accepted answers: spacing, curly quotes,
+ * surrounding quotes and a full stop (or other end punctuation) at the end do not count,
+ * so "Paris." and ‘Paris’ match "Paris".
+ */
+export function normAnswer(s: unknown, caseSensitive = false): string {
+  const t = String(s ?? "").replace(/[‘’`´]/g, "'").replace(/[“”]/g, '"').replace(/ /g, " ");
+  return norm(t, caseSensitive).replace(/^["']+|["']+$/g, "").replace(/\s*[.,;:!?]+$/, "").replace(/^["']+|["']+$/g, "").trim();
+}
+
+/** A stored true/false key or answer: true, "true", "True", "T", "yes" and 1 are true; anything else is false. */
+export function toBool(v: unknown): boolean {
+  return v === true || v === 1 || /^(true|t|yes|y|1)$/i.test(String(v ?? "").trim());
+}
+
 export function isAutoMarked(type: QuestionType): boolean {
   return QUESTION_TYPES.find(q => q.type === type)?.auto ?? false;
 }
@@ -70,7 +85,22 @@ export function isAutoMarked(type: QuestionType): boolean {
  * Returns the value and its significant figures (trailing zeros of a whole number do not count).
  */
 export function readNumber(input: unknown): { value: number; sigFigs: number } | null {
-  const s = String(input ?? "").trim().replace(/,/g, "").replace(/−/g, "-").replace(/\s+/g, " ");
+  const s = String(input ?? "").trim().replace(/,/g, "").replace(/[−–]/g, "-").replace(/\s+/g, " ");
+  // Fractions and mixed numbers: "3/4", "-1/2", "1 1/2". Without this "1/2" was read as 1.
+  // A fraction is exact, so it has no significant figures (an answer asked to n s.f. must be a decimal).
+  const mixed = /^([+-]?)(\d+) (\d+)\/(\d+)$/.exec(s);
+  if (mixed) {
+    const d = Number(mixed[4]);
+    if (!d) return null;
+    const v = Number(mixed[2]) + Number(mixed[3]) / d;
+    return { value: mixed[1] === "-" ? -v : v, sigFigs: 0 };
+  }
+  const frac = /^([+-]?\d+(?:\.\d+)?) ?\/ ?(\d+(?:\.\d+)?)$/.exec(s);
+  if (frac) {
+    const d = Number(frac[2]);
+    if (!d) return null;
+    return { value: Number(frac[1]) / d, sigFigs: 0 };
+  }
   const m = /^([+-]?(?:\d+\.?\d*|\.\d+))(?:\s*(?:[eE]|[x×*]\s*10\s*\^?\s*)([+-]?\d+))?/.exec(s);
   if (!m) return null;
   const mant = m[1].replace(/^[+-]/, "");
@@ -237,10 +267,9 @@ export function markQuestion(q: Question, response: unknown): Mark {
     case "mcq_single":
       return { points: response === a.correct ? max : 0, max, auto: true };
 
-    case "true_false": {
-      const r = response === true || response === "true";
-      return { points: r === Boolean(a.correct) ? max : 0, max, auto: true };
-    }
+    case "true_false":
+      // Keys imported from files can be the text "false", which Boolean() would read as true.
+      return { points: toBool(response) === toBool(a.correct) ? max : 0, max, auto: true };
 
     case "mcq_multi": {
       const correct = new Set<string>(a.correct ?? []);
@@ -255,8 +284,8 @@ export function markQuestion(q: Question, response: unknown): Mark {
 
     case "short_answer": {
       const cs = Boolean(a.case_sensitive);
-      const accepted: string[] = (a.accepted ?? []).map((x: string) => norm(x, cs));
-      return { points: accepted.includes(norm(response, cs)) ? max : 0, max, auto: true };
+      const accepted: string[] = (a.accepted ?? []).map((x: string) => normAnswer(x, cs));
+      return { points: accepted.includes(normAnswer(response, cs)) ? max : 0, max, auto: true };
     }
 
     case "numeric": {
@@ -279,7 +308,7 @@ export function markQuestion(q: Question, response: unknown): Mark {
       const cs = Boolean(a.case_sensitive);
       const resp = Array.isArray(response) ? response : [];
       let ok = 0;
-      blanks.forEach((acc, i) => { if (acc.map(x => norm(x, cs)).includes(norm(resp[i], cs))) ok++; });
+      blanks.forEach((acc, i) => { const r = normAnswer(resp[i], cs); if (r && acc.map(x => normAnswer(x, cs)).includes(r)) ok++; });
       return { points: clampPoints((ok / blanks.length) * max, max), max, auto: true };
     }
 
@@ -405,9 +434,10 @@ export function markAttempt(questions: Question[], answers: Record<string, unkno
   for (const q of questions) {
     const prev = existing[q.id];
     let m = markQuestion(q, answers[q.id]);
-    // Teacher marks and code-runner results are kept; everything else is re-marked.
+    // Teacher marks and code-runner results are kept; everything else is re-marked. A kept mark
+    // never exceeds the question's points (they may have been lowered since).
     if (prev && (prev.auto === false || prev.runner) && prev.points !== null && prev.points !== undefined) {
-      m = { ...prev, max: Number(q.points) };
+      m = { ...prev, points: clampPoints(Number(prev.points), m.max), max: m.max };
     }
     marks[q.id] = m;
     max += m.max;
@@ -568,7 +598,7 @@ export function describeAnswer(q: Pick<Question, "type" | "data" | "answer">): s
   switch (q.type) {
     case "mcq_single": return text(d.options, a.correct);
     case "mcq_multi": return (a.correct ?? []).map((id: string) => text(d.options, id)).join("; ");
-    case "true_false": return a.correct ? "True" : "False";
+    case "true_false": return toBool(a.correct) ? "True" : "False";
     case "short_answer": return (a.accepted ?? []).join(" or ");
     case "numeric": return `${a.value}${a.tolerance ? ` (± ${a.tolerance})` : a.tolerance_pct ? ` (± ${a.tolerance_pct}%)` : ""}${d.unit ? ` ${d.unit}` : ""}${a.sig_figs ? `, ${a.sig_figs} s.f.` : ""}`;
     case "matrix": return (d.rows ?? []).map((r: Option) => `${r.text}: ${text(d.cols, a.correct?.[r.id])}`).join("; ");

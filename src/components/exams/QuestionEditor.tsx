@@ -365,7 +365,9 @@ function HotspotEditor({ q, setData, setAnswer }: { q: EditorQuestion; setData: 
       {q.data.image_url && (
         <>
           <p className="text-xs text-slate-500">Drag on the image to draw each correct area. A click inside any area earns the points.</p>
-          <div ref={ref} className="relative inline-block max-w-full cursor-crosshair select-none"
+          {/* Measured against the image alone (block, no gap under it), exactly as the student's click is,
+              so an area drawn here is the area that earns the marks. */}
+          <div ref={ref} className="relative inline-block max-w-full cursor-crosshair select-none align-top"
             onMouseDown={e => setStart(pos(e))}
             onMouseUp={e => {
               if (!start) return;
@@ -375,7 +377,7 @@ function HotspotEditor({ q, setData, setAnswer }: { q: EditorQuestion; setData: 
               setStart(null);
             }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={q.data.image_url} alt="Hotspot" className="max-h-[400px] max-w-full" draggable={false} />
+            <img src={q.data.image_url} alt="Hotspot" className="block max-h-[400px] max-w-full select-none" draggable={false} />
             {regions.map((g, i) => (
               <div key={i} className="absolute border-2 border-emerald-500 bg-emerald-400/30" style={{ left: `${g.x}%`, top: `${g.y}%`, width: `${g.w}%`, height: `${g.h}%` }} />
             ))}

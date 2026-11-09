@@ -1,7 +1,7 @@
 /**
  * Learning paths, breakout rooms and online lessons. Pure, unit tested.
  */
-import { markAttempt, validateQuestion, type Question } from "./exams/engine";
+import { markAttempt, validateQuestion, isAutoMarked, type Question } from "./exams/engine";
 import { secureShuffle } from "./crypto";
 
 // ---------------- learning paths ----------------
@@ -46,13 +46,21 @@ export function prerequisiteCycle(steps: { id: string; requires: string[] }[]): 
   return null;
 }
 
-/** Marks a quiz step. Only auto-marked questions count. */
+/** Question types a learning-path quiz can use: the ones a computer marks at once (a passage is shown for reading). */
+export function quizCanUse(type: string): boolean {
+  return isAutoMarked(type as Question["type"]);
+}
+
+/**
+ * Marks a quiz step. Only auto-marked questions count: a drawing or spoken answer (which a
+ * teacher would mark) used to stay unmarked but still count, so the quiz could never be passed.
+ */
 export function markQuizStep(questions: Question[], answers: Record<string, unknown>, passPct: number) {
-  const auto = questions.filter(q => !["essay", "code", "file_upload"].includes(q.type));
+  const auto = questions.filter(q => quizCanUse(q.type));
   const r = markAttempt(auto, answers);
   const pct = r.max_score > 0 ? Math.round((r.total_score / r.max_score) * 1000) / 10 : 0;
-  const right = Object.fromEntries(Object.entries(r.marks).map(([id, m]) => [id, m.points !== null && m.points >= m.max]));
-  return { pct, passed: pct >= passPct, right, total: r.total_score, max: r.max_score };
+  const right = Object.fromEntries(Object.entries(r.marks).filter(([, m]) => m.max > 0).map(([id, m]) => [id, m.points !== null && m.points >= m.max]));
+  return { pct, passed: r.max_score > 0 ? pct >= passPct : true, right, total: r.total_score, max: r.max_score };
 }
 
 // ---------------- breakout rooms ----------------

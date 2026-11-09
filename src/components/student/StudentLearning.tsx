@@ -6,6 +6,7 @@ import ContentPlayer, { keepOffline, isKeptOffline, forgetOffline } from "@/comp
 import { KIND } from "@/components/learning/ContentLibrary";
 import { STEP_KIND } from "@/components/learning/PathsAdmin";
 import { PROVIDER } from "@/components/learning/OnlineLessons";
+import QuestionView from "@/components/exams/QuestionView";
 
 // ---------------- learning paths ----------------
 
@@ -91,20 +92,12 @@ function QuizStep({ step, onDone }: { step: StepView; onDone: (text: string, ok:
     }}>
       <p className="text-xs text-slate-500">Pass mark {step.pass_pct}%.{step.progress?.status === "passed" ? " You have already passed; you can practise again." : ""}</p>
       {step.questions.map((q, i) => (
-        <fieldset key={q.id} className={"rounded-lg border p-3 " + (result ? (result.right[q.id] ? "border-emerald-300 bg-emerald-50/40" : "border-rose-300 bg-rose-50/40") : "border-slate-200")}>
-          <legend className="px-1 text-xs text-slate-500">Question {i + 1}</legend>
-          <RichText text={q.prompt} />
-          {q.type === "mcq_single" && (q.data.options ?? []).map((o: { id: string; text: string }) => (
-            <label key={o.id} className="flex items-center gap-2"><input type="radio" name={q.id} checked={answers[q.id] === o.id} onChange={() => set(q.id, o.id)} />{o.text}</label>))}
-          {q.type === "mcq_multi" && (q.data.options ?? []).map((o: { id: string; text: string }) => {
-            const cur = (answers[q.id] as string[] | undefined) ?? [];
-            return <label key={o.id} className="flex items-center gap-2"><input type="checkbox" checked={cur.includes(o.id)} onChange={e => set(q.id, e.target.checked ? [...cur, o.id] : cur.filter(x => x !== o.id))} />{o.text}</label>;
-          })}
-          {q.type === "true_false" && ["true", "false"].map(v => <label key={v} className="mr-4 inline-flex items-center gap-2"><input type="radio" name={q.id} checked={answers[q.id] === v} onChange={() => set(q.id, v)} />{v === "true" ? "True" : "False"}</label>)}
-          {(q.type === "short_answer" || q.type === "numeric" || q.type === "math") && (
-            <span className="flex items-center gap-2"><input className="input max-w-xs" value={String(answers[q.id] ?? "")} onChange={e => set(q.id, e.target.value)} inputMode={q.type === "numeric" ? "decimal" : undefined} aria-label={`Answer ${i + 1}`} />{q.data.unit && <span>{q.data.unit}</span>}</span>
-          )}
-          {!["mcq_single", "mcq_multi", "true_false", "short_answer", "numeric", "math"].includes(q.type) && <p className="text-xs text-slate-500">This question type is answered in exams.</p>}
+        <fieldset key={q.id} className={"rounded-lg border p-3 " + (result && result.right[q.id] !== undefined ? (result.right[q.id] ? "border-emerald-300 bg-emerald-50/40" : "border-rose-300 bg-rose-50/40") : "border-slate-200")}>
+          <legend className="px-1 text-xs text-slate-500">{q.type === "passage" ? "Read this" : `Question ${i + 1}`}</legend>
+          {/* The same answering screens as exams, so every quiz type (matching, ordering, blanks,
+              graphs, diagrams, equations…) can be answered, with its picture or sound. */}
+          <QuestionView q={{ ...q, section: null }} value={answers[q.id]} onChange={v => set(q.id, v)} spellcheck />
+          {result && result.right[q.id] !== undefined && !result.explanations[q.id] && <p className="mt-1 text-xs font-semibold text-slate-700">{result.right[q.id] ? "Right." : "Not quite."}</p>}
           {result && result.explanations[q.id] && <p className="mt-1 text-xs text-slate-700"><b>{result.right[q.id] ? "Right." : "Not quite."}</b> {result.explanations[q.id]}</p>}
         </fieldset>
       ))}

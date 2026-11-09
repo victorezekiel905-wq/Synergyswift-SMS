@@ -19,7 +19,7 @@ type ExamInfo = {
   webcam_snapshots: boolean; snapshot_interval_sec: number; network_restricted: boolean;
 };
 type AttemptState = { id: string; status: string; started_at: string; deadline_at: string; violations: number; server_now: string; answers: Record<string, any>; questions: PublicQuestion[] };
-type Result = { released: boolean; pending_manual?: boolean; total_score?: number; max_score?: number; per_question?: { id: string; prompt: string; points: number; max: number; feedback: string | null }[] | null };
+type Result = { released: boolean; pending_manual?: boolean; total_score?: number; max_score?: number; percent?: number | null; per_question?: { id: string; prompt: string; points: number | null; max: number; feedback: string | null }[] | null };
 
 /**
  * Talks to the exam API. Never throws: no connection (or a request that hangs on a weak
@@ -406,13 +406,22 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
         <div className="rounded-xl bg-emerald-50 p-6 text-center">
           <p className="text-2xl font-bold text-emerald-700">Submitted ✓</p>
           {result?.released
-            ? <p className="mt-2 text-lg">Your score: <b>{result.total_score} / {result.max_score}</b></p>
+            ? <>
+                <p className="mt-2 text-lg">Your score: <b>{result.total_score} / {result.max_score}</b>{result.percent !== null && result.percent !== undefined ? <span className="text-slate-600"> ({result.percent}%)</span> : null}</p>
+                {result.pending_manual && <p className="mt-1 text-sm text-amber-800">Some answers are still being marked by your teacher, so this score may go up.</p>}
+              </>
             : <p className="mt-2 text-slate-600">{result?.pending_manual ? "Some answers are marked by your teacher. " : ""}Your teacher will release the results.</p>}
         </div>
         {lateNote && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{lateNote}</p>}
         {result?.per_question && (
           <ul className="mt-4 space-y-2 text-sm">
-            {result.per_question.map((q, i) => <li key={q.id} className="card p-3"><b>Q{i + 1}</b> {q.points}/{q.max}{q.feedback ? <span className="block text-slate-600">{q.feedback}</span> : null}</li>)}
+            {result.per_question.map((q, i) => (
+              <li key={q.id} className="card flex flex-wrap items-baseline gap-x-2 p-3">
+                <b>Q{i + 1}</b>
+                {q.points === null ? <span className="text-amber-700">Waiting to be marked (out of {q.max})</span> : <span className="tabular-nums">{q.points} / {q.max}</span>}
+                {q.feedback ? <span className="block w-full text-slate-600">{q.feedback}</span> : null}
+              </li>
+            ))}
           </ul>
         )}
         <Link href={exam.require_seb ? `/exam/${id}/done` : "/student"} className="btn btn-primary mt-6">{exam.require_seb ? "Finish and quit" : "Back to my exams"}</Link>

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, hasAny, type Ctx } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { stepStates, pathSummary, prerequisiteCycle, markQuizStep, finished, type StepProgress } from "@/lib/learning";
-import { toPublicQuestion, type Question } from "@/lib/exams/engine";
+import { stepStates, pathSummary, prerequisiteCycle, markQuizStep, quizCanUse, finished, type StepProgress } from "@/lib/learning";
+import { toPublicQuestion, buildAttemptLayout, type Question } from "@/lib/exams/engine";
 import { POINTS } from "@/lib/lms";
 
 export const dynamic = "force-dynamic";
@@ -103,7 +103,11 @@ export async function GET(req: NextRequest) {
     svc.from("content_packages").select("id,title,kind").in("id", states.map(s => s.package_id).filter(Boolean)),
     svc.from("homework").select("id,title,due_at").in("id", states.map(s => s.homework_id).filter(Boolean))
   ]);
-  const qMap = new Map((qs ?? []).map((q: any) => [q.id, q]));
+  // Only questions a quiz can mark, shuffled for this student: "put in order" items in their stored
+  // order were the answer itself, and options always in the same place are easy to copy.
+  const usable = ((qs ?? []) as any[]).filter(q => quizCanUse(q.type)).map(q => ({ ...q, points: Number(q.points) })) as Question[];
+  const layout = buildAttemptLayout(usable, { shuffleOptions: true });
+  const qMap = new Map(usable.map(q => [q.id, toPublicQuestion(q, layout.option_orders[q.id])]));
   return NextResponse.json({
     staff: false, path: { id: path.id, title: path.title, description: path.description, subject: (path as any).subjects?.name ?? null }, ...pathSummary(states, prog),
     steps: states.map(s => ({
@@ -111,7 +115,7 @@ export async function GET(req: NextRequest) {
       body: s.state === "locked" ? null : s.body, url: s.state === "locked" ? null : s.url,
       package: s.package_id ? (pkgs ?? []).find((p: any) => p.id === s.package_id) ?? null : null,
       homework: s.homework_id ? (hws ?? []).find((h: any) => h.id === s.homework_id) ?? null : null,
-      questions: s.kind === "quiz" && s.state !== "locked" ? s.question_ids.map((q: string) => qMap.get(q)).filter(Boolean).map((q: any) => toPublicQuestion(q as Question)) : []
+      questions: s.kind === "quiz" && s.state !== "locked" ? s.question_ids.map((q: string) => qMap.get(q)).filter(Boolean) : []
     }))
   });
 }

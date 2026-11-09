@@ -4,6 +4,11 @@ import { useApi, send, Alert, Empty, Field, Badge, Modal, Loading, fmtDate } fro
 import { ClassPicker, KIND } from "@/components/learning/ContentLibrary";
 import QuizGenerator from "@/components/exams/QuizGenerator";
 
+// Types a teacher marks by hand cannot go in a quiz step (it is marked the moment the student finishes).
+// Kept in step with the auto-marked types in lib/exams/engine (QUESTION_TYPES).
+const TEACHER_MARKED = new Set(["essay", "code", "drawing", "audio_response", "file_upload"]);
+const quizCanUse = (type: string) => !TEACHER_MARKED.has(type);
+
 type Opt = { id: string; name: string };
 type Step = { id: string; path_id: string; position: number; title: string; kind: string; body: string | null; url: string | null; package_id: string | null; homework_id: string | null;
   question_ids: string[]; pass_pct: number; requires: string[] };
@@ -154,11 +159,11 @@ function StepForm({ step, path, steps, subjects, onDone }: { step: Partial<Step>
         {(hws.data ?? []).filter(h => !path.class_group_ids.length || path.class_group_ids.includes(h.class_group_id)).map(h => <option key={h.id} value={h.id}>{h.title} ({h.class_groups?.name})</option>)}</select></Field>}
       {(f.kind === "quiz" || f.kind === "content") && <Field label="Pass mark %"><input className="input w-24" type="number" min={0} max={100} value={f.pass_pct} onChange={e => setF({ ...f, pass_pct: Number(e.target.value) })} /></Field>}
       {f.kind === "quiz" && (
-        <Field label={`Questions (${f.question_ids.length} chosen; multiple choice, true/false, short answer and number questions are marked straight away)`}>
+        <Field label={`Questions (${f.question_ids.length} chosen; every question here is marked straight away. Essays, drawings, recordings, code and uploads go in exams or homework)`}>
           <div className="flex gap-2"><input className="input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search the question bank" aria-label="Search questions" />
             <button type="button" className="btn btn-outline whitespace-nowrap" onClick={() => setDrafting(!drafting)}>{drafting ? "Close drafting" : "Draft new questions"}</button></div>
           {drafting && <div className="mt-2 rounded-lg bg-slate-50 p-3"><QuizGenerator subjects={subjects} defaults={{ subject_id: path.subject_id, topic: f.title }} onSaved={ids => { setF({ ...f, question_ids: [...new Set([...f.question_ids, ...ids])] }); setDrafting(false); bank.reload(); }} /></div>}
-          <ul className="mt-1 max-h-48 space-y-1 overflow-y-auto rounded border border-slate-200 p-2">{(bank.data?.questions ?? []).filter(q => !["essay", "code", "file_upload"].includes(q.type)).map(q => (
+          <ul className="mt-1 max-h-48 space-y-1 overflow-y-auto rounded border border-slate-200 p-2">{(bank.data?.questions ?? []).filter(q => quizCanUse(q.type)).map(q => (
             <li key={q.id}><label className="flex gap-2"><input type="checkbox" checked={chosen.has(q.id)} onChange={e => setF({ ...f, question_ids: e.target.checked ? [...f.question_ids, q.id] : f.question_ids.filter(x => x !== q.id) })} />
               <span className="line-clamp-2">{q.prompt}{q.topic && <span className="text-xs text-slate-500"> · {q.topic}</span>}</span></label></li>))}
             {bank.error && <li className="text-xs text-rose-600">{bank.error}</li>}</ul>

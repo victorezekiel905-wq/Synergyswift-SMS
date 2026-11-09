@@ -5,6 +5,8 @@ import { validateQuestion, QUESTION_TYPES, type QuestionType } from "@/lib/exams
 import { TOOL_IDS } from "@/lib/exams/tools";
 import { randomToken } from "@/lib/crypto";
 import { isValidIpRule } from "@/lib/net";
+import { createServiceClient } from "@/lib/supabase/service";
+import { remarkFinishedAttempts } from "@/lib/exams/server";
 
 export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -109,7 +111,16 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const row = { ...q, media_url: q.media_url || null, exam_id: params.id };
   if (q.id) {
     const { error } = await ctx.sb.from("exam_questions").update(row).eq("exam_id", params.id).eq("id", q.id);
-    return error ? jsonError(error.message) : NextResponse.json({ id: q.id });
+    if (error) return jsonError(error.message);
+    // A corrected answer key or new points re-mark everyone who has handed in (teacher marks are kept).
+    const svc = createServiceClient();
+    const { remarked, changed } = await remarkFinishedAttempts(svc, params.id);
+    let pushed = false;
+    if (changed) {
+      const { count } = await svc.from("score_entries").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenant.id).eq("source", `exam:${params.id}`);
+      pushed = (count ?? 0) > 0;
+    }
+    return NextResponse.json({ id: q.id, remarked, changed, pushed_scores_outdated: pushed });
   }
   const { data: last } = await ctx.sb.from("exam_questions").select("position").eq("exam_id", params.id).order("position", { ascending: false }).limit(1);
   const { data, error } = await ctx.sb.from("exam_questions").insert({ ...row, position: (last?.[0]?.position ?? 0) + 1 }).select("id").single();

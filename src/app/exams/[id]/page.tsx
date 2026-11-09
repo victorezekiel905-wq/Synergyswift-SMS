@@ -52,8 +52,10 @@ function Questions({ exam, questions, reload }: { exam: Exam; questions: Questio
     setMsg(r.ok ? `Saved ${r.data.saved} question${r.data.saved === 1 ? "" : "s"} to the question bank.` : r.error);
   }
   async function save(q: EditorQuestion) {
-    const r = await send(`/api/exams/${exam.id}`, q);
+    const r = await send<{ changed?: number; pushed_scores_outdated?: boolean }>(`/api/exams/${exam.id}`, q);
     if (!r.ok) return r.error;
+    // A corrected key re-marks the scripts already handed in; say so, and what to do about report cards.
+    if (r.data?.changed) setMsg(`Saved. ${r.data.changed} student score${r.data.changed === 1 ? " was" : "s were"} re-marked with the new answer.${r.data.pushed_scores_outdated ? " Use \"Release and push to report cards\" under Marking again to update the score sheet." : ""}`);
     setEditing(null); reload(); return null;
   }
   async function remove(q: Question) {

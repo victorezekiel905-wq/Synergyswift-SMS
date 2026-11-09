@@ -13,7 +13,7 @@
  *  - Reliability: Cronbach's alpha (KR-20 for right/wrong items) over students
  *    who were given every item (pools are skipped).
  */
-import type { Question } from "./engine";
+import { toBool, type Question } from "./engine";
 
 export type AnalysisAttempt = {
   id: string;
@@ -59,7 +59,10 @@ function correlation(xs: number[], ys: number[]) {
 
 const normAnswer = (v: unknown) => String(v ?? "").trim().replace(/\s+/g, " ").toLowerCase().slice(0, 80);
 
-export function analyseExam(questions: (Question & { topic?: string | null; bloom?: string | null; difficulty?: string | null })[], attempts: AnalysisAttempt[]): ExamAnalysis {
+export function analyseExam(allQuestions: (Question & { topic?: string | null; bloom?: string | null; difficulty?: string | null })[], attempts: AnalysisAttempt[]): ExamAnalysis {
+  // Reading passages and other 0-mark items have nothing to analyse; left in, they made
+  // reliability "not available" for every exam with a passage.
+  const questions = allQuestions.filter(q => q.type !== "passage" && Number(q.points) > 0);
   // Item fraction per student, only for questions the student was given and that are marked.
   const given = (a: AnalysisAttempt, qid: string) => !a.question_order?.length || a.question_order.includes(qid);
   const frac = (a: AnalysisAttempt, qid: string): number | null => {
@@ -83,7 +86,7 @@ export function analyseExam(questions: (Question & { topic?: string | null; bloo
   const lower = new Set(scored.slice(-k).map(a => a.id));
   const groupsUsable = scored.length >= 6;
 
-  const items: ItemStats[] = questions.map((q, idx) => {
+  const items: ItemStats[] = questions.map(q => {
     const rows = scored.map(a => ({ a, f: frac(a, q.id) })).filter((r): r is { a: AnalysisAttempt; f: number } => r.f !== null);
     const p = mean(rows.map(r => r.f));
     const pu = mean(rows.filter(r => upper.has(r.a.id)).map(r => r.f));
@@ -107,7 +110,7 @@ export function analyseExam(questions: (Question & { topic?: string | null; bloo
       const options: { id: string; text: string }[] = q.type === "true_false"
         ? [{ id: "true", text: "True" }, { id: "false", text: "False" }]
         : (q.data?.options ?? []);
-      const correct = q.type === "true_false" ? String(Boolean(q.answer?.correct)) : q.answer?.correct;
+      const correct = q.type === "true_false" ? String(toBool(q.answer?.correct)) : q.answer?.correct;
       distractors = [...options, { id: "", text: "(no answer)" }].map(o => {
         const chose = (a: AnalysisAttempt) => {
           const v = a.answers?.[q.id];
@@ -141,7 +144,7 @@ export function analyseExam(questions: (Question & { topic?: string | null; bloo
       }
     }
     return {
-      question_id: q.id, position: idx + 1, type: q.type, topic: q.topic ?? null, bloom: q.bloom ?? null, difficulty_tag: q.difficulty ?? null,
+      question_id: q.id, position: allQuestions.indexOf(q) + 1, type: q.type, topic: q.topic ?? null, bloom: q.bloom ?? null, difficulty_tag: q.difficulty ?? null,
       n: rows.length, p: r3(p), discrimination: r3(D), point_biserial: r3(pb), distractors, common_wrong, flags
     };
   });

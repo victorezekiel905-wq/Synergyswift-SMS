@@ -92,6 +92,26 @@ export async function autoSubmitIfExpired(svc: any, attempt: any, questions: Que
   return attempt;
 }
 
+/**
+ * Re-marks every handed-in attempt after the teacher changed a question (a corrected answer
+ * key, different points). Teacher marks are kept. Without this a fixed key changed nothing:
+ * every student kept the score from the wrong key. Returns how many scores changed.
+ */
+export async function remarkFinishedAttempts(svc: any, examId: string): Promise<{ remarked: number; changed: number }> {
+  const questions = await loadQuestions(svc, examId);
+  const { data: attempts } = await svc.from("exam_attempts").select("*").eq("exam_id", examId).in("status", ["submitted", "graded"]);
+  let changed = 0;
+  for (const a of attempts ?? []) {
+    const r = markAttempt(questionsForAttempt(questions, a), a.answers ?? {}, (a.marks ?? {}) as Record<string, Mark>);
+    const status = r.pending === 0 ? "graded" : "submitted";
+    if (Number(a.total_score) === r.total_score && Number(a.max_score) === r.max_score && a.status === status && JSON.stringify(a.marks ?? {}) === JSON.stringify(r.marks)) continue;
+    await svc.from("exam_attempts").update({ marks: r.marks, auto_score: r.auto_score, total_score: r.total_score, max_score: r.max_score, status })
+      .eq("id", a.id).in("status", ["submitted", "graded"]);
+    changed++;
+  }
+  return { remarked: (attempts ?? []).length, changed };
+}
+
 /** Student's view of their result, respecting the release setting. */
 export function studentResultView(exam: ExamRow, attempt: any, questions: Question[]) {
   const released = exam.results_released || Boolean(exam.settings?.show_score_after_submit);
@@ -99,9 +119,16 @@ export function studentResultView(exam: ExamRow, attempt: any, questions: Questi
     return { released: false, pending_manual: attempt.status === "submitted" };
   }
   const review = Boolean(exam.settings?.allow_review) && exam.results_released;
+  const max = Number(attempt.max_score);
   return {
     released: true,
     total_score: attempt.total_score, max_score: attempt.max_score,
-    per_question: review ? questionsForAttempt(questions, attempt).map(q => ({ id: q.id, prompt: q.prompt, points: attempt.marks?.[q.id]?.points ?? 0, max: Number(q.points), feedback: attempt.marks?.[q.id]?.feedback ?? null })) : null
+    percent: max > 0 ? Math.round((Number(attempt.total_score) / max) * 1000) / 10 : null,
+    // Released before every answer was marked: the score so far, said plainly.
+    pending_manual: attempt.status === "submitted",
+    per_question: review ? questionsForAttempt(questions, attempt).filter(q => q.type !== "passage").map(q => {
+      const m = attempt.marks?.[q.id];
+      return { id: q.id, prompt: q.prompt, points: m && m.points !== null && m.points !== undefined ? Number(m.points) : null, max: Number(q.points), feedback: m?.feedback ?? null };
+    }) : null
   };
 }
