@@ -13,7 +13,6 @@ export const COMPANY = {
   incorporated: "2026-11-02",
   incorporatedLabel: "2 November 2026",
   law: "Companies and Allied Matters Act 2020",
-  tin: "2622450931737",
   registeredAddress: ["23 Joseph Avenue", "Lekki", "Lagos State 105102", "Nigeria"],
   country: "Nigeria",
   /** CAC's public register: anyone can look the company up by its RC number. */

@@ -15,7 +15,6 @@ export default function CompanyPage() {
     ["Company type", COMPANY.type],
     ["Incorporated", `${COMPANY.incorporatedLabel}, under the ${COMPANY.law}`],
     ["Registered with", "Corporate Affairs Commission (CAC), Nigeria"],
-    ["Tax identification number (TIN)", <span key="tin" className="font-mono">{COMPANY.tin}</span>],
     ["Registered office", <span key="addr">{COMPANY.registeredAddress.map((l) => <span key={l} className="block">{l}</span>)}</span>]
   ];
   return (

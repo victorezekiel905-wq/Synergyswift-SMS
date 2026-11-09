@@ -83,7 +83,7 @@ function Billing({ token }: { token: string }) {
             )}
             <p className="mt-6 text-xs leading-relaxed text-slate-500">
               {inv.company}<br />
-              RC {COMPANY.rcNumber} · TIN {COMPANY.tin}<br />
+              RC {COMPANY.rcNumber}<br />
               {registeredAddress}
             </p>
           </div>
