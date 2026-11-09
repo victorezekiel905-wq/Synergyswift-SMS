@@ -98,6 +98,6 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
   const doc = new URL(req.url).searchParams.get("doc") ?? "";
   const { data } = await ctx.sb.from("student_documents").delete().eq("tenant_id", ctx.tenant.id).eq("student_id", id).eq("id", doc).select("path").maybeSingle();
   if (!data) return jsonError("not found", 404);
-  await createServiceClient().storage.from("student-documents").remove([data.path]);
+  // The file stays while the document is in the recycle bin.
   return NextResponse.json({ ok: true });
 }

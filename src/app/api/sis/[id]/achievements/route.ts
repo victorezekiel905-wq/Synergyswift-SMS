@@ -116,7 +116,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     case "delete_item": {
       const { data, error } = await sb.from("portfolio_items").delete().eq("tenant_id", tid).eq("student_id", id).eq("id", b.id).select("path").maybeSingle();
       if (error || !data) return jsonError(error?.message ?? "not found", 404);
-      if (data.path) await createServiceClient().storage.from("student-documents").remove([data.path]);
+      // The file stays while the item is in the recycle bin.
       return NextResponse.json({ ok: true });
     }
   }

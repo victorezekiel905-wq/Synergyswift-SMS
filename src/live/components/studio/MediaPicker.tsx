@@ -78,10 +78,8 @@ export function MediaThumb({ m }: { m: MediaRow }) {
 }
 
 export async function deleteMedia(m: MediaRow) {
-  const sb = createClient();
-  const { error } = await sb.storage.from("live-lesson-media").remove([m.storage_path]);
-  if (error) throw new Error(error.message);
-  const res = await sb.from("lesson_media").delete().eq("id", m.id);
+  // The file stays while the media is in the school's recycle bin (it goes when the bin is emptied).
+  const res = await createClient().from("lesson_media").delete().eq("id", m.id);
   if (res.error) throw new Error(res.error.message);
 }
 

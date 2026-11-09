@@ -56,8 +56,8 @@ export async function POST(req: NextRequest) {
   }
   const b = await readJson<Record<string, any>>(req);
   if (b.action === "delete") {
-    const { data } = await svc.from("staff_achievements").delete().eq("tenant_id", tid).eq("staff_id", s.id).eq("id", String(b.id ?? "")).select("photo_path").maybeSingle();
-    if (data?.photo_path) await svc.storage.from("student-documents").remove([data.photo_path]);
+    // The photo stays while the achievement is in the recycle bin.
+    await svc.from("staff_achievements").delete().eq("tenant_id", tid).eq("staff_id", s.id).eq("id", String(b.id ?? ""));
     return NextResponse.json({ ok: true });
   }
   if (b.action === "share") {

@@ -175,8 +175,8 @@ export async function POST(req: NextRequest) {
       return error ? fail(error.message) : NextResponse.json({ ok: true });
     }
     case "delete_application": {
-      const { data } = await sb.from("job_applications").delete().eq("tenant_id", tid).eq("id", b.id).select("cv_path");
-      if (data?.[0]?.cv_path) await svc.storage.from("job-applications").remove([data[0].cv_path]);
+      // The CV stays while the application is in the recycle bin.
+      const { data } = await sb.from("job_applications").delete().eq("tenant_id", tid).eq("id", b.id).select("id");
       return data?.length ? NextResponse.json({ ok: true }) : jsonError("not found", 404);
     }
     case "schedule_interview": {

@@ -210,8 +210,8 @@ export async function POST(req: NextRequest) {
       return data?.length ? NextResponse.json({ ok: true }) : jsonError("not found", 404);
     }
     case "delete_document": {
-      const { data } = await sb.from("staff_documents").delete().eq("tenant_id", tid).eq("id", b.id).select("path");
-      if (data?.[0]?.path) await createServiceClient().storage.from("staff-documents").remove([data[0].path]);
+      // The file stays while the document is in the recycle bin.
+      const { data } = await sb.from("staff_documents").delete().eq("tenant_id", tid).eq("id", b.id).select("id");
       return data?.length ? NextResponse.json({ ok: true }) : jsonError("not found", 404);
     }
     case "document_visibility": {

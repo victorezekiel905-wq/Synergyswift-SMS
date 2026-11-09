@@ -136,6 +136,7 @@ export const NAV: NavGroup[] = [
     { href: "/school/integrations", label: "Website & connections", roles: [...ADMIN, "admissions_officer"] },
     { href: "/teacher/admin", label: "Device policies & audit", roles: [...ADMIN, "it_admin"] },
     { href: "/school/audit", label: "Change history", roles: ADMIN },
+    { href: "/school/recycle-bin", label: "Recycle bin", roles: ["school_admin", "platform_admin"], hint: "Restore what was deleted, or delete it for good" },
     { href: "/account/security", label: "My account & password", roles: [...STAFF, "parent", "student"] }
   ] }
 ];

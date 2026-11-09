@@ -84,6 +84,6 @@ export async function POST(req: NextRequest) {
   if (!pkg) return jsonError("not found", 404);
   const { data: gone, error } = await ctx.sb.from("content_packages").delete().eq("tenant_id", tid).eq("id", b.id).select("id").maybeSingle();
   if (error || !gone) return jsonError(error?.message ?? "only the teacher who added it or an admin can delete it", 403);
-  await removePackageFiles(svc, tid, b.id, (pkg.files ?? []).map((f: { p: string }) => f.p));
+  // The package's files stay while it is in the recycle bin.
   return NextResponse.json({ ok: true });
 }

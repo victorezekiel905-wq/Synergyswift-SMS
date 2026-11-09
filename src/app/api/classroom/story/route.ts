@@ -113,6 +113,6 @@ export async function DELETE(req: NextRequest) {
   if (!post) return jsonError("not found", 404);
   const { data, error } = await ctx.sb.from("class_story_posts").delete().eq("id", id).select("id");
   if (error || !data?.length) return jsonError(error?.message ?? "only the author or an admin can delete this", 403);
-  if (post.photos?.length) await createServiceClient().storage.from("class-story").remove(post.photos);
+  // The photos stay while the post is in the recycle bin.
   return NextResponse.json({ ok: true });
 }

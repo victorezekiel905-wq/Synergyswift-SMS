@@ -104,9 +104,8 @@ export async function POST(req: NextRequest) {
     case "delete_draft": {
       const { data: d } = await ctx.sb.from("school_documents").select("path,status").eq("tenant_id", tid).eq("id", b.id).maybeSingle();
       if (!d || d.status !== "draft") return jsonError("Only drafts can be deleted; archive approved documents instead.");
-      const r = await ctx.sb.from("school_documents").delete().eq("id", b.id);
-      if (!r.error && d.path) await createServiceClient().storage.from("school-documents").remove([d.path]);
-      return done(r);
+      // The file stays while the draft is in the recycle bin (it goes when the bin is emptied).
+      return done(await ctx.sb.from("school_documents").delete().eq("id", b.id));
     }
     case "save_check": {
       const { action: _a, id, ...row } = b;
