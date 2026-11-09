@@ -8,6 +8,7 @@ import SearchPalette from "@/components/SearchPalette";
 import { EmergencyBanner } from "@/components/comms/NoticeBoard";
 import NativeBridge, { forgetDevice } from "@/components/NativeBridge";
 import { claimDevice } from "@/components/offline";
+import { applyBrand, clearBrandOnPage, PUBLIC_PAGES } from "@/lib/theme";
 
 import { NAV, PLATFORM_NAV, visibleNav, bottomBar, activeHref, type NavGroup } from "@/lib/nav";
 import SideNav, { BottomBar, ModuleBar, tabbedNav } from "@/components/SideNav";
@@ -30,6 +31,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // The public home page has its own header; signed-in visitors are sent on to their dashboard.
   const landing = pathname === "/";
   const bare = landing || BARE.some(r => r.test(pathname));
+  // Synergy Swift's public pages keep its own colours, even when reached from a school's pages.
+  useEffect(() => { if (PUBLIC_PAGES.test(pathname)) clearBrandOnPage(); }, [pathname]);
   // Lite mode (set on My learning) is kept per device.
   useEffect(() => { try { document.documentElement.dataset.lite = localStorage.getItem("ecf-lite") === "1" ? "1" : ""; } catch { /* storage unavailable */ } }, []);
 
@@ -40,6 +43,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       if (process.env.NEXT_PUBLIC_DESIGN_PREVIEW === "1" && pathname.startsWith("/design-preview") && !j?.profile) { setMe(PREVIEW_ME); return; }
       setMe(j);
       if (j.user?.id) claimDevice(j.user.id);
+      // The school's own colour across the app (Synergy Swift's public pages keep theirs).
+      if (!PUBLIC_PAGES.test(pathname)) applyBrand(j.profile ? j.prefs?.brand_color ?? null : null);
       const state = j.account?.state;
       // A second factor is required before this account can see anything.
       if ((j.platform_mfa || state === "mfa_required") && !pathname.startsWith("/account/security")) {

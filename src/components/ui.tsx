@@ -267,7 +267,7 @@ export type Me = {
   platform: boolean;
   group?: boolean;
   account?: { state: string; school?: string; message?: string | null; device?: string | null };
-  prefs?: { currency: string; idle_minutes: number; password_days_left: number | null } | null;
+  prefs?: { currency: string; idle_minutes: number; password_days_left: number | null; brand_color?: string | null } | null;
   platform_mfa?: boolean;
   is_guardian: boolean;
 };

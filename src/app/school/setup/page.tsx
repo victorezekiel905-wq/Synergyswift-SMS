@@ -5,6 +5,8 @@ import { notify } from "@/components/Toaster";
 import { LANGUAGES } from "@/lib/languages";
 import { CURRENCIES } from "@/lib/currency";
 import Sections from "@/components/admin/Sections";
+import BrandColour from "@/components/admin/BrandColour";
+import { applyBrand } from "@/lib/theme";
 
 type Tab = "profile" | "academic" | "sections" | "classes" | "departments";
 
@@ -114,8 +116,10 @@ function Profile() {
       "notify_gate_events", "notify_results", "staff_start_time", "student_start_time", "geofence_lat", "geofence_lng", "geofence_radius_m",
       "library_loan_days", "library_fine_per_day", "currency", "pickup_code_ttl_min", "exam_violation_limit", "sms_mode", "require_mfa", "default_language",
       "principal_signature_url", "stamp_url", "report_footer"];
-    const body = Object.fromEntries(keys.filter(k => s[k] !== undefined).map(k => [k, typeof s[k] === "string" && /time$/.test(k) ? s[k].slice(0, 5) : s[k]]));
+    const body = Object.fromEntries(keys.filter(k => s[k] !== undefined && !(k === "brand_color" && !s[k])).map(k => [k, typeof s[k] === "string" && /time$/.test(k) ? s[k].slice(0, 5) : s[k]]));
     const r = await send("/api/school/settings", body, "PUT");
+    // The new colour shows across the app straight away, for everyone on their next page.
+    if (r.ok) applyBrand(s.brand_color ?? null);
     flash(r.ok, r.ok ? "Settings saved." : r.error ?? "Save failed");
   }
   function useMyLocation() {
@@ -139,7 +143,7 @@ function Profile() {
           <ImageUpload kind="stamp" label="School stamp" hint="Printed beside the signature on report cards." value={s.stamp_url} onChange={v => setS(x => ({ ...x, stamp_url: v }))} />
         </div>
         <div className="md:col-span-2"><Field label="Report card footer" hint="For example the school's fees reminder or contact line."><textarea className="input h-16" {...text("report_footer")} /></Field></div>
-        <Field label="Brand colour"><input className="input h-10" type="color" value={s.brand_color ?? "#2f4f8f"} onChange={e => setS({ ...s, brand_color: e.target.value })} /></Field>
+        <div className="md:col-span-2"><BrandColour value={s.brand_color ?? null} onChange={v => setS(x => ({ ...x, brand_color: v }))} /></div>
         <Field label="Message sender name"><input className="input" {...text("sender_name")} /></Field>
         <Field label="Reply-to email for parents"><input className="input" type="email" {...text("reply_to_email")} /></Field>
       </section>

@@ -14,11 +14,9 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: "#f3f6fb", 100: "#e4ebf5", 200: "#c9d6ea", 300: "#a0b5d8",
-          400: "#6f8cc0", 500: "#4a6aa8", 600: "#2f4f8f", 700: "#263f73",
-          800: "#1f335c", 900: "#1a2a4a", 950: "#111c33"
-        },
+        // The school's own colour (src/lib/theme.ts). The defaults (the calm navy) are in globals.css.
+        brand: Object.fromEntries([50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
+          .map(s => [s, `rgb(var(--brand-${s}) / <alpha-value>)`])),
         canvas: "#f6f7f9",
         // The logo: the ink of the tile and the brass of the centre jewel. Brand pages only, used sparingly.
         navy: "#1b2d55",

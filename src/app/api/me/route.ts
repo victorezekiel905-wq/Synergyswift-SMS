@@ -51,13 +51,15 @@ export async function GET() {
   if (profile) {
     const svc = createServiceClient();
     const [{ data: s }, { data: u }] = await Promise.all([
-      svc.from("tenant_settings").select("currency,session_idle_minutes,password_max_age_days,password_policy_scope").eq("tenant_id", profile.tenant_id).maybeSingle(),
+      svc.from("tenant_settings").select("currency,session_idle_minutes,password_max_age_days,password_policy_scope,brand_color").eq("tenant_id", profile.tenant_id).maybeSingle(),
       svc.from("users").select("password_changed_at,must_change_password").eq("id", user.id).maybeSingle()
     ]);
     const staffRole = !["student", "parent"].includes(profile.role);
     const applies = Boolean(s?.password_max_age_days) && (staffRole || s?.password_policy_scope === "all");
     prefs = {
       currency: s?.currency ?? "NGN",
+      // The school's own colour for the whole app (src/lib/theme.ts).
+      brand_color: s?.brand_color ?? null,
       idle_minutes: staffRole ? (s?.session_idle_minutes ?? 0) : 0,
       password_days_left: applies ? passwordDaysLeft(u?.password_changed_at ?? null, s!.password_max_age_days) : null
     };

@@ -19,6 +19,7 @@ export const NAV: NavGroup[] = [
   { id: "home", title: "Home", links: [
     { href: "/dashboard", label: "Dashboard", roles: [...STAFF, "student"] },
     { href: "/school", label: "School at a glance", roles: NOT_TILL },
+    { href: "/school/analysis", label: "Analysis dashboard", roles: ADMIN, hint: "Everything in the school, in one place" },
     { href: "/student", label: "My school", roles: ["student"] },
     { href: "/student/support", label: "My support plan", roles: ["student"], module: "sims" },
     { href: "/student/transcript", label: "My transcript", roles: ["student"], module: "results" },
