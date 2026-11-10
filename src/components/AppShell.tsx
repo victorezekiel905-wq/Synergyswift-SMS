@@ -44,7 +44,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       setMe(j);
       if (j.user?.id) claimDevice(j.user.id);
       // The school's own colour across the app (Synergy Swift's public pages keep theirs).
-      if (!PUBLIC_PAGES.test(pathname)) applyBrand(j.profile ? j.prefs?.brand_color ?? null : null);
+      if (!PUBLIC_PAGES.test(pathname)) applyBrand(j.profile ? j.prefs?.brand_color ?? null : null, j.profile ? j.prefs?.brand_color_2 ?? null : null);
       const state = j.account?.state;
       // A second factor is required before this account can see anything.
       if ((j.platform_mfa || state === "mfa_required") && !pathname.startsWith("/account/security")) {
@@ -67,6 +67,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bare]);
   useEffect(() => { setOpen(false); setPicked(null); }, [pathname]);
+  // The school's logo is the icon in the browser tab too.
+  const logo = me?.profile && !me.platform ? me.prefs?.logo_url ?? null : null;
+  useEffect(() => {
+    if (!logo || bare) return;
+    const link = document.querySelector<HTMLLinkElement>("link[rel~='icon']") ?? Object.assign(document.createElement("link"), { rel: "icon" });
+    const before = link.href;
+    link.href = logo;
+    if (!link.parentNode) document.head.appendChild(link);
+    return () => { if (before) link.href = before; };
+  }, [logo, bare]);
   // Keep the session's access grant fresh while the page is open (schools that restrict staff access).
   useEffect(() => {
     if (bare || !me?.profile) return;
@@ -131,13 +141,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
+      {/* A thin line of the school's main colour: the one bold touch on the page. */}
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white shadow-[inset_0_3px_0_0_rgb(var(--brand-600))]">
         <div className="flex h-14 items-center justify-between gap-4 px-4 sm:px-5">
           <div className="flex min-w-0 items-center gap-2.5">
             <button className="btn btn-ghost -ml-1.5 px-2 py-1.5 lg:hidden" onClick={() => setOpen(o => !o)} aria-label="Toggle navigation" aria-expanded={open}><Icon name="menu" className="h-5 w-5" /></button>
             <Link href={me?.platform ? "/platform" : "/dashboard"} className="flex min-w-0 items-center gap-2.5">
-              <Monogram />
-              <span className="truncate text-[15px] font-semibold tracking-tight text-slate-900">{me?.tenant?.name ?? (me?.platform ? "Synergy Swift platform" : "Synergy Swift")}</span>
+              {logo ? <SchoolLogo src={logo} /> : <Monogram />}
+              <span className="truncate text-[15px] font-semibold tracking-tight text-brand-950">{me?.tenant?.name ?? (me?.platform ? "Synergy Swift platform" : "Synergy Swift")}</span>
             </Link>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -186,6 +197,14 @@ const PREVIEW_ME = {
   profile: { id: "preview", tenant_id: "preview", full_name: "Folake Adebayo", role: "principal", extra_roles: [] },
   tenant: { id: "preview", name: "Greenfield College", status: "active", modules: {} }
 } as Me;
+
+/** The school's own logo in the top bar; Synergy Swift's mark comes back if it can't be loaded. */
+function SchoolLogo({ src }: { src: string }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) return <Monogram />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt="" className="h-8 w-auto max-w-[120px] shrink-0 object-contain" onError={() => setBroken(true)} />;
+}
 
 /** The product mark (see BrandMark). `solid` for the 16 px sizes. */
 export function Monogram({ size = "h-8 w-8", solid = false }: { size?: string; solid?: boolean }) {

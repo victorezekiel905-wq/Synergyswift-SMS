@@ -50,16 +50,22 @@ export async function GET() {
   let mustChange = false;
   if (profile) {
     const svc = createServiceClient();
-    const [{ data: s }, { data: u }] = await Promise.all([
-      svc.from("tenant_settings").select("currency,session_idle_minutes,password_max_age_days,password_policy_scope,brand_color").eq("tenant_id", profile.tenant_id).maybeSingle(),
+    const base = "currency,session_idle_minutes,password_max_age_days,password_policy_scope,brand_color,logo_url";
+    const [first, { data: u }] = await Promise.all([
+      svc.from("tenant_settings").select(`${base},brand_color_2`).eq("tenant_id", profile.tenant_id).maybeSingle(),
       svc.from("users").select("password_changed_at,must_change_password").eq("id", user.id).maybeSingle()
     ]);
+    // Before the database update (migration 10000) there is no second colour yet: read the rest.
+    const s: any = first.error ? (await svc.from("tenant_settings").select(base).eq("tenant_id", profile.tenant_id).maybeSingle()).data : first.data;
     const staffRole = !["student", "parent"].includes(profile.role);
     const applies = Boolean(s?.password_max_age_days) && (staffRole || s?.password_policy_scope === "all");
     prefs = {
       currency: s?.currency ?? "NGN",
       // The school's own colour for the whole app (src/lib/theme.ts).
       brand_color: s?.brand_color ?? null,
+      brand_color_2: s?.brand_color_2 ?? null,
+      // The school's logo, shown in the top bar instead of Synergy Swift's mark.
+      logo_url: s?.logo_url || null,
       idle_minutes: staffRole ? (s?.session_idle_minutes ?? 0) : 0,
       password_days_left: applies ? passwordDaysLeft(u?.password_changed_at ?? null, s!.password_max_age_days) : null
     };

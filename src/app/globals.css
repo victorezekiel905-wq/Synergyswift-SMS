@@ -8,6 +8,8 @@
   --brand-50: 243 246 251; --brand-100: 228 235 245; --brand-200: 201 214 234; --brand-300: 160 181 216;
   --brand-400: 111 140 192; --brand-500: 74 106 168; --brand-600: 47 79 143; --brand-700: 38 63 115;
   --brand-800: 31 51 92; --brand-900: 26 42 74; --brand-950: 17 28 51;
+  /* The second colour, for small details only (brass by default). A school's own replaces these. */
+  --tint-100: 243 236 223; --tint-300: 210 185 138; --tint-500: 176 141 79; --tint-700: 118 91 46;
 }
 
 @layer base {

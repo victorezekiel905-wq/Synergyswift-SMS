@@ -55,8 +55,10 @@ export function PageHeader({ eyebrow, title, subtitle, actions }: { eyebrow?: st
   return (
     <header className="mb-7 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
-        {eyebrow && <p className="mb-1 text-[13px] text-slate-500">{eyebrow}</p>}
-        <h1 className="font-serif text-[26px] font-semibold leading-tight tracking-[-0.01em] text-slate-900 sm:text-[28px]">{title}</h1>
+        {/* The school's second colour, as a small detail: a short rule and the section's name. */}
+        {eyebrow && <p className="mb-1.5 flex items-center gap-2 text-[13px] font-medium text-tint-700"><span aria-hidden className="h-px w-5 bg-tint-500" />{eyebrow}</p>}
+        {/* Titles in the deepest shade of the school's main colour: reads as ink, carries the brand. */}
+        <h1 className="font-serif text-[26px] font-semibold leading-tight tracking-[-0.01em] text-brand-950 sm:text-[28px]">{title}</h1>
         {subtitle && <p className="mt-1.5 max-w-3xl text-[15px] leading-relaxed text-slate-600 sm:text-sm">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -267,7 +269,7 @@ export type Me = {
   platform: boolean;
   group?: boolean;
   account?: { state: string; school?: string; message?: string | null; device?: string | null };
-  prefs?: { currency: string; idle_minutes: number; password_days_left: number | null; brand_color?: string | null } | null;
+  prefs?: { currency: string; idle_minutes: number; password_days_left: number | null; brand_color?: string | null; brand_color_2?: string | null; logo_url?: string | null } | null;
   platform_mfa?: boolean;
   is_guardian: boolean;
 };

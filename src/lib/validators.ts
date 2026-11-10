@@ -46,6 +46,8 @@ export const TenantSettingsInput = z.object({
   logo_url: z.string().trim().url().or(z.literal("")).nullish(),
   principal_name: z.string().trim().max(120).nullish(),
   brand_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  // The second colour, for small details; empty = Synergy Swift's brass.
+  brand_color_2: z.string().regex(/^#[0-9a-fA-F]{6}$/).or(z.literal("")).nullish(),
   sender_name: z.string().trim().max(80).nullish(),
   reply_to_email: z.string().trim().email().or(z.literal("")).nullish(),
   notify_gate_events: z.boolean().optional(),

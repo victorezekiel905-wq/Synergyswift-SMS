@@ -112,14 +112,14 @@ function Profile() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    const keys = ["school_name", "motto", "address", "phone", "email", "logo_url", "principal_name", "brand_color", "sender_name", "reply_to_email",
+    const keys = ["school_name", "motto", "address", "phone", "email", "logo_url", "principal_name", "brand_color", "brand_color_2", "sender_name", "reply_to_email",
       "notify_gate_events", "notify_results", "staff_start_time", "student_start_time", "geofence_lat", "geofence_lng", "geofence_radius_m",
       "library_loan_days", "library_fine_per_day", "currency", "pickup_code_ttl_min", "exam_violation_limit", "sms_mode", "require_mfa", "default_language",
       "principal_signature_url", "stamp_url", "report_footer"];
     const body = Object.fromEntries(keys.filter(k => s[k] !== undefined && !(k === "brand_color" && !s[k])).map(k => [k, typeof s[k] === "string" && /time$/.test(k) ? s[k].slice(0, 5) : s[k]]));
     const r = await send("/api/school/settings", body, "PUT");
     // The new colour shows across the app straight away, for everyone on their next page.
-    if (r.ok) applyBrand(s.brand_color ?? null);
+    if (r.ok) applyBrand(s.brand_color ?? null, s.brand_color_2 ?? null);
     flash(r.ok, r.ok ? "Settings saved." : r.error ?? "Save failed");
   }
   function useMyLocation() {
@@ -138,12 +138,12 @@ function Profile() {
         <Field label="Email"><input className="input" type="email" {...text("email")} /></Field>
         <Field label="Principal / head teacher"><input className="input" {...text("principal_name")} /></Field>
         <div className="grid gap-4 sm:grid-cols-3 md:col-span-2">
-          <ImageUpload kind="logo" label="School logo" hint="Shown on report cards, emails and payment pages." value={s.logo_url} onChange={v => setS(x => ({ ...x, logo_url: v }))} />
+          <ImageUpload kind="logo" label="School logo" hint="Shown at the top of every page in your school's system, on report cards, emails and payment pages." value={s.logo_url} onChange={v => setS(x => ({ ...x, logo_url: v }))} />
           <ImageUpload kind="signature" label="Principal's signature" hint="Sign on white paper and photograph it, or use a transparent PNG. Printed on report cards." value={s.principal_signature_url} onChange={v => setS(x => ({ ...x, principal_signature_url: v }))} />
           <ImageUpload kind="stamp" label="School stamp" hint="Printed beside the signature on report cards." value={s.stamp_url} onChange={v => setS(x => ({ ...x, stamp_url: v }))} />
         </div>
         <div className="md:col-span-2"><Field label="Report card footer" hint="For example the school's fees reminder or contact line."><textarea className="input h-16" {...text("report_footer")} /></Field></div>
-        <div className="md:col-span-2"><BrandColour value={s.brand_color ?? null} onChange={v => setS(x => ({ ...x, brand_color: v }))} /></div>
+        <div className="md:col-span-2"><BrandColour value={s.brand_color ?? null} value2={s.brand_color_2 ?? null} logoUrl={s.logo_url} schoolName={s.school_name} onChange={v => setS(x => ({ ...x, brand_color: v }))} onChange2={v => setS(x => ({ ...x, brand_color_2: v }))} /></div>
         <Field label="Message sender name"><input className="input" {...text("sender_name")} /></Field>
         <Field label="Reply-to email for parents"><input className="input" type="email" {...text("reply_to_email")} /></Field>
       </section>

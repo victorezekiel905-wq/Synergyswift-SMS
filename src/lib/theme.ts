@@ -1,11 +1,14 @@
 /**
- * A school's own colour across the system. The school picks one colour (School setup →
- * Brand colour); this turns it into the light-to-dark shades the interface uses
- * (brand-50 … brand-950), written as CSS variables that Tailwind's `brand` colours read.
+ * A school's own colours across the system (School setup → School colours). Two colours,
+ * used sparingly the way the Synergy Swift home page uses its navy and brass:
  *
- * Shade 600 is the main colour (buttons, links, the active menu item). It is darkened
- * when needed so white text on it stays readable (WCAG AA, 4.5:1); a very light pick
- * such as yellow still gives usable buttons.
+ * - The main colour becomes the light-to-dark shades the interface uses (brand-50 …
+ *   brand-950): buttons, links, the active menu item, page titles in its deepest shade.
+ *   Shade 600 is darkened when needed so white text on it stays readable (WCAG AA, 4.5:1).
+ * - The second colour is for small details only (tint-100 … tint-700): the short rule and
+ *   label above a page title, small markers. Shade 700 stays readable as small text.
+ *
+ * Everything else stays white and grey, so a school's colours look calm, not loud.
  */
 export const DEFAULT_BRAND = "#2f4f8f";
 export const SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const;
@@ -78,26 +81,84 @@ export function chosenBrand(hex: unknown): string | null {
   return h === DB_DEFAULT_BRAND || h === DEFAULT_BRAND ? null : h;
 }
 
+// ---------- The second colour: small details only ----------
+
+/** Synergy Swift's own second colour (the brass of its logo). */
+export const DEFAULT_TINT = "#b08d4f";
+export const TINT_SHADES = [100, 300, 500, 700] as const;
+export type TintShade = (typeof TINT_SHADES)[number];
+
+/** Four shades of the second colour: a wash (100), a soft line (300), the colour (500), and small text (700, readable on white). */
+export function tintPalette(hex: unknown): Record<TintShade, RGB> {
+  const c = parseHex(hex) ?? parseHex(DEFAULT_TINT)!;
+  const round = (x: RGB) => x.map(Math.round) as RGB;
+  return { 100: round(mix(c, WHITE, 0.86)), 300: round(mix(c, WHITE, 0.45)), 500: c, 700: round(readableBase(c)) };
+}
+
+export function tintVars(hex: unknown): Record<string, string> {
+  const p = tintPalette(hex);
+  return Object.fromEntries(TINT_SHADES.map(s => [`--tint-${s}`, p[s].join(" ")]));
+}
+
+/** The school's second colour, or null when it hasn't chosen one. */
+export function chosenTint(hex: unknown): string | null {
+  const c = parseHex(hex);
+  if (!c) return null;
+  const h = toHex(c);
+  return h === DEFAULT_TINT ? null : h;
+}
+
+/**
+ * The main colours of a logo, from its pixels (RGBA, as a canvas gives them): the most used
+ * colours that are not white, black, grey or see-through, most used first, each clearly
+ * different from the ones before. Up to `max`.
+ */
+export function logoColours(px: ArrayLike<number>, max = 4): string[] {
+  const buckets = new Map<string, { n: number; r: number; g: number; b: number }>();
+  for (let i = 0; i + 3 < px.length; i += 4) {
+    const r = px[i]!, g = px[i + 1]!, b = px[i + 2]!, a = px[i + 3]!;
+    if (a < 200) continue;
+    const hi = Math.max(r, g, b), lo = Math.min(r, g, b);
+    if (hi > 240 && lo > 225) continue;              // white / paper
+    if (hi < 28) continue;                           // black
+    if (hi - lo < 28) continue;                      // grey
+    const key = `${r >> 4},${g >> 4},${b >> 4}`;
+    const k = buckets.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
+    k.n++; k.r += r; k.g += g; k.b += b;
+    buckets.set(key, k);
+  }
+  const ranked = [...buckets.values()].sort((x, y) => y.n - x.n).map(k => [k.r / k.n, k.g / k.n, k.b / k.n] as RGB);
+  const out: RGB[] = [];
+  for (const c of ranked) {
+    if (out.every(o => Math.hypot(o[0] - c[0], o[1] - c[1], o[2] - c[2]) > 70)) out.push(c);
+    if (out.length >= max) break;
+  }
+  return out.map(toHex);
+}
+
 export const BRAND_KEY = "ecf-brand";
 
-/** Puts a school's colour on the page (and remembers it, so the next page load starts in it). */
-export function applyBrand(hex: string | null | undefined) {
+/** Puts a school's colours on the page (and remembers them, so the next page load starts in them). */
+export function applyBrand(hex: string | null | undefined, tint?: string | null) {
   if (typeof document === "undefined") return;
-  const chosen = chosenBrand(hex);
+  const chosen = chosenBrand(hex), second = chosenTint(tint);
   const root = document.documentElement.style;
-  if (chosen) for (const [k, v] of Object.entries(brandVars(chosen))) root.setProperty(k, v);
-  else for (const s of SHADES) root.removeProperty(`--brand-${s}`);   // back to the defaults in globals.css
-  try { if (chosen) localStorage.setItem(BRAND_KEY, JSON.stringify(brandVars(chosen))); else localStorage.removeItem(BRAND_KEY); } catch { /* storage blocked */ }
+  const vars = { ...(chosen ? brandVars(chosen) : {}), ...(second ? tintVars(second) : {}) };
+  if (!chosen) for (const s of SHADES) root.removeProperty(`--brand-${s}`);       // back to the defaults in globals.css
+  if (!second) for (const s of TINT_SHADES) root.removeProperty(`--tint-${s}`);
+  for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
+  try { if (Object.keys(vars).length) localStorage.setItem(BRAND_KEY, JSON.stringify(vars)); else localStorage.removeItem(BRAND_KEY); } catch { /* storage blocked */ }
 }
 
 /** Back to Synergy Swift's colours on this page, without forgetting the school's for next time. */
 export function clearBrandOnPage() {
   if (typeof document === "undefined") return;
   for (const s of SHADES) document.documentElement.style.removeProperty(`--brand-${s}`);
+  for (const s of TINT_SHADES) document.documentElement.style.removeProperty(`--tint-${s}`);
 }
 
 /** Synergy Swift's own public pages, which always keep Synergy Swift's colours. */
 export const PUBLIC_PAGES = /^\/(how-it-works|tour|features|company|guide|demo|login|signup|onboard)?\/?$/;
 
 /** Runs in <head> before the page paints: the last school colour seen on this device, so pages don't flash navy first. */
-export const BRAND_BOOT_SCRIPT = `try{if(!${PUBLIC_PAGES}.test(location.pathname)){var v=JSON.parse(localStorage.getItem("${BRAND_KEY}")||"null");if(v&&typeof v==="object")for(var k in v)if(/^--brand-\\d+$/.test(k)&&/^\\d{1,3} \\d{1,3} \\d{1,3}$/.test(v[k]))document.documentElement.style.setProperty(k,v[k])}}catch(e){}`;
+export const BRAND_BOOT_SCRIPT = `try{if(!${PUBLIC_PAGES}.test(location.pathname)){var v=JSON.parse(localStorage.getItem("${BRAND_KEY}")||"null");if(v&&typeof v==="object")for(var k in v)if(/^--(brand|tint)-\\d+$/.test(k)&&/^\\d{1,3} \\d{1,3} \\d{1,3}$/.test(v[k]))document.documentElement.style.setProperty(k,v[k])}}catch(e){}`;

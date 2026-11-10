@@ -44,8 +44,8 @@ export default async function Dashboard() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-10">
       <header className="mb-8">
-        <p className="text-[13px] text-slate-500">Dashboard</p>
-        <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em]">Welcome back, {me.full_name.split(" ")[0]}</h1>
+        <p className="mb-1.5 flex items-center gap-2 text-[13px] font-medium text-tint-700"><span aria-hidden className="h-px w-5 bg-tint-500" />Dashboard</p>
+        <h1 className="text-[26px] font-serif font-semibold tracking-[-0.01em] text-brand-950">Welcome back, {me.full_name.split(" ")[0]}</h1>
         <div className="mt-4 flex flex-wrap gap-2"><Link href="/school/results" className="btn btn-primary">Enter scores</Link><Link href="/teacher" className="btn btn-outline">My teaching day</Link><Link href="/exams" className="btn btn-outline">Exams</Link></div>
       </header>
 

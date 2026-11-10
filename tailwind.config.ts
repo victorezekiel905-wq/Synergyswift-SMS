@@ -17,6 +17,8 @@ const config: Config = {
         // The school's own colour (src/lib/theme.ts). The defaults (the calm navy) are in globals.css.
         brand: Object.fromEntries([50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
           .map(s => [s, `rgb(var(--brand-${s}) / <alpha-value>)`])),
+        // The school's second colour, for small details only (src/lib/theme.ts; brass by default).
+        tint: Object.fromEntries([100, 300, 500, 700].map(s => [s, `rgb(var(--tint-${s}) / <alpha-value>)`])),
         canvas: "#f6f7f9",
         // The logo: the ink of the tile and the brass of the centre jewel. Brand pages only, used sparingly.
         navy: "#1b2d55",
