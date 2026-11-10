@@ -8,22 +8,8 @@ import { computeClassResults, midtermScheme, midtermParts, projectScore, cumulat
 import { schemeFor, subjectPartsFor, termLabel, studentName } from "./school";
 import { signPublishedCards } from "./report-sign";
 
-const PAGE = 1000;
-
-/**
- * Reads every row of a query. Supabase returns at most 1000 rows per request
- * (the API's "max rows" setting, which .limit() cannot raise), so a big class
- * would otherwise lose scores silently. `build` must order by a unique key.
- */
-export async function fetchAll<T>(build: () => any): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await build().range(from, from + PAGE - 1);
-    if (error) throw new Error(error.message);
-    out.push(...(data ?? []));
-    if (!data || data.length < PAGE) return out;
-  }
-}
+import { fetchAll } from "./fetch-all";
+export { fetchAll };
 
 export type CardKind = "term" | "midterm";
 

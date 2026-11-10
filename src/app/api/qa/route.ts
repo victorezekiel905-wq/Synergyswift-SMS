@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchAllSafe } from "@/lib/fetch-all";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { currentTerm, startOfTodayIso } from "@/lib/school";
@@ -25,9 +26,10 @@ export async function GET() {
   if (term) {
     const [{ data: offerings }, { data: students }, { data: comps }, { data: scores }] = await Promise.all([
       sb.from("subject_offerings").select("class_group_id,subject_id,class_groups(name),subjects(name)").eq("tenant_id", tid),
-      sb.from("students").select("id,class_group_id").eq("tenant_id", tid).eq("status", "active"),
+      // Counted below, so every row is read: one class's scores alone pass the API's 1000-row stop.
+      fetchAllSafe<any>(() => sb.from("students").select("id,class_group_id").eq("tenant_id", tid).eq("status", "active").order("id")).then(data => ({ data })),
       sb.from("grading_schemes").select("is_default,grading_components(id)").eq("tenant_id", tid).eq("is_default", true).limit(1),
-      sb.from("score_entries").select("student_id,subject_id").eq("tenant_id", tid).eq("term_id", term.id).limit(200000)
+      fetchAllSafe<any>(() => sb.from("score_entries").select("student_id,subject_id").eq("tenant_id", tid).eq("term_id", term.id).order("id"), 1_000_000).then(data => ({ data }))
     ]);
     const nComp = comps?.[0]?.grading_components?.length ?? 1;
     const perClass: Record<string, number> = {};
@@ -47,11 +49,11 @@ export async function GET() {
 
   const since30 = new Date(Date.now() - 30 * 86400_000).toISOString();
   const [staffIn, overdue, pendingReq, pendingLeave, outbox] = await Promise.all([
-    sb.from("gate_events").select("late").eq("tenant_id", tid).eq("person_type", "staff").eq("direction", "in").gte("at", since30).limit(20000),
+    fetchAllSafe<any>(() => sb.from("gate_events").select("late").eq("tenant_id", tid).eq("person_type", "staff").eq("direction", "in").gte("at", since30).order("id")).then(data => ({ data })),
     sb.from("library_loans").select("id", { count: "exact", head: true }).eq("tenant_id", tid).is("returned_at", null).lt("due_at", new Date().toISOString()),
     sb.from("requisitions").select("id", { count: "exact", head: true }).eq("tenant_id", tid).eq("status", "submitted"),
     sb.from("leave_requests").select("id", { count: "exact", head: true }).eq("tenant_id", tid).eq("status", "pending"),
-    sb.from("message_outbox").select("status").eq("tenant_id", tid).gte("created_at", since30).limit(20000)
+    fetchAllSafe<any>(() => sb.from("message_outbox").select("status").eq("tenant_id", tid).gte("created_at", since30).order("id")).then(data => ({ data }))
   ]);
   const ins = staffIn.data ?? [];
   const msgs = outbox.data ?? [];

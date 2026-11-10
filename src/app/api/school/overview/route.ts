@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchAll, fetchAllSafe } from "@/lib/fetch-all";
 import { requireCtx, ROLES } from "@/lib/auth";
 import { currentTerm, startOfTodayIso } from "@/lib/school";
 
@@ -15,7 +16,7 @@ export async function GET() {
     head("staff").neq("status", "exited"),
     head("guardians"),
     head("class_groups"),
-    sb.from("gate_events").select("person_type,direction,late,student_id,staff_id").eq("tenant_id", tid).gte("at", today).limit(20000),
+    fetchAllSafe<any>(() => sb.from("gate_events").select("person_type,direction,late,student_id,staff_id").eq("tenant_id", tid).gte("at", today).order("id")).then(data => ({ data })),
     head("requisitions").eq("status", "submitted"),
     head("leave_requests").eq("status", "pending"),
     head("exams").eq("status", "published"),

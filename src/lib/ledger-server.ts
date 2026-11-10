@@ -30,13 +30,13 @@ export async function loadLedger(svc: any, tenantId: string, to: string) {
   const [mappings, invoices, payments, expenses, petty, payroll, wallet, journals] = await Promise.all([
     svc.from("ledger_mappings").select("source,key,account_id").eq("tenant_id", tenantId).then((r: any) => r.data ?? []),
     fetchAll<any>(() => svc.from("fee_invoices").select("id,invoice_no,created_at,status,voided_at,fee_invoice_lines(kind,amount,fee_item_id)")
-      .eq("tenant_id", tenantId).lte("created_at", end).order("created_at")),
+      .eq("tenant_id", tenantId).lte("created_at", end).order("created_at").order("id")),
     fetchAll<any>(() => svc.from("fee_payments").select("reference,receipt_no,amount,method,paid_at,fee_invoices(invoice_no)")
       .eq("tenant_id", tenantId).eq("status", "success").not("paid_at", "is", null).lte("paid_at", end).order("paid_at")),
     fetchAll<any>(() => svc.from("expenses").select("id,category,description,amount,spent_on,method").eq("tenant_id", tenantId).lte("spent_on", to).order("spent_on")),
     fetchAll<any>(() => svc.from("petty_cash_moves").select("kind,amount,on_date,note,petty_cash_floats(name)").eq("tenant_id", tenantId).neq("kind", "spend").lte("on_date", to).order("on_date")),
     svc.from("payroll_runs").select("period,status,gross,deductions,net,employer_total,approved_at,paid_at").eq("tenant_id", tenantId).in("status", ["approved", "paid"]).then((r: any) => r.data ?? []),
-    fetchAll<any>(() => svc.from("wallet_transactions").select("kind,amount,method,created_at,reference").eq("tenant_id", tenantId).eq("status", "success").lte("created_at", end).order("created_at")),
+    fetchAll<any>(() => svc.from("wallet_transactions").select("kind,amount,method,created_at,reference").eq("tenant_id", tenantId).eq("status", "success").lte("created_at", end).order("created_at").order("id")),
     fetchAll<any>(() => svc.from("journal_entries").select("entry_no,entry_date,memo,journal_lines(account_id,debit,credit,description)")
       .eq("tenant_id", tenantId).eq("status", "posted").lte("entry_date", to).order("entry_date"))
   ]);

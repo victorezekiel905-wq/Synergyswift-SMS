@@ -13,6 +13,7 @@ import { feeReminder } from "./messaging/notices";
 import { reminderDue, lateFee, installmentStatus, statement, aging } from "./fee-rules";
 import { studentName } from "./school";
 import { localParts } from "./attendance";
+import { fetchAll } from "./fetch-all";
 
 // ---------------- payment methods ----------------
 
@@ -105,9 +106,9 @@ export async function runFeeAutomation(svc: any, baseUrl: string) {
   let reminded = 0, lateFees = 0;
   for (const t of tenants ?? []) {
     const today = localParts(new Date(), t.tenants?.timezone ?? "Africa/Lagos").date;
-    const { data: invoices } = await svc.from("fee_invoices").select("id,student_id,title,total,amount_paid,due_date,pay_token,late_fee_applied_at,last_reminded_at,students(first_name,last_name,other_names),invoice_installments(id,seq,amount,due_date,late_fee_applied)")
-      .eq("tenant_id", t.tenant_id).in("status", ["issued", "part_paid"]).not("due_date", "is", null).limit(5000);
-    for (const inv of invoices ?? []) {
+    const invoices = await fetchAll<any>(() => svc.from("fee_invoices").select("id,student_id,title,total,amount_paid,due_date,pay_token,late_fee_applied_at,last_reminded_at,students(first_name,last_name,other_names),invoice_installments(id,seq,amount,due_date,late_fee_applied)")
+      .eq("tenant_id", t.tenant_id).in("status", ["issued", "part_paid"]).not("due_date", "is", null).order("id"));
+    for (const inv of invoices) {
       const balance = Number(inv.total) - Number(inv.amount_paid);
       if (balance <= 0) continue;
       const insts = installmentStatus((inv.invoice_installments ?? []).map((i: any) => ({ ...i, amount: Number(i.amount) })), Number(inv.amount_paid), today);
@@ -155,11 +156,13 @@ export async function studentStatement(svc: any, tenantId: string, studentIds: s
 }
 
 export async function debtAging(svc: any, tenantId: string, today: string, classGroupId?: string | null) {
-  let q = svc.from("fee_invoices").select("id,student_id,invoice_no,title,total,amount_paid,due_date,students!inner(first_name,last_name,other_names,admission_no,class_group_id,class_groups(name))")
-    .eq("tenant_id", tenantId).in("status", ["issued", "part_paid"]).limit(20000);
-  if (classGroupId) q = q.eq("students.class_group_id", classGroupId);
-  const { data } = await q;
-  const rows = (data ?? []).map((i: any) => ({ ...i, balance: Math.round((Number(i.total) - Number(i.amount_paid)) * 100) / 100 })).filter((i: any) => i.balance > 0);
+  const data = await fetchAll<any>(() => {
+    let q = svc.from("fee_invoices").select("id,student_id,invoice_no,title,total,amount_paid,due_date,students!inner(first_name,last_name,other_names,admission_no,class_group_id,class_groups(name))")
+      .eq("tenant_id", tenantId).in("status", ["issued", "part_paid"]);
+    if (classGroupId) q = q.eq("students.class_group_id", classGroupId);
+    return q.order("id");
+  });
+  const rows = data.map((i: any) => ({ ...i, balance: Math.round((Number(i.total) - Number(i.amount_paid)) * 100) / 100 })).filter((i: any) => i.balance > 0);
   const byStudent = new Map<string, { name: string; admission_no: string; class_name: string | null; balance: number; oldest_due: string | null; invoices: number }>();
   for (const r of rows) {
     const cur = byStudent.get(r.student_id) ?? { name: studentName(r.students), admission_no: r.students?.admission_no, class_name: r.students?.class_groups?.name ?? null, balance: 0, oldest_due: null, invoices: 0 };

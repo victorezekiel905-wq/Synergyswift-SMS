@@ -7,6 +7,7 @@ import { notifyGuardians } from "./notify";
 import { communityNote } from "./messaging/notices";
 import { staffRows, enqueue, tryDispatch, formatInZone } from "./messaging/outbox";
 import { studentName } from "./school";
+import { fetchAllSafe } from "./fetch-all";
 import { requestDays, closedDates, addDays, localParts, zonedToUtc, staffDay, summarize, schoolDays, type DevicePunch, type Mark } from "./attendance";
 import { personByIdentifier, recordGateEvent, type GateMethod } from "./gate";
 
@@ -193,15 +194,12 @@ export async function alertMissedLessons(svc: any, p: { tenantId: string; timezo
 // ---------------- analytics ----------------
 
 export async function loadMarks(svc: any, tenantId: string, from: string, to: string, classGroupId?: string | null) {
-  const out: { student_id: string; date: string; status: Mark; class_group_id: string | null }[] = [];
-  for (let page = 0; page < 40; page++) {
-    let q = svc.from("class_attendance").select("student_id,date,status,class_group_id").eq("tenant_id", tenantId).gte("date", from).lte("date", to).order("date").range(page * 1000, page * 1000 + 999);
+  // Paged by a unique order (date alone let rows slip between pages) and without a 40,000-row stop.
+  return fetchAllSafe<{ student_id: string; date: string; status: Mark; class_group_id: string | null }>(() => {
+    let q = svc.from("class_attendance").select("student_id,date,status,class_group_id").eq("tenant_id", tenantId).gte("date", from).lte("date", to);
     if (classGroupId) q = q.eq("class_group_id", classGroupId);
-    const { data } = await q;
-    out.push(...(data ?? []));
-    if (!data || data.length < 1000) break;
-  }
-  return out;
+    return q.order("date").order("id");
+  }, 500_000);
 }
 
 export { summarize, formatInZone };

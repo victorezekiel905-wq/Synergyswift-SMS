@@ -7,6 +7,7 @@ import { admissionNote } from "@/lib/messaging/notices";
 import { nextStep, promiseState, LEVELS } from "@/lib/collections";
 import { initializePayment, providerConfigured, newReference, verifyPayment, matchesExpected, type Provider } from "@/lib/payments";
 import { financeSettings } from "@/lib/fees";
+import { fetchAll, chunks } from "@/lib/fetch-all";
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
 const daysBetween = (a: string, b: string) => Math.floor((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000);
@@ -14,15 +15,20 @@ const daysBetween = (a: string, b: string) => Math.floor((new Date(b).getTime() 
 /** Every family that owes, with balance, age, promises, last contact, escalation and the suggested next step. */
 export async function loadCollections(svc: any, tenantId: string) {
   const today = day(new Date());
-  const { data: invoices } = await svc.from("fee_invoices").select("id,student_id,total,amount_paid,due_date,pay_token,status")
-    .eq("tenant_id", tenantId).not("status", "in", "(paid,void)").limit(20000);
-  const owing = (invoices ?? []).filter((i: any) => Number(i.total) - Number(i.amount_paid ?? 0) > 0.005);
+  // Every unpaid invoice (the API stops at 1000), and the families read in parts.
+  const invoices = await fetchAll<any>(() => svc.from("fee_invoices").select("id,student_id,total,amount_paid,due_date,pay_token,status")
+    .eq("tenant_id", tenantId).not("status", "in", "(paid,void)").order("id"));
+  const owing = invoices.filter((i: any) => Number(i.total) - Number(i.amount_paid ?? 0) > 0.005);
   const sids = [...new Set(owing.map((i: any) => i.student_id))] as string[];
   if (!sids.length) return { families: [], total: 0 };
-  const [{ data: links }, { data: students }] = await Promise.all([
-    svc.from("student_guardians").select("student_id,guardian_id,is_primary,guardians(id,full_name,phone,email,whatsapp_phone)").eq("tenant_id", tenantId).in("student_id", sids),
-    svc.from("students").select("id,first_name,last_name,class_groups(name)").in("id", sids)
-  ]);
+  const links: any[] = [], students: any[] = [];
+  for (const part of chunks(sids, 200)) {
+    const [l, s] = await Promise.all([
+      svc.from("student_guardians").select("student_id,guardian_id,is_primary,guardians(id,full_name,phone,email,whatsapp_phone)").eq("tenant_id", tenantId).in("student_id", part),
+      svc.from("students").select("id,first_name,last_name,class_groups(name)").eq("tenant_id", tenantId).in("id", part)
+    ]);
+    links.push(...(l.data ?? [])); students.push(...(s.data ?? []));
+  }
   // One family per child: the primary guardian, else the first linked.
   const familyOf = new Map<string, any>();
   for (const l of (links ?? []).sort((a: any, b: any) => Number(b.is_primary) - Number(a.is_primary))) if (!familyOf.has(l.student_id) && l.guardians) familyOf.set(l.student_id, l.guardians);
@@ -38,11 +44,18 @@ export async function loadCollections(svc: any, tenantId: string) {
     fam.set(g.id, f);
   }
   const gids = [...fam.keys()];
-  const [{ data: contacts }, { data: promises }, { data: cases }] = await Promise.all([
-    svc.from("crm_interactions").select("guardian_id,occurred_at,kind,body").eq("tenant_id", tenantId).in("guardian_id", gids).order("occurred_at", { ascending: false }).limit(10000),
-    svc.from("fee_promises").select("*").eq("tenant_id", tenantId).in("guardian_id", gids).order("created_at", { ascending: false }).limit(10000),
-    svc.from("fee_collection_cases").select("*").eq("tenant_id", tenantId).in("guardian_id", gids)
-  ]);
+  const contacts: any[] = [], promises: any[] = [], cases: any[] = [];
+  for (const part of chunks(gids, 200)) {
+    const [c, p, k] = await Promise.all([
+      fetchAll<any>(() => svc.from("crm_interactions").select("guardian_id,occurred_at,kind,body").eq("tenant_id", tenantId).in("guardian_id", part).order("occurred_at", { ascending: false }).order("id")),
+      fetchAll<any>(() => svc.from("fee_promises").select("*").eq("tenant_id", tenantId).in("guardian_id", part).order("created_at", { ascending: false }).order("id")),
+      fetchAll<any>(() => svc.from("fee_collection_cases").select("*").eq("tenant_id", tenantId).in("guardian_id", part).order("id"))
+    ]);
+    contacts.push(...c); promises.push(...p); cases.push(...k);
+  }
+  // Newest first across the parts, as one query gave.
+  contacts.sort((a, b) => String(b.occurred_at).localeCompare(String(a.occurred_at)));
+  promises.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
   const nameOf = (sid: string) => { const s = (students ?? []).find((x: any) => x.id === sid); return s ? { id: sid, name: `${s.first_name} ${s.last_name}`, class_name: s.class_groups?.name ?? null } : { id: sid, name: "", class_name: null }; };
   const families = gids.map(gid => {
     const f = fam.get(gid);

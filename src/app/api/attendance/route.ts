@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchAll, fetchAllSafe } from "@/lib/fetch-all";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -26,7 +27,8 @@ export async function GET(req: NextRequest) {
   if (u.searchParams.get("format") === "csv" || u.searchParams.get("from")) {
     const from = u.searchParams.get("from") ?? new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
     const to = u.searchParams.get("to") ?? new Date().toISOString().slice(0, 10);
-    const { data: rows } = ids.length ? await ctx.sb.from("class_attendance").select("student_id,date,status").eq("tenant_id", tid).in("student_id", ids).gte("date", from).lte("date", to).limit(50000) : { data: [] };
+    // A class over a term is thousands of marks: read them all (the API stops at 1000, which made the rates wrong).
+    const rows = ids.length ? await fetchAll<any>(() => ctx.sb.from("class_attendance").select("student_id,date,status").eq("tenant_id", tid).in("student_id", ids).gte("date", from).lte("date", to).order("id")) : [];
     const stats = new Map<string, Record<string, number>>();
     for (const r of rows ?? []) { const m = stats.get(r.student_id) ?? { present: 0, absent: 0, late: 0, excused: 0 }; m[r.status]++; stats.set(r.student_id, m); }
     const out = (students ?? []).map((s: any) => {

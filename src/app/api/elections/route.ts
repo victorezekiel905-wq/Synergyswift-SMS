@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { fetchAll } from "@/lib/fetch-all";
 import { appUrl } from "@/lib/school";
 import { notifyContact } from "@/lib/notify";
 import { admissionNote } from "@/lib/messaging/notices";
@@ -156,12 +157,14 @@ async function tellVoters(e: any, what: "open" | "publish", base: string) {
     : [`The results of ${e.title} are out.`];
   const people: { name: string; email: string | null; phone: string | null }[] = [];
   if (["parents", "everyone"].includes(e.audience)) {
-    let q = svc.from("student_guardians").select("guardians!inner(id,full_name,email,phone,user_id),students!inner(status,class_group_id)")
-      .eq("tenant_id", e.tenant_id).eq("students.status", "active").not("guardians.user_id", "is", null).limit(20000);
-    if (e.class_group_ids?.length) q = q.in("students.class_group_id", e.class_group_ids);
-    const { data } = await q;
+    const data = await fetchAll<any>(() => {
+      let q = svc.from("student_guardians").select("guardians!inner(id,full_name,email,phone,user_id),students!inner(status,class_group_id)")
+        .eq("tenant_id", e.tenant_id).eq("students.status", "active").not("guardians.user_id", "is", null);
+      if (e.class_group_ids?.length) q = q.in("students.class_group_id", e.class_group_ids);
+      return q.order("student_id").order("guardian_id");
+    });
     const seen = new Set<string>();
-    for (const r of data ?? []) {
+    for (const r of data) {
       const g = (r as any).guardians;
       if (!g || seen.has(g.id)) continue;
       seen.add(g.id);
@@ -169,8 +172,8 @@ async function tellVoters(e: any, what: "open" | "publish", base: string) {
     }
   }
   if (["staff", "everyone"].includes(e.audience)) {
-    const { data } = await svc.from("users").select("full_name,email,phone,role,active").eq("tenant_id", e.tenant_id).not("role", "in", "(student,parent,alumni)").limit(5000);
-    for (const u of data ?? []) if ((u as any).active !== false) people.push({ name: (u as any).full_name, email: (u as any).email, phone: (u as any).phone ?? null });
+    const data = await fetchAll<any>(() => svc.from("users").select("full_name,email,phone,role,active").eq("tenant_id", e.tenant_id).not("role", "in", "(student,parent,alumni)").order("id"));
+    for (const u of data) if ((u as any).active !== false) people.push({ name: (u as any).full_name, email: (u as any).email, phone: (u as any).phone ?? null });
   }
   let sent = 0;
   for (const p of people) {

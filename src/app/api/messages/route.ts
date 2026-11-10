@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, denyUnless } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { fetchAll } from "@/lib/fetch-all";
 import { guardiansByStudent, rowsForGuardian, enqueue, tryDispatch, loadBrand, type OutboxRow, type Guardian } from "@/lib/messaging/outbox";
 import { broadcast } from "@/lib/messaging/templates";
 import { emailConfigured, whatsappConfigured, smsConfigured } from "@/lib/messaging/providers";
@@ -57,10 +58,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, delivery });
   }
 
-  let sq = svc.from("students").select("id").eq("tenant_id", tid).eq("status", "active");
-  if (b.class_group_ids.length) sq = sq.in("class_group_id", b.class_group_ids);
-  const { data: students } = await sq.limit(20000);
-  const ids = (students ?? []).map((s: { id: string }) => s.id);
+  // Every student (the API stops at 1000 a request; the rest of the families got nothing).
+  const students = await fetchAll<{ id: string }>(() => {
+    let sq = svc.from("students").select("id").eq("tenant_id", tid).eq("status", "active");
+    if (b.class_group_ids.length) sq = sq.in("class_group_id", b.class_group_ids);
+    return sq.order("id");
+  });
+  const ids = students.map(s => s.id);
   if (!ids.length) return jsonError("no students in the selected classes");
   const byStudent = await guardiansByStudent(svc, tid, ids);
   const brand = await loadBrand(svc, tid);

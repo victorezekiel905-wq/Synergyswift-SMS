@@ -79,12 +79,12 @@ export async function loadFamilies(svc: any, tenantId: string, only?: string): P
   const byStudents = (q: any) => (only ? q.in("student_id", studentIds.length ? studentIds : ["00000000-0000-0000-0000-000000000000"]) : q);
   const [invoices, nps, tickets, rates, round, referrals, interactions, convos] = await Promise.all([
     fetchAll<any>(() => byStudents(svc.from("fee_invoices").select("id,student_id,total,amount_paid,due_date").eq("tenant_id", tenantId).in("status", ["issued", "part_paid"]).order("id"))),
-    fetchAll<any>(() => byG(svc.from("survey_responses").select("guardian_id,nps,created_at").eq("tenant_id", tenantId).not("guardian_id", "is", null).not("nps", "is", null).order("created_at", { ascending: false }))),
+    fetchAll<any>(() => byG(svc.from("survey_responses").select("guardian_id,nps,created_at").eq("tenant_id", tenantId).not("guardian_id", "is", null).not("nps", "is", null).order("created_at", { ascending: false }).order("id"))),
     fetchAll<any>(() => byG(svc.from("tickets").select("guardian_id,status,respond_due_at,resolve_due_at,first_response_at,resolved_at").eq("tenant_id", tenantId).not("guardian_id", "is", null).not("status", "in", `(${DONE.join(",")})`).order("id"))),
     fetchAll<any>(() => svc.rpc("attendance_rates", { p_tenant: tenantId, p_since: since30 }).order("student_id")),
     openRound(svc, tenantId),
     fetchAll<any>(() => { const q = svc.from("admission_leads").select("referred_by").eq("tenant_id", tenantId).not("referred_by", "is", null).order("id"); return only ? q.eq("referred_by", only) : q; }),
-    fetchAll<any>(() => byG(svc.from("crm_interactions").select("guardian_id,occurred_at").eq("tenant_id", tenantId).not("guardian_id", "is", null).gte("occurred_at", yearAgo).order("occurred_at", { ascending: false }))),
+    fetchAll<any>(() => byG(svc.from("crm_interactions").select("guardian_id,occurred_at").eq("tenant_id", tenantId).not("guardian_id", "is", null).gte("occurred_at", yearAgo).order("occurred_at", { ascending: false }).order("id"))),
     fetchAll<any>(() => byG(svc.from("conversations").select("guardian_id,last_message_at").eq("tenant_id", tenantId).gte("last_message_at", yearAgo).order("id")))
   ]);
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchAllSafe } from "@/lib/fetch-all";
 import { requireCtx, ROLES } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { localDate } from "@/lib/staff-time";
@@ -24,7 +25,7 @@ export async function GET() {
   const open = (e: any) => e.status === "published" && (!e.opens_at || Date.parse(e.opens_at) <= t) && (!e.closes_at || Date.parse(e.closes_at) >= t);
   const live = (exams ?? []).filter(open);
   const ids = (exams ?? []).map((e: any) => e.id);
-  const { data: attempts } = ids.length ? await svc.from("exam_attempts").select("exam_id,status,violations").eq("tenant_id", tid).in("exam_id", ids).limit(20000) : { data: [] };
+  const attempts = ids.length ? await fetchAllSafe<any>(() => svc.from("exam_attempts").select("exam_id,status,violations").eq("tenant_id", tid).in("exam_id", ids).order("id")) : [];
   const by = new Map<string, any[]>();
   for (const a of attempts ?? []) by.set(a.exam_id, [...(by.get(a.exam_id) ?? []), a]);
   const count = (id: string, f: (a: any) => boolean) => (by.get(id) ?? []).filter(f).length;

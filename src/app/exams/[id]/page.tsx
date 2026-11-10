@@ -519,12 +519,20 @@ function Marking({ exam, reload: reloadExam }: { exam: Exam; reload: () => void 
     setMsg({ ok: r.ok, text: r.ok ? `Results released to students.${push ? ` ${r.data.pushed} scores pushed to the report-card score sheet.` : ""}${r.data.still_running ? ` ${r.data.still_running} students are still writing.` : ""}` : r.error ?? "failed" });
     if (r.ok) { reload(); reloadExam(); }
   }
+  async function remarkAll() {
+    const r = await send<{ remarked: number; changed: number; pushed_scores_outdated: boolean }>(`/api/exams/${exam.id}/attempts`, { action: "remark_all" }, "PATCH");
+    setMsg({ ok: r.ok, text: r.ok
+      ? `Marked ${r.data.remarked} script${r.data.remarked === 1 ? "" : "s"} again: ${r.data.changed ? `${r.data.changed} score${r.data.changed === 1 ? "" : "s"} changed.` : "no score changed."}${r.data.changed && r.data.pushed_scores_outdated ? " Use \"Release and push to report cards\" to update the score sheet." : ""}`
+      : r.error ?? "failed" });
+    if (r.ok) reload();
+  }
   const list = (data?.attempts ?? []).filter(a => ["submitted", "graded"].includes(a.status));
   return (
     <div>
       <div className="mb-4 flex flex-wrap gap-2">
         <button className="btn btn-primary" onClick={() => release(false)}>Release results to students</button>
         <button className="btn btn-outline" onClick={() => confirm("Push every graded score into the term score sheet for the chosen component?") && release(true)}>Release and push to report cards</button>
+        <button className="btn btn-outline" title="Marks every handed-in script again with the current answers. Your own marks are kept." onClick={() => confirm("Mark every handed-in script again with the current answer key? Marks you gave by hand are kept.") && remarkAll()}>Re-mark all scripts</button>
         <a className="btn btn-ghost ml-auto" href={`/api/exams/${exam.id}/attempts?format=csv`}>Download marks (CSV)</a>
       </div>
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}

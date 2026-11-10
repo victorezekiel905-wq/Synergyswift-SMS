@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchAll, fetchAllSafe } from "@/lib/fetch-all";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { riskScore } from "@/lib/risk";
@@ -16,21 +17,23 @@ export async function GET(req: NextRequest) {
   const cg = new URL(req.url).searchParams.get("class_group_id");
   let sq = ctx.sb.from("students").select("id,admission_no,first_name,last_name,other_names,class_group_id,class_groups(name)").eq("tenant_id", tid).eq("status", "active");
   if (cg) sq = sq.eq("class_group_id", cg);
-  const { data: students } = await sq.limit(5000);
-  const ids = (students ?? []).map((s: any) => s.id);
+  const students = await fetchAll<any>(() => sq.order("id"));
+  const ids = students.map((s: any) => s.id);
   if (!ids.length) return NextResponse.json({ students: [], interventions: [], term: null });
 
   const term = await currentTerm(ctx.sb, tid);
   const since = new Date(Date.now() - 30 * 86400_000);
   const chunk = <T,>(arr: T[], n = 400) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
   const att: any[] = [], beh: any[] = [], cards: any[] = [];
-  for (const part of chunk(ids)) {
+  // 30 days of registers for a few hundred students is thousands of rows: read them all
+  // (the API stops at 1000 a request, which made every risk score from part of the register).
+  for (const part of chunk(ids, 200)) {
     const [a, b, c] = await Promise.all([
-      ctx.sb.from("class_attendance").select("student_id,status").eq("tenant_id", tid).in("student_id", part).gte("date", since.toISOString().slice(0, 10)).limit(50000),
-      ctx.sb.from("behaviour_records").select("student_id,points").eq("tenant_id", tid).eq("kind", "negative").in("student_id", part).gte("occurred_at", since.toISOString()).limit(50000),
-      ctx.sb.from("report_cards").select("student_id,term_id,average,computed_at,data").eq("tenant_id", tid).eq("kind", "term").in("student_id", part).order("computed_at", { ascending: false }).limit(20000)
+      fetchAll<any>(() => ctx.sb.from("class_attendance").select("student_id,status").eq("tenant_id", tid).in("student_id", part).gte("date", since.toISOString().slice(0, 10)).order("id")),
+      fetchAll<any>(() => ctx.sb.from("behaviour_records").select("student_id,points").eq("tenant_id", tid).eq("kind", "negative").in("student_id", part).gte("occurred_at", since.toISOString()).order("id")),
+      fetchAll<any>(() => ctx.sb.from("report_cards").select("student_id,term_id,average,computed_at,data").eq("tenant_id", tid).eq("kind", "term").in("student_id", part).order("computed_at", { ascending: false }).order("id"))
     ]);
-    att.push(...(a.data ?? [])); beh.push(...(b.data ?? [])); cards.push(...(c.data ?? []));
+    att.push(...a); beh.push(...b); cards.push(...c);
   }
   const classIds = [...new Set((students ?? []).map((s: any) => s.class_group_id).filter(Boolean))];
   const { data: hw } = classIds.length ? await ctx.sb.from("homework").select("id,class_group_id").eq("tenant_id", tid).in("class_group_id", classIds)

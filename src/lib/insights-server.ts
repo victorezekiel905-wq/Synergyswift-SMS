@@ -93,8 +93,8 @@ export async function financeInsights(svc: any, tenantId: string, timeZone: stri
   const months = monthsBack(monthOf(new Date().toISOString(), timeZone), 12);
   const since = `${months[0]}-01`;
   const [payments, invoices, termInv] = await Promise.all([
-    fetchAll<any>(() => svc.from("fee_payments").select("amount,method,paid_at,created_at").eq("tenant_id", tenantId).eq("status", "success").gte("created_at", since).order("created_at")),
-    fetchAll<any>(() => svc.from("fee_invoices").select("total,created_at,status").eq("tenant_id", tenantId).neq("status", "void").gte("created_at", since).order("created_at")),
+    fetchAll<any>(() => svc.from("fee_payments").select("amount,method,paid_at,created_at").eq("tenant_id", tenantId).eq("status", "success").gte("created_at", since).order("created_at").order("id")),
+    fetchAll<any>(() => svc.from("fee_invoices").select("total,created_at,status").eq("tenant_id", tenantId).neq("status", "void").gte("created_at", since).order("created_at").order("id")),
     termId ? fetchAll<any>(() => svc.from("fee_invoices").select("id,total,amount_paid,status,students(class_groups(name))").eq("tenant_id", tenantId).eq("term_id", termId).order("id")) : Promise.resolve([])
   ]);
   const methods = new Map<string, number>();
@@ -110,7 +110,7 @@ export async function financeInsights(svc: any, tenantId: string, timeZone: stri
 /** Admissions over the last year: applications by month and by source, and where they stand. */
 export async function admissionsInsights(svc: any, tenantId: string, timeZone: string) {
   const months = monthsBack(monthOf(new Date().toISOString(), timeZone), 12);
-  const apps = await fetchAll<any>(() => svc.from("applications").select("status,source,created_at,applying_for").eq("tenant_id", tenantId).gte("created_at", `${months[0]}-01`).order("created_at"));
+  const apps = await fetchAll<any>(() => svc.from("applications").select("status,source,created_at,applying_for").eq("tenant_id", tenantId).gte("created_at", `${months[0]}-01`).order("created_at").order("id"));
   const statuses = ["new", "reviewing", "assessment", "interview", "offered", "accepted", "enrolled", "rejected", "withdrawn"];
   const levels = new Map<string, number>();
   for (const a of apps) levels.set(a.applying_for, (levels.get(a.applying_for) ?? 0) + 1);

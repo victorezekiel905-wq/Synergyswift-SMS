@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { fetchAll } from "@/lib/fetch-all";
 import { studentName } from "@/lib/school";
 import { CERT_KINDS, certificateText } from "@/lib/sis";
 import { certificateFacts, issueCertificate } from "@/lib/sis-server";
@@ -18,16 +19,17 @@ export async function GET(req: NextRequest) {
     .eq("tenant_id", tid).order("created_at", { ascending: false }).limit(500);
   const kind = u.get("kind");
   if (kind && (CERT_KINDS as readonly string[]).includes(kind)) q = q.eq("kind", kind);
-  const [{ data, error }, { data: classes }, { data: students }, { data: s }] = await Promise.all([
+  const [{ data, error }, { data: classes }, students, { data: s }] = await Promise.all([
     q,
     ctx.sb.from("class_groups").select("id,name").eq("tenant_id", tid).order("name"),
-    ctx.sb.from("students").select("id,first_name,last_name,other_names,admission_no,class_group_id,status").eq("tenant_id", tid).in("status", ["active", "graduated", "withdrawn"]).order("first_name").limit(10000),
+    // Every student for the picker (past 1000 the API stopped and children were missing).
+    fetchAll<any>(() => ctx.sb.from("students").select("id,first_name,last_name,other_names,admission_no,class_group_id,status").eq("tenant_id", tid).in("status", ["active", "graduated", "withdrawn"]).order("first_name").order("id")),
     createServiceClient().from("tenant_settings").select("principal_name").eq("tenant_id", tid).maybeSingle()
   ]);
   if (error) return jsonError(error.message);
   return NextResponse.json({
     items: (data ?? []).map((c: any) => ({ ...c, student: c.students ? `${studentName(c.students)} (${c.students.admission_no})` : "—" })),
-    classes: classes ?? [], students: (students ?? []).map((x: any) => ({ id: x.id, name: studentName(x), admission_no: x.admission_no, class_group_id: x.class_group_id, status: x.status })),
+    classes: classes ?? [], students: students.map((x: any) => ({ id: x.id, name: studentName(x), admission_no: x.admission_no, class_group_id: x.class_group_id, status: x.status })),
     principal: s?.principal_name ?? null
   });
 }

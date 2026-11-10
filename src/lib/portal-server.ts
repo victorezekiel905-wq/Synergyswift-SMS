@@ -5,6 +5,7 @@
  */
 import { localParts, weekday, type Mark } from "./attendance";
 import { currentTerm } from "./school";
+import { fetchAllSafe } from "./fetch-all";
 import {
   dayPlan, homeworkStatus, feeSummary, attendanceRate, teacherTasks, childGlance, kpis,
   type PeriodRow, type LessonRow, type HomeworkItem, type ChildGlance, type Kpis
@@ -162,9 +163,10 @@ export async function schoolKpis(svc: any, tenantId: string, timeZone: string): 
     head("staff").neq("status", "exited"),
     head("leave_requests").eq("status", "approved").lte("starts_on", date).gte("ends_on", date),
     head("class_groups"),
-    svc.from("class_attendance").select("class_group_id,status").eq("tenant_id", tenantId).eq("date", date).limit(20000),
-    term.id ? svc.from("fee_invoices").select("total,amount_paid").eq("tenant_id", tenantId).eq("term_id", term.id).neq("status", "void").limit(20000) : { data: [] },
-    svc.from("fee_invoices").select("total,amount_paid").eq("tenant_id", tenantId).in("status", ["issued", "part_paid"]).lt("due_date", date).limit(20000),
+    // Added up below, so every row is read (the API stops at 1000 a request).
+    fetchAllSafe<any>(() => svc.from("class_attendance").select("class_group_id,status").eq("tenant_id", tenantId).eq("date", date).order("id")).then(data => ({ data })),
+    term.id ? fetchAllSafe<any>(() => svc.from("fee_invoices").select("total,amount_paid").eq("tenant_id", tenantId).eq("term_id", term.id).neq("status", "void").order("id")).then(data => ({ data })) : { data: [] },
+    fetchAllSafe<any>(() => svc.from("fee_invoices").select("total,amount_paid").eq("tenant_id", tenantId).in("status", ["issued", "part_paid"]).lt("due_date", date).order("id")).then(data => ({ data })),
     head("library_loans").is("returned_at", null).lt("due_at", now.toISOString()),
     svc.from("inventory_items").select("quantity,reorder_level").eq("tenant_id", tenantId).gt("reorder_level", 0).limit(5000),
     head("behaviour_incidents").gte("occurred_at", new Date(now.getTime() - 7 * DAY).toISOString()),

@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const { data: s } = await ctx.sb.from("surveys").select("*").eq("tenant_id", tid).eq("id", id).maybeSingle();
     if (!s) return jsonError("survey not found", 404);
     const [responses, invites] = await Promise.all([
-      fetchAll<any>(() => svc.from("survey_responses").select("id,nps,answers,created_at,guardians(id,full_name)").eq("survey_id", id).order("created_at", { ascending: false })),
+      fetchAll<any>(() => svc.from("survey_responses").select("id,nps,answers,created_at,guardians(id,full_name)").eq("survey_id", id).order("created_at", { ascending: false }).order("id")),
       fetchAll<any>(() => svc.from("survey_invites").select("responded_at").eq("survey_id", id).order("id"))
     ]);
     // Over time: NPS per month, so schools see whether things are improving.

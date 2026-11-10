@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { fetchAll } from "@/lib/fetch-all";
 import { notifyGuardians, money } from "@/lib/notify";
 import { eventInvite } from "@/lib/messaging/notices";
 import { formatInZone } from "@/lib/messaging/outbox";
@@ -49,13 +50,15 @@ export async function POST(req: NextRequest) {
   let queued = 0;
   if (notify) {
     const svc = createServiceClient();
-    let q = svc.from("students").select("id").eq("tenant_id", tid).eq("status", "active");
-    if (row.class_group_ids.length) q = q.in("class_group_id", row.class_group_ids);
-    const { data: studs } = await q.limit(20000);
+    const studs = await fetchAll<{ id: string }>(() => {
+      let q = svc.from("students").select("id").eq("tenant_id", tid).eq("status", "active");
+      if (row.class_group_ids.length) q = q.in("class_group_id", row.class_group_ids);
+      return q.order("id");
+    });
     const { data: s } = await svc.from("tenant_settings").select("currency").eq("tenant_id", tid).maybeSingle();
     const f = formatInZone(new Date(ev.starts_at), ctx.tenant.timezone);
     const base = appUrl(req);
-    const r = await notifyGuardians(svc, { tenantId: tid, studentIds: (studs ?? []).map((x: any) => x.id), kind: "event", refId: ev.id, createdBy: ctx.userId,
+    const r = await notifyGuardians(svc, { tenantId: tid, studentIds: studs.map(x => x.id), kind: "event", refId: ev.id, createdBy: ctx.userId,
       dedupeGuardians: true, budgetMs: 20_000,
       build: (brand, g) => eventInvite(brand, { guardianName: g.full_name, title: row.title, when: `${f.date} ${f.time}`, needsConsent: row.requires_consent,
         fee: row.fee > 0 ? money(row.fee, s?.currency ?? "NGN") : null, link: g.portal_token ? `${base}/g/${g.portal_token}#events` : `${base}/parent#events` }) });

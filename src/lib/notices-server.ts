@@ -10,6 +10,7 @@ import { assistConfigured, translateTexts } from "./assist";
 import { needsTranslation } from "./languages";
 import { fillTemplate, joinNames } from "./communication";
 import { ROLES } from "./auth";
+import { fetchAll } from "./fetch-all";
 
 export type Audience = { scope: "school" | "sections" | "classes" | "people"; ids?: string[]; students?: string[]; guardians?: string[]; staff?: string[] };
 export type Notice = { id: string; tenant_id: string; kind: "announcement" | "circular" | "emergency"; title: string; body: string; audience: Audience;
@@ -17,11 +18,14 @@ export type Notice = { id: string; tenant_id: string; kind: "announcement" | "ci
 
 /** The students a notice is about (for families and students). */
 async function audienceStudents(svc: any, tid: string, a: Audience) {
-  let q = svc.from("students").select("id,first_name,user_id,class_group_id,class_groups(name,section_id)").eq("tenant_id", tid).eq("status", "active").limit(20000);
-  if (a.scope === "classes") q = q.in("class_group_id", a.ids?.length ? a.ids : ["00000000-0000-0000-0000-000000000000"]);
-  if (a.scope === "people") q = q.in("id", a.students?.length ? a.students : ["00000000-0000-0000-0000-000000000000"]);
-  const { data } = await q;
-  let list = (data ?? []) as { id: string; first_name: string; user_id: string | null; class_group_id: string | null; class_groups: { name: string; section_id: string | null } | null }[];
+  // Every student, a page at a time: past 1000 the API stopped, and those families got nothing.
+  const data = await fetchAll<any>(() => {
+    let q = svc.from("students").select("id,first_name,user_id,class_group_id,class_groups(name,section_id)").eq("tenant_id", tid).eq("status", "active");
+    if (a.scope === "classes") q = q.in("class_group_id", a.ids?.length ? a.ids : ["00000000-0000-0000-0000-000000000000"]);
+    if (a.scope === "people") q = q.in("id", a.students?.length ? a.students : ["00000000-0000-0000-0000-000000000000"]);
+    return q.order("id");
+  });
+  let list = data as { id: string; first_name: string; user_id: string | null; class_group_id: string | null; class_groups: { name: string; section_id: string | null } | null }[];
   if (a.scope === "sections") list = list.filter(s => s.class_groups?.section_id && (a.ids ?? []).includes(s.class_groups.section_id));
   return list;
 }
@@ -80,8 +84,8 @@ export async function sendNotice(svc: any, n: Notice, baseUrl: string) {
     await svc.from("notice_recipients").upsert(part.filter(r => r.recipient_kind === "guardian"), { onConflict: "notice_id,guardian_id", ignoreDuplicates: true });
     await svc.from("notice_recipients").upsert(part.filter(r => r.recipient_kind !== "guardian"), { onConflict: "notice_id,user_id", ignoreDuplicates: true });
   }
-  const { data: receipts } = await svc.from("notice_recipients").select("id,recipient_kind,guardian_id,user_id,read_token,delivered_at").eq("notice_id", n.id).limit(50000);
-  const todo = (receipts ?? []).filter((r: any) => !r.delivered_at);
+  const receipts = await fetchAll<any>(() => svc.from("notice_recipients").select("id,recipient_kind,guardian_id,user_id,read_token,delivered_at").eq("notice_id", n.id).order("id"));
+  const todo = receipts.filter((r: any) => !r.delivered_at);
   const brand = await loadBrand(svc, tid);
 
   // One translation per language.
@@ -131,14 +135,14 @@ export async function sendNotice(svc: any, n: Notice, baseUrl: string) {
   for (let i = 0; i < delivered.length; i += 500) await svc.from("notice_recipients").update({ delivered_at: now }).in("id", delivered.slice(i, i + 500));
   await svc.from("notices").update({ status: "sent", sent_at: now, updated_at: now }).eq("id", n.id);
   const delivery = await tryDispatch(svc, { budgetMs: emergency ? 40_000 : 20_000, concurrency: 12 });
-  return { recipients: (receipts ?? []).length, messages: out.length, families: families.size, students: studentUsers.length, staff: staff.length, translated_into: [...versions.keys()], delivery };
+  return { recipients: receipts.length, messages: out.length, families: families.size, students: studentUsers.length, staff: staff.length, translated_into: [...versions.keys()], delivery };
 }
 
 /** Sends the notice again to people who have not read (or acknowledged) it. */
 export async function remindUnread(svc: any, n: Notice, baseUrl: string) {
   const col = n.requires_ack || n.kind === "emergency" ? "acknowledged_at" : "read_at";
-  const { data: left } = await svc.from("notice_recipients").select("id").eq("notice_id", n.id).is(col, null).limit(50000);
-  const ids = (left ?? []).map((r: any) => r.id);
+  const left = await fetchAll<{ id: string }>(() => svc.from("notice_recipients").select("id").eq("notice_id", n.id).is(col, null).order("id"));
+  const ids = left.map(r => r.id);
   for (let i = 0; i < ids.length; i += 500) await svc.from("notice_recipients").update({ delivered_at: null, reminded_at: new Date().toISOString() }).in("id", ids.slice(i, i + 500));
   if (!ids.length) return { reminded: 0 };
   const r = await sendNotice(svc, { ...n, title: `Reminder: ${n.title}` }, baseUrl);

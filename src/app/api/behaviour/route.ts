@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchAllSafe } from "@/lib/fetch-all";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -23,7 +24,8 @@ export async function GET(req: NextRequest) {
     ctx.sb.from("houses").select("*").eq("tenant_id", tid).order("name"),
     ctx.sb.from("behaviour_actions").select("id,student_id,action,status,created_at,note,students(first_name,last_name,other_names,class_groups(name))").eq("tenant_id", tid).eq("status", "open").order("created_at", { ascending: false }).limit(200),
     recQ,
-    ctx.sb.from("behaviour_records").select("points,students!inner(house_id)").eq("tenant_id", tid).gte("occurred_at", since).not("students.house_id", "is", null).limit(50000)
+    // House totals are added up here: every record counts (the API stops at 1000 a request).
+    fetchAllSafe<any>(() => ctx.sb.from("behaviour_records").select("points,students!inner(house_id)").eq("tenant_id", tid).gte("occurred_at", since).not("students.house_id", "is", null).order("id")).then(data => ({ data }))
   ]);
   const totals: Record<string, number> = {};
   for (const r of housePoints.data ?? []) { const h = (r as any).students?.house_id; if (h) totals[h] = (totals[h] ?? 0) + Number(r.points); }

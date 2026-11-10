@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchAllSafe } from "@/lib/fetch-all";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { requireCtx, readJson, jsonError, ROLES, hasAny } from "@/lib/auth";
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
   const [{ data: students }, { data: skills }, { data: events }, { data: settings }] = await Promise.all([
     svc.from("students").select("id,first_name,last_name,photo_url").eq("tenant_id", tid).eq("class_group_id", cg).eq("status", "active").order("first_name"),
     svc.from("point_skills").select("id,name,kind,points,icon,active,position").eq("tenant_id", tid).order("position"),
-    svc.from("point_events").select("id,student_id,skill_name,points,note,given_by,batch_id,created_at").eq("tenant_id", tid).eq("class_group_id", cg).gte("created_at", since).order("created_at", { ascending: false }).limit(2000),
+    fetchAllSafe<any>(() => svc.from("point_events").select("id,student_id,skill_name,points,note,given_by,batch_id,created_at").eq("tenant_id", tid).eq("class_group_id", cg).gte("created_at", since).order("created_at", { ascending: false }).order("id")).then(data => ({ data })),
     svc.from("tenant_settings").select("points_allow_needs_work").eq("tenant_id", tid).maybeSingle()
   ]);
   const totals = pointTotals(events ?? []);

@@ -7,6 +7,7 @@ import { notifyGuardians, money } from "./notify";
 import { feeReceipt, feeReminder } from "./messaging/notices";
 import { initializePayment, verifyPayment, matchesExpected, newReference, providerConfigured, type Provider } from "./payments";
 import { studentName } from "./school";
+import { fetchAll, chunks } from "./fetch-all";
 import { chargesFor, invoiceLines, siblingRanks, splitInstallments, type Rule, type Award, type Part } from "./fee-rules";
 
 export async function financeSettings(svc: any, tenantId: string) {
@@ -53,31 +54,36 @@ export async function generateInvoices(svc: any, p: { tenantId: string; termId: 
   if (p.planId && !plan) throw new Error("instalment plan not found");
 
   // Every active student (sibling order counts the whole family, not only the classes chosen).
-  const { data: all } = await svc.from("students").select("id,class_group_id,fee_category,date_of_birth,admitted_on").eq("tenant_id", p.tenantId).eq("status", "active").limit(20000);
-  const students = (all ?? []).filter((s: any) => (!p.classGroupIds.length || p.classGroupIds.includes(s.class_group_id)) && (!p.studentIds || p.studentIds.includes(s.id)));
-  const ids = (all ?? []).map((s: any) => s.id);
-  const [{ data: links }, { data: existing }, { data: choices }, { data: awards }] = await Promise.all([
-    svc.from("student_guardians").select("student_id,guardian_id,guardians(user_id)").eq("tenant_id", p.tenantId).limit(40000),
-    svc.from("fee_invoices").select("student_id").eq("tenant_id", p.tenantId).eq("term_id", p.termId).eq("title", title).neq("status", "void").limit(20000),
-    svc.from("fee_optional_choices").select("student_id,fee_item_id,term_id").eq("tenant_id", p.tenantId).limit(40000),
-    svc.from("fee_awards").select("*").eq("tenant_id", p.tenantId).not("approved_by", "is", null).limit(20000)
+  // Read in full: past 1000 rows the API stops, which made duplicate invoices and missed children.
+  const all = await fetchAll<any>(() => svc.from("students").select("id,class_group_id,fee_category,date_of_birth,admitted_on").eq("tenant_id", p.tenantId).eq("status", "active").order("id"));
+  const students = all.filter((s: any) => (!p.classGroupIds.length || p.classGroupIds.includes(s.class_group_id)) && (!p.studentIds || p.studentIds.includes(s.id)));
+  const ids = new Set(all.map((s: any) => s.id));
+  const [links, existing, choices, awards] = await Promise.all([
+    fetchAll<any>(() => svc.from("student_guardians").select("student_id,guardian_id,guardians(user_id)").eq("tenant_id", p.tenantId).order("student_id").order("guardian_id")),
+    fetchAll<any>(() => svc.from("fee_invoices").select("student_id").eq("tenant_id", p.tenantId).eq("term_id", p.termId).eq("title", title).neq("status", "void").order("id")),
+    fetchAll<any>(() => svc.from("fee_optional_choices").select("student_id,fee_item_id,term_id").eq("tenant_id", p.tenantId).order("id")),
+    fetchAll<any>(() => svc.from("fee_awards").select("*").eq("tenant_id", p.tenantId).not("approved_by", "is", null).order("id"))
   ]);
-  const ranks = siblingRanks(all ?? [], (links ?? []).filter((l: any) => ids.includes(l.student_id)));
+  const ranks = siblingRanks(all, links.filter((l: any) => ids.has(l.student_id)));
   // A child of a member of staff: a guardian who signs in as staff.
-  const guardianUsers = [...new Set((links ?? []).map((l: any) => l.guardians?.user_id).filter(Boolean))] as string[];
-  const { data: staffUsers } = guardianUsers.length ? await svc.from("users").select("id,role").in("id", guardianUsers).not("role", "in", "(parent,student,alumni)") : { data: [] };
-  const staffSet = new Set((staffUsers ?? []).map((u: any) => u.id));
-  const staffChildren = new Set((links ?? []).filter((l: any) => staffSet.has(l.guardians?.user_id)).map((l: any) => l.student_id));
-  const have = new Set((existing ?? []).map((e: { student_id: string }) => e.student_id));
+  const guardianUsers = [...new Set(links.map((l: any) => l.guardians?.user_id).filter(Boolean))] as string[];
+  const staffUsers: any[] = [];
+  for (const part of chunks(guardianUsers)) {
+    const { data } = await svc.from("users").select("id,role").in("id", part).not("role", "in", "(parent,student,alumni)");
+    staffUsers.push(...(data ?? []));
+  }
+  const staffSet = new Set(staffUsers.map((u: any) => u.id));
+  const staffChildren = new Set(links.filter((l: any) => staffSet.has(l.guardians?.user_id)).map((l: any) => l.student_id));
+  const have = new Set(existing.map((e: { student_id: string }) => e.student_id));
 
   let created = 0, skipped = 0, discounted = 0;
   for (const s of students) {
     if (have.has(s.id)) { skipped++; continue; }
-    const chosen = new Set<string>((choices ?? []).filter((c: any) => c.student_id === s.id && (!c.term_id || c.term_id === p.termId)).map((c: any) => c.fee_item_id));
+    const chosen = new Set<string>(choices.filter((c: any) => c.student_id === s.id && (!c.term_id || c.term_id === p.termId)).map((c: any) => c.fee_item_id));
     const charges = chargesFor(rows, { classGroupId: s.class_group_id, category: s.fee_category ?? null, chosenOptional: chosen });
     if (!charges.length) { skipped++; continue; }
     const lines = invoiceLines(charges, { rank: ranks.get(s.id) ?? 1, staffChild: staffChildren.has(s.id) || s.fee_category === "staff_child", category: s.fee_category ?? null,
-      rules: (rules ?? []) as Rule[], awards: ((awards ?? []) as (Award & { student_id: string })[]).filter(a => a.student_id === s.id), on: today });
+      rules: (rules ?? []) as Rule[], awards: (awards as (Award & { student_id: string })[]).filter(a => a.student_id === s.id), on: today });
     const total = lines.reduce((a, l) => a + l.amount, 0);
     const parts = plan ? splitInstallments(total, plan.parts as Part[], p.dueDate ?? today) : [];
     const { data: no } = await svc.rpc("next_doc_no", { p_tenant: p.tenantId, p_kind: "inv" });
@@ -85,7 +91,9 @@ export async function generateInvoices(svc: any, p: { tenantId: string; termId: 
       tenant_id: p.tenantId, student_id: s.id, term_id: p.termId, invoice_no: no, title, due_date: parts[0]?.due_date ?? p.dueDate ?? null, created_by: p.createdBy
     }).select("id").single();
     if (error) { skipped++; continue; }
-    await svc.from("fee_invoice_lines").insert(lines.map(l => ({ invoice_id: inv.id, tenant_id: p.tenantId, fee_item_id: l.fee_item_id, kind: l.kind, description: l.description, amount: l.amount, source: l.source })));
+    const { error: lineErr } = await svc.from("fee_invoice_lines").insert(lines.map(l => ({ invoice_id: inv.id, tenant_id: p.tenantId, fee_item_id: l.fee_item_id, kind: l.kind, description: l.description, amount: l.amount, source: l.source })));
+    // An invoice whose lines did not save would read as ₦0 (paid): remove it rather than send it.
+    if (lineErr) { await svc.from("fee_invoices").delete().eq("id", inv.id); skipped++; continue; }
     if (parts.length) await svc.from("invoice_installments").insert(parts.map(x => ({ ...x, tenant_id: p.tenantId, invoice_id: inv.id })));
     if (lines.some(l => l.amount < 0)) discounted++;
     created++;
@@ -100,7 +108,8 @@ export async function createInvoice(svc: any, p: { tenantId: string; studentId: 
     tenant_id: p.tenantId, student_id: p.studentId, title: p.title, invoice_no: no, due_date: p.dueDate ?? null, created_by: p.createdBy ?? null
   }).select("id,pay_token").single();
   if (error) throw new Error(error.message);
-  await svc.from("fee_invoice_lines").insert(p.lines.map(l => ({ invoice_id: inv.id, tenant_id: p.tenantId, fee_item_id: l.fee_item_id ?? null, description: l.description, amount: l.amount })));
+  const { error: lineErr } = await svc.from("fee_invoice_lines").insert(p.lines.map(l => ({ invoice_id: inv.id, tenant_id: p.tenantId, fee_item_id: l.fee_item_id ?? null, description: l.description, amount: l.amount })));
+  if (lineErr) { await svc.from("fee_invoices").delete().eq("id", inv.id); throw new Error(lineErr.message); }
   return inv as { id: string; pay_token: string };
 }
 
@@ -209,11 +218,13 @@ export async function confirmOnlinePayment(svc: any, reference: string, baseUrl:
 }
 
 export async function sendFeeReminders(svc: any, p: { tenantId: string; termId?: string | null; classGroupIds?: string[]; baseUrl: string; createdBy: string }) {
-  let q = svc.from("fee_invoices").select("id,student_id,title,total,amount_paid,due_date,pay_token,students!inner(first_name,last_name,other_names,class_group_id)")
-    .eq("tenant_id", p.tenantId).in("status", ["issued", "part_paid"]).limit(20000);
-  if (p.termId) q = q.eq("term_id", p.termId);
-  if (p.classGroupIds?.length) q = q.in("students.class_group_id", p.classGroupIds);
-  const { data: invoices } = await q;
+  const invoices = await fetchAll<any>(() => {
+    let q = svc.from("fee_invoices").select("id,student_id,title,total,amount_paid,due_date,pay_token,students!inner(first_name,last_name,other_names,class_group_id)")
+      .eq("tenant_id", p.tenantId).in("status", ["issued", "part_paid"]);
+    if (p.termId) q = q.eq("term_id", p.termId);
+    if (p.classGroupIds?.length) q = q.in("students.class_group_id", p.classGroupIds);
+    return q.order("id");
+  });
   const { currency } = await financeSettings(svc, p.tenantId);
   let queued = 0;
   for (const inv of invoices ?? []) {
@@ -233,7 +244,7 @@ export async function sendFeeReminders(svc: any, p: { tenantId: string; termId?:
 
 /** Outstanding balance per student for a term (used to withhold results). */
 export async function debtorsForTerm(svc: any, tenantId: string, termId: string): Promise<Set<string>> {
-  const { data } = await svc.from("fee_invoices").select("student_id,total,amount_paid")
-    .eq("tenant_id", tenantId).eq("term_id", termId).in("status", ["issued", "part_paid"]).limit(20000);
-  return new Set((data ?? []).filter((i: any) => Number(i.total) - Number(i.amount_paid) > 0).map((i: any) => i.student_id));
+  const data = await fetchAll<any>(() => svc.from("fee_invoices").select("student_id,total,amount_paid")
+    .eq("tenant_id", tenantId).eq("term_id", termId).in("status", ["issued", "part_paid"]).order("id"));
+  return new Set(data.filter((i: any) => Number(i.total) - Number(i.amount_paid) > 0).map((i: any) => i.student_id));
 }

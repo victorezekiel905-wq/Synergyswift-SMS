@@ -296,11 +296,11 @@ export async function exportTable(sb: any, tid: string, entityKey: string): Prom
       return { headers: [...headers, "status"], rows: st.map(x => [x.staff_no, x.full_name, x.email, x.phone, x.department, x.position, x.employment_type, x.hire_date, x.users?.role, x.status].map(s)) };
     }
     case "classes": {
-      const cl = await fetchAll<any>(() => sb.from("class_groups").select("name,level,school_sections(name),users:form_teacher_id(email)").eq("tenant_id", tid).order("name"));
+      const cl = await fetchAll<any>(() => sb.from("class_groups").select("name,level,school_sections(name),users:form_teacher_id(email)").eq("tenant_id", tid).order("name").order("id"));
       return { headers, rows: cl.map(x => [x.name, x.level, x.school_sections?.name, x.users?.email].map(s)) };
     }
     case "subjects": {
-      const su = await fetchAll<any>(() => sb.from("subjects").select("name,code,departments(name)").eq("tenant_id", tid).order("name"));
+      const su = await fetchAll<any>(() => sb.from("subjects").select("name,code,departments(name)").eq("tenant_id", tid).order("name").order("id"));
       return { headers, rows: su.map(x => [x.name, x.code, x.departments?.name].map(s)) };
     }
     case "class_subjects": {
@@ -316,7 +316,7 @@ export async function exportTable(sb: any, tid: string, entityKey: string): Prom
       return { headers, rows: al.map(x => headers.map(h => s(x[h]))) };
     }
     case "partners": {
-      const ps = await fetchAll<any>(() => sb.from("crm_partners").select("name,kind,category,contact_name,email,phone").eq("tenant_id", tid).order("name"));
+      const ps = await fetchAll<any>(() => sb.from("crm_partners").select("name,kind,category,contact_name,email,phone").eq("tenant_id", tid).order("name").order("id"));
       return { headers, rows: ps.map(x => headers.map(h => s(x[h]))) };
     }
   }

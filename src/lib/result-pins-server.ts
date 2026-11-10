@@ -45,7 +45,9 @@ export async function checkResult(svc: any, p: { slug: string; admissionNo: stri
   if ((ipTries ?? 0) >= TRIES.perAddress || (stTries ?? 0) >= TRIES.perStudent) return { ok: false, error: "Too many tries. Wait 15 minutes and try again.", status: 429 };
   await svc.from("result_pin_tries").insert([{ key: ipKey }, { key: stKey }]);
 
-  const { data: student } = await svc.from("students").select("id,first_name,last_name,status").eq("tenant_id", tenant.id).ilike("admission_no", p.admissionNo.trim()).maybeSingle();
+  // Matched without regard to capitals, with _ and % taken literally (in ilike they match any character).
+  const admission = p.admissionNo.trim().replace(/[\\%_]/g, m => `\\${m}`);
+  const { data: student } = await svc.from("students").select("id,first_name,last_name,status").eq("tenant_id", tenant.id).ilike("admission_no", admission).maybeSingle();
   const { data: pin } = await svc.from("result_pins").select("id,status,uses,student_id,batch_id,first_used_at").eq("tenant_id", tenant.id).eq("pin_hash", pinHash(tenant.id, p.pin)).maybeSingle();
   const { data: batch } = pin ? await svc.from("result_pin_batches").select("max_uses,expires_on,term_id").eq("id", pin.batch_id).maybeSingle() : { data: null };
   if (!student) return { ok: false, error: "We could not find that admission number with that PIN.", status: 400 };

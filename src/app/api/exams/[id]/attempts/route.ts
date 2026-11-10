@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { loadQuestions, autoSubmitIfExpired, finalizeAttempt, computeDeadline, type ExamRow } from "@/lib/exams/server";
+import { loadQuestions, autoSubmitIfExpired, finalizeAttempt, computeDeadline, remarkFinishedAttempts, type ExamRow } from "@/lib/exams/server";
 import { markAttempt, questionsForAttempt, type Mark } from "@/lib/exams/engine";
 import { studentName, toCsv } from "@/lib/school";
 
@@ -71,7 +71,8 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reopen"), attempt_id: z.string().uuid(), minutes: z.number().int().min(1).max(240) }),
   z.object({ action: z.literal("grade"), attempt_id: z.string().uuid(),
     marks: z.record(z.object({ points: z.number().min(0), feedback: z.string().max(2000).optional() })) }),
-  z.object({ action: z.literal("reset"), attempt_id: z.string().uuid() })
+  z.object({ action: z.literal("reset"), attempt_id: z.string().uuid() }),
+  z.object({ action: z.literal("remark_all") })
 ]);
 
 export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -84,6 +85,13 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
   const exam = await loadExam(ctx, params.id);
   if (!exam) return jsonError("not found", 404);
   const svc = createServiceClient();
+  if (b.action === "remark_all") {
+    // Every handed-in script marked again with today's answer key and marking (teacher marks kept).
+    const r = await remarkFinishedAttempts(svc, exam.id);
+    await ctx.sb.from("audit_logs").insert({ tenant_id: ctx.tenant.id, actor_id: ctx.userId, action: "exam.remarked", target: exam.id, meta: r });
+    const { count } = r.changed ? await svc.from("score_entries").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenant.id).eq("source", `exam:${exam.id}`) : { count: 0 };
+    return NextResponse.json({ ok: true, ...r, pushed_scores_outdated: (count ?? 0) > 0 });
+  }
   const { data: a } = await svc.from("exam_attempts").select("*").eq("tenant_id", ctx.tenant.id).eq("exam_id", exam.id).eq("id", b.attempt_id).maybeSingle();
   if (!a) return jsonError("attempt not found", 404);
   const log = (kind: string, meta: Record<string, unknown> = {}) =>

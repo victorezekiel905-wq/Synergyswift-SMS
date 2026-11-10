@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { fetchAll } from "@/lib/fetch-all";
 import { conferenceSlots } from "@/lib/communication";
 import { notifyGuardians } from "@/lib/notify";
 import { communityNote } from "@/lib/messaging/notices";
@@ -86,9 +87,9 @@ export async function POST(req: NextRequest) {
   }
   let told = 0;
   if (b.notify) {
-    const { data: kids } = await svc.from("students").select("id").eq("tenant_id", tid).eq("status", "active").in("class_group_id", b.class_group_ids).limit(20000);
+    const kids = await fetchAll<{ id: string }>(() => svc.from("students").select("id").eq("tenant_id", tid).eq("status", "active").in("class_group_id", b.class_group_ids).order("id"));
     const base = appUrl(req);
-    const r = await notifyGuardians(svc, { tenantId: tid, studentIds: (kids ?? []).map((k: any) => k.id), kind: "meeting", dedupeGuardians: true, refId: c.id,
+    const r = await notifyGuardians(svc, { tenantId: tid, studentIds: kids.map(k => k.id), kind: "meeting", dedupeGuardians: true, refId: c.id,
       build: (brand, g) => communityNote(brand, { name: g.full_name, subject: `Book your appointments: ${b.title}`,
         lines: [`${b.title} is on ${b.date}, ${b.start} to ${b.end}${b.location ? ` at ${b.location}` : ""}.`, `Book a ${b.slot_minutes}-minute appointment with each of your child's teachers in the parent portal (Meetings).`],
         link: g.user_id ? `${base}/parent#meetings` : g.portal_token ? `${base}/g/${g.portal_token}#meetings` : null, linkLabel: "Book now" }) });

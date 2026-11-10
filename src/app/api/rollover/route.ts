@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { studentName } from "@/lib/school";
 import { createServiceClient } from "@/lib/supabase/service";
+import { fetchAll, chunks } from "@/lib/fetch-all";
 
 /**
  * Year-end promotion wizard (fixes the painful "rollover" other systems are
@@ -13,16 +14,18 @@ export async function GET() {
   const ctx = await requireCtx(ROLES.admin, "sims");
   if (ctx instanceof NextResponse) return ctx;
   const tid = ctx.tenant.id;
-  const [{ data: groups }, { data: students }, { data: scheme }] = await Promise.all([
+  const [{ data: groups }, students, { data: scheme }] = await Promise.all([
     ctx.sb.from("class_groups").select("id,name,level").eq("tenant_id", tid).order("level").order("name"),
-    ctx.sb.from("students").select("id,admission_no,first_name,last_name,other_names,class_group_id").eq("tenant_id", tid).eq("status", "active").limit(20000),
+    // Every student (the API stops at 1000 a request: big schools showed empty classes).
+    fetchAll<any>(() => ctx.sb.from("students").select("id,admission_no,first_name,last_name,other_names,class_group_id").eq("tenant_id", tid).eq("status", "active").order("id")),
     ctx.sb.from("grading_schemes").select("pass_mark").eq("tenant_id", tid).eq("is_default", true).maybeSingle()
   ]);
-  const ids = (students ?? []).map((s: any) => s.id);
+  const ids = students.map((s: any) => s.id);
   const latest = new Map<string, number | null>();
-  for (let i = 0; i < ids.length; i += 400) {
-    const { data } = await ctx.sb.from("report_cards").select("student_id,average,computed_at").eq("tenant_id", tid).eq("kind", "term").in("student_id", ids.slice(i, i + 400)).order("computed_at", { ascending: false });
-    for (const r of data ?? []) if (!latest.has(r.student_id)) latest.set(r.student_id, r.average === null ? null : Number(r.average));
+  for (const part of chunks(ids, 100)) {
+    const data = await fetchAll<any>(() => ctx.sb.from("report_cards").select("student_id,average,computed_at").eq("tenant_id", tid).eq("kind", "term").in("student_id", part)
+      .order("computed_at", { ascending: false }).order("id"));
+    for (const r of data) if (!latest.has(r.student_id)) latest.set(r.student_id, r.average === null ? null : Number(r.average));
   }
   const gs = groups ?? [];
   // Suggest the next class: same arm name at the next level (JSS1 Gold → JSS2 Gold), else the first class of the next level.
@@ -37,7 +40,7 @@ export async function GET() {
   };
   return NextResponse.json({
     pass_mark: Number(scheme?.pass_mark ?? 40),
-    classes: gs.map((g: any) => ({ ...g, suggested: suggest(g), students: (students ?? []).filter((s: any) => s.class_group_id === g.id)
+    classes: gs.map((g: any) => ({ ...g, suggested: suggest(g), students: students.filter((s: any) => s.class_group_id === g.id)
       .map((s: any) => ({ id: s.id, name: studentName(s), admission_no: s.admission_no, average: latest.get(s.id) ?? null })) }))
   });
 }
@@ -61,8 +64,8 @@ export async function POST(req: NextRequest) {
   // a class that is itself moving on does not get moved twice.
   const snapshot = new Map<string, string[]>();
   for (const m of b.moves) {
-    const { data } = await ctx.sb.from("students").select("id").eq("tenant_id", tid).eq("class_group_id", m.from).eq("status", "active").limit(5000);
-    snapshot.set(m.from, (data ?? []).map((s: any) => s.id).filter((id: string) => !repeat.has(id)));
+    const data = await fetchAll<{ id: string }>(() => ctx.sb.from("students").select("id").eq("tenant_id", tid).eq("class_group_id", m.from).eq("status", "active").order("id"));
+    snapshot.set(m.from, data.map(s => s.id).filter((id: string) => !repeat.has(id)));
   }
   let promoted = 0, graduated = 0;
   const today = new Date().toISOString().slice(0, 10);
@@ -93,19 +96,25 @@ export async function POST(req: NextRequest) {
     if (m.to === "graduate") graduated += ids.length; else promoted += ids.length;
   }
   if (repeat.size) {
-    const { data: rep } = await ctx.sb.from("students").select("id,class_group_id").eq("tenant_id", tid).in("id", [...repeat]);
-    for (const s of rep ?? []) history.push({ tenant_id: tid, student_id: s.id, kind: "repeated", effective_on: today, from_class: className.get(s.class_group_id) ?? null,
+    const rep: any[] = [];
+    for (const part of chunks([...repeat])) rep.push(...((await ctx.sb.from("students").select("id,class_group_id").eq("tenant_id", tid).in("id", part)).data ?? []));
+    for (const s of rep) history.push({ tenant_id: tid, student_id: s.id, kind: "repeated", effective_on: today, from_class: className.get(s.class_group_id) ?? null,
       to_class: className.get(s.class_group_id) ?? null, session_name: sessionName, recorded_by: ctx.userId });
   }
   for (let i = 0; i < history.length; i += 500) await ctx.sb.from("student_movements").insert(history.slice(i, i + 500));
   let alumni = 0;
   if (b.add_graduates_to_alumni && graduates.length) {
     const svc = createServiceClient();
-    const { data: have } = await svc.from("alumni").select("student_id").eq("tenant_id", tid).in("student_id", graduates.map(g => g.id));
-    const skip = new Set((have ?? []).map((a: any) => a.student_id));
-    const { data: names } = await svc.from("students").select("id,first_name,last_name,other_names").in("id", graduates.map(g => g.id));
+    // In parts: a whole year group's ids in one request made the address too long.
+    const have: any[] = [], names: any[] = [];
+    for (const part of chunks(graduates.map(g => g.id))) {
+      have.push(...((await svc.from("alumni").select("student_id").eq("tenant_id", tid).in("student_id", part)).data ?? []));
+      names.push(...((await svc.from("students").select("id,first_name,last_name,other_names").eq("tenant_id", tid).in("id", part)).data ?? []));
+    }
+    const skip = new Set(have.map((a: any) => a.student_id));
+    const byId = new Map(names.map((x: any) => [x.id, x]));
     const rows = graduates.filter(g => !skip.has(g.id)).map(g => {
-      const s = (names ?? []).find((x: any) => x.id === g.id);
+      const s = byId.get(g.id);
       return { tenant_id: tid, student_id: g.id, full_name: studentName(s), graduation_year: Number(today.slice(0, 4)), last_class: g.from || null, source: "graduated", status: "active" };
     });
     for (let i = 0; i < rows.length; i += 500) await svc.from("alumni").insert(rows.slice(i, i + 500));

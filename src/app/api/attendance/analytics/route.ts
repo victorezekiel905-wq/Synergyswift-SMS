@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchAll, fetchAllSafe } from "@/lib/fetch-all";
 import { requireCtx, ROLES } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadMarks } from "@/lib/attendance-server";
@@ -27,9 +28,9 @@ export async function GET(req: NextRequest) {
     loadMarks(svc, tid, from, to, cg),
     svc.from("tenant_settings").select("chronic_absence_pct,school_weekdays").eq("tenant_id", tid).maybeSingle(),
     svc.from("class_groups").select("id,name,form_teacher_id,users:form_teacher_id(full_name)").eq("tenant_id", tid).order("name"),
-    svc.from("students").select("id,first_name,last_name,other_names,admission_no,class_group_id").eq("tenant_id", tid).eq("status", "active"),
-    svc.from("lesson_attendance").select("student_id,status").eq("tenant_id", tid).gte("date", from).lte("date", to).eq("status", "absent").limit(20000),
-    svc.from("class_attendance").select("class_group_id").eq("tenant_id", tid).eq("date", today)
+    fetchAllSafe<any>(() => svc.from("students").select("id,first_name,last_name,other_names,admission_no,class_group_id").eq("tenant_id", tid).eq("status", "active").order("id")).then(data => ({ data })),
+    fetchAllSafe<any>(() => svc.from("lesson_attendance").select("student_id,status").eq("tenant_id", tid).gte("date", from).lte("date", to).eq("status", "absent").order("id")).then(data => ({ data })),
+    fetchAllSafe<any>(() => svc.from("class_attendance").select("class_group_id").eq("tenant_id", tid).eq("date", today).order("id")).then(data => ({ data }))
   ]);
   const threshold = settings?.chronic_absence_pct ?? 90;
   const byId = new Map((students ?? []).map((s: any) => [s.id, s]));

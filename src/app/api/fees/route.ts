@@ -4,6 +4,7 @@ import { requireCtx, ROLES, readJson, jsonError, denyUnless } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { generateInvoices, recordManualPayment, sendFeeReminders, financeSettings } from "@/lib/fees";
 import { appUrl, currentTerm, toCsv, studentName } from "@/lib/school";
+import { fetchAll } from "@/lib/fetch-all";
 
 /** Bursary overview: fee items, schedule for a term, and collection summary. ?format=csv exports invoices. */
 export async function GET(req: NextRequest) {
@@ -15,10 +16,11 @@ export async function GET(req: NextRequest) {
   const [items, schedules, invoices, payments, expenses, settings] = await Promise.all([
     ctx.sb.from("fee_items").select("id,name,description").eq("tenant_id", tid).order("name"),
     termId ? ctx.sb.from("fee_schedules").select("id,fee_item_id,class_group_id,category,amount,optional").eq("tenant_id", tid).eq("term_id", termId) : { data: [] },
-    termId ? ctx.sb.from("fee_invoices").select("id,status,total,amount_paid,student_id,invoice_no,title,due_date,students(first_name,last_name,other_names,admission_no,class_groups(name))")
-      .eq("tenant_id", tid).eq("term_id", termId).neq("status", "void").limit(20000) : { data: [] },
-    ctx.sb.from("fee_payments").select("amount,method,paid_at").eq("tenant_id", tid).eq("status", "success")
-      .gte("paid_at", new Date(Date.now() - 30 * 86400_000).toISOString()).limit(20000),
+    // Totals are added up here, so every invoice and payment must be read (the API stops at 1000).
+    termId ? fetchAll<any>(() => ctx.sb.from("fee_invoices").select("id,status,total,amount_paid,student_id,invoice_no,title,due_date,students(first_name,last_name,other_names,admission_no,class_groups(name))")
+      .eq("tenant_id", tid).eq("term_id", termId).neq("status", "void").order("id")).then(data => ({ data })) : { data: [] },
+    fetchAll<any>(() => ctx.sb.from("fee_payments").select("amount,method,paid_at").eq("tenant_id", tid).eq("status", "success")
+      .gte("paid_at", new Date(Date.now() - 30 * 86400_000).toISOString()).order("id")).then(data => ({ data })),
     ctx.sb.from("expenses").select("amount,spent_on").eq("tenant_id", tid).gte("spent_on", new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10)),
     financeSettings(ctx.sb, tid)
   ]);

@@ -25,11 +25,17 @@ export async function POST(req: NextRequest) {
   const { email, role } = parsed.data;
   const svc = createServiceClient();
   // A school account cannot also be a platform account: keep the two worlds apart.
-  const { data: schoolUser } = await svc.from("users").select("id").ilike("email", email).maybeSingle();
-  if (schoolUser) return jsonError("this email belongs to a school account; use a separate email for platform work");
+  // Exact match, capitals aside (in ilike "_" matches any character, so john_doe@ matched johnxdoe@).
+  const { data: schoolUsers } = await svc.from("users").select("id").ilike("email", email.replace(/[\\%_]/g, m => `\\${m}`)).limit(1);
+  if (schoolUsers?.length) return jsonError("this email belongs to a school account; use a separate email for platform work");
   let userId: string | null = null;
-  const { data: list } = await svc.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  userId = list?.users?.find((u: { email?: string }) => (u.email ?? "").toLowerCase() === email)?.id ?? null;
+  // Every sign-in account, a page at a time: students and parents soon pass the first 1000.
+  for (let page = 1; page <= 200 && !userId; page++) {
+    const { data: list } = await svc.auth.admin.listUsers({ page, perPage: 1000 });
+    const users = list?.users ?? [];
+    userId = users.find((u: { email?: string }) => (u.email ?? "").toLowerCase() === email)?.id ?? null;
+    if (users.length < 1000) break;
+  }
   if (!userId && authMailConfigured()) {
     // The invitation comes from Synergy Swift's own email service.
     const base = appUrl(req);
