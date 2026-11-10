@@ -136,6 +136,31 @@ export async function createOneTimeLogin(svc: Svc, p: { tenantId: string; kind: 
   return { username: email, password, sent: rows.length };
 }
 
+/**
+ * The third way in: an emailed invitation link. The person opens it and sets their password;
+ * the account has the role chosen for them (staff: the role on their code) and is joined to
+ * their record. Their sign-up code is spent.
+ */
+export async function inviteByEmail(svc: Svc, p: { tenantId: string; kind: "staff" | "student" | "guardian"; id: string; email?: string | null; actor: string; baseUrl: string }) {
+  const t = PERSON[p.kind];
+  const { data: rec } = await svc.from(t.table).select(`id,user_id,${t.name}${p.kind === "student" ? "" : ",email"}`).eq("tenant_id", p.tenantId).eq("id", p.id).maybeSingle();
+  if (!rec) throw new Error("not found");
+  if (rec.user_id) throw new Error("this person already has an account");
+  const email = String(p.email || rec.email || "").trim().toLowerCase();
+  if (!EMAIL.test(email)) throw new Error("enter their email address: the invitation goes there and it becomes their username");
+  const name = p.kind === "student" ? `${rec.first_name} ${rec.last_name}`.trim() : rec.full_name;
+  const col = `${p.kind}_id`;
+  const { data: code } = await svc.from("account_codes").select("role,extra_roles").eq("kind", p.kind).eq(col, p.id).is("revoked_at", null).maybeSingle();
+  const role = p.kind === "staff" ? (code?.role ?? "teacher") : p.kind === "student" ? "student" : "parent";
+  const { provisionUser } = await import("./provision");
+  const { userId } = await provisionUser(svc, { tenantId: p.tenantId, email, fullName: name, role, extraRoles: p.kind === "staff" ? (code?.extra_roles ?? []) : [],
+    redirectTo: `${p.baseUrl}/auth/welcome?next=${homeFor(role)}`, createdBy: p.actor });
+  await svc.from(t.table).update({ user_id: userId, ...(p.kind !== "student" ? { email } : {}) }).eq("id", p.id);
+  await svc.from("account_codes").update({ used_at: new Date().toISOString(), used_by: userId }).eq("kind", p.kind).eq(col, p.id).is("revoked_at", null);
+  await svc.from("audit_logs").insert({ tenant_id: p.tenantId, actor_id: p.actor, action: "account.invitation_sent", target: userId, meta: { kind: p.kind, role } });
+  return { email };
+}
+
 export type CodeRow = { kind: CodeKind; id: string; name: string; detail: string | null; code: string | null; role: string | null; extra_roles: string[];
   uses: number; max_uses: number; has_account: boolean; email: string | null; phone: string | null };
 

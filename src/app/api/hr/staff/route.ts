@@ -6,6 +6,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { provisionUser } from "@/lib/provision";
 import { appUrl } from "@/lib/school";
 import { formatCode } from "@/lib/sign-up-codes";
+import { inviteByEmail, createOneTimeLogin } from "@/lib/sign-up-codes-server";
 
 const ASSIGNABLE = STAFF_ROLE_OPTIONS;
 
@@ -44,7 +45,9 @@ const StaffInput = z.object({
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("save"), staff: StaffInput }),
   // Create a login and set roles (primary + extra)
-  z.object({ action: z.literal("grant_access"), staff_id: z.string().uuid(), role: z.enum(ASSIGNABLE), extra_roles: z.array(z.enum(ASSIGNABLE)).default([]) }),
+  // For someone without an account, how they get in: their sign-up code, an emailed invitation, or a one-time password.
+  z.object({ action: z.literal("grant_access"), staff_id: z.string().uuid(), role: z.enum(ASSIGNABLE), extra_roles: z.array(z.enum(ASSIGNABLE)).default([]),
+    method: z.enum(["code", "invite", "otp"]).default("code"), email: z.string().trim().max(254).nullish() }),
   z.object({ action: z.literal("set_active"), staff_id: z.string().uuid(), active: z.boolean() })
 ]);
 
@@ -107,5 +110,16 @@ export async function POST(req: NextRequest) {
     } catch (e) { return jsonError((e as Error).message); }
   }
   await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "account.code_role_set", target: s.id, meta: { role: b.role, extra } });
+  // The role is on the code now; the other two ways in use it.
+  try {
+    if (b.method === "invite") {
+      const r = await inviteByEmail(svc, { tenantId: tid, kind: "staff", id: s.id, email: b.email || s.email, actor: ctx.userId, baseUrl: appUrl(req) });
+      return NextResponse.json({ ok: true, invited: true, email: r.email });
+    }
+    if (b.method === "otp") {
+      const r = await createOneTimeLogin(svc, { tenantId: tid, kind: "staff", id: s.id, email: String(b.email || s.email || ""), actor: ctx.userId, baseUrl: appUrl(req) });
+      return NextResponse.json({ ok: true, otp: r });
+    }
+  } catch (e) { return jsonError((e as Error).message); }
   return NextResponse.json({ ok: true, code: formatCode(code as string) });
 }

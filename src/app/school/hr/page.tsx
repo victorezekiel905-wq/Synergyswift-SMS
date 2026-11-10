@@ -151,21 +151,39 @@ function AccessForm({ staff, onClose, onDone }: { staff: Staff | null; onClose: 
   const [role, setRole] = useState<string>("");
   const [extra, setExtra] = useState<string[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [method, setMethod] = useState<"code" | "invite" | "otp">("code");
+  const [email, setEmail] = useState("");
   const r0 = role || staff?.users?.role || "teacher";
   const x0 = extra ?? staff?.users?.extra_roles ?? [];
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    const r = await send("/api/hr/staff", { action: "grant_access", staff_id: staff!.id, role: r0, extra_roles: x0 });
+    const r = await send("/api/hr/staff", { action: "grant_access", staff_id: staff!.id, role: r0, extra_roles: x0, method, email: email || staff?.email || null });
     if (!r.ok) return setErr(r.error);
-    setRole(""); setExtra(null); setErr(null);
-    onDone(r.data.code
-      ? `${staff!.full_name}'s sign-up code is ${r.data.code}. They make their account at /join with it and get these roles. To send it, or to give them a one-time password instead, use School office → Sign-up codes & logins.`
-      : r.data.invited ? `Invitation sent to ${staff!.email}.` : "Roles updated.");
+    setRole(""); setExtra(null); setErr(null); setMethod("code"); setEmail("");
+    onDone(r.data.otp
+      ? `${staff!.full_name}'s login is ready. Username: ${r.data.otp.username} · One-time password: ${r.data.otp.password} (sent to them; shown only now). They choose their own password at the first sign-in.`
+      : r.data.code
+      ? `${staff!.full_name}'s sign-up code is ${r.data.code}. They make their account at /join with it and get these roles. To send it, use School office → Sign-up codes & logins.`
+      : r.data.invited ? `Invitation link emailed to ${r.data.email ?? staff!.email}. They open it and set their password.` : "Roles updated.");
   }
   return (
     <Modal open={Boolean(staff)} onClose={() => { setRole(""); setExtra(null); onClose(); }} title={`Access: ${staff?.full_name ?? ""}`}>
       <form onSubmit={save} className="space-y-3">
-        {!staff?.user_id && <p className="text-sm text-slate-600">{staff?.full_name} has no account yet. The roles go on their sign-up code: the account they make with it gets these roles.</p>}
+        {!staff?.user_id && (
+          <fieldset className="space-y-2">
+            <legend className="label">{staff?.full_name} has no account yet. How should they get in?</legend>
+            {([["code", "Sign-up code", "They make their account at /join with their code, their email and a password."],
+              ["invite", "Email invitation link", "A link goes to their email; they open it and set their password."],
+              ["otp", "One-time password", "Their email becomes the username; they sign in with the one-time password and choose their own at once."]] as const).map(([v, label, hint]) => (
+              <label key={v} className={"flex cursor-pointer items-start gap-2 rounded-md border p-2.5 text-sm " + (method === v ? "border-brand-500 bg-brand-50" : "border-slate-200")}>
+                <input type="radio" name="method" className="mt-0.5" checked={method === v} onChange={() => setMethod(v)} />
+                <span><b>{label}</b><span className="block text-xs text-slate-600">{hint}</span></span>
+              </label>
+            ))}
+            {method !== "code" && <Field label="Email"><input className="input" type="email" required value={email || staff?.email || ""} onChange={e => setEmail(e.target.value)} /></Field>}
+            <p className="text-xs text-slate-500">Whichever you choose, the account gets the roles below.</p>
+          </fieldset>
+        )}
         <Field label="Main role"><select className="input" value={r0} onChange={e => setRole(e.target.value)}>{ROLE_OPTIONS.map(r => <option key={r} value={r}>{r.replace(/_/g, " ")}</option>)}</select></Field>
         <fieldset>
           <legend className="label">Extra duties</legend>
@@ -176,7 +194,7 @@ function AccessForm({ staff, onClose, onDone }: { staff: Staff | null; onClose: 
           </div>
         </fieldset>
         {err && <Alert>{err}</Alert>}
-        <div className="flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button className="btn btn-primary">{staff?.user_id ? "Save roles" : "Save roles and show the code"}</button></div>
+        <div className="flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button className="btn btn-primary">{staff?.user_id ? "Save roles" : method === "invite" ? "Save and send invitation" : method === "otp" ? "Save and make login" : "Save and show the code"}</button></div>
       </form>
     </Modal>
   );

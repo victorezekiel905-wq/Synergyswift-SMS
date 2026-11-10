@@ -26,7 +26,7 @@ export default function AccountCodesPage() {
   const [all, setAll] = useState(false);
   const [q, setQ] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [otp, setOtp] = useState<Row | null>(null);
+  const [otp, setOtp] = useState<{ row: Row; mode: "otp" | "invite" } | null>(null);
   const [roleFor, setRoleFor] = useState<Row | null>(null);
 
   const rows = useMemo(() => (data?.rows ?? []).filter(r => r.kind === tab && (all || tab === "parent_link" || !r.has_account)
@@ -44,7 +44,7 @@ export default function AccountCodesPage() {
   return (
     <Page wide>
       <PageHeader eyebrow="School office" title="Sign-up codes & logins"
-        subtitle="Two ways in for everyone you add. 1. Their sign-up code: they make their own account at /join with their email and a password. 2. A one-time password: you enter their email, they sign in with it and choose their own password straight away." />
+        subtitle="Three ways in for everyone you add; use whichever suits each person. 1. Their sign-up code: they make their own account at /join with their email and a password. 2. An email invitation link: they open it and set their password. 3. A one-time password: you enter their email, they sign in with it and choose their own password straight away." />
       {msg && <div className="mb-4"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
       {error && <Alert>{error}</Alert>}
       <Tabs tabs={TABS} value={tab} onChange={t => { setTab(t); setMsg(null); }} />
@@ -81,7 +81,8 @@ export default function AccountCodesPage() {
                       {r.code && !r.has_account && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => act({ action: "send", items: [{ kind: r.kind, id: r.id }] }, d => d.messages ? "Sent." : "No email or phone on record: hand the code over in person.")}>Send</button>}
                       {tab === "staff" && !r.has_account && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setRoleFor(r)}>Role</button>}
                       {(!r.has_account || r.kind === "parent_link") && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => confirm("Make a new code? The old one stops working.") && act({ action: "new_code", kind: r.kind, id: r.id }, d => `New code: ${d.code}`)}>New code</button>}
-                      {r.kind !== "parent_link" && !r.has_account && <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => setOtp(r)}>One-time password</button>}
+                      {r.kind !== "parent_link" && !r.has_account && <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => setOtp({ row: r, mode: "invite" })}>Email invitation</button>}
+                      {r.kind !== "parent_link" && !r.has_account && <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => setOtp({ row: r, mode: "otp" })}>One-time password</button>}
                     </div>
                   </td>
                 </tr>
@@ -90,18 +91,43 @@ export default function AccountCodesPage() {
           </table>
         </div>
       )}
-      <OneTimePassword row={otp} onClose={() => setOtp(null)} onDone={() => reload()} />
+      <OneTimePassword row={otp?.row ?? null} mode={otp?.mode ?? "otp"} onClose={() => setOtp(null)} onDone={() => reload()} />
       <RoleForm row={roleFor} onClose={() => setRoleFor(null)} onDone={t => { setRoleFor(null); setMsg({ ok: true, text: t }); reload(); }} />
     </Page>
   );
 }
 
-function OneTimePassword({ row, onClose, onDone }: { row: Row | null; onClose: () => void; onDone: () => void }) {
+function OneTimePassword({ row, mode, onClose, onDone }: { row: Row | null; mode: "otp" | "invite"; onClose: () => void; onDone: () => void }) {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [made, setMade] = useState<{ username: string; password: string; sent: number } | null>(null);
-  const close = () => { setEmail(""); setErr(null); setMade(null); onClose(); };
+  const [invited, setInvited] = useState<string | null>(null);
+  const close = () => { setEmail(""); setErr(null); setMade(null); setInvited(null); onClose(); };
+  if (mode === "invite") return (
+    <Modal open={Boolean(row)} onClose={close} title={`Email invitation: ${row?.name ?? ""}`}>
+      {invited ? (
+        <div className="space-y-3 text-sm">
+          <Alert tone="green">Invitation link emailed to {invited}. They open it and set their password; the link lasts 24 hours.</Alert>
+          <div className="flex justify-end"><button className="btn btn-primary" onClick={close}>Done</button></div>
+        </div>
+      ) : (
+        <form className="space-y-3" onSubmit={async e => {
+          e.preventDefault();
+          setBusy(true); setErr(null);
+          const r = await send<{ email: string }>("/api/school/account-codes", { action: "invite", kind: row!.kind, id: row!.id, email: email || row!.email || "" });
+          setBusy(false);
+          if (!r.ok) { setErr(r.error); return; }
+          setInvited(r.data.email); onDone();
+        }}>
+          <p className="text-sm text-slate-600">A link goes to this email. They open it, set their password and sign in{row?.kind === "staff" ? " with the role shown on this page" : ""}. The email becomes their username.</p>
+          <Field label="Email"><input className="input" type="email" required autoFocus value={email || row?.email || ""} onChange={e => setEmail(e.target.value)} /></Field>
+          {err && <Alert>{err}</Alert>}
+          <div className="flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={close}>Cancel</button><button className="btn btn-primary" disabled={busy}>{busy ? "Sending…" : "Send invitation"}</button></div>
+        </form>
+      )}
+    </Modal>
+  );
   return (
     <Modal open={Boolean(row)} onClose={close} title={`One-time password: ${row?.name ?? ""}`}>
       {made ? (

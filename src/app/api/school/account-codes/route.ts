@@ -4,7 +4,7 @@ import { requireCtx, ROLES, readJson, jsonError, STAFF_ROLE_OPTIONS } from "@/li
 import { ALWAYS_ALLOWED_ROLES } from "@/lib/saas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { appUrl } from "@/lib/school";
-import { listCodes, createOneTimeLogin, sendCodes } from "@/lib/sign-up-codes-server";
+import { listCodes, createOneTimeLogin, sendCodes, inviteByEmail } from "@/lib/sign-up-codes-server";
 import { formatCode } from "@/lib/sign-up-codes";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +29,8 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("staff_role"), staff_id: z.string().uuid(), role: z.enum(STAFF_ROLE_OPTIONS), extra_roles: z.array(z.enum(STAFF_ROLE_OPTIONS)).max(10).default([]) }),
   // The second way in: a login with their email and a one-time password.
   z.object({ action: z.literal("one_time_password"), kind: z.enum(["staff", "student", "guardian"]), id: z.string().uuid(), email: z.string().trim().max(254) }),
+  // The third way in: an emailed invitation link to set their password.
+  z.object({ action: z.literal("invite"), kind: z.enum(["staff", "student", "guardian"]), id: z.string().uuid(), email: z.string().trim().max(254).nullish() }),
   z.object({ action: z.literal("send"), items: z.array(z.object({ kind: KIND, id: z.string().uuid() })).min(1).max(2000) })
 ]);
 
@@ -69,6 +71,13 @@ export async function POST(req: NextRequest) {
   if (b.action === "one_time_password") {
     try {
       const r = await createOneTimeLogin(svc, { tenantId: tid, kind: b.kind, id: b.id, email: b.email, actor: ctx.userId, baseUrl: appUrl(req) });
+      return NextResponse.json({ ok: true, ...r });
+    } catch (e) { return jsonError((e as Error).message); }
+  }
+
+  if (b.action === "invite") {
+    try {
+      const r = await inviteByEmail(svc, { tenantId: tid, kind: b.kind, id: b.id, email: b.email ?? null, actor: ctx.userId, baseUrl: appUrl(req) });
       return NextResponse.json({ ok: true, ...r });
     } catch (e) { return jsonError((e as Error).message); }
   }
