@@ -1,14 +1,15 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useApi, send, Page, PageHeader, Alert, Badge, Empty, Field, Tabs, Stat, money, fmtTime, fmtDate } from "@/components/ui";
-import { byCategory, receipt, pauseSale, MAX_PAUSED, type PausedSale } from "@/lib/tuck-shop";
+import { byCategory, receipt, pauseSale, MAX_PAUSED, formatBuyCode, cleanBuyCode, type PausedSale } from "@/lib/tuck-shop";
 
 type Item = { id: string; name: string; price: number; category: string | null; active: boolean; stock: number | null; stock_alert: number | null; barcode?: string | null };
-type Settings = { shop_purchases_per_day?: number; shop_gap_minutes?: number; shop_code_windows?: string; shop_daily_cap?: number | null; shop_require_code?: boolean;
+type Settings = { shop_purchases_per_day?: number; shop_gap_minutes?: number; shop_code_windows?: string; shop_selling_windows?: string; shop_daily_cap?: number | null; shop_require_code?: boolean;
   shop_notify_each_purchase?: boolean; shop_parent_topup?: boolean };
 type Overview = { currency: string; timezone?: string; items: Item[]; devices: { id: string; name: string; location: string | null; last_seen_at: string | null }[];
-  settings: Settings; can_settings: boolean; can_credit: boolean; today: { sales: number; takings: number } };
-type Sale = { total: number; balance: number; reference: string; lines: { name: string; qty: number; price: number }[]; exhausted: boolean; left_today: number;
+  settings: Settings; selling_open?: boolean; can_settings: boolean; can_credit: boolean; today: { sales: number; takings: number } };
+type Child = { id: string; name: string; photo_url: string | null; class_name: string | null };
+type Sale = { total: number; reference: string; lines: { name: string; qty: number; price: number }[]; exhausted: boolean; left_today: number;
   student: { id: string; name: string; photo_url: string | null; admission_no: string | null; class_name: string | null } };
 type Tab = "sale" | "stock" | "activity" | "wallets" | "settings";
 
@@ -53,7 +54,10 @@ function QuickSale({ ov, reload }: { ov: Overview; reload: () => void }) {
   const [done, setDone] = useState<Sale | null>(null);
   const [finger, setFinger] = useState<{ device: string; since: string } | null>(null);
   const [device, setDevice] = useState(ov.devices[0]?.id ?? "");
+  // The child the code (or finger) belongs to, shown before paying: name, photo, class. Never the balance.
+  const [child, setChild] = useState<{ who: Child; pay: Record<string, unknown> } | null>(null);
   const codeRef = useRef<HTMLInputElement>(null);
+  const lookedUp = useRef("");
   useEffect(() => { setPaused(loadPaused()); }, []);
   const groups = byCategory(ov.items);
   const r = receipt(basket, ov.items);
@@ -65,8 +69,21 @@ function QuickSale({ ov, reload }: { ov: Overview; reload: () => void }) {
     const res = await send<Sale>("/api/shop", { action: "sell", items: r.lines.map(l => ({ id: l.id, qty: l.qty })), ...body }, "POST", { quiet: true });
     setBusy(false); setFinger(null);
     if (!res.ok) { setMsg({ ok: false, text: res.error ?? "The sale didn't go through." }); return; }
-    setDone(res.data); setBasket({}); setCode(""); reload();
+    setDone(res.data); setBasket({}); setCode(""); setChild(null); lookedUp.current = ""; reload();
   }
+
+  // Six characters typed: show whose code it is.
+  async function lookup(raw: string) {
+    const c = cleanBuyCode(raw);
+    if (c.length !== 6 || lookedUp.current === c) return;
+    lookedUp.current = c;
+    setBusy(true); setMsg(null);
+    const res = await send<{ child: Child }>("/api/shop", { action: "lookup", code: c }, "POST", { quiet: true });
+    setBusy(false);
+    if (!res.ok) { setMsg({ ok: false, text: res.error ?? "That code is not right." }); setChild(null); return; }
+    setChild({ who: res.data.child, pay: { method: "code", code: c } });
+  }
+  const clearChild = () => { setChild(null); setCode(""); lookedUp.current = ""; setTimeout(() => codeRef.current?.focus(), 30); };
 
   // Fingerprint: wait (up to a minute) for the student's finger on the shop machine, then pay.
   useEffect(() => {
@@ -78,7 +95,7 @@ function QuickSale({ ov, reload }: { ov: Overview; reload: () => void }) {
       if (Date.now() > end) { setFinger(null); setMsg({ ok: false, text: "No finger was scanned. Try again, or ask for the buy code." }); return; }
       const res = await fetch(`/api/shop?view=scan&device=${finger.device}&since=${encodeURIComponent(finger.since)}`).then(x => x.json()).catch(() => null);
       if (stop) return;
-      if (res?.scan) { stop = true; await pay({ method: "fingerprint", scan_id: res.scan.id }); return; }
+      if (res?.scan) { stop = true; setFinger(null); setChild({ who: res.scan.student, pay: { method: "fingerprint", scan_id: res.scan.id } }); return; }
       setTimeout(tick, 1200);
     };
     tick();
@@ -89,7 +106,7 @@ function QuickSale({ ov, reload }: { ov: Overview; reload: () => void }) {
     const label = (typeof window !== "undefined" ? window.prompt("A note to recognise this sale (optional), e.g. 'boy in red cap':", "") : "") ?? "";
     const p = pauseSale(paused, { label: label.trim() || `Sale ${paused.length + 1}`, basket });
     if (!p.ok) { setMsg({ ok: false, text: p.error }); return; }
-    setPaused(p.paused); savePaused(p.paused); setBasket({}); setCode(""); setMsg({ ok: true, text: "Sale put on hold. Serve the next student." });
+    setPaused(p.paused); savePaused(p.paused); setBasket({}); setCode(""); setChild(null); lookedUp.current = ""; setMsg({ ok: true, text: "Sale put on hold. Serve the next student." });
   }
   function resume(id: string) {
     if (r.lines.length && !window.confirm("Replace the sale on screen? Put it on hold first if you need it.")) return;
@@ -134,8 +151,7 @@ function QuickSale({ ov, reload }: { ov: Overview; reload: () => void }) {
                 <div><b>{done.student.name}</b><span className="block text-xs text-slate-500">{[done.student.admission_no, done.student.class_name].filter(Boolean).join(" · ")}</span></div>
               </div>
               <table className="w-full"><tbody>{done.lines.map((l, k) => <tr key={k}><td>{l.qty}× {l.name}</td><td className="text-right tabular-nums">{money(l.qty * l.price, cur)}</td></tr>)}
-                <tr className="border-t font-bold"><td>Total</td><td className="text-right tabular-nums">{money(done.total, cur)}</td></tr>
-                <tr className="text-slate-600"><td>Balance now</td><td className="text-right tabular-nums">{money(done.balance, cur)}</td></tr></tbody></table>
+                <tr className="border-t font-bold"><td>Total</td><td className="text-right tabular-nums">{money(done.total, cur)}</td></tr></tbody></table>
               <p className="text-xs text-slate-500">Receipt {done.reference} · {fmtTime(new Date().toISOString())}{done.exhausted ? " · wallet now empty (family told)" : ""}</p>
               <div className="flex gap-2 print:hidden"><button className="btn btn-outline" onClick={() => window.print()}>Print receipt</button><button className="btn btn-primary ml-auto" onClick={() => setDone(null)}>Next student</button></div>
             </div>
@@ -146,13 +162,30 @@ function QuickSale({ ov, reload }: { ov: Overview; reload: () => void }) {
                 <table className="w-full text-sm"><tbody>{r.lines.map(l => <tr key={l.id}><td className="py-0.5">{l.qty}× {l.name}</td><td className="text-right tabular-nums">{money(l.amount, cur)}</td></tr>)}
                   <tr className="border-t text-base font-bold"><td className="pt-1">Total</td><td className="pt-1 text-right tabular-nums">{money(r.total, cur)}</td></tr></tbody></table>
               )}
+              {ov.selling_open === false && <div className="mt-3"><Alert tone="amber">The shop is closed now. Selling times: {ov.settings.shop_selling_windows}.</Alert></div>}
               {msg && <div className="mt-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
-              <form className="mt-3 flex gap-2" onSubmit={e => { e.preventDefault(); if (code.trim().length === 4) pay({ method: "code", code: code.trim() }); else setMsg({ ok: false, text: "A buy code has 4 letters and numbers." }); }}>
-                <input ref={codeRef} className="input flex-1 text-center font-mono text-2xl uppercase tracking-[0.4em]" maxLength={4} placeholder="CODE" autoComplete="off" spellCheck={false}
-                  value={code} onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} aria-label="Student's buy code" disabled={busy || !r.lines.length} />
-                <button className="btn btn-primary" disabled={busy || !r.lines.length || code.length !== 4}>{busy ? "Paying…" : "Pay"}</button>
-              </form>
-              {ov.devices.length > 0 && (
+              {child ? (
+                <div className="mt-3 space-y-3 rounded-lg border-2 border-brand-500 bg-brand-50/40 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Is this the child in front of you?</p>
+                  <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {child.who.photo_url ? <img src={child.who.photo_url} alt="" className="h-20 w-20 rounded-lg object-cover" /> : <div className="grid h-20 w-20 place-items-center rounded-lg bg-white text-2xl font-bold text-slate-400">{child.who.name[0]}</div>}
+                    <div><p className="text-lg font-semibold">{child.who.name}</p><p className="text-sm text-slate-600">{child.who.class_name ?? "No class"}</p></div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="btn btn-primary flex-1 text-base" disabled={busy || !r.lines.length} onClick={() => pay(child.pay)}>{busy ? "Paying…" : `Pay ${money(r.total, cur)}`}</button>
+                    <button className="btn btn-ghost" disabled={busy} onClick={clearChild}>Not this child</button>
+                  </div>
+                </div>
+              ) : (
+                <form className="mt-3 flex gap-2" onSubmit={e => { e.preventDefault(); void lookup(code); }}>
+                  <input ref={codeRef} className="input flex-1 text-center font-mono text-2xl uppercase tracking-[0.3em]" maxLength={7} placeholder="7K3-PX9" autoComplete="off" spellCheck={false} inputMode="text"
+                    value={code} onChange={e => { const v = formatBuyCode(e.target.value); setCode(v); if (cleanBuyCode(v).length === 6) void lookup(v); else lookedUp.current = ""; }}
+                    aria-label="Student's buy code" disabled={busy || !r.lines.length || ov.selling_open === false} />
+                  <button className="btn btn-primary" disabled={busy || !r.lines.length || cleanBuyCode(code).length !== 6}>{busy ? "Checking…" : "Find"}</button>
+                </form>
+              )}
+              {!child && ov.devices.length > 0 && (
                 <div className="mt-2 flex gap-2">
                   {ov.devices.length > 1 && <select className="input" value={device} onChange={e => setDevice(e.target.value)} aria-label="Fingerprint machine">{ov.devices.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select>}
                   <button className="btn btn-outline flex-1" disabled={busy || !r.lines.length || Boolean(finger)} onClick={() => { setMsg(null); setFinger({ device, since: new Date(Date.now() - 2000).toISOString() }); }}>
@@ -160,7 +193,7 @@ function QuickSale({ ov, reload }: { ov: Overview; reload: () => void }) {
                   {finger && <button className="btn btn-ghost" onClick={() => setFinger(null)}>Stop</button>}
                 </div>
               )}
-              {ov.settings.shop_require_code === false && (
+              {!child && ov.settings.shop_require_code === false && (
                 <form className="mt-2 flex gap-2" onSubmit={async e => {
                   e.preventDefault();
                   const el = e.currentTarget.elements.namedItem("card") as HTMLInputElement;
@@ -175,7 +208,7 @@ function QuickSale({ ov, reload }: { ov: Overview; reload: () => void }) {
               )}
               <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
                 <button className="btn btn-outline" disabled={!r.lines.length || paused.length >= MAX_PAUSED} onClick={pause} title={`Up to ${MAX_PAUSED} sales can be on hold`}>Pause sale</button>
-                <button className="btn btn-ghost" disabled={!r.lines.length} onClick={() => { setBasket({}); setCode(""); setMsg(null); }}>New sale</button>
+                <button className="btn btn-ghost" disabled={!r.lines.length} onClick={() => { setBasket({}); setCode(""); setChild(null); lookedUp.current = ""; setMsg(null); }}>New sale</button>
               </div>
             </>
           )}
@@ -302,14 +335,14 @@ function Activity({ currency }: { currency: string }) {
 
 function Rules({ s, reload }: { s: Settings; reload: () => void }) {
   const [f, setF] = useState({
-    perDay: String(s.shop_purchases_per_day ?? 1), gap: String(s.shop_gap_minutes ?? 60), windows: s.shop_code_windows ?? "", cap: s.shop_daily_cap == null ? "" : String(s.shop_daily_cap),
+    perDay: String(s.shop_purchases_per_day ?? 1), gap: String(s.shop_gap_minutes ?? 60), windows: s.shop_code_windows ?? "", selling: s.shop_selling_windows ?? "", cap: s.shop_daily_cap == null ? "" : String(s.shop_daily_cap),
     requireCode: s.shop_require_code !== false, notify: s.shop_notify_each_purchase !== false, parentTopup: Boolean(s.shop_parent_topup)
   });
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   return (
     <form className="card max-w-2xl space-y-4 p-5" onSubmit={async e => {
       e.preventDefault();
-      const r = await send("/api/shop", { action: "settings", purchases_per_day: Number(f.perDay), gap_minutes: Number(f.gap), code_windows: f.windows.trim(),
+      const r = await send("/api/shop", { action: "settings", purchases_per_day: Number(f.perDay), gap_minutes: Number(f.gap), code_windows: f.windows.trim(), selling_windows: f.selling.trim(),
         daily_cap: f.cap === "" ? null : Number(f.cap), require_code: f.requireCode, notify_each_purchase: f.notify, parent_topup: f.parentTopup });
       setMsg({ ok: r.ok, text: r.ok ? "Saved. The rules apply to the next code and the next sale." : r.error ?? "failed" });
       if (r.ok) reload();
@@ -319,7 +352,8 @@ function Rules({ s, reload }: { s: Settings; reload: () => void }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Buys a day per student" hint="After the last one: 'wait till tomorrow'."><input className="input" type="number" min={1} max={20} required value={f.perDay} onChange={e => setF({ ...f, perDay: e.target.value })} /></Field>
         <Field label="Wait after a buy (minutes)" hint="Before the next code can be made, e.g. 60."><input className="input" type="number" min={0} max={600} required value={f.gap} onChange={e => setF({ ...f, gap: e.target.value })} /></Field>
-        <Field label="Times codes can be made" hint="e.g. 10:00-10:30, 12:30-13:15. Empty: any time."><input className="input" value={f.windows} onChange={e => setF({ ...f, windows: e.target.value })} placeholder="10:00-10:30, 12:30-13:15" /></Field>
+        <Field label="Selling times" hint="Sellers can sell only then, e.g. 10:00-10:30, 12:30-13:15 (break times). Empty: any time."><input className="input" value={f.selling} onChange={e => setF({ ...f, selling: e.target.value })} placeholder="10:00-10:30, 12:30-13:15" /></Field>
+        <Field label="Times codes can be made" hint="e.g. 09:45-10:30, 12:15-13:15. Empty: any time."><input className="input" value={f.windows} onChange={e => setF({ ...f, windows: e.target.value })} placeholder="10:00-10:30, 12:30-13:15" /></Field>
         <Field label="Most a student can spend a day" hint="For every student. Empty: no school limit (a parent's own limit still applies)."><input className="input" type="number" min={0} step="0.01" value={f.cap} onChange={e => setF({ ...f, cap: e.target.value })} /></Field>
       </div>
       <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5" checked={f.requireCode} onChange={e => setF({ ...f, requireCode: e.target.checked })} />

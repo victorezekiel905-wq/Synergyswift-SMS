@@ -1,6 +1,7 @@
-// Tuck shop (migration 9700): one-time 4-character buy codes made within the school's rules,
-// fingerprint scans from a machine in shop mode, prices and stock from the shop, the wallet
-// locked while it pays, and every refusal recorded.
+// Tuck shop (migration 9700): one-time 6-character buy codes (shown 7K3-PX9) made within the
+// school's rules, the child shown first (never the balance), selling only in the school's
+// selling times, fingerprint scans from a machine in shop mode, prices and stock from the shop,
+// wrong codes recorded but never blocking the seller, and every refusal recorded.
 export default async function ({ q, expectError, check, U, T }) {
   console.log("\nTuck shop: codes, fingerprints, limits and stock");
   const one = async sql => (await q(sql))[0];
@@ -17,10 +18,16 @@ export default async function ({ q, expectError, check, U, T }) {
   check("no money, no code", (await make()).error === "empty");
   await q(`insert into wallets (student_id, tenant_id, balance) values ('${ST}', '${T.A}', 1000)`);
   const c1 = await make();
-  check("a student makes a 4-character code with no look-alikes", /^[A-HJ-NP-Z2-9]{4}$/.test(c1.code ?? "") && c1.reused === false, c1);
+  check("a student makes a 6-character code with no look-alikes", /^[A-HJ-NP-Z2-9]{6}$/.test(c1.code ?? "") && c1.reused === false, c1);
   check("making it again gives the same code (one live code at a time)", (await make()).code === c1.code);
 
-  const s1 = await sell("code", `'${c1.code.toLowerCase()}'`);
+  // The seller types the code (with or without the dash): the child shows first, never the balance.
+  const seen = (await q(`select shop_lookup_code('${T.A}', '${OP}', '${c1.code.slice(0, 3)}-${c1.code.slice(3).toLowerCase()}') r`))[0].r;
+  check("the code shows the child: name, photo, class", seen.student_id === ST && seen.name === "Tobi Ade" && "photo_url" in seen && "class_name" in seen, seen);
+  check("…and never the balance", !("balance" in seen));
+  check("a wrong code shows nobody", (await q(`select shop_lookup_code('${T.A}', '${OP}', 'ZZZ-ZZZ') r`))[0].r.error === "bad_code");
+
+  const s1 = await sell("code", `'${c1.code.slice(0, 3)}-${c1.code.slice(3).toLowerCase()}'`);
   check("the seller types the code and the money leaves the wallet at once", s1.ok === true && Number(s1.total) === 200 && Number(s1.balance) === 800, s1);
   check("…priced by the shop, with the receipt lines", s1.lines?.[0]?.name === "Digestive" && Number(s1.lines[0].qty) === 2);
   check("…the stock goes down", Number((await one(`select stock from shop_items where id = '${B1}'`)).stock) === 3);
@@ -83,10 +90,25 @@ export default async function ({ q, expectError, check, U, T }) {
   const s5 = await sell("code", `'${c5.code}'`, `[{"id":"${D1}","qty":1}]`);
   check("spending the last of the money is flagged", s5.ok === true && s5.exhausted === true && Boolean(await one(`select 1 x from shop_events where student_id = '${ST}' and kind = 'exhausted'`)), s5);
   check("an empty wallet makes no code", (await make()).error === "empty");
+  await set(`shop_gap_minutes = 0, shop_purchases_per_day = 20`);
 
-  // A seller guessing codes is stopped.
-  for (let i = 0; i < 10; i++) await sell("code", `'ZZZ${"23456789AB"[i]}'`);
-  check("ten wrong codes in 15 minutes stop the seller", (await sell("code", `'ABCD'`)).error === "too_many_tries");
+  // Wrong codes never stop a seller (the break is timed); they are recorded for the admins.
+  for (let i = 0; i < 20; i++) await sell("code", `'ZZZZZ${"23456789ABCDEFGHJKLM"[i]}'`);
+  await q(`update wallets set balance = 500 where student_id = '${ST}'`);
+  await q(`update shop_items set price = 100 where id = '${D1}'`);
+  const c6 = await make();
+  const after = await sell("code", `'${c6.code}'`, `[{"id":"${D1}","qty":1}]`);
+  check("twenty wrong codes later, the seller still sells", after.ok === true, after);
+  check("…and the wrong codes are in the shop log", Number((await one(`select count(*) n from shop_events where tenant_id = '${T.A}' and operator = '${OP}' and kind = 'bad_code'`)).n) >= 20);
+
+  // Selling only in the school's selling times.
+  await set(`shop_selling_windows = '${hm(3 * 3600_000)}-${hm(3 * 3600_000 + 60_000)}'`);
+  const c7 = await make();
+  check("outside the selling times the till doesn't sell", (await sell("code", `'${c7.code ?? "XXXXXX"}'`, `[{"id":"${D1}","qty":1}]`)).error === "closed");
+  check("…or look up codes", (await q(`select shop_lookup_code('${T.A}', '${OP}', '${c7.code ?? "XXXXXX"}') r`))[0].r.error === "closed");
+  await set(`shop_selling_windows = '${hm(-60_000)}-${hm(120_000)}'`);
+  check("inside the selling times it does", (await q(`select shop_lookup_code('${T.A}', '${OP}', '${c7.code ?? "XXXXXX"}') r`))[0].r.error !== "closed");
+  await set(`shop_selling_windows = ''`);
 
   await expectError("staff can't read codes", U.adminA, "select * from shop_codes", /permission denied/);
   await expectError("staff can't sell directly", U.adminA, `select shop_sell('${T.A}', '${OP}', '[]'::jsonb, 100, 'card', null, null, '${ST}')`, /permission denied/);

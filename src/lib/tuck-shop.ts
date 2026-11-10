@@ -7,7 +7,35 @@ export type ShopStatus = {
   max: number; used: number; left: number; gap_minutes: number; last_at: string | null; next_at: string | null;
   cap: number | null; spent_today: number; cap_left: number | null; balance: number; frozen: boolean; has_wallet: boolean;
   window_open: boolean; windows: string; day_ends: string; code: string | null; code_expires: string | null;
+  selling_open?: boolean; selling_windows?: string;
 };
+
+/** A buy code as people type it: capitals, letters and numbers only (the dash and spaces dropped). */
+export function cleanBuyCode(input: string): string {
+  return String(input ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+}
+/** 7K3-PX9: the dash goes in by itself as the seller types. */
+export function formatBuyCode(input: string | null | undefined): string {
+  const c = cleanBuyCode(input ?? "");
+  return c.length > 3 ? `${c.slice(0, 3)}-${c.slice(3)}` : c;
+}
+/** Whether now (in the school's time zone) is inside times written "10:00-10:30, 12:30-13:15". Empty: always. */
+export function inWindows(windows: string | null | undefined, timeZone?: string, now = new Date()): boolean {
+  const w = String(windows ?? "").trim();
+  if (!w) return true;
+  const hm = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, ...(timeZone ? { timeZone } : {}) }).format(now);
+  const mins = (t: string) => { const [h, m] = t.trim().split(":").map(Number); return h * 60 + m; };
+  const cur = mins(hm);
+  return w.split(",").some(part => {
+    const m = /^\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*$/.exec(part);
+    return m ? cur >= mins(m[1]) && cur <= mins(m[2]) : false;
+  });
+}
+
+/** Six characters from the 32 without look-alikes (no 0, O, 1, I). */
+export function isBuyCodeShape(input: string): boolean {
+  return /^[A-HJ-NP-Z2-9]{6}$/.test(cleanBuyCode(input));
+}
 export type ShopRefusal = { error: string; [k: string]: unknown };
 
 const fmtMoney = (n: unknown, currency: string) => {
@@ -39,7 +67,7 @@ export function sellRefusal(r: ShopRefusal, p: { currency: string; timeZone?: st
   const who = p.name ?? "This student";
   switch (r.error) {
     case "bad_code": return "That code is not right, or it has been used. Ask the student to check it.";
-    case "too_many_tries": return "Too many wrong codes. Wait 15 minutes before trying another code.";
+    case "closed": return `The shop is closed now. Selling times: ${String(r.windows ?? "").replace(/\s*,\s*/g, ", ")}.`;
     case "scan_expired": return "That fingerprint is no longer valid. Ask the student to scan again.";
     case "code_required": return "Ask for the student's buy code or fingerprint.";
     case "empty": return `${who}'s wallet is empty.`;

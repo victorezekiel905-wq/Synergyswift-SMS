@@ -6,7 +6,7 @@ import { communityNote } from "./messaging/notices";
 import { financeSettings } from "./fees";
 import { studentName } from "./school";
 import { maybeLowBalanceAlert } from "./wallet";
-import { codeRefusal, spendingAnalysis, type ShopStatus, type ShopRefusal } from "./tuck-shop";
+import { codeRefusal, spendingAnalysis, formatBuyCode, type ShopStatus, type ShopRefusal } from "./tuck-shop";
 
 type Svc = any;
 
@@ -40,7 +40,7 @@ export async function sendCodeToTeacher(svc: Svc, p: { tenantId: string; guardia
   const { startFromGuardian } = await import("./conversations");
   const r = await startFromGuardian(svc, { tenantId: p.tenantId, guardianId: p.guardianId, guardianName: p.guardianName, studentId: p.studentId, staffUserId: teacher,
     subject: `Tuck shop code for ${st?.first_name ?? "my child"}`,
-    body: `Please give ${studentName(st)} this tuck shop buy code: ${p.code}. It works once, today only (until ${until}). Thank you.`, baseUrl: p.baseUrl });
+    body: `Please give ${studentName(st)} this tuck shop buy code: ${formatBuyCode(p.code)}. It works once, today only (until ${until}). Thank you.`, baseUrl: p.baseUrl });
   return { conversation: r.id, to: teacher ? "class teacher" : "school office" };
 }
 
@@ -50,7 +50,10 @@ export async function sell(svc: Svc, p: { tenantId: string; operator: string; it
   const { data, error } = await svc.rpc("shop_sell", { p_tenant: p.tenantId, p_operator: p.operator, p_items: p.items, p_amount: p.amount ?? null, p_method: p.method,
     p_code: p.code ?? null, p_scan: p.scanId ?? null, p_student: p.studentId ?? null, p_reference: null });
   if (error) throw rpcError(error.message);
-  if (data?.error) return { ok: false as const, refusal: data as ShopRefusal };
+  if (data?.error) {
+    if (data.error === "bad_code") void alertOnWrongCodes(svc, { tenantId: p.tenantId, operator: p.operator, baseUrl: p.baseUrl }).catch(() => undefined);
+    return { ok: false as const, refusal: data as ShopRefusal };
+  }
   const { data: s } = await svc.from("students").select("id,first_name,last_name,other_names,photo_url,admission_no,class_groups(name)").eq("id", data.student_id).maybeSingle();
   const name = studentName(s);
   // Messages after the sale: never hold up the queue.
@@ -78,6 +81,38 @@ async function afterSale(svc: Svc, p: { tenantId: string; studentId: string; nam
   } else if (p.low) {
     await maybeLowBalanceAlert(svc, { tenantId: p.tenantId, studentId: p.studentId, balance: p.balance, baseUrl: p.baseUrl });
   }
+}
+
+/** The seller typed a code: the child it belongs to (name, photo, class; never the balance). */
+export async function lookupCode(svc: Svc, p: { tenantId: string; operator: string; code: string; baseUrl: string }) {
+  const { data, error } = await svc.rpc("shop_lookup_code", { p_tenant: p.tenantId, p_operator: p.operator, p_code: p.code });
+  if (error) throw rpcError(error.message);
+  if (data?.error) {
+    if (data.error === "bad_code") void alertOnWrongCodes(svc, { tenantId: p.tenantId, operator: p.operator, baseUrl: p.baseUrl }).catch(() => undefined);
+    return { ok: false as const, refusal: data as ShopRefusal };
+  }
+  return { ok: true as const, child: { id: data.student_id as string, name: data.name as string, photo_url: (data.photo_url as string | null) ?? null, class_name: (data.class_name as string | null) ?? null } };
+}
+
+/** Wrong codes never stop a seller; when one seller types many (15 in 10 minutes), the admins are told, at most once an hour. */
+export const WRONG_CODE_ALERT = { count: 15, minutes: 10 };
+export async function alertOnWrongCodes(svc: Svc, p: { tenantId: string; operator: string; baseUrl: string }) {
+  const since = new Date(Date.now() - WRONG_CODE_ALERT.minutes * 60_000).toISOString();
+  const { count } = await svc.from("shop_events").select("id", { count: "exact", head: true }).eq("tenant_id", p.tenantId).eq("operator", p.operator).eq("kind", "bad_code").gte("created_at", since);
+  if ((count ?? 0) < WRONG_CODE_ALERT.count) return false;
+  const { data: recent } = await svc.from("shop_events").select("id").eq("tenant_id", p.tenantId).eq("operator", p.operator).eq("kind", "seller_alert")
+    .gte("created_at", new Date(Date.now() - 3600_000).toISOString()).limit(1);
+  if (recent?.length) return false;
+  const { data: who } = await svc.from("users").select("full_name").eq("id", p.operator).maybeSingle();
+  await svc.from("shop_events").insert({ tenant_id: p.tenantId, kind: "seller_alert", detail: { wrong_codes: count, minutes: WRONG_CODE_ALERT.minutes }, operator: p.operator });
+  const { data: admins } = await svc.from("users").select("id").eq("tenant_id", p.tenantId).eq("active", true).in("role", ["school_admin", "principal"]).limit(10);
+  const { staffRows, enqueue, tryDispatch } = await import("./messaging/outbox");
+  const rows = await staffRows(svc, { tenantId: p.tenantId, userIds: (admins ?? []).map((a: { id: string }) => a.id), kind: "shop_alert", refId: p.operator,
+    subject: `Tuck shop: many wrong codes from ${who?.full_name ?? "a seller"}`,
+    text: `${who?.full_name ?? "A seller"} typed ${count} wrong buy codes in the last ${WRONG_CODE_ALERT.minutes} minutes. Sales were not stopped. Please check with them.`,
+    url: `${p.baseUrl}/school/shop` });
+  if (rows.length) { await enqueue(svc, rows); await tryDispatch(svc, { budgetMs: 3000 }).catch(() => null); }
+  return true;
 }
 
 /** The latest fingerprint read at a shop machine since the till asked, with the student. */

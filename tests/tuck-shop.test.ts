@@ -1,5 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { codeRefusal, sellRefusal, byCategory, receipt, pauseSale, spendingAnalysis, MAX_PAUSED, type PausedSale } from "@/lib/tuck-shop";
+import { codeRefusal, sellRefusal, byCategory, receipt, pauseSale, spendingAnalysis, MAX_PAUSED, formatBuyCode, cleanBuyCode, isBuyCodeShape, inWindows, type PausedSale } from "@/lib/tuck-shop";
+
+describe("tuck shop: 6-character buy codes", () => {
+  it("puts the dash in by itself as the seller types", () => {
+    expect(formatBuyCode("7")).toBe("7");
+    expect(formatBuyCode("7K3")).toBe("7K3");
+    expect(formatBuyCode("7k3p")).toBe("7K3-P");
+    expect(formatBuyCode("7k3px9")).toBe("7K3-PX9");
+    expect(formatBuyCode("7K3-PX9")).toBe("7K3-PX9");
+    expect(formatBuyCode("7K3-PX9Z")).toBe("7K3-PX9");
+  });
+  it("reads the code with or without the dash", () => {
+    expect(cleanBuyCode("7k3-px9")).toBe("7K3PX9");
+    expect(isBuyCodeShape("7K3-PX9")).toBe(true);
+    expect(isBuyCodeShape("7K3PX9")).toBe(true);
+    expect(isBuyCodeShape("7K3-PX0")).toBe(false);   // zero is never used
+    expect(isBuyCodeShape("7K3-PX")).toBe(false);
+  });
+});
+
+describe("tuck shop: selling times", () => {
+  const at = (hhmm: string) => new Date(`2026-11-10T${hhmm}:00Z`);
+  it("is open only inside the times set (school's time zone)", () => {
+    expect(inWindows("10:00-10:30, 12:30-13:15", "UTC", at("10:15"))).toBe(true);
+    expect(inWindows("10:00-10:30, 12:30-13:15", "UTC", at("11:00"))).toBe(false);
+    expect(inWindows("10:00-10:30, 12:30-13:15", "UTC", at("13:15"))).toBe(true);
+    expect(inWindows("10:00-10:30", "Africa/Lagos", at("09:15"))).toBe(true);   // 10:15 in Lagos
+    expect(inWindows("", "UTC", at("03:00"))).toBe(true);
+  });
+  it("tells the seller when the shop is closed", () => {
+    expect(sellRefusal({ error: "closed", windows: "10:00-10:30,12:30-13:15" }, { currency: "NGN" })).toBe("The shop is closed now. Selling times: 10:00-10:30, 12:30-13:15.");
+  });
+});
 
 describe("tuck shop: what people are told", () => {
   it("tells a student why no code can be made", () => {

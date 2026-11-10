@@ -4,12 +4,12 @@ import { requireCtx, ROLES, hasAny, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { financeSettings } from "@/lib/fees";
 import { appUrl, startOfTodayIso } from "@/lib/school";
-import { sell, latestScan, shopEvents, ShopError } from "@/lib/tuck-shop-server";
-import { sellRefusal } from "@/lib/tuck-shop";
+import { sell, latestScan, shopEvents, lookupCode, ShopError } from "@/lib/tuck-shop-server";
+import { sellRefusal, inWindows, isBuyCodeShape, cleanBuyCode } from "@/lib/tuck-shop";
 
 export const dynamic = "force-dynamic";
 
-const SETTINGS = "shop_purchases_per_day,shop_gap_minutes,shop_code_windows,shop_daily_cap,shop_require_code,shop_notify_each_purchase,shop_parent_topup";
+const SETTINGS = "shop_purchases_per_day,shop_gap_minutes,shop_code_windows,shop_selling_windows,shop_daily_cap,shop_require_code,shop_notify_each_purchase,shop_parent_topup";
 const WINDOWS = /^\s*(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\s*)(,\s*\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\s*)*$/;
 
 /**
@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
     ]);
     return NextResponse.json({
       currency, timezone: ctx.tenant.timezone, items: items ?? [], devices: devices ?? [], settings: settings ?? {},
+      selling_open: inWindows((settings as { shop_selling_windows?: string } | null)?.shop_selling_windows, ctx.tenant.timezone),
       can_settings: hasAny(ctx, ROLES.admin), can_credit: hasAny(ctx, ROLES.admin),
       today: { sales: (sales ?? []).length, takings: (sales ?? []).reduce((a: number, s: any) => a - Number(s.amount), 0) }
     });
@@ -60,13 +61,15 @@ export async function GET(req: NextRequest) {
 
 const Item = z.object({ id: z.string().uuid(), qty: z.number().int().min(1).max(50) });
 const Body = z.discriminatedUnion("action", [
+  // The seller typed a code: show the child (name, photo, class) before paying.
+  z.object({ action: z.literal("lookup"), code: z.string().trim().min(1).max(12) }),
   z.object({ action: z.literal("sell"), items: z.array(Item).max(40).default([]), amount: z.number().positive().max(1_000_000).nullish(),
-    method: z.enum(["code", "fingerprint", "card"]), code: z.string().trim().max(8).nullish(), scan_id: z.string().uuid().nullish(), student_id: z.string().uuid().nullish() }),
+    method: z.enum(["code", "fingerprint", "card"]), code: z.string().trim().max(12).nullish(), scan_id: z.string().uuid().nullish(), student_id: z.string().uuid().nullish() }),
   z.object({ action: z.literal("save_item"), id: z.string().uuid().optional(), name: z.string().trim().min(1).max(80), price: z.number().min(0).max(1_000_000),
     category: z.string().trim().max(40).nullish(), active: z.boolean().default(true), stock: z.number().int().min(0).max(1_000_000).nullable(), stock_alert: z.number().int().min(0).max(100_000).nullable() }),
   z.object({ action: z.literal("stock"), item_id: z.string().uuid(), change: z.number().int().min(-100_000).max(100_000), reason: z.enum(["restock", "count", "damaged"]), note: z.string().trim().max(200).nullish() }),
   z.object({ action: z.literal("settings"), purchases_per_day: z.number().int().min(1).max(20), gap_minutes: z.number().int().min(0).max(600),
-    code_windows: z.string().trim().max(200), daily_cap: z.number().min(0).max(10_000_000).nullable(), require_code: z.boolean(), notify_each_purchase: z.boolean(), parent_topup: z.boolean() })
+    code_windows: z.string().trim().max(200), selling_windows: z.string().trim().max(200).default(""), daily_cap: z.number().min(0).max(10_000_000).nullable(), require_code: z.boolean(), notify_each_purchase: z.boolean(), parent_topup: z.boolean() })
 ]);
 
 export async function POST(req: NextRequest) {
@@ -78,11 +81,20 @@ export async function POST(req: NextRequest) {
   const tid = ctx.tenant.id;
   const svc = createServiceClient();
   try {
+    if (b.action === "lookup") {
+      if (!isBuyCodeShape(b.code)) return jsonError("A buy code has 6 letters and numbers, like 7K3-PX9.");
+      const r = await lookupCode(svc, { tenantId: tid, operator: ctx.userId, code: cleanBuyCode(b.code), baseUrl: appUrl(req) });
+      if (!r.ok) {
+        const { currency } = await financeSettings(svc, tid);
+        return NextResponse.json({ error: sellRefusal(r.refusal, { currency, timeZone: ctx.tenant.timezone }), reason: r.refusal.error }, { status: 409 });
+      }
+      return NextResponse.json({ ok: true, child: r.child });
+    }
     if (b.action === "sell") {
       if (b.method === "code" && !b.code) return jsonError("Type the student's buy code.");
       if (b.method === "fingerprint" && !b.scan_id) return jsonError("Ask the student to scan their finger.");
       if (b.method === "card" && !b.student_id) return jsonError("Scan the student's ID card.");
-      const r = await sell(svc, { tenantId: tid, operator: ctx.userId, items: b.items, amount: b.amount ?? null, method: b.method, code: b.code ?? null,
+      const r = await sell(svc, { tenantId: tid, operator: ctx.userId, items: b.items, amount: b.amount ?? null, method: b.method, code: b.code ? cleanBuyCode(b.code) : null,
         scanId: b.scan_id ?? null, studentId: b.student_id ?? null, baseUrl: appUrl(req) });
       if (!r.ok) {
         const { currency } = await financeSettings(svc, tid);
@@ -93,7 +105,9 @@ export async function POST(req: NextRequest) {
         }
         return NextResponse.json({ error: sellRefusal(r.refusal, { currency, timeZone: ctx.tenant.timezone, name }), reason: r.refusal.error }, { status: 409 });
       }
-      return NextResponse.json({ ok: true, ...r.sale });
+      // The seller sees the receipt and the child, never the child's balance.
+      const { balance: _balance, low: _low, ...sale } = r.sale as Record<string, unknown>;
+      return NextResponse.json({ ok: true, ...sale });
     }
     if (b.action === "save_item") {
       const row = { tenant_id: tid, name: b.name, price: b.price, category: b.category || null, active: b.active, stock: b.stock, stock_alert: b.stock_alert };
@@ -123,8 +137,9 @@ export async function POST(req: NextRequest) {
     // settings: admins only
     if (!hasAny(ctx, ROLES.admin)) return jsonError("only a school admin can change the tuck shop rules", 403);
     if (b.code_windows && !WINDOWS.test(b.code_windows)) return jsonError("write the times like 10:00-10:30, 12:30-13:15 (or leave empty for any time)");
+    if (b.selling_windows && !WINDOWS.test(b.selling_windows)) return jsonError("write the selling times like 10:00-10:30, 12:30-13:15 (or leave empty for any time)");
     const { error } = await svc.from("tenant_settings").upsert({ tenant_id: tid, shop_purchases_per_day: b.purchases_per_day, shop_gap_minutes: b.gap_minutes,
-      shop_code_windows: b.code_windows.replace(/\s+/g, " ").trim(), shop_daily_cap: b.daily_cap, shop_require_code: b.require_code,
+      shop_code_windows: b.code_windows.replace(/\s+/g, " ").trim(), shop_selling_windows: b.selling_windows.replace(/\s+/g, " ").trim(), shop_daily_cap: b.daily_cap, shop_require_code: b.require_code,
       shop_notify_each_purchase: b.notify_each_purchase, shop_parent_topup: b.parent_topup }, { onConflict: "tenant_id" });
     if (error) return jsonError(/shop_/.test(error.message) ? "The tuck shop needs the database update (migration 20260101009700)." : error.message);
     await svc.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "shop.settings", meta: b });

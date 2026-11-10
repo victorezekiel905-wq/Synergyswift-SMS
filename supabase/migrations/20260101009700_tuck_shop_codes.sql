@@ -1,6 +1,8 @@
 -- 9700: the tuck shop with one-time buy codes and fingerprints.
 --
--- * A student (or their parent) makes a 4-character buy code. It works once, and only today.
+-- * A student (or their parent) makes a 6-character buy code (shown 7K3-PX9). It works once, and only today.
+--   The seller types it, sees the child (name, photo, class; not the balance), then pays.
+--   Sellers sell only in the school's selling times (shop_selling_windows). Wrong codes never stop a seller.
 --   The school decides how many buys a day (shop_purchases_per_day), how long to wait after a
 --   buy before the next (shop_gap_minutes), the times codes can be made (shop_code_windows,
 --   e.g. "10:00-10:30, 12:30-13:15"; empty = any time) and a daily spending cap for every
@@ -17,13 +19,14 @@ alter table public.tenant_settings
   add column if not exists shop_purchases_per_day int not null default 1,
   add column if not exists shop_gap_minutes int not null default 60,
   add column if not exists shop_code_windows text not null default '',
+  add column if not exists shop_selling_windows text not null default '',
   add column if not exists shop_daily_cap numeric(14,2),
   add column if not exists shop_require_code boolean not null default true,
   add column if not exists shop_notify_each_purchase boolean not null default true,
   add column if not exists shop_parent_topup boolean not null default false;
 do $$ begin
   alter table public.tenant_settings add constraint shop_settings_ok check (shop_purchases_per_day between 1 and 20 and shop_gap_minutes between 0 and 600
-    and (shop_daily_cap is null or shop_daily_cap >= 0) and length(shop_code_windows) <= 200);
+    and (shop_daily_cap is null or shop_daily_cap >= 0) and length(shop_code_windows) <= 200 and length(shop_selling_windows) <= 200);
 exception when duplicate_object then null; end $$;
 
 alter table public.shop_items
@@ -49,7 +52,7 @@ create table if not exists public.shop_codes (
   id          uuid primary key default gen_random_uuid(),
   tenant_id   uuid not null references public.tenants(id) on delete cascade,
   student_id  uuid not null references public.students(id) on delete cascade,
-  code        text not null check (code ~ '^[A-HJ-NP-Z2-9]{4}$'),
+  code        text not null check (code ~ '^[A-HJ-NP-Z2-9]{6}$'),
   made_by     uuid references auth.users(id) on delete set null,
   made_as     text not null default 'student' check (made_as in ('student', 'parent', 'staff')),
   expires_at  timestamptz not null,
@@ -77,7 +80,7 @@ create table if not exists public.shop_events (
   id          bigint generated always as identity primary key,
   tenant_id   uuid not null references public.tenants(id) on delete cascade,
   student_id  uuid references public.students(id) on delete cascade,
-  kind        text not null check (kind in ('purchase', 'refused', 'code', 'exhausted', 'topup', 'bad_code', 'restock', 'low_stock')),
+  kind        text not null check (kind in ('purchase', 'refused', 'code', 'exhausted', 'topup', 'bad_code', 'restock', 'low_stock', 'seller_alert')),
   amount      numeric(14,2),
   detail      jsonb not null default '{}'::jsonb,
   operator    uuid references public.users(id) on delete set null,
@@ -97,8 +100,22 @@ alter table public.shop_events enable row level security;
 revoke all on public.shop_stock_moves, public.shop_codes, public.shop_finger_scans, public.shop_events from anon, authenticated;
 grant select, insert, update, delete on public.shop_stock_moves, public.shop_codes, public.shop_finger_scans, public.shop_events to service_role;
 
-/** The school's day and settings for one student: buys left, the wait, the limits, the wallet. */
-create or replace function public.shop_status(p_tenant uuid, p_student uuid) returns jsonb
+/** Whether a local time falls in any of the school's times, written "10:00-10:30, 12:30-13:15" (empty: always). */
+create or replace function public.shop_in_windows(p_windows text, p_local time) returns boolean
+language plpgsql immutable set search_path = '' as $$
+declare v_part text;
+begin
+  if btrim(coalesce(p_windows, '')) = '' then return true; end if;
+  for v_part in select btrim(x) from regexp_split_to_table(p_windows, ',') x loop
+    if v_part ~ '^\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}$'
+       and p_local >= btrim(split_part(v_part, '-', 1))::time and p_local <= btrim(split_part(v_part, '-', 2))::time then
+      return true;
+    end if;
+  end loop;
+  return false;
+end$$;
+
+/** The school's day and settings for one student: buys left, the wait, the limits, the wallet. */create or replace function public.shop_status(p_tenant uuid, p_student uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare
   s        public.tenant_settings;
@@ -112,7 +129,6 @@ declare
   v_next   timestamptz;
   v_cap    numeric;
   v_open   boolean := true;
-  v_part   text;
   v_code   public.shop_codes;
 begin
   select * into s from public.tenant_settings where tenant_id = p_tenant;
@@ -127,15 +143,8 @@ begin
     if v_next <= now() then v_next := null; end if;
   end if;
   v_cap := case when w.daily_limit is null then s.shop_daily_cap when s.shop_daily_cap is null then w.daily_limit else least(w.daily_limit, s.shop_daily_cap) end;
-  if btrim(coalesce(s.shop_code_windows, '')) <> '' then
-    v_open := false;
-    for v_part in select btrim(x) from regexp_split_to_table(s.shop_code_windows, ',') x loop
-      if v_part ~ '^\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}$'
-         and v_local::time >= btrim(split_part(v_part, '-', 1))::time and v_local::time <= btrim(split_part(v_part, '-', 2))::time then
-        v_open := true;
-      end if;
-    end loop;
-  end if;
+  v_open := public.shop_in_windows(s.shop_code_windows, v_local::time);
+
   select * into v_code from public.shop_codes where student_id = p_student and tenant_id = p_tenant and used_at is null and revoked_at is null and expires_at > now()
     order by created_at desc limit 1;
   return jsonb_build_object(
@@ -144,6 +153,7 @@ begin
     'cap', v_cap, 'spent_today', v_spent, 'cap_left', case when v_cap is null then null else greatest(v_cap - v_spent, 0) end,
     'balance', coalesce(w.balance, 0), 'frozen', coalesce(w.frozen, false), 'has_wallet', w.student_id is not null,
     'window_open', v_open, 'windows', coalesce(s.shop_code_windows, ''), 'day_ends', v_start + interval '1 day',
+    'selling_open', public.shop_in_windows(s.shop_selling_windows, v_local::time), 'selling_windows', coalesce(s.shop_selling_windows, ''),
     'code', v_code.code, 'code_expires', v_code.expires_at);
 end$$;
 
@@ -176,7 +186,7 @@ begin
   update public.shop_codes set revoked_at = now() where tenant_id = p_tenant and used_at is null and revoked_at is null and expires_at <= now();
   loop
     c := '';
-    for i in 0..3 loop
+    for i in 0..5 loop
       c := c || substr(a, 1 + (('x' || substr(md5(gen_random_uuid()::text || clock_timestamp()::text), i * 3 + 1, 3))::bit(12)::int % 32), 1);
     end loop;
     exit when not exists (select 1 from public.shop_codes where tenant_id = p_tenant and code = c and used_at is null and revoked_at is null);
@@ -197,6 +207,30 @@ begin
 end$$;
 
 /**
+ * The seller types a code: the child it belongs to (name, photo, class; never the balance), so the
+ * seller can check it's the child in front of them before paying. A wrong code is recorded.
+ */
+create or replace function public.shop_lookup_code(p_tenant uuid, p_operator uuid, p_code text) returns jsonb
+language plpgsql volatile security definer set search_path = '' as $$
+declare
+  s     public.tenant_settings;
+  v_tz  text;
+  c     public.shop_codes;
+  st    record;
+begin
+  select * into s from public.tenant_settings where tenant_id = p_tenant;
+  select coalesce(timezone, 'Africa/Lagos') into v_tz from public.tenants where id = p_tenant;
+  if not public.shop_in_windows(s.shop_selling_windows, (now() at time zone v_tz)::time) then
+    return jsonb_build_object('error', 'closed', 'windows', s.shop_selling_windows);
+  end if;
+  select * into c from public.shop_codes where tenant_id = p_tenant and code = upper(regexp_replace(coalesce(p_code, ''), '[^A-Za-z0-9]', '', 'g'))
+    and used_at is null and revoked_at is null and expires_at > now();
+  if c.id is null then return public.shop_refuse(p_tenant, null, p_operator, 'bad_code', null); end if;
+  select s2.id, s2.first_name, s2.last_name, s2.photo_url, g.name as class_name into st
+    from public.students s2 left join public.class_groups g on g.id = s2.class_group_id where s2.id = c.student_id;
+  return jsonb_build_object('student_id', st.id, 'name', st.first_name || ' ' || st.last_name, 'photo_url', st.photo_url, 'class_name', st.class_name);
+end$$;
+/**
  * A sale at the till (server only). Pays with a buy code, a fingerprint scan, or (if the
  * school allows it) the ID card. Prices come from the shop; stock, limits, the wait, buys
  * left and the balance are all checked with the wallet locked. Refusals come back as values.
@@ -215,15 +249,18 @@ declare
   w        public.wallets;
   st       jsonb;
   v_tx     uuid;
-  v_bad    int;
+  v_tz     text;
   v_ref    text := coalesce(p_reference, 'SHOP-' || upper(substr(md5(gen_random_uuid()::text), 1, 10)));
 begin
   select * into s from public.tenant_settings where tenant_id = p_tenant;
+  -- Sellers sell only in the school's selling times. Wrong codes never stop a seller (the break is short);
+  -- they are recorded, and admins are alerted when one seller types many.
+  select coalesce(timezone, 'Africa/Lagos') into v_tz from public.tenants where id = p_tenant;
+  if not public.shop_in_windows(s.shop_selling_windows, (now() at time zone v_tz)::time) then
+    return jsonb_build_object('error', 'closed', 'windows', s.shop_selling_windows);
+  end if;
   if p_method = 'code' then
-    -- A seller typing wrong codes is slowed down (codes are short).
-    select count(*) into v_bad from public.shop_events where tenant_id = p_tenant and operator = p_operator and kind = 'bad_code' and created_at > now() - interval '15 minutes';
-    if v_bad >= 10 then return jsonb_build_object('error', 'too_many_tries'); end if;
-    select * into v_code from public.shop_codes where tenant_id = p_tenant and code = upper(btrim(coalesce(p_code, '')))
+    select * into v_code from public.shop_codes where tenant_id = p_tenant and code = upper(regexp_replace(coalesce(p_code, ''), '[^A-Za-z0-9]', '', 'g'))
       and used_at is null and revoked_at is null for update;
     if v_code.id is null or v_code.expires_at <= now() then return public.shop_refuse(p_tenant, null, p_operator, 'bad_code', null); end if;
     v_sid := v_code.student_id;
@@ -302,9 +339,9 @@ begin
 end$$;
 
 revoke execute on function public.shop_status(uuid, uuid), public.shop_make_code(uuid, uuid, uuid, text), public.shop_refuse(uuid, uuid, uuid, text, numeric, jsonb),
-  public.shop_sell(uuid, uuid, jsonb, numeric, text, text, uuid, uuid, text), public.shop_record_scan(uuid, uuid) from public, anon, authenticated;
+  public.shop_sell(uuid, uuid, jsonb, numeric, text, text, uuid, uuid, text), public.shop_record_scan(uuid, uuid), public.shop_lookup_code(uuid, uuid, text) from public, anon, authenticated;
 grant execute on function public.shop_status(uuid, uuid), public.shop_make_code(uuid, uuid, uuid, text), public.shop_refuse(uuid, uuid, uuid, text, numeric, jsonb),
-  public.shop_sell(uuid, uuid, jsonb, numeric, text, text, uuid, uuid, text), public.shop_record_scan(uuid, uuid) to service_role;
+  public.shop_sell(uuid, uuid, jsonb, numeric, text, text, uuid, uuid, text), public.shop_record_scan(uuid, uuid), public.shop_lookup_code(uuid, uuid, text) to service_role;
 
 -- Only admins add money now (the bursar no longer can, unless the school makes them an admin).
 create or replace function public.wallet_credit(p_student uuid, p_amount numeric, p_kind text, p_method text, p_reference text, p_description text)

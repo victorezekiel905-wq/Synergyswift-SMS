@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useApi, send, Alert, Badge, money, fmtDate, fmtTime } from "@/components/ui";
-import type { ShopStatus } from "@/lib/tuck-shop";
+import { formatBuyCode, type ShopStatus } from "@/lib/tuck-shop";
 
 export type ShopEvent = { id: number; kind: string; amount: number | null; detail: Record<string, any>; at: string; student: string | null; by: string | null };
 type Tx = { id: string; kind: string; amount: number; balance_after: number | null; description: string | null; method: string | null; status: string; created_at: string };
@@ -48,7 +48,7 @@ export default function MyShop() {
         {s.code ? (
           <>
             <p className="text-xs uppercase tracking-wide text-slate-500">Your buy code</p>
-            <p className="my-1 font-mono text-5xl font-bold tracking-[0.3em] text-navy" aria-live="polite">{s.code}</p>
+            <p className="my-1 font-mono text-5xl font-bold tracking-[0.2em] text-navy" aria-live="polite">{formatBuyCode(s.code)}</p>
             <p className="text-xs text-slate-500">Tell it to the seller. It works once, today only{s.code_expires ? ` (until ${at(s.code_expires)})` : ""}.</p>
           </>
         ) : (
