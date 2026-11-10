@@ -1,8 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useApi, Page, PageHeader, Stat, Alert, Loading, money, fmtDate, type Me } from "@/components/ui";
-
-type Count = { key: string; count: number };
+import { Card, Figure, Figures, Bars, Columns, Split, Table, num, per, MONTH, tone, type Count } from "@/components/analysis/Charts";
 type Data = {
   school: string; generated_at: string; today: string; timezone: string;
   term: { id: string; name: string; starts_on: string | null; ends_on: string | null } | null;
@@ -16,14 +15,15 @@ type Data = {
   welfare: { behaviour_30: number | null; sickbay_30: number | null; tickets_open: number | null } | null;
   library: { on_loan: number; overdue: number } | null;
   engagement: { notices_30: number; live_lessons_30: number | null; gate_signins_30: number | null } | null;
+  activity: { actions: number; people: number; by_area: Count[]; by_role: Count[]; by_day: { date: string; count: number }[]; accounts: { role: string; accounts: number; active_30: number }[] } | null;
+  shop: { sales_30: number; takings_30: number; buyers_30: number; refused_30: number; topups_30: number; emptied_30: number } | null;
+  learning: { active_students_30: number; lessons_completed_30: number | null; online_joins_30: number | null } | null;
+  boarding: { boarders: number | null; out_on_exeat: number | null; clubs: number | null; students_in_clubs: number } | null;
   unavailable: string[];
   highlights: { tone: "bad" | "warn" | "good"; text: string; href: string }[];
   share_female: number | null;
 };
 
-const num = (n: number | null | undefined) => (n === null || n === undefined ? "—" : n.toLocaleString());
-const per = (n: number | null | undefined) => (n === null || n === undefined ? "—" : `${n}%`);
-const MONTH = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
 
 /** The whole school in one view, in the school's own colour (school admins and principals). */
 export default function AnalysisPage() {
@@ -32,7 +32,7 @@ export default function AnalysisPage() {
   const cur = me?.prefs?.currency ?? "NGN";
   if (error) return <Page wide><PageHeader eyebrow="Analysis" title="Analysis dashboard" /><Alert>{error}</Alert></Page>;
   if (!data) return <Page wide><PageHeader eyebrow="Analysis" title="Analysis dashboard" /><Loading label="Bringing the school's figures together…" /></Page>;
-  const { people, attendance, fees, academics, admissions, welfare, library, engagement } = data;
+  const { people, attendance, fees, academics, admissions, welfare, library, engagement, activity, shop, learning, boarding } = data;
 
   return (
     <Page wide>
@@ -149,85 +149,48 @@ export default function AnalysisPage() {
             <Figure label="Gate sign-ins (30 days)" value={num(engagement?.gate_signins_30)} href="/school/gate" />
           </div>
         </Card>
+
+        {(shop || learning || boarding) && (
+          <Card title="Tuck shop, online learning, boarding and clubs">
+            {shop && <Figures>
+              <Figure label="Tuck shop sales (30 days)" value={num(shop.sales_30)} hint={money(shop.takings_30, cur)} href="/school/shop" />
+              <Figure label="Students who bought" value={num(shop.buyers_30)} />
+              <Figure label="Wallets topped up" value={money(shop.topups_30, cur)} />
+              <Figure label="Refused · emptied" value={`${shop.refused_30} · ${shop.emptied_30}`} />
+            </Figures>}
+            {learning && <Figures>
+              <Figure label="Students learning online (30 days)" value={num(learning.active_students_30)} href="/school/learning" />
+              <Figure label="Online lessons completed" value={num(learning.lessons_completed_30)} />
+              <Figure label="Online lesson joins" value={num(learning.online_joins_30)} />
+            </Figures>}
+            {boarding && <Figures>
+              <Figure label="Boarders" value={num(boarding.boarders)} href="/school/hostel" />
+              <Figure label="Out on exeat now" value={num(boarding.out_on_exeat)} />
+              <Figure label="Clubs" value={num(boarding.clubs)} href="/school/activities" />
+              <Figure label="Students in clubs" value={num(boarding.students_in_clubs)} />
+            </Figures>}
+          </Card>
+        )}
       </div>
+
+      {activity && (
+        <section className="mt-5 grid gap-5 lg:grid-cols-2">
+          <Card title="Activity across the school, last 30 days" href="/school/audit">
+            <Figures>
+              <Figure label="Things done" value={num(activity.actions)} />
+              <Figure label="People active" value={num(activity.people)} />
+            </Figures>
+            <Columns title="Activity per day" rows={activity.by_day.map(d => ({ label: fmtDate(d.date), value: d.count, text: `${d.count} actions` }))} empty="Nothing recorded in the last 30 days." />
+            <Bars title="By area" rows={activity.by_area} />
+          </Card>
+          <Card title="Who is using the system" href="/school/roles">
+            <Bars title="Actions by role" rows={activity.by_role} />
+            <Table head={["Role", "Accounts", "Active in 30 days", "Share active"]} rows={activity.accounts.map(r => [<span key="r" className="capitalize">{r.role}</span>, r.accounts, r.active_30, r.accounts ? `${Math.round((r.active_30 / r.accounts) * 100)}%` : "—"])} />
+            <p className="text-xs text-slate-500">&quot;Active&quot; means the person changed something (marks, registers, payments, messages and so on). Reading only is not counted.</p>
+          </Card>
+        </section>
+      )}
       <p className="mt-6 text-xs text-slate-500">Figures are for {data.school} only, counted in the school&apos;s time zone ({data.timezone}). Parts for switched-off modules are left out. Colours follow your school colour (School setup).</p>
     </Page>
-  );
-}
-
-function tone(v: number | null | undefined, good: number, bad: number): "good" | "warn" | "bad" | undefined {
-  if (v === null || v === undefined) return undefined;
-  return v >= good ? "good" : v < bad ? "bad" : "warn";
-}
-
-function Card({ title, href, children }: { title: string; href?: string; children: React.ReactNode }) {
-  return (
-    <section className="card p-5">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="font-semibold">{title}</h2>
-        {href && <Link href={href} className="text-xs font-medium text-brand-700 hover:underline">Open →</Link>}
-      </div>
-      <div className="space-y-4">{children}</div>
-    </section>
-  );
-}
-
-function Figure({ label, value, href }: { label: string; value: React.ReactNode; href?: string }) {
-  const body = <><p className="text-xs text-slate-500">{label}</p><p className="mt-0.5 font-semibold tabular-nums text-slate-900">{value}</p></>;
-  return href ? <Link href={href} className="rounded-md bg-brand-50/60 p-2 hover:bg-brand-50">{body}</Link> : <div className="rounded-md bg-brand-50/60 p-2">{body}</div>;
-}
-
-/** Horizontal bars, longest first, in the school's colour. */
-function Bars({ title, rows }: { title: string; rows: Count[] }) {
-  if (!rows.length) return null;
-  const max = Math.max(...rows.map(r => r.count), 1);
-  return (
-    <div>
-      <p className="mb-1.5 text-xs font-medium text-slate-500">{title}</p>
-      <ul className="space-y-1">
-        {rows.map(r => (
-          <li key={r.key} className="grid grid-cols-[minmax(0,9rem)_1fr_3rem] items-center gap-2 text-xs">
-            <span className="truncate capitalize text-slate-700" title={r.key}>{r.key}</span>
-            <span className="h-2.5 rounded-full bg-slate-100"><span className="block h-full rounded-full bg-brand-600" style={{ width: `${(r.count / max) * 100}%` }} /></span>
-            <span className="text-right tabular-nums text-slate-600">{r.count.toLocaleString()}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/** Vertical columns over time, in the school's colour. */
-function Columns({ rows, max, title, empty }: { rows: { label: string; value: number; text: string }[]; max?: number; title?: string; empty?: string }) {
-  if (!rows.length) return empty ? <p className="text-sm text-slate-500">{empty}</p> : null;
-  const top = max ?? Math.max(...rows.map(r => r.value), 1);
-  return (
-    <div>
-      {title && <p className="mb-1.5 text-xs font-medium text-slate-500">{title}</p>}
-      <div className="flex h-32 items-end gap-1" role="img" aria-label={title ?? "Chart"}>
-        {rows.map((r, i) => (
-          <div key={i} className="group relative flex h-full flex-1 flex-col justify-end" title={`${r.label}: ${r.text}`}>
-            <div className="rounded-t bg-brand-500 transition-colors group-hover:bg-brand-700" style={{ height: `${Math.max(2, (r.value / top) * 100)}%` }} />
-          </div>
-        ))}
-      </div>
-      <div className="mt-1 flex justify-between text-[10px] text-slate-400"><span>{rows[0]!.label}</span><span>{rows[rows.length - 1]!.label}</span></div>
-    </div>
-  );
-}
-
-/** Shares of a whole, as one bar in shades of the school's colour. */
-function Split({ title, rows }: { title: string; rows: Count[] }) {
-  const total = rows.reduce((s, r) => s + r.count, 0);
-  if (!total) return null;
-  const shades = ["bg-brand-700", "bg-brand-400", "bg-brand-200", "bg-slate-300", "bg-slate-200"];
-  return (
-    <div>
-      <p className="mb-1.5 text-xs font-medium text-slate-500">{title}</p>
-      <div className="flex h-3 overflow-hidden rounded-full">{rows.map((r, i) => <span key={r.key} className={shades[i % shades.length]} style={{ width: `${(r.count / total) * 100}%` }} />)}</div>
-      <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-        {rows.map((r, i) => <li key={r.key} className="flex items-center gap-1.5"><span className={"h-2 w-2 rounded-full " + shades[i % shades.length]} />{r.key.replace(/_/g, " ")}: {r.count.toLocaleString()} ({Math.round((r.count / total) * 100)}%)</li>)}
-      </ul>
-    </div>
   );
 }

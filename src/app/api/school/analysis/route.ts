@@ -3,6 +3,7 @@ import { requireCtx, ROLES } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { fetchAll } from "@/lib/results";
 import { attendanceByDay, attendanceRate, countBy, dayIn, feeSummary, highlights, lastDays, lastMonths, pct, sumByMonth } from "@/lib/analysis";
+import { activitySummary } from "@/lib/analysis-staff";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export async function GET() {
 
   const { data: term } = await svc.from("terms").select("id,name,starts_on,ends_on").eq("tenant_id", tid).eq("is_current", true).maybeSingle();
 
-  const [people, attendance, fees, academics, admissions, welfare, library, engagement] = await Promise.all([
+  const [people, attendance, fees, academics, admissions, welfare, library, engagement, activity, shop, learning, boarding] = await Promise.all([
     part("people", async () => {
       const [students, classes, staff, guardians] = await Promise.all([
         fetchAll<{ id: string; gender: string | null; class_group_id: string | null; created_at: string }>(() =>
@@ -136,13 +137,53 @@ export async function GET() {
         on("gate") ? count("gate_events", q => q.eq("direction", "in").gte("at", since30)) : Promise.resolve(null)
       ]);
       return { notices_30: notices30, live_lessons_30: lessons30, gate_signins_30: signins30 };
+    }),
+    // Everything done in the school in 30 days (the change history), by area, by role and by day.
+    part("activity", async () => {
+      const [logs, users] = await Promise.all([
+        fetchAll<{ action: string; actor_id: string | null; ts: string }>(() => svc.from("audit_logs").select("id,action,actor_id,ts").eq("tenant_id", tid).gte("ts", since30).order("id"), 100_000),
+        fetchAll<{ id: string; role: string; active: boolean }>(() => svc.from("users").select("id,role,active").eq("tenant_id", tid).order("id"))
+      ]);
+      const roleOf = new Map(users.map(u => [u.id, u.role]));
+      const sum = activitySummary(logs, roleOf, days, ts => dayIn(ts, tz));
+      const activeBy = new Map<string, Set<string>>();
+      for (const l of logs) if (l.actor_id && roleOf.has(l.actor_id)) { const r = roleOf.get(l.actor_id)!; activeBy.set(r, (activeBy.get(r) ?? new Set()).add(l.actor_id)); }
+      const accounts = countBy(users.filter(u => u.active !== false), u => u.role);
+      return { ...sum, accounts: accounts.map(a => ({ role: a.key.replace(/_/g, " "), accounts: a.count, active_30: activeBy.get(a.key)?.size ?? 0 })) };
+    }),
+    on("wallet") ? part("shop", async () => {
+      const ev = await fetchAll<{ kind: string; amount: number | null; student_id: string | null }>(() =>
+        svc.from("shop_events").select("id,kind,amount,student_id").eq("tenant_id", tid).gte("created_at", since30).in("kind", ["purchase", "refused", "topup", "exhausted"]).order("id"));
+      const sales = ev.filter(e => e.kind === "purchase");
+      return { sales_30: sales.length, takings_30: Math.round(sales.reduce((a, e) => a + (Number(e.amount) || 0), 0) * 100) / 100,
+        buyers_30: new Set(sales.map(e => e.student_id)).size, refused_30: ev.filter(e => e.kind === "refused").length,
+        topups_30: Math.round(ev.filter(e => e.kind === "topup").reduce((a, e) => a + (Number(e.amount) || 0), 0) * 100) / 100,
+        emptied_30: ev.filter(e => e.kind === "exhausted").length };
+    }) : null,
+    on("lms") ? part("learning", async () => {
+      const [act, done, joins] = await Promise.all([
+        fetchAll<{ student_id: string }>(() => svc.from("learning_activity").select("id,student_id").eq("tenant_id", tid).gte("on_date", days[0]).order("id")).catch(() => []),
+        count("content_attempts", q => q.in("status", ["completed", "passed"]).gte("completed_at", since30)).catch(() => null),
+        // (this table has no id column: count on its own key)
+        svc.from("online_lesson_joins").select("lesson_id", { count: "exact", head: true }).eq("tenant_id", tid).gte("joined_at", since30).then((r: any) => (r.error ? null : r.count ?? 0))
+      ]);
+      return { active_students_30: new Set(act.map(a => a.student_id)).size, lessons_completed_30: done, online_joins_30: joins };
+    }) : null,
+    part("boarding", async () => {
+      const [boarders, out, clubs, members] = await Promise.all([
+        on("hostel") ? count("hostel_allocations", q => q.is("ended_at", null)).catch(() => null) : Promise.resolve(null),
+        on("hostel") ? count("exeat_requests", q => q.eq("status", "out")).catch(() => null) : Promise.resolve(null),
+        on("events") ? count("cc_groups", q => q.eq("active", true)).catch(() => null) : Promise.resolve(null),
+        on("events") ? fetchAll<{ student_id: string }>(() => svc.from("cc_members").select("group_id,student_id").eq("tenant_id", tid).eq("status", "active").order("group_id").order("student_id")).catch(() => []) : Promise.resolve([])
+      ]);
+      return { boarders, out_on_exeat: out, clubs, students_in_clubs: new Set(members.map(m => m.student_id)).size };
     })
   ]);
 
   return NextResponse.json({
     school: ctx.tenant.name, generated_at: new Date().toISOString(), today, timezone: tz,
     term: term ? { id: term.id, name: term.name, starts_on: term.starts_on, ends_on: term.ends_on } : null,
-    people, attendance, fees, academics, admissions, welfare, library, engagement,
+    people, attendance, fees, academics, admissions, welfare, library, engagement, activity, shop, learning, boarding,
     unavailable: failed,
     highlights: highlights({
       attendance_today: attendance?.today.rate ?? null, attendance_30: attendance?.rate_30 ?? null,

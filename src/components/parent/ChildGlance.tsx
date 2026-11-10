@@ -7,9 +7,9 @@ export type GlanceData = Glance & { next_homework: { title: string; subject: str
 const attTone = (r: number | null) => (r === null ? "" : r >= 95 ? "text-emerald-600" : r >= 90 ? "text-amber-600" : "text-rose-600");
 
 /** One child's attendance, homework and fees in a row of small figures. */
-export function GlanceStrip({ g }: { g: GlanceData }) {
+export function GlanceStrip({ g, href }: { g: GlanceData; href?: string }) {
   return (
-    <div className="grid grid-cols-3 gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-3 text-center text-sm">
+    <div className="relative grid grid-cols-3 gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-3 text-center text-sm">
       <div>
         <p className="text-xs text-slate-500">Attendance this term</p>
         <p className={`font-bold ${attTone(g.attendance_rate)}`}>{g.attendance_rate === null ? "—" : `${g.attendance_rate}%`}</p>
@@ -25,6 +25,7 @@ export function GlanceStrip({ g }: { g: GlanceData }) {
         <p className={`font-bold ${g.overdue > 0 ? "text-rose-600" : g.owed > 0 ? "text-amber-600" : "text-emerald-600"}`}>{g.owed > 0 ? money(g.owed) : "Paid"}</p>
         <p className="text-xs text-slate-500">{g.overdue > 0 ? `${money(g.overdue)} past due` : g.owed > 0 ? "outstanding" : "nothing owed"}</p>
       </div>
+      {href && <a href={href} className="col-span-3 text-xs font-medium text-brand-700 hover:underline">See the full analysis →</a>}
     </div>
   );
 }

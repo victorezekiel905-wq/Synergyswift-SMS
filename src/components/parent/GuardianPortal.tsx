@@ -94,7 +94,7 @@ export default function GuardianPortal({ api, act, mode, token }: { api: string;
               </div>
               <Badge tone={c.on_site ? "green" : "slate"}>{c.on_site ? "In school now" : "Not in school"}</Badge>
             </div>
-            {c.glance && <GlanceStrip g={c.glance} />}
+            {c.glance && <GlanceStrip g={c.glance} href={`/parent/analysis?child=${c.id}${mode === "token" && token ? `&token=${encodeURIComponent(token)}` : ""}`} />}
             {(c.points?.recent.length || c.story?.length) ? <ClassroomPanel points={c.points} story={c.story ?? []} /> : null}
             <div className="grid gap-4 p-4 sm:grid-cols-2">
               <div>
