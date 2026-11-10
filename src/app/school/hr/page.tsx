@@ -72,8 +72,7 @@ function StaffTab({ isHr, isAdmin, myId, data, error, reload, onOpen }: { isHr: 
   const subjectName = new Map(subjects.map(x => [x.id, x.name]));
   return (
     <div>
-      {isHr && <a className="btn btn-outline mb-4 mr-2" href="/school/staff-onboarding">Staff onboarding</a>}
-      {isHr && <button className="btn btn-primary mb-4" onClick={() => setEdit({ employment_type: "full_time", status: "active", leave_allowance: 20 })}>+ Add staff</button>}
+      {isHr && <div className="mb-4 flex flex-wrap items-center gap-3"><a className="btn btn-primary" href="/school/staff-onboarding">+ Add staff</a><span className="text-sm text-slate-500">New staff are added in Staff onboarding: their email, subjects and how they sign in, in one place.</span></div>}
       {error && <Alert>{error}</Alert>}
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
       {!data?.length ? <Empty>No staff records yet.</Empty> : (
@@ -92,7 +91,8 @@ function StaffTab({ isHr, isAdmin, myId, data, error, reload, onOpen }: { isHr: 
                     {isHr && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => onOpen(s.id)}>Record</button>}
                     <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setCard(s)}>ID card</button>
                     {isHr && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setEdit(s)}>Edit</button>}
-                    {isAdmin && s.user_id !== myId && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setAccess(s)}>{s.user_id ? "Roles" : "Give login"}</button>}
+                    {isAdmin && s.user_id && s.user_id !== myId && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setAccess(s)}>Roles</button>}
+                    {isAdmin && !s.user_id && <a className="btn btn-ghost px-2 py-1 text-xs" href={`/school/staff-onboarding?focus=${s.id}`}>Give login</a>}
                     {isAdmin && s.users && s.user_id !== myId && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={async () => { const r = await send("/api/hr/staff", { action: "set_active", staff_id: s.id, active: !s.users!.active }); setMsg({ ok: r.ok, text: r.ok ? "Updated." : r.error ?? "" }); reload(); }}>{s.users.active ? "Disable login" : "Enable login"}</button>}
                   </td>
                 </tr>

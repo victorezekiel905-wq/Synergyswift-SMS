@@ -6,6 +6,7 @@
  */
 import { fetchAll } from "./fetch-all";
 import { tellStaff } from "./hr-server";
+import { assignmentChanges, type Assignment } from "./staff-onboarding";
 
 type Svc = any;
 
@@ -52,6 +53,8 @@ export async function nextStaffNo(svc: Svc, tenantId: string): Promise<string> {
 export type OnboardRow = {
   id: string; full_name: string; email: string | null; staff_no: string; position: string | null; created_at: string;
   subject_ids: string[]; has_account: boolean; role: string | null; code: string | null; classes: number; active: boolean | null;
+  /** Their classes now (signed up) or the classes waiting for them (not yet). */
+  assignments: Assignment[];
 };
 
 /**
@@ -59,15 +62,21 @@ export type OnboardRow = {
  * signed up, and how many classes they are in (form teacher, subject teacher or class team).
  */
 export async function onboardingList(svc: Svc, tenantId: string): Promise<OnboardRow[]> {
-  const [staff, subjects, codes, users, offerings, forms, team] = await Promise.all([
+  const [staff, subjects, codes, users, offerings, forms, team, plans] = await Promise.all([
     fetchAll<any>(() => svc.from("staff").select("id,full_name,email,staff_no,position,created_at,user_id,status").eq("tenant_id", tenantId).neq("status", "exited").order("id")),
     subjectsByStaff(svc, tenantId),
     fetchAll<any>(() => svc.from("account_codes").select("staff_id,code,role,used_at,uses,max_uses").eq("tenant_id", tenantId).eq("kind", "staff").is("revoked_at", null).order("id")).catch(() => []),
     fetchAll<any>(() => svc.from("users").select("id,role,active").eq("tenant_id", tenantId).order("id")),
-    fetchAll<any>(() => svc.from("subject_offerings").select("class_group_id,teacher_id").eq("tenant_id", tenantId).not("teacher_id", "is", null).order("id")),
+    fetchAll<any>(() => svc.from("subject_offerings").select("class_group_id,subject_id,teacher_id").eq("tenant_id", tenantId).not("teacher_id", "is", null).order("id")),
     fetchAll<any>(() => svc.from("class_groups").select("id,form_teacher_id").eq("tenant_id", tenantId).not("form_teacher_id", "is", null).order("id")),
-    fetchAll<any>(() => svc.from("class_staff").select("class_group_id,user_id").eq("tenant_id", tenantId).order("id")).catch(() => [])
+    fetchAll<any>(() => svc.from("class_staff").select("class_group_id,user_id").eq("tenant_id", tenantId).order("id")).catch(() => []),
+    fetchAll<any>(() => svc.from("staff_class_plans").select("staff_id,class_group_id,subject_id").eq("tenant_id", tenantId).order("id")).catch(() => [])
   ]);
+  const own = new Map<string, Assignment[]>();
+  const put = (key: string | null, a: Assignment) => { if (key) own.set(key, [...(own.get(key) ?? []), a]); };
+  for (const o of offerings) put(`u:${o.teacher_id}`, { class_group_id: o.class_group_id, subject_id: o.subject_id });
+  for (const c of forms) put(`u:${c.form_teacher_id}`, { class_group_id: c.id, subject_id: null });
+  for (const pl of plans) put(`s:${pl.staff_id}`, { class_group_id: pl.class_group_id, subject_id: pl.subject_id ?? null });
   const classesOf = new Map<string, Set<string>>();
   const add = (uid: string | null, cls: string) => { if (uid) classesOf.set(uid, (classesOf.get(uid) ?? new Set()).add(cls)); };
   for (const o of offerings) add(o.teacher_id, o.class_group_id);
@@ -82,7 +91,8 @@ export async function onboardingList(svc: Svc, tenantId: string): Promise<Onboar
     return {
       id: s.id, full_name: s.full_name, email: s.email, staff_no: s.staff_no, position: s.position, created_at: s.created_at,
       subject_ids: subjects.get(s.id) ?? [], has_account: Boolean(s.user_id), role: u?.role ?? c?.role ?? null,
-      code: !s.user_id && live ? formatCode(c.code) : null, classes: s.user_id ? (classesOf.get(s.user_id)?.size ?? 0) : 0, active: u ? Boolean(u.active) : null
+      code: !s.user_id && live ? formatCode(c.code) : null, classes: s.user_id ? (classesOf.get(s.user_id)?.size ?? 0) : 0, active: u ? Boolean(u.active) : null,
+      assignments: s.user_id ? own.get(`u:${s.user_id}`) ?? [] : own.get(`s:${s.id}`) ?? []
     };
   }).sort((a: OnboardRow, b: OnboardRow) => b.created_at.localeCompare(a.created_at));
 }
@@ -102,4 +112,52 @@ export async function staffJoined(svc: Svc, p: { tenantId: string; userId: strin
   await tellStaff(svc, p.tenantId, to, "staff_joined", `${s.full_name} has signed up`,
     `${s.full_name} has made their account${teaches ? ` and teaches ${teaches}` : ""}. Put them in their classes under School office → Class teams.`,
     `${p.baseUrl}/school/class-teams`, s.id);
+}
+
+/**
+ * Sets the classes someone teaches to exactly what was ticked. Signed up: put in place now
+ * (subject teacher, or form teacher). Not yet: kept and put in place the moment they sign up.
+ */
+export async function setStaffClasses(svc: Svc, p: { tenantId: string; staffId: string; actor: string; want: Assignment[] }): Promise<{ error?: string; applied?: boolean; count: number }> {
+  const tid = p.tenantId;
+  const { data: s } = await svc.from("staff").select("id,user_id").eq("tenant_id", tid).eq("id", p.staffId).maybeSingle();
+  if (!s) return { error: "staff not found", count: 0 };
+  const classIds = [...new Set(p.want.map(a => a.class_group_id))], subjectIds = [...new Set(p.want.map(a => a.subject_id).filter(Boolean) as string[])];
+  if (classIds.length) {
+    const { data } = await svc.from("class_groups").select("id").eq("tenant_id", tid).in("id", classIds);
+    if ((data ?? []).length !== classIds.length) return { error: "a class chosen is not one of the school's classes", count: 0 };
+  }
+  if (subjectIds.length) {
+    const { data } = await svc.from("subjects").select("id").eq("tenant_id", tid).in("id", subjectIds);
+    if ((data ?? []).length !== subjectIds.length) return { error: "a subject chosen is not one of the school's subjects", count: 0 };
+  }
+  if (!s.user_id) {
+    const { error: dErr } = await svc.from("staff_class_plans").delete().eq("tenant_id", tid).eq("staff_id", s.id);
+    if (dErr) return { error: /does not exist|schema cache/i.test(dErr.message) ? "choosing classes before sign-up needs the database update (migration 20260101009800)" : dErr.message, count: 0 };
+    const rows = [...new Map(p.want.map(a => [`${a.class_group_id}:${a.subject_id ?? ""}`, a])).values()]
+      .map(a => ({ tenant_id: tid, staff_id: s.id, class_group_id: a.class_group_id, subject_id: a.subject_id, created_by: p.actor }));
+    if (rows.length) { const { error } = await svc.from("staff_class_plans").insert(rows); if (error) return { error: error.message, count: 0 }; }
+    return { applied: false, count: rows.length };
+  }
+  const uid = s.user_id;
+  const [{ data: offs }, { data: forms }] = await Promise.all([
+    svc.from("subject_offerings").select("id,class_group_id,subject_id").eq("tenant_id", tid).eq("teacher_id", uid),
+    svc.from("class_groups").select("id").eq("tenant_id", tid).eq("form_teacher_id", uid)
+  ]);
+  const have: Assignment[] = [...(offs ?? []).map((o: any) => ({ class_group_id: o.class_group_id, subject_id: o.subject_id })), ...(forms ?? []).map((c: any) => ({ class_group_id: c.id, subject_id: null }))];
+  const { add, remove } = assignmentChanges(have, p.want);
+  for (const a of remove) {
+    const r = a.subject_id
+      ? await svc.from("subject_offerings").update({ teacher_id: null }).eq("tenant_id", tid).eq("class_group_id", a.class_group_id).eq("subject_id", a.subject_id).eq("teacher_id", uid)
+      : await svc.from("class_groups").update({ form_teacher_id: null }).eq("tenant_id", tid).eq("id", a.class_group_id).eq("form_teacher_id", uid);
+    if (r.error) return { error: r.error.message, count: 0 };
+  }
+  for (const a of add) {
+    const r = a.subject_id
+      ? await svc.from("subject_offerings").upsert({ tenant_id: tid, class_group_id: a.class_group_id, subject_id: a.subject_id, teacher_id: uid }, { onConflict: "class_group_id,subject_id" })
+      : await svc.from("class_groups").update({ form_teacher_id: uid }).eq("tenant_id", tid).eq("id", a.class_group_id);
+    if (r.error) return { error: r.error.message, count: 0 };
+  }
+  if (add.length || remove.length) await svc.from("audit_logs").insert({ tenant_id: tid, actor_id: p.actor, action: "staff.classes_set", target: uid, meta: { added: add.length, removed: remove.length } });
+  return { applied: true, count: p.want.length };
 }

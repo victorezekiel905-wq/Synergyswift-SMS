@@ -5,7 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { appUrl } from "@/lib/school";
 import { sendCodes } from "@/lib/sign-up-codes-server";
 import { grantStaffAccess, rolesOutsidePlan, type AccessResult } from "@/lib/staff-access-server";
-import { onboardingList, setStaffSubjects, nextStaffNo } from "@/lib/staff-onboarding-server";
+import { onboardingList, setStaffSubjects, nextStaffNo, setStaffClasses } from "@/lib/staff-onboarding-server";
 
 export const dynamic = "force-dynamic";
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -16,21 +16,32 @@ export async function GET() {
   if (ctx instanceof NextResponse) return ctx;
   const svc = createServiceClient();
   const tid = ctx.tenant.id;
-  const [{ data: subjects }, list] = await Promise.all([
-    svc.from("subjects").select("id,name").eq("tenant_id", tid).order("name"),
+  const [{ data: subjects }, { data: classes }, { data: offerings }, { data: users }, list] = await Promise.all([
+    svc.from("subjects").select("id,name,code").eq("tenant_id", tid).order("name"),
+    svc.from("class_groups").select("id,name,level,form_teacher_id").eq("tenant_id", tid).order("name"),
+    svc.from("subject_offerings").select("class_group_id,subject_id,teacher_id").eq("tenant_id", tid),
+    svc.from("users").select("id,full_name").eq("tenant_id", tid).not("role", "in", "(student,parent)"),
     onboardingList(svc, tid)
   ]);
   const roles = STAFF_ROLE_OPTIONS.filter(r => !rolesOutsidePlan(ctx, [r]).length);
-  return NextResponse.json({ subjects: subjects ?? [], staff: list, roles });
+  // Who teaches what now, so the page can say "replaces …".
+  const names = new Map(((users ?? []) as any[]).map(u => [u.id, u.full_name]));
+  const taken: Record<string, string> = {};
+  for (const o of (offerings ?? []) as any[]) if (o.teacher_id) taken[`${o.class_group_id}:${o.subject_id}`] = names.get(o.teacher_id) ?? "someone";
+  for (const c of (classes ?? []) as any[]) if (c.form_teacher_id) taken[`${c.id}:form`] = names.get(c.form_teacher_id) ?? "someone";
+  return NextResponse.json({ subjects: subjects ?? [], classes: (classes ?? []).map((c: any) => ({ id: c.id, name: c.name, level: c.level })), taken, staff: list, roles });
 }
 
 const Method = z.enum(["code", "invite", "otp"]);
+const Assignments = z.array(z.object({ class_group_id: z.string().uuid(), subject_id: z.string().uuid().nullable() })).max(200);
 const Role = z.enum(STAFF_ROLE_OPTIONS);
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("onboard"), full_name: z.string().trim().min(2).max(120), email: z.string().trim().max(254),
     staff_no: z.string().trim().max(40).nullish(), subject_ids: z.array(z.string().uuid()).max(60).default([]),
-    role: Role.default("teacher"), extra_roles: z.array(Role).max(15).default([]), method: Method.default("code"),
-    phone: z.string().trim().max(30).nullish(), position: z.string().trim().max(80).nullish() }),
+    role: Role.default("teacher"), extra_roles: z.array(Role).max(15).default([]), method: Method.default("invite"),
+    phone: z.string().trim().max(30).nullish(), position: z.string().trim().max(80).nullish(), classes: Assignments.default([]) }),
+  // The classes they teach: in place now if they have signed up, else as soon as they do.
+  z.object({ action: z.literal("classes"), staff_id: z.string().uuid(), classes: Assignments }),
   // Someone still waiting: a fresh code, the invitation link, or a one-time password.
   z.object({ action: z.literal("resend"), staff_id: z.string().uuid(), method: Method, email: z.string().trim().max(254).nullish() }),
   z.object({ action: z.literal("subjects"), staff_id: z.string().uuid(), subject_ids: z.array(z.string().uuid()).max(60) })
@@ -61,10 +72,26 @@ export async function POST(req: NextRequest) {
     return r.error ? jsonError(r.error) : NextResponse.json({ ok: true });
   }
 
+  if (b.action === "classes") {
+    const r = await setStaffClasses(svc, { tenantId: tid, staffId: b.staff_id, actor: ctx.userId, want: b.classes });
+    if (r.error) return jsonError(r.error);
+    return NextResponse.json({ ok: true, message: r.applied ? "Classes saved." : "Classes saved. They are put in place the moment this person signs up." });
+  }
+
   if (b.action === "resend") {
     const { data: s } = await svc.from("staff").select("id,full_name,email,user_id").eq("tenant_id", tid).eq("id", b.staff_id).maybeSingle();
     if (!s) return jsonError("staff not found", 404);
     if (s.user_id) return jsonError(`${s.full_name} has an account already. Change their roles in HR, or reset their password.`);
+    // A record with no email (added before, or imported): the email typed now is kept on it.
+    const typed = (b.email ?? "").trim().toLowerCase();
+    if (typed && typed !== (s.email ?? "").toLowerCase()) {
+      if (!EMAIL.test(typed)) return jsonError("Enter their email address.");
+      const { data: taken } = await svc.from("users").select("id").eq("email", typed).limit(1);
+      if (taken?.length) return jsonError("This email already has a Synergy Swift account. Use a different email.");
+      await ctx.sb.from("staff").update({ email: typed }).eq("tenant_id", tid).eq("id", s.id);
+      s.email = typed;
+    }
+    if (!s.email && b.method !== "code") return jsonError("Enter their email address first.");
     const { data: c } = await svc.from("account_codes").select("role,extra_roles").eq("tenant_id", tid).eq("kind", "staff").eq("staff_id", s.id).is("revoked_at", null).maybeSingle();
     const r = await grantStaffAccess(ctx, svc, req, { staff: s, role: c?.role ?? "teacher", extra: c?.extra_roles ?? [], method: b.method, email: b.email || s.email });
     if (!r.ok) return jsonError(r.error, r.status);
@@ -103,7 +130,9 @@ export async function POST(req: NextRequest) {
 
   const subj = b.subject_ids.length ? await setStaffSubjects(ctx.sb, tid, staff.id, b.subject_ids) : {};
   const r = await grantStaffAccess(ctx, svc, req, { staff, role: b.role, extra: b.extra_roles, method: b.method, email });
-  const note = subj.error ? ` (Subjects were not saved: ${subj.error}.)` : "";
+  // Classes chosen now: in place at once if the account was made (link, one-time password), else when they sign up.
+  const cls = b.classes.length ? await setStaffClasses(svc, { tenantId: tid, staffId: staff.id, actor: ctx.userId, want: b.classes }) : null;
+  const note = (subj.error ? ` (Subjects were not saved: ${subj.error}.)` : "") + (cls?.error ? ` (Classes were not saved: ${cls.error}. Choose them again from the list.)` : "");
   if (!r.ok) {
     return NextResponse.json({ ok: true, staff_id: staff.id, staff_no: staff.staff_no, access_error: r.error,
       message: `${staff.full_name} is on the staff list (ID ${staff.staff_no}), but their sign-in was not made: ${r.error}. Try again from the list below.${note}` });
