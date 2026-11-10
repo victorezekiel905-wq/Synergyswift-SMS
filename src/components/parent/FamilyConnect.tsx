@@ -120,7 +120,7 @@ export function ParentWallet({ token, kids }: { token?: string; kids: { id: stri
                 <input className="input w-36" type="number" min="1" step="1" required placeholder="Amount" value={amount[w.student_id] ?? ""} onChange={e => setAmount({ ...amount, [w.student_id]: e.target.value })} aria-label={`Top-up amount for ${name}`} />
                 <button className="btn btn-primary">Top up</button>
               </form>
-            ) : <p className="mt-1 text-xs text-slate-500">Top up at the school bursary.</p>}
+            ) : <p className="mt-1 text-xs text-slate-500">The school adds money to the wallet: contact the school office.</p>}
             <details className="mt-2 text-sm">
               <summary className="cursor-pointer text-brand-700">Limits and card</summary>
               <form className="mt-2 grid gap-2 sm:grid-cols-3" onSubmit={async e => {

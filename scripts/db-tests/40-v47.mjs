@@ -52,10 +52,12 @@ export default async function ({ db, as, q, expectRows, expectError, expectOk, c
   await expectRows("push subscriptions are server-only", U.adminA, "select count(*) n from push_subscriptions", 0);
 
   console.log("\nCashless wallet");
-  await expectError("teachers cannot top up wallets", U.teacherA, `select wallet_credit('${S1}', 1000, 'topup', 'cash', 'CASH-1', 'Pocket money')`, /forbidden/);
-  await expectOk("bursar records a cash top-up", U.bursarA, `select wallet_credit('${S1}', 1000, 'topup', 'cash', 'CASH-1', 'Pocket money')`);
-  await expectError("a reference cannot be used twice", U.bursarA, `select wallet_credit('${S1}', 1000, 'topup', 'cash', 'CASH-1', 'Again')`, /duplicate key/);
-  await expectError("the cashier cannot top up", cashier, `select wallet_credit('${S1}', 500, 'topup', 'cash', 'CASH-2', 'x')`, /forbidden/);
+  // Only school admins add money (9700).
+  await expectError("teachers cannot top up wallets", U.teacherA, `select wallet_credit('${S1}', 1000, 'topup', 'cash', 'CASH-1', 'Pocket money')`, /only a school admin/);
+  await expectError("the bursar cannot top up wallets", U.bursarA, `select wallet_credit('${S1}', 1000, 'topup', 'cash', 'CASH-0', 'Pocket money')`, /only a school admin/);
+  await expectOk("an admin records a cash top-up", U.adminA, `select wallet_credit('${S1}', 1000, 'topup', 'cash', 'CASH-1', 'Pocket money')`);
+  await expectError("a reference cannot be used twice", U.adminA, `select wallet_credit('${S1}', 1000, 'topup', 'cash', 'CASH-1', 'Again')`, /duplicate key/);
+  await expectError("the cashier cannot top up", cashier, `select wallet_credit('${S1}', 500, 'topup', 'cash', 'CASH-2', 'x')`, /only a school admin/);
   await expectOk("cashier charges a purchase", cashier, `select wallet_charge('${S1}', 300, '[{"name":"Juice","qty":1,"price":300}]', 'Tuck shop', 'POS-1')`);
   await expectError("cannot spend more than the balance", cashier, `select wallet_charge('${S1}', 800, '[]', 'Tuck shop', 'POS-2')`, /insufficient balance/);
   await db.exec(`update wallets set daily_limit = 500 where student_id = '${S1}'`);

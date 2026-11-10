@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { send, Alert, Badge, Empty, Tabs, Field, fmtDate, fmtTime, money } from "@/components/ui";
 import { ParentMessages, ParentWallet, ParentBus } from "./FamilyConnect";
+import ParentShop from "./ParentShop";
 import { ReenrolCard, SurveyPrompt, SupportTab, ConsentCard, type SupportData } from "./Support";
 import Records, { type RecordsData } from "./Records";
 
@@ -153,7 +154,7 @@ export default function FamilyTabs({ extras, kids, token, onChange }: { extras: 
 
       {tab === "notices" && <FamilyNotices extras={extras} act={act} />}
       {tab === "messages" && <ParentMessages token={token} />}
-      {tab === "wallet" && <ParentWallet token={token} kids={kids} />}
+      {tab === "wallet" && <div className="space-y-6"><ParentShop token={token} /><ParentWallet token={token} kids={kids} /></div>}
       {tab === "bus" && <ParentBus token={token} kids={kids} />}
       {tab === "boarding" && <Boarding extras={extras} kids={kids} name={name} onRequest={b => act({ action: "exeat", ...b }, "Exeat requested. The house staff will reply shortly.")}
         onConsent={(id, approve) => act({ action: "exeat_consent", id, approve }, approve ? "Thank you. The boarding house has your agreement." : "Declined. The boarding house has been told.")} />}

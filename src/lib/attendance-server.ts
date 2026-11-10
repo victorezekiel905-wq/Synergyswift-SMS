@@ -106,6 +106,18 @@ const METHOD: Record<DevicePunch["verify"], GateMethod> = { fingerprint: "finger
 /** Records punches from a clocking machine. Unknown user numbers are counted and skipped. */
 export async function recordPunches(svc: any, device: { id: string; tenant_id: string; mode: string; name: string }, timezone: string, punches: (DevicePunch | { code: string; at: Date; direction: "in" | "out" | "auto"; method: GateMethod })[]) {
   let saved = 0, unknown = 0, skipped = 0;
+  // A machine at the tuck shop (migration 9700): a finger read pays at the till, not the gate register.
+  if (device.mode === "shop") {
+    for (const p of punches.slice(0, 50)) {
+      const person = "pin" in p ? await personByIdentifier(svc, device.tenant_id, "device_pin", p.pin)
+        : (await personByIdentifier(svc, device.tenant_id, "card", p.code)) ?? (await personByIdentifier(svc, device.tenant_id, "device_pin", p.code));
+      if (!person || person.type !== "student") { unknown++; continue; }
+      const { data } = await svc.rpc("shop_record_scan", { p_device: device.id, p_student: person.id });
+      if (data) saved++; else skipped++;
+    }
+    await svc.from("attendance_devices").update({ last_seen_at: new Date().toISOString(), last_error: unknown ? `${unknown} unknown or non-student finger(s) at the shop` : null }).eq("id", device.id);
+    return { saved, unknown, skipped };
+  }
   for (const p of punches.slice(0, 2000)) {
     const isLog = "pin" in p;
     const person = isLog ? await personByIdentifier(svc, device.tenant_id, "device_pin", p.pin)

@@ -11,6 +11,7 @@ import MyExeats from "@/components/student/MyExeats";
 import MyClubs from "@/components/student/MyClubs";
 import MyDay from "@/components/student/MyDay";
 import MyTools from "@/components/student/MyTools";
+import MyShop from "@/components/student/MyShop";
 
 type Exam = { id: string; title: string; subject: string | null; duration_minutes: number; opens_at: string | null; closes_at: string | null; window: string; require_seb: boolean; attempt_status: string | null; score: { total: number; max: number } | null };
 type Result = { id: string; term: string; class_name: string; average: number | null; position: number | null; class_size: number | null; published_at: string; access_token: string };
@@ -22,6 +23,7 @@ export default function StudentHome() {
     <Page>
       <PageHeader eyebrow="Student" title="My school" />
       <MyDay />
+      <MyShop />
       <NoticeBoard />
       <WellbeingCheckin />
       <MyExeats />

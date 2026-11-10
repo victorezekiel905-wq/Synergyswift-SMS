@@ -285,6 +285,7 @@ create or replace function public.recycle_bin_skip_tables() returns text[] langu
     'public.tenant_module_overrides','public.subscriptions','public.feature_flags','public.weekly_report_runs','public.tenant_groups','public.group_admins',
     'public.sales_leads','public.sales_activities','public.sales_quotes','public.whatsapp_unmatched','public.open_books',
     'public.account_codes','public.account_code_tries',
+    'public.shop_codes','public.shop_finger_scans','public.shop_events','public.shop_stock_moves',
     'live.audit_logs','live.browser_events','live.browser_sessions','live.environment_events','live.error_events','live.screen_snapshots','live.rtc_rooms',
     'live.rtc_peers','live.rtc_signals','live.raise_hands','live.teacher_commands','live.device_enrollments','live.device_pairing_codes','live.devices',
     'live.rate_buckets','live.platform_admins','live.platform_audit','live.platform_config','live.platform_stats','live.notifications','live.users',

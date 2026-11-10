@@ -27,8 +27,8 @@ export async function GET(req: NextRequest) {
 
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("add_device"), name: z.string().trim().min(2).max(80), kind: z.enum(["zkteco", "webhook"]), serial: z.string().trim().regex(/^[A-Za-z0-9-]{4,40}$/).nullish(),
-    location: z.string().trim().max(120).nullish(), mode: z.enum(["auto", "in", "out"]).default("auto") }),
-  z.object({ action: z.literal("update_device"), id: z.string().uuid(), name: z.string().trim().min(2).max(80), location: z.string().trim().max(120).nullish(), mode: z.enum(["auto", "in", "out"]), active: z.boolean() }),
+    location: z.string().trim().max(120).nullish(), mode: z.enum(["auto", "in", "out", "shop"]).default("auto") }),
+  z.object({ action: z.literal("update_device"), id: z.string().uuid(), name: z.string().trim().min(2).max(80), location: z.string().trim().max(120).nullish(), mode: z.enum(["auto", "in", "out", "shop"]), active: z.boolean() }),
   z.object({ action: z.literal("new_key"), id: z.string().uuid() }),
   z.object({ action: z.literal("delete_device"), id: z.string().uuid() }),
   z.object({ action: z.literal("add_identifier"), person: z.string().trim().min(1).max(60), kind: z.enum(["card", "device_pin"]), value: z.string().trim().min(1).max(64) }),

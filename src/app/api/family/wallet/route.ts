@@ -10,6 +10,13 @@ import { appUrl } from "@/lib/school";
 
 export const dynamic = "force-dynamic";
 
+/** Only admins add money unless the school lets parents top up online (migration 9700). Before that update: as before. */
+async function parentTopUpAllowed(svc: any, tenantId: string): Promise<boolean> {
+  const { data, error } = await svc.from("tenant_settings").select("shop_parent_topup").eq("tenant_id", tenantId).maybeSingle();
+  if (error) return true;
+  return Boolean(data?.shop_parent_topup);
+}
+
 /** Parent view of each child's wallet: balance, what they bought, limits. */
 export async function GET(req: NextRequest) {
   const svc = createServiceClient();
@@ -18,7 +25,7 @@ export async function GET(req: NextRequest) {
   const { data: kids } = await svc.from("student_guardians").select("student_id,students(status)").eq("tenant_id", who.tenantId).eq("guardian_id", who.guardianId);
   const ids = (kids ?? []).filter((k: any) => k.students?.status === "active").map((k: any) => k.student_id);
   const s = await financeSettings(svc, who.tenantId);
-  return NextResponse.json({ currency: s.currency, online: providerConfigured(s.provider), wallets: await walletsForStudents(svc, who.tenantId, ids) },
+  return NextResponse.json({ currency: s.currency, online: providerConfigured(s.provider) && (await parentTopUpAllowed(svc, who.tenantId)), wallets: await walletsForStudents(svc, who.tenantId, ids) },
     { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -39,6 +46,7 @@ export async function POST(req: NextRequest) {
   if (!(await guardianHasChild(svc, who.tenantId, who.guardianId, b.student_id))) return jsonError("you are not linked to this student", 403);
   try {
     if (b.action === "topup") {
+      if (!(await parentTopUpAllowed(svc, who.tenantId))) return jsonError("The school adds money to wallets. Please contact the school office.", 403);
       return NextResponse.json(await startWalletTopUp(svc, { tenantId: who.tenantId, guardianId: who.guardianId, studentId: b.student_id,
         amount: b.amount, email: b.email, baseUrl: appUrl(req), returnPath: b.return_path }));
     }

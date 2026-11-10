@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
   ]);
   const purchases = (sales ?? []).filter((s: any) => s.kind === "purchase");
   return NextResponse.json({
-    currency, can_credit: hasAny(ctx, ROLES.finance), items: items ?? [],
+    currency, can_credit: hasAny(ctx, ROLES.admin), items: items ?? [],
     today: {
       takings: purchases.reduce((a: number, s: any) => a - Number(s.amount), 0), sales: purchases.length,
       topups: (sales ?? []).filter((s: any) => s.kind === "topup").reduce((a: number, s: any) => a + Number(s.amount), 0),
@@ -95,6 +95,9 @@ export async function POST(req: NextRequest) {
         return error ? jsonError(error.message) : NextResponse.json({ ok: true });
       }
       case "charge": {
+        // With buy codes on (9700), a card alone doesn't pay: the till asks for the code or fingerprint.
+        const { data: rule } = await svc.from("tenant_settings").select("shop_require_code").eq("tenant_id", tid).maybeSingle();
+        if (rule && rule.shop_require_code !== false) return jsonError("Ask for the student's buy code or fingerprint (Tuck shop → Till).", 409);
         let lines: { id: string; name: string; qty: number; price: number }[] = [];
         let total: number;
         if (b.items.length) {
@@ -109,7 +112,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, total, balance: Number(data.balance), spent_today: Number(data.spent_today) });
       }
       case "credit": {
-        if (!hasAny(ctx, ROLES.finance)) return jsonError("only the bursar or an admin can add money", 403);
+        if (!hasAny(ctx, ROLES.admin)) return jsonError("only a school admin can add money to wallets", 403);
         const { data, error } = await ctx.sb.rpc("wallet_credit", { p_student: b.student_id, p_amount: b.amount, p_kind: b.kind, p_method: b.method,
           p_reference: b.reference || newReference(b.kind === "refund" ? "RFD" : "CASH"), p_description: b.note ?? (b.kind === "refund" ? "Refund" : "Top-up at the bursary") });
         if (error) return jsonError(error.message.includes("duplicate") ? "that reference has already been used" : error.message.replace(/^.*?: /, ""));

@@ -176,7 +176,7 @@ export function DevicesAndCards() {
           <Field label="Name"><input className="input" value={dev.name} onChange={e => setDev({ ...dev, name: e.target.value })} required minLength={2} placeholder="Main gate" /></Field>
           <Field label="Type"><select className="input" value={dev.kind} onChange={e => setDev({ ...dev, kind: e.target.value })}><option value="zkteco">ZKTeco (push)</option><option value="webhook">Other (webhook)</option></select></Field>
           {dev.kind === "zkteco" ? <Field label="Serial number"><input className="input" value={dev.serial} onChange={e => setDev({ ...dev, serial: e.target.value })} required /></Field> : <div />}
-          <Field label="Counts as"><select className="input" value={dev.mode} onChange={e => setDev({ ...dev, mode: e.target.value })}><option value="auto">In and out</option><option value="in">Arrivals only</option><option value="out">Departures only</option></select></Field>
+          <Field label="Counts as"><select className="input" value={dev.mode} onChange={e => setDev({ ...dev, mode: e.target.value })}><option value="auto">In and out</option><option value="in">Arrivals only</option><option value="out">Departures only</option><option value="shop">Tuck shop (fingerprint pays at the till)</option></select></Field>
           <div className="flex items-end"><button className="btn btn-primary w-full">Add machine</button></div>
         </form>
       </section>
