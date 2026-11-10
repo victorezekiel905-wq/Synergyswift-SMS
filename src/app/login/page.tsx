@@ -16,8 +16,18 @@ const REASONS: Record<string, string> = {
   missing_oauth_code: "Single sign-on did not finish. Please try again."
 };
 
+type Who = "staff" | "parent" | "student";
+const WHO: Record<Who, { tab: string; title: string; lead: string; field: string; join: string }> = {
+  staff: { tab: "Staff", title: "Staff sign in", lead: "Teachers, administrators and every member of staff.", field: "Email", join: "New staff? Make your account with the sign-up code from your school" },
+  parent: { tab: "Parent", title: "Parent sign in", lead: "See your children's results, fees, attendance and messages.", field: "Email", join: "New parent? Make your account with your sign-up code or your child's parent code" },
+  student: { tab: "Student", title: "Student sign in", lead: "Your lessons, homework, exams and results.", field: "Email or username", join: "New student? Make your account with your sign-up code" }
+};
+/** Which tab an account belongs on. */
+const whoFor = (role?: string | null): Who | null => !role ? null : role === "parent" ? "parent" : role === "student" ? "student" : "staff";
+
 export default function LoginPage() {
   const router = useRouter();
+  const [who, setWho] = useState<Who>("staff");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -31,6 +41,9 @@ export default function LoginPage() {
   const [info, setInfo] = useState<string | null>(null);
   const [unconfirmed, setUnconfirmed] = useState(false);
   useEffect(() => {
+    const as = new URLSearchParams(window.location.search).get("as");
+    if (as === "staff" || as === "parent" || as === "student") setWho(as);
+    else { try { const saved = localStorage.getItem("ss-login-as"); if (saved === "parent" || saved === "student") setWho(saved); } catch { /* storage off */ } }
     const e = new URLSearchParams(window.location.search).get("error");
     if (e) setNotice(REASONS[e] ?? e);
     // Back from Google or Microsoft: check the second factor, then finish setting up.
@@ -66,6 +79,14 @@ export default function LoginPage() {
       setErr(j.error ?? "profile setup failed");
       return;
     }
+    // Each account signs in from its own tab: a parent on the Staff tab is told where to go.
+    const actual = j.platform || j.group ? "staff" : whoFor(j.role);
+    if (actual && actual !== who) {
+      await sb.auth.signOut();
+      setErr(`This is a ${WHO[actual].tab.toLowerCase()} account. Choose "${WHO[actual].tab}" above and sign in there.`);
+      return;
+    }
+    try { localStorage.setItem("ss-login-as", who); } catch { /* storage off */ }
     const after = new URLSearchParams(window.location.search).get("next");
     router.push(j.next && j.next !== "/dashboard" ? j.next : after && after.startsWith("/") && !after.startsWith("//") ? after : "/dashboard");
     router.refresh();
@@ -114,8 +135,14 @@ export default function LoginPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-[400px] flex-col px-5 py-10 sm:py-16">
       <Link href="/" className="flex items-center gap-2.5 self-start"><Monogram /><span className="text-[15px] font-semibold tracking-tight">Synergy Swift</span></Link>
-      <h1 className="mt-14 font-serif text-[30px] font-semibold leading-tight tracking-[-0.01em]">Sign in</h1>
-      <p className="mt-2 text-[15px] text-slate-600 sm:text-sm">Use the account your school set up for you.</p>
+      <h1 className="mt-14 font-serif text-[30px] font-semibold leading-tight tracking-[-0.01em]">{WHO[who].title}</h1>
+      <p className="mt-2 text-[15px] text-slate-600 sm:text-sm">{WHO[who].lead}</p>
+      <nav aria-label="I am" className="mt-6 grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-white p-1" role="tablist">
+        {(["staff", "parent", "student"] as Who[]).map(w => (
+          <button key={w} type="button" role="tab" aria-selected={who === w} onClick={() => { setWho(w); setErr(null); setInfo(null); }}
+            className={"rounded-md py-2 text-sm font-semibold transition-colors " + (who === w ? "bg-navy text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}>{WHO[w].tab}</button>
+        ))}
+      </nav>
       {notice && <p role="status" className="mt-5 rounded-md border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">{notice}</p>}
       <div className="card mt-7 space-y-5 p-6">
         {factorId ? (
@@ -140,8 +167,8 @@ export default function LoginPage() {
             {mode === "phone" && phoneOk ? <PhoneLogin onSignedIn={afterPhone} /> : (
             <form onSubmit={onSubmit} className="space-y-4">
               <div>
-                <label className="label">Email or username</label>
-                <input className="input" type="text" inputMode="email" autoCapitalize="none" spellCheck={false} autoComplete="username" required value={email} placeholder="Email or username" onChange={(e) => setEmail(e.target.value)} />
+                <label className="label">{WHO[who].field}</label>
+                <input className="input" type="text" inputMode="email" autoCapitalize="none" spellCheck={false} autoComplete="username" required value={email} placeholder={WHO[who].field} onChange={(e) => setEmail(e.target.value)} />
               </div>
               <div>
                 <label className="label">Password</label>
@@ -155,10 +182,11 @@ export default function LoginPage() {
                 {unconfirmed && <button type="button" className="font-medium text-brand-700 hover:underline" onClick={() => mail("resend")}>Send the confirmation email again</button>}
               </div>
               <p className="text-center text-xs leading-relaxed text-slate-500">
-                Staff and parents get an invitation from their school.{" "}
-                <Link href="/student/join" className="font-medium text-brand-700 hover:underline">Students: join a class</Link>
+                Got a one-time password from the school? Sign in with it above; you will choose your own password next.
               </p>
-              <p className="text-center text-xs text-slate-500">New school with an onboarding code? <Link href="/onboard" className="font-medium text-brand-700 hover:underline">Onboard your school</Link></p>
+              <Link href={`/join?as=${who}`} className="btn btn-outline w-full no-underline">{WHO[who].join}</Link>
+              {who === "student" && <p className="text-center text-xs text-slate-500">Have a class code instead? <Link href="/student/join" className="font-medium text-brand-700 hover:underline">Join a class</Link></p>}
+              {who === "staff" && <p className="text-center text-xs text-slate-500">New school with an onboarding code? <Link href="/onboard" className="font-medium text-brand-700 hover:underline">Onboard your school</Link></p>}
             </form>
             )}
           </>

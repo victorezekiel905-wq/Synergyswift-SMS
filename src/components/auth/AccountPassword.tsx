@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useApi, send, Alert, Badge, Field, fmtDate } from "@/components/ui";
+import { passwordsMatch } from "@/lib/sign-up-codes";
 
 /** Change password under the school's rules (also used when a password has expired). */
 export function PasswordCard({ required, onChanged }: { required?: boolean; onChanged?: () => void }) {
-  const { data, reload } = useApi<{ rules: string; days_left: number | null; needs_current: boolean }>("/api/account/password");
+  const { data, reload } = useApi<{ rules: string; days_left: number | null; needs_current: boolean; first_time?: boolean }>("/api/account/password");
   const [f, setF] = useState({ current: "", pw: "", pw2: "", others: true });
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -14,13 +15,16 @@ export function PasswordCard({ required, onChanged }: { required?: boolean; onCh
         <h2 className="mr-auto font-semibold">Password</h2>
         {data?.days_left != null && <Badge tone={data.days_left < 0 ? "red" : data.days_left <= 7 ? "amber" : "slate"}>{data.days_left < 0 ? "expired" : `expires in ${data.days_left} days`}</Badge>}
       </div>
-      {required && <Alert tone="amber">Your password has expired. Choose a new one to continue.</Alert>}
+      {data?.first_time
+        ? <Alert tone="amber">Welcome! You signed in with a one-time password. Choose your own password, type it again to confirm, and you&apos;re in.</Alert>
+        : required && <Alert tone="amber">Your password has expired. Choose a new one to continue.</Alert>}
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
       <form className="grid gap-3 sm:grid-cols-3" onSubmit={async e => {
         e.preventDefault();
-        if (f.pw !== f.pw2) { setMsg({ ok: false, text: "The new passwords do not match." }); return; }
+        const mismatch = passwordsMatch(f.pw, f.pw2);
+        if (mismatch) { setMsg({ ok: false, text: mismatch }); return; }
         setBusy(true);
-        const r = await send("/api/account/password", { password: f.pw, current_password: f.current || undefined, sign_out_others: f.others });
+        const r = await send("/api/account/password", { password: f.pw, password2: f.pw2, current_password: f.current || undefined, sign_out_others: f.others });
         setBusy(false);
         setMsg({ ok: r.ok, text: r.ok ? "Password changed." : r.error ?? "failed" });
         if (r.ok) { setF({ current: "", pw: "", pw2: "", others: f.others }); reload(); onChanged?.(); }

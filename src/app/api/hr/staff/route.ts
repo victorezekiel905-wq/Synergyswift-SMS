@@ -5,6 +5,7 @@ import { ALWAYS_ALLOWED_ROLES } from "@/lib/saas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { provisionUser } from "@/lib/provision";
 import { appUrl } from "@/lib/school";
+import { formatCode } from "@/lib/sign-up-codes";
 
 const ASSIGNABLE = STAFF_ROLE_OPTIONS;
 
@@ -92,11 +93,19 @@ export async function POST(req: NextRequest) {
     await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "staff.roles_changed", target: s.user_id, meta: { role: b.role, extra } });
     return NextResponse.json({ ok: true });
   }
-  try {
-    const { userId } = await provisionUser(svc, { tenantId: tid, email: String(s.email ?? ""), fullName: s.full_name, role: b.role, extraRoles: extra,
-      redirectTo: `${appUrl(req)}/auth/welcome?next=/dashboard`, createdBy: ctx.userId });
-    await svc.from("staff").update({ user_id: userId }).eq("tenant_id", tid).eq("id", s.id);
-    await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "staff.login_created", target: userId, meta: { role: b.role, extra } });
-    return NextResponse.json({ ok: true, invited: true });
-  } catch (e) { return jsonError((e as Error).message); }
+  // No account yet: the roles go on their sign-up code, so the account they make has them
+  // (migration 9600). A one-time password can be made on School office → Sign-up codes & logins.
+  const { data: code, error: cErr } = await svc.rpc("issue_account_code", { p_kind: "staff", p_id: s.id, p_by: ctx.userId, p_role: b.role, p_extra: extra });
+  if (cErr) {
+    // Before the database update: the old email invitation.
+    try {
+      const { userId } = await provisionUser(svc, { tenantId: tid, email: String(s.email ?? ""), fullName: s.full_name, role: b.role, extraRoles: extra,
+        redirectTo: `${appUrl(req)}/auth/welcome?next=/dashboard`, createdBy: ctx.userId });
+      await svc.from("staff").update({ user_id: userId }).eq("tenant_id", tid).eq("id", s.id);
+      await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "staff.login_created", target: userId, meta: { role: b.role, extra } });
+      return NextResponse.json({ ok: true, invited: true });
+    } catch (e) { return jsonError((e as Error).message); }
+  }
+  await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "account.code_role_set", target: s.id, meta: { role: b.role, extra } });
+  return NextResponse.json({ ok: true, code: formatCode(code as string) });
 }

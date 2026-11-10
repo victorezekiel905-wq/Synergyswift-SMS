@@ -158,12 +158,14 @@ function AccessForm({ staff, onClose, onDone }: { staff: Staff | null; onClose: 
     const r = await send("/api/hr/staff", { action: "grant_access", staff_id: staff!.id, role: r0, extra_roles: x0 });
     if (!r.ok) return setErr(r.error);
     setRole(""); setExtra(null); setErr(null);
-    onDone(r.data.invited ? `Invitation sent to ${staff!.email}.` : "Roles updated.");
+    onDone(r.data.code
+      ? `${staff!.full_name}'s sign-up code is ${r.data.code}. They make their account at /join with it and get these roles. To send it, or to give them a one-time password instead, use School office → Sign-up codes & logins.`
+      : r.data.invited ? `Invitation sent to ${staff!.email}.` : "Roles updated.");
   }
   return (
     <Modal open={Boolean(staff)} onClose={() => { setRole(""); setExtra(null); onClose(); }} title={`Access: ${staff?.full_name ?? ""}`}>
       <form onSubmit={save} className="space-y-3">
-        {!staff?.user_id && <p className="text-sm text-slate-600">An invitation email goes to <b>{staff?.email ?? "(no email: add one first)"}</b>.</p>}
+        {!staff?.user_id && <p className="text-sm text-slate-600">{staff?.full_name} has no account yet. The roles go on their sign-up code: the account they make with it gets these roles.</p>}
         <Field label="Main role"><select className="input" value={r0} onChange={e => setRole(e.target.value)}>{ROLE_OPTIONS.map(r => <option key={r} value={r}>{r.replace(/_/g, " ")}</option>)}</select></Field>
         <fieldset>
           <legend className="label">Extra duties</legend>
@@ -174,7 +176,7 @@ function AccessForm({ staff, onClose, onDone }: { staff: Staff | null; onClose: 
           </div>
         </fieldset>
         {err && <Alert>{err}</Alert>}
-        <div className="flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button className="btn btn-primary">{staff?.user_id ? "Save roles" : "Send invitation"}</button></div>
+        <div className="flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button className="btn btn-primary">{staff?.user_id ? "Save roles" : "Save roles and show the code"}</button></div>
       </form>
     </Modal>
   );

@@ -19,7 +19,7 @@ async function who() {
   store.actor = `user:${user.id}`;
   const { data: { session } } = await sb.auth.getSession();
   const svc = createServiceClient();
-  const { data: profile } = await svc.from("users").select("id,tenant_id,full_name,role,password_changed_at").eq("id", user.id).maybeSingle();
+  const { data: profile } = await svc.from("users").select("id,tenant_id,full_name,role,password_changed_at,must_change_password").eq("id", user.id).maybeSingle();
   const { data: s } = profile ? await svc.from("tenant_settings")
     .select("password_min_length,password_require_mixed_case,password_require_number,password_require_symbol,password_max_age_days,password_policy_scope")
     .eq("tenant_id", profile.tenant_id).maybeSingle() : { data: null };
@@ -35,24 +35,36 @@ export async function GET() {
   const w = await who();
   if (!w) return jsonError("unauthenticated", 401);
   const methods = (tokenClaims(w.session?.access_token).amr ?? []).map(a => a.method);
+  // First sign-in with a one-time (or starting) password: they just typed it, so only the new one, twice.
+  const firstTime = Boolean(w.profile?.must_change_password);
   return NextResponse.json({
     rules: passwordRulesText(w.policy), policy: w.policy,
     days_left: passwordDaysLeft(w.profile?.password_changed_at ?? null, w.policy.max_age_days ?? 0),
-    needs_current: methods.includes("password")
+    needs_current: methods.includes("password") && !firstTime,
+    first_time: firstTime
   });
 }
 
 export async function POST(req: NextRequest) {
   const w = await who();
   if (!w) return jsonError("unauthenticated", 401);
-  const b = await readJson<{ password?: string; current_password?: string; sign_out_others?: boolean }>(req);
+  const b = await readJson<{ password?: string; password2?: string; current_password?: string; sign_out_others?: boolean }>(req);
   const pw = String(b.password ?? "");
+  // The new password typed twice must match (checked here too, not only on the page).
+  if (b.password2 !== undefined && b.password2 !== pw) return jsonError("The two new passwords are not the same. Type them again.");
   const problems = checkPassword(pw, w.policy, { email: w.user.email, name: w.profile?.full_name });
   if (problems.length) return jsonError(`Please ${problems.join(", ")}.`);
+  const firstTime = Boolean(w.profile?.must_change_password);
   // Someone who signed in with a password must prove they know it. Invitation,
-  // reset, phone-code and single-sign-on sessions set a password without one.
+  // reset, phone-code and single-sign-on sessions set a password without one, and so
+  // does the first sign-in with a one-time password (it was typed a moment ago).
   const methods = (tokenClaims(w.session?.access_token).amr ?? []).map(a => a.method);
-  if (methods.includes("password")) {
+  if (firstTime) {
+    // The new password must not be the one-time password itself.
+    const plain = createPlainClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data: same } = await plain.auth.signInWithPassword({ email: w.user.email!, password: pw });
+    if (same?.session) { await plain.auth.signOut(); return jsonError("choose a new password, not the one-time password"); }
+  } else if (methods.includes("password")) {
     if (!b.current_password) return jsonError("enter your current password");
     if (b.current_password === pw) return jsonError("choose a password different from your current one");
     const plain = createPlainClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
