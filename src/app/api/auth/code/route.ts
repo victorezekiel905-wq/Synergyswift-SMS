@@ -6,6 +6,8 @@ import { clientIp } from "@/lib/net";
 import { codeInfo, codeTriesExceeded, recordCodeTry, signUpWithCode, policyFor } from "@/lib/sign-up-codes-server";
 import { passwordsMatch } from "@/lib/sign-up-codes";
 import { passwordRulesText } from "@/lib/security";
+import { staffJoined } from "@/lib/staff-onboarding-server";
+import { appUrl } from "@/lib/school";
 
 export const dynamic = "force-dynamic";
 
@@ -47,5 +49,7 @@ export async function POST(req: NextRequest) {
   if (info.kind === "parent_link" && !b.full_name?.trim()) return jsonError("Type your full name.");
   const r = await signUpWithCode(svc, { code: b.code, email: b.email, password: b.password, fullName: b.full_name ?? null });
   if (!r.ok) return jsonError(r.error, r.status);
-  return NextResponse.json(r);
+  // The handshake: the school's admins hear that a member of staff has joined, to put them in classes.
+  if (r.kind === "staff") await staffJoined(svc, { tenantId: r.tenantId, userId: r.userId, baseUrl: appUrl(req) }).catch(() => {});
+  return NextResponse.json({ ok: true, email: r.email, role: r.role, next: r.next, school: r.school });
 }

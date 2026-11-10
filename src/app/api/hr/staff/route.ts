@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, STAFF_ROLE_OPTIONS, denyUnless } from "@/lib/auth";
-import { ALWAYS_ALLOWED_ROLES } from "@/lib/saas";
 import { createServiceClient } from "@/lib/supabase/service";
-import { provisionUser } from "@/lib/provision";
-import { appUrl } from "@/lib/school";
-import { formatCode } from "@/lib/sign-up-codes";
-import { inviteByEmail, createOneTimeLogin } from "@/lib/sign-up-codes-server";
+import { grantStaffAccess } from "@/lib/staff-access-server";
+import { subjectsByStaff, setStaffSubjects } from "@/lib/staff-onboarding-server";
 
 const ASSIGNABLE = STAFF_ROLE_OPTIONS;
 
@@ -23,7 +20,8 @@ export async function GET() {
   if (error) return jsonError(error.message);
   const used: Record<string, number> = {};
   for (const l of leave ?? []) used[l.staff_id] = (used[l.staff_id] ?? 0) + l.days;
-  return NextResponse.json((staff ?? []).map((s: any) => ({ ...s, leave_used: used[s.id] ?? 0 })));
+  const subjects = await subjectsByStaff(ctx.sb, tid);
+  return NextResponse.json((staff ?? []).map((s: any) => ({ ...s, leave_used: used[s.id] ?? 0, subject_ids: subjects.get(s.id) ?? [] })));
 }
 
 const StaffInput = z.object({
@@ -39,11 +37,11 @@ const StaffInput = z.object({
   status: z.enum(["active", "on_leave", "exited"]).default("active"),
   leave_allowance: z.number().int().min(0).max(365).default(20),
   line_manager_id: z.string().uuid().nullish().or(z.literal("")),
-  probation_ends_on: z.string().regex(/^d{4}-d{2}-d{2}$/).nullish().or(z.literal(""))
+  probation_ends_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish().or(z.literal(""))
 });
 
 const Body = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("save"), staff: StaffInput }),
+  z.object({ action: z.literal("save"), staff: StaffInput, subject_ids: z.array(z.string().uuid()).max(60).optional() }),
   // Create a login and set roles (primary + extra)
   // For someone without an account, how they get in: their sign-up code, an emailed invitation, or a one-time password.
   z.object({ action: z.literal("grant_access"), staff_id: z.string().uuid(), role: z.enum(ASSIGNABLE), extra_roles: z.array(z.enum(ASSIGNABLE)).default([]),
@@ -67,6 +65,10 @@ export async function POST(req: NextRequest) {
       ? await ctx.sb.from("staff").update(row).eq("tenant_id", tid).eq("id", id).select("id").single()
       : await ctx.sb.from("staff").insert(row).select("id").single();
     if (error) return jsonError(error.message.includes("duplicate") ? "staff number already exists" : error.message);
+    if (b.subject_ids) {
+      const r = await setStaffSubjects(ctx.sb, tid, data.id, b.subject_ids);
+      if (r.error) return NextResponse.json({ ...data, warning: `Saved, but not the subjects: ${r.error}` });
+    }
     return NextResponse.json(data);
   }
 
@@ -84,42 +86,9 @@ export async function POST(req: NextRequest) {
   }
 
   { const denied = denyUnless(ctx, "staff.roles"); if (denied) return denied; }
-  const extra = b.extra_roles.filter(r => r !== b.role);
-  // Only roles Synergy Swift allows this school.
-  const ceiling = ctx.tenant.allowed_roles;
-  const outside = ceiling ? [b.role, ...extra].filter(r => !ALWAYS_ALLOWED_ROLES.includes(r) && !ceiling.includes(r)) : [];
-  if (outside.length) return jsonError(`your school's plan does not include: ${outside.join(", ")}`);
-  if (s.user_id) {
-    if (s.user_id === ctx.userId) return jsonError("you cannot change your own roles");
-    const { error } = await ctx.sb.from("users").update({ role: b.role, extra_roles: extra }).eq("tenant_id", tid).eq("id", s.user_id);
-    if (error) return jsonError(error.message);
-    await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "staff.roles_changed", target: s.user_id, meta: { role: b.role, extra } });
-    return NextResponse.json({ ok: true });
-  }
-  // No account yet: the roles go on their sign-up code, so the account they make has them
-  // (migration 9600). A one-time password can be made on School office → Sign-up codes & logins.
-  const { data: code, error: cErr } = await svc.rpc("issue_account_code", { p_kind: "staff", p_id: s.id, p_by: ctx.userId, p_role: b.role, p_extra: extra });
-  if (cErr) {
-    // Before the database update: the old email invitation.
-    try {
-      const { userId } = await provisionUser(svc, { tenantId: tid, email: String(s.email ?? ""), fullName: s.full_name, role: b.role, extraRoles: extra,
-        redirectTo: `${appUrl(req)}/auth/welcome?next=/dashboard`, createdBy: ctx.userId });
-      await svc.from("staff").update({ user_id: userId }).eq("tenant_id", tid).eq("id", s.id);
-      await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "staff.login_created", target: userId, meta: { role: b.role, extra } });
-      return NextResponse.json({ ok: true, invited: true });
-    } catch (e) { return jsonError((e as Error).message); }
-  }
-  await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "account.code_role_set", target: s.id, meta: { role: b.role, extra } });
-  // The role is on the code now; the other two ways in use it.
-  try {
-    if (b.method === "invite") {
-      const r = await inviteByEmail(svc, { tenantId: tid, kind: "staff", id: s.id, email: b.email || s.email, actor: ctx.userId, baseUrl: appUrl(req) });
-      return NextResponse.json({ ok: true, invited: true, email: r.email });
-    }
-    if (b.method === "otp") {
-      const r = await createOneTimeLogin(svc, { tenantId: tid, kind: "staff", id: s.id, email: String(b.email || s.email || ""), actor: ctx.userId, baseUrl: appUrl(req) });
-      return NextResponse.json({ ok: true, otp: r });
-    }
-  } catch (e) { return jsonError((e as Error).message); }
-  return NextResponse.json({ ok: true, code: formatCode(code as string) });
+  // The same way in as Staff onboarding (lib/staff-access-server).
+  const r = await grantStaffAccess(ctx, svc, req, { staff: s, role: b.role, extra: b.extra_roles, method: b.method, email: b.email || s.email });
+  if (!r.ok) return jsonError(r.error, r.status);
+  if (r.rolesOnly) return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ...(r.code ? { code: r.code } : {}), ...(r.invited ? { invited: true, email: r.email } : {}), ...(r.otp ? { otp: r.otp } : {}) });
 }

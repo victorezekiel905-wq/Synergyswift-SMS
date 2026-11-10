@@ -84,7 +84,7 @@ export async function signUpWithCode(svc: Svc, p: { code: string; email: string;
     await svc.auth.admin.deleteUser(made.user.id);
     return { ok: false as const, status: 400, error: cErr.message.includes("does not exist") ? "Sign-up codes need the database update (migration 20260101009600)." : cErr.message };
   }
-  return { ok: true as const, email, role: r.role as string, next: (r.next as string) ?? homeFor(r.role), school: info.school };
+  return { ok: true as const, email, role: r.role as string, next: (r.next as string) ?? homeFor(r.role), school: info.school, kind: info.kind, tenantId: info.tenantId, userId: made.user.id as string };
 }
 
 /** Kinds of people a one-time password can be made for, and their tables. */

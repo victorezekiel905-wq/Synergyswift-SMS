@@ -4,6 +4,7 @@ import { requireCtx, readJson, jsonError, ROLES } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { appUrl } from "@/lib/school";
 import { runAccountAutomation, resendStudentKey, ensureGuardianInvite } from "@/lib/accounts-server";
+import { onboardingList, type OnboardRow } from "@/lib/staff-onboarding-server";
 
 /**
  * Class teams and accounts, for school admins: each class's form teacher,
@@ -15,7 +16,7 @@ export async function GET() {
   if (ctx instanceof NextResponse) return ctx;
   const tid = ctx.tenant.id;
   const svc = createServiceClient();
-  const [classes, offerings, team, staff, subjects, settings, studentsAll, studentsNoLogin, guardiansAll, guardiansNoLogin, guardiansWaiting] = await Promise.all([
+  const [classes, offerings, team, staff, subjects, settings, studentsAll, studentsNoLogin, guardiansAll, guardiansNoLogin, guardiansWaiting, staffRecs] = await Promise.all([
     svc.from("class_groups").select("id,name,level,form_teacher_id").eq("tenant_id", tid).order("name"),
     svc.from("subject_offerings").select("id,class_group_id,subject_id,teacher_id,subjects(name)").eq("tenant_id", tid),
     svc.from("class_staff").select("*").eq("tenant_id", tid),
@@ -26,10 +27,18 @@ export async function GET() {
     svc.from("students").select("id,first_name,last_name,login_sent_at", { count: "exact" }).eq("tenant_id", tid).eq("status", "active").is("user_id", null).limit(50),
     svc.from("guardians").select("id", { count: "exact", head: true }).eq("tenant_id", tid),
     svc.from("guardians").select("id", { count: "exact", head: true }).eq("tenant_id", tid).is("user_id", null),
-    svc.from("guardians").select("id,full_name,email,phone,invited_at").eq("tenant_id", tid).is("user_id", null).is("invited_at", null).limit(50)
+    svc.from("guardians").select("id,full_name,email,phone,invited_at").eq("tenant_id", tid).is("user_id", null).is("invited_at", null).limit(50),
+    svc.from("staff").select("id,user_id").eq("tenant_id", tid).not("user_id", "is", null)
   ]);
+  // The handshake with Staff onboarding: the subjects each person teaches, and who is new.
+  const onboard = await onboardingList(svc, tid).catch(() => [] as OnboardRow[]);
+  const userOf = new Map<string, string>(((staffRecs.data ?? []) as any[]).filter(s => s.user_id).map(s => [s.id, s.user_id]));
+  const teaches: Record<string, string[]> = {};
+  for (const o of onboard) { const uid = userOf.get(o.id); if (uid && o.subject_ids.length) teaches[uid] = o.subject_ids; }
   return NextResponse.json({
-    classes: classes.data ?? [], offerings: offerings.data ?? [], team: team.data ?? [], staff: staff.data ?? [], subjects: subjects.data ?? [],
+    classes: classes.data ?? [], offerings: offerings.data ?? [], team: team.data ?? [], staff: staff.data ?? [], subjects: subjects.data ?? [], teaches,
+    newcomers: onboard.filter(o => o.has_account && o.active !== false && o.classes === 0).map(o => ({ user_id: userOf.get(o.id) ?? null, full_name: o.full_name, subject_ids: o.subject_ids })).filter(o => o.user_id),
+    waiting: onboard.filter(o => !o.has_account).map(o => ({ id: o.id, full_name: o.full_name, subject_ids: o.subject_ids })),
     settings: Object.fromEntries(["auto_student_logins", "auto_parent_invites", "story_photo_consent", "points_allow_needs_work", "ussd_enabled", "all_classes_roles"].map(k => [k, (settings.data as any)?.[k]])),
     accounts: {
       students: studentsAll.count ?? 0, students_without_login: studentsNoLogin.count ?? 0, students_waiting: studentsNoLogin.data ?? [],

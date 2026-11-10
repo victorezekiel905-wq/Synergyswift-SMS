@@ -14,7 +14,7 @@ import { MyAchievements } from "@/components/hr/MyAchievements";
 type Staff = {
   id: string; staff_no: string; full_name: string; email: string | null; phone: string | null; department: string | null; position: string | null;
   employment_type: string; hire_date: string | null; status: string; leave_allowance: number; leave_used: number; card_code: string; user_id: string | null;
-  line_manager_id: string | null; probation_ends_on: string | null;
+  line_manager_id: string | null; probation_ends_on: string | null; subject_ids?: string[];
   users: { id: string; role: string; extra_roles: string[]; active: boolean } | null;
 };
 type Tab = "overview" | "me" | "portfolio" | "leave" | "time" | "development" | "staff" | "recruitment" | "checklists";
@@ -67,8 +67,12 @@ function StaffTab({ isHr, isAdmin, myId, data, error, reload, onOpen }: { isHr: 
   const [access, setAccess] = useState<Staff | null>(null);
   const [card, setCard] = useState<Staff | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const structure = useApi<{ subjects: { id: string; name: string }[] }>("/api/school/structure");
+  const subjects = structure.data?.subjects ?? [];
+  const subjectName = new Map(subjects.map(x => [x.id, x.name]));
   return (
     <div>
+      {isHr && <a className="btn btn-outline mb-4 mr-2" href="/school/staff-onboarding">Staff onboarding</a>}
       {isHr && <button className="btn btn-primary mb-4" onClick={() => setEdit({ employment_type: "full_time", status: "active", leave_allowance: 20 })}>+ Add staff</button>}
       {error && <Alert>{error}</Alert>}
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
@@ -80,7 +84,7 @@ function StaffTab({ isHr, isAdmin, myId, data, error, reload, onOpen }: { isHr: 
               {data.map(s => (
                 <tr key={s.id} className="border-t border-slate-100">
                   <td className="p-3"><span className="font-medium">{s.full_name}</span><div className="text-xs text-slate-500">{s.staff_no} · {s.email ?? "no email"}</div></td>
-                  <td className="p-3">{s.position}<div className="text-xs text-slate-500">{s.department}</div></td>
+                  <td className="p-3">{s.position}<div className="text-xs text-slate-500">{s.department}</div>{(s.subject_ids ?? []).length > 0 && <div className="mt-0.5 text-xs text-slate-600">Teaches {(s.subject_ids ?? []).map(id => subjectName.get(id) ?? "?").join(", ")}</div>}</td>
                   <td className="p-3">{s.users ? <div className="flex flex-wrap gap-1"><Badge tone={s.users.active ? "blue" : "red"}>{s.users.role.replace(/_/g, " ")}</Badge>{s.users.extra_roles.map(r => <Badge key={r}>{r.replace(/_/g, " ")}</Badge>)}</div> : <span className="text-xs text-slate-400">no login</span>}</td>
                   <td className="p-3 tabular-nums">{s.leave_used} / {s.leave_allowance} days</td>
                   <td className="p-3"><Badge tone={statusTone(s.status)}>{s.status}</Badge></td>
@@ -97,7 +101,7 @@ function StaffTab({ isHr, isAdmin, myId, data, error, reload, onOpen }: { isHr: 
           </table>
         </div>
       )}
-      <StaffForm staff={edit} all={data ?? []} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload(); }} />
+      <StaffForm staff={edit} all={data ?? []} subjects={subjects} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload(); }} />
       <AccessForm staff={access} onClose={() => setAccess(null)} onDone={(t) => { setAccess(null); setMsg({ ok: true, text: t }); reload(); }} />
       <Modal open={Boolean(card)} onClose={() => setCard(null)} title="Staff ID card">
         {card && <div className="mx-auto w-72 rounded-xl border-2 border-slate-800 p-4 text-center">
@@ -111,7 +115,7 @@ function StaffTab({ isHr, isAdmin, myId, data, error, reload, onOpen }: { isHr: 
   );
 }
 
-function StaffForm({ staff, all, onClose, onSaved }: { staff: Partial<Staff> | null; all: Staff[]; onClose: () => void; onSaved: () => void }) {
+function StaffForm({ staff, all, subjects, onClose, onSaved }: { staff: Partial<Staff> | null; all: Staff[]; subjects: { id: string; name: string }[]; onClose: () => void; onSaved: () => void }) {
   const [s, setS] = useState<Partial<Staff>>({});
   const [err, setErr] = useState<string | null>(null);
   const cur = { ...staff, ...s };
@@ -121,8 +125,10 @@ function StaffForm({ staff, all, onClose, onSaved }: { staff: Partial<Staff> | n
     const r = await send("/api/hr/staff", { action: "save", staff: {
       id: cur.id, staff_no: cur.staff_no, full_name: cur.full_name, email: cur.email || null, phone: cur.phone || null,
       department: cur.department || null, position: cur.position || null, employment_type: cur.employment_type, hire_date: cur.hire_date || null,
-      status: cur.status, leave_allowance: Number(cur.leave_allowance ?? 20), line_manager_id: cur.line_manager_id || null, probation_ends_on: cur.probation_ends_on || null } });
+      status: cur.status, leave_allowance: Number(cur.leave_allowance ?? 20), line_manager_id: cur.line_manager_id || null, probation_ends_on: cur.probation_ends_on || null },
+      subject_ids: cur.subject_ids ?? [] });
     if (!r.ok) return setErr(r.error);
+    if ((r.data as any)?.warning) return setErr((r.data as any).warning);
     setS({}); setErr(null); onSaved();
   }
   return (
@@ -140,6 +146,15 @@ function StaffForm({ staff, all, onClose, onSaved }: { staff: Partial<Staff> | n
         <Field label="Annual leave days"><input className="input" type="number" min={0} {...bind("leave_allowance")} /></Field>
         <Field label="Line manager"><select className="input" {...bind("line_manager_id")}><option value="">—</option>{all.filter(x => x.id !== cur.id && x.status !== "exited").map(x => <option key={x.id} value={x.id}>{x.full_name}</option>)}</select></Field>
         <Field label="Probation ends"><input className="input" type="date" {...bind("probation_ends_on")} /></Field>
+        {subjects.length > 0 && (
+          <fieldset className="sm:col-span-3">
+            <legend className="label">Subjects they teach</legend>
+            <div className="grid max-h-40 grid-cols-2 gap-1 overflow-auto rounded-md border border-slate-200 p-2 sm:grid-cols-4">
+              {subjects.map(x => { const ids = cur.subject_ids ?? []; return (
+                <label key={x.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={ids.includes(x.id)} onChange={() => setS({ ...s, subject_ids: ids.includes(x.id) ? ids.filter(i => i !== x.id) : [...ids, x.id] })} />{x.name}</label>); })}
+            </div>
+          </fieldset>
+        )}
         {err && <div className="sm:col-span-3"><Alert>{err}</Alert></div>}
         <div className="flex justify-end gap-2 sm:col-span-3"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button className="btn btn-primary">Save</button></div>
       </form>

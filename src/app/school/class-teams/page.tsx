@@ -8,6 +8,9 @@ type Data = {
   classes: { id: string; name: string; level: string | null; form_teacher_id: string | null }[];
   offerings: { id: string; class_group_id: string; subject_id: string; teacher_id: string | null; subjects: { name: string } | null }[];
   team: Member[]; staff: Staff[]; subjects: { id: string; name: string }[];
+  teaches?: Record<string, string[]>;
+  newcomers?: { user_id: string; full_name: string; subject_ids: string[] }[];
+  waiting?: { id: string; full_name: string; subject_ids: string[] }[];
   settings: { auto_student_logins?: boolean; auto_parent_invites?: boolean; story_photo_consent?: boolean; ussd_enabled?: boolean; all_classes_roles?: string[] };
   accounts: { students: number; students_without_login: number; students_waiting: { id: string; first_name: string; last_name: string; login_sent_at: string | null }[]; parents: number; parents_without_login: number; parents_waiting: { id: string; full_name: string; email: string | null; phone: string | null }[] };
 };
@@ -29,11 +32,23 @@ export default function ClassTeamsPage() {
     if (r.ok) reload();
     return r;
   };
-  const staffSelect = (value: string | null, onChange: (v: string | null) => void, label: string) => (
-    <select className="input py-1" value={value ?? ""} onChange={e => onChange(e.target.value || null)} aria-label={label}>
-      <option value="">Nobody yet</option>{data.staff.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-    </select>
-  );
+  const teaches = data.teaches ?? {};
+  const subjectName = (id: string) => data.subjects.find(s => s.id === id)?.name ?? "";
+  // For a subject, the people onboarded to teach it come first.
+  const staffSelect = (value: string | null, onChange: (v: string | null) => void, label: string, subjectId?: string) => {
+    const mine = subjectId ? data.staff.filter(s => teaches[s.id]?.includes(subjectId)) : [];
+    const rest = data.staff.filter(s => !mine.includes(s));
+    return (
+      <select className="input py-1" value={value ?? ""} onChange={e => onChange(e.target.value || null)} aria-label={label}>
+        <option value="">Nobody yet</option>
+        {mine.length > 0 ? <>
+          <optgroup label={`Teaches ${subjectName(subjectId!)}`}>{mine.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}</optgroup>
+          <optgroup label="Other staff">{rest.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}</optgroup>
+        </> : rest.map(s => <option key={s.id} value={s.id}>{s.full_name}{teaches[s.id]?.length ? ` (${teaches[s.id].map(subjectName).join(", ")})` : ""}</option>)}
+      </select>
+    );
+  };
+  const newcomers = data.newcomers ?? [], waiting = data.waiting ?? [];
   const a = data.accounts;
   return (
     <Page wide>
@@ -79,6 +94,25 @@ export default function ClassTeamsPage() {
         </div>
       </section>
 
+      {(newcomers.length > 0 || waiting.length > 0) && (
+        <section className="card mb-5 p-5" aria-labelledby="new-staff">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 id="new-staff" className="mr-auto font-semibold">New staff to put in classes</h2>
+            <a className="text-sm text-brand-700 hover:underline" href="/school/staff-onboarding">Staff onboarding →</a>
+          </div>
+          {newcomers.length > 0 && <>
+            <p className="mt-1 text-sm text-slate-600">They have signed up but are in no class yet. Open a class below: they are listed first for the subjects they teach.</p>
+            <ul className="mt-2 flex flex-wrap gap-2">{newcomers.map(n => (
+              <li key={n.user_id} className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-sm"><b>{n.full_name}</b>{n.subject_ids.length > 0 && <span className="text-slate-600"> · {n.subject_ids.map(subjectName).join(", ")}</span>}</li>))}</ul>
+          </>}
+          {waiting.length > 0 && <>
+            <p className="mt-3 text-sm text-slate-600">Still to sign up (they can be put in classes once they have):</p>
+            <ul className="mt-1 flex flex-wrap gap-2">{waiting.map(w => (
+              <li key={w.id} className="rounded-md border border-slate-200 px-2.5 py-1 text-sm text-slate-600">{w.full_name}{w.subject_ids.length > 0 && <span> · {w.subject_ids.map(subjectName).join(", ")}</span>}</li>))}</ul>
+          </>}
+        </section>
+      )}
+
       <section className="card p-5">
         <h2 className="mb-1 font-semibold">Classes</h2>
         <p className="mb-3 text-sm text-slate-600">Form teachers and subject teachers can do everything in their classes. Add co-teachers, assistants and support staff with just the privileges they need.</p>
@@ -104,7 +138,7 @@ export default function ClassTeamsPage() {
                         <div>
                           <p className="label">Subject teachers</p>
                           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                            {offers.map(o => <label key={o.id} className="text-sm"><span className="mb-0.5 block text-xs text-slate-600">{o.subjects?.name}</span>{staffSelect(o.teacher_id, v => act({ action: "subject_teacher", offering_id: o.id, user_id: v }, "Subject teacher saved"), `${o.subjects?.name} teacher`)}</label>)}
+                            {offers.map(o => <label key={o.id} className="text-sm"><span className="mb-0.5 block text-xs text-slate-600">{o.subjects?.name}</span>{staffSelect(o.teacher_id, v => act({ action: "subject_teacher", offering_id: o.id, user_id: v }, "Subject teacher saved"), `${o.subjects?.name} teacher`, o.subject_id)}</label>)}
                           </div>
                         </div>
                       )}
