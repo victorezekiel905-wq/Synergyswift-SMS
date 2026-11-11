@@ -59,6 +59,7 @@ export async function sell(svc: Svc, p: { tenantId: string; operator: string; it
   // Messages after the sale: never hold up the queue.
   void afterSale(svc, { tenantId: p.tenantId, studentId: data.student_id, name, total: Number(data.total), balance: Number(data.balance), lines: data.lines ?? [],
     exhausted: Boolean(data.exhausted), low: Boolean(data.low), baseUrl: p.baseUrl }).catch(() => undefined);
+  void lowStockAlerts(svc, { tenantId: p.tenantId, itemIds: (data.lines ?? []).map((l: { id: string }) => l.id), operator: p.operator, baseUrl: p.baseUrl }).catch(() => undefined);
   return { ok: true as const, sale: { ...data, student: { id: data.student_id, name, photo_url: s?.photo_url ?? null, admission_no: s?.admission_no ?? null, class_name: s?.class_groups?.name ?? null } } };
 }
 
@@ -113,6 +114,34 @@ export async function alertOnWrongCodes(svc: Svc, p: { tenantId: string; operato
     url: `${p.baseUrl}/school/shop` });
   if (rows.length) { await enqueue(svc, rows); await tryDispatch(svc, { budgetMs: 3000 }).catch(() => null); }
   return true;
+}
+
+/**
+ * An item sold down to its warning level: recorded in the shop log and the admins and the seller
+ * are told, once per item per day. Restocking above the level starts the day's count afresh.
+ */
+export async function lowStockAlerts(svc: Svc, p: { tenantId: string; itemIds: string[]; operator: string; baseUrl: string }) {
+  if (!p.itemIds.length) return 0;
+  const { data: items } = await svc.from("shop_items").select("id,name,stock,stock_alert").eq("tenant_id", p.tenantId).in("id", p.itemIds)
+    .not("stock", "is", null).not("stock_alert", "is", null);
+  const low = (items ?? []).filter((i: any) => Number(i.stock) <= Number(i.stock_alert));
+  if (!low.length) return 0;
+  const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
+  const { data: told } = await svc.from("shop_events").select("detail").eq("tenant_id", p.tenantId).eq("kind", "low_stock").gte("created_at", dayAgo);
+  const already = new Set((told ?? []).map((e: any) => e.detail?.item_id));
+  const fresh = low.filter((i: any) => !already.has(i.id));
+  if (!fresh.length) return 0;
+  await svc.from("shop_events").insert(fresh.map((i: any) => ({ tenant_id: p.tenantId, kind: "low_stock", amount: null,
+    detail: { item_id: i.id, item: i.name, stock: Number(i.stock), alert: Number(i.stock_alert) }, operator: p.operator })));
+  const { data: admins } = await svc.from("users").select("id").eq("tenant_id", p.tenantId).eq("active", true).in("role", ["school_admin", "principal"]).limit(10);
+  const to = [...new Set([...(admins ?? []).map((a: { id: string }) => a.id), p.operator])];
+  const list = fresh.map((i: any) => `${i.name} (${i.stock} left)`).join(", ");
+  const { staffRows, enqueue, tryDispatch } = await import("./messaging/outbox");
+  const rows = await staffRows(svc, { tenantId: p.tenantId, userIds: to, kind: "shop_low_stock", refId: fresh[0].id,
+    subject: `Tuck shop: ${fresh.length === 1 ? "an item is" : `${fresh.length} items are`} low on stock`,
+    text: `Running low: ${list}. Restock under Tuck shop → Stock & prices.`, url: `${p.baseUrl}/school/shop` });
+  if (rows.length) { await enqueue(svc, rows); await tryDispatch(svc, { budgetMs: 3000 }).catch(() => null); }
+  return fresh.length;
 }
 
 /** The latest fingerprint read at a shop machine since the till asked, with the student. */

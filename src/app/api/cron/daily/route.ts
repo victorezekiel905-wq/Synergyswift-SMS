@@ -11,6 +11,7 @@ import { sendOverdueReminders } from "@/lib/library-server";
 import { remindDocuments } from "@/lib/compliance-server";
 import { appUrl } from "@/lib/school";
 import { expireDeletions } from "@/lib/recycle-bin-server";
+import { remindUnansweredInvites } from "@/lib/sign-up-reminders-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -57,6 +58,8 @@ export async function GET(req: NextRequest) {
   }
   // Deletions leave the recycle bin for good after 30 days, with their stored files.
   const binExpired = await expireDeletions(svc).catch(() => 0);
+  // Staff and parents who never answered their invitation hear again; admins get a Monday line.
+  const signups = await remindUnansweredInvites(svc, appUrl(req)).catch(() => null);
   await svc.from("access_grants").delete().lt("expires_at", now);
   await svc.from("phone_login_codes").delete().lt("created_at", new Date(Date.now() - 86400_000).toISOString());
   // Webcam photos are kept for 30 days for appeals, then removed.
@@ -94,5 +97,5 @@ export async function GET(req: NextRequest) {
   }
   if (rows.length) await enqueue(svc, rows);
   const delivery = rows.length ? await dispatchDue(svc, { budgetMs: 40_000 }) : null;
-  return NextResponse.json({ document_reminders: documentReminders, expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, reader_reminders: readerReminders, webcam_photos_deleted: snapPaths.length, admission_offers_expired: offersExpired, entrance_photos_deleted: entrancePhotos, fee_promises: promises, change_history_purged: historyPurged, recycle_bin_expired: binExpired, fees, delivery });
+  return NextResponse.json({ document_reminders: documentReminders, expired_pickup_codes: expired?.length ?? 0, exams_closed: closed?.length ?? 0, library_reminders: rows.length, reader_reminders: readerReminders, webcam_photos_deleted: snapPaths.length, admission_offers_expired: offersExpired, entrance_photos_deleted: entrancePhotos, fee_promises: promises, change_history_purged: historyPurged, recycle_bin_expired: binExpired, sign_up_reminders: signups, fees, delivery });
 }

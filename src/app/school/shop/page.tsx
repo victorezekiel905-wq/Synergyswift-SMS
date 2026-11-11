@@ -312,6 +312,8 @@ function Activity({ currency, showBalance }: { currency: string; showBalance: bo
       case "topup": return `${money(e.amount, currency)} added to ${e.student}'s wallet`;
       case "code": return `${e.student}: buy code made${e.detail.made_as === "parent" ? " by a parent" : ""}`;
       case "restock": return `Restock: ${e.detail.change} ${e.detail.item} (now ${e.detail.stock})`;
+      case "low_stock": return `Low stock: ${e.detail.item}, ${e.detail.stock} left (warn at ${e.detail.alert}). Admins told.`;
+      case "seller_alert": return `Many wrong codes typed (${e.detail.wrong_codes} in ${e.detail.minutes} minutes). Admins told.`;
       default: return e.kind;
     }
   };
@@ -320,13 +322,13 @@ function Activity({ currency, showBalance }: { currency: string; showBalance: bo
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <select className="input w-auto" value={only} onChange={e => setOnly(e.target.value)} aria-label="Show">
           <option value="">Everything</option><option value="purchase">Sales</option><option value="refused">Refused</option><option value="exhausted">Empty wallets</option>
-          <option value="topup">Money added</option><option value="code">Codes made</option><option value="bad_code">Wrong codes</option><option value="restock">Restocks</option></select>
+          <option value="topup">Money added</option><option value="code">Codes made</option><option value="bad_code">Wrong codes</option><option value="restock">Restocks</option><option value="low_stock">Low stock</option></select>
         <span className="text-xs text-slate-500">Updates every 15 seconds.</span>
       </div>
       {!list.length ? <Empty>Nothing yet.</Empty> : (
         <ul className="divide-y divide-slate-100 text-sm">{list.map(e => (
           <li key={e.id} className="flex justify-between gap-3 py-1.5">
-            <span className={e.kind === "refused" || e.kind === "bad_code" || e.kind === "exhausted" ? "text-rose-700" : ""}>{text(e)}<span className="block text-xs text-slate-500">{fmtDate(e.at)} {fmtTime(e.at)}{e.by ? ` · ${e.by}` : ""}</span></span>
+            <span className={e.kind === "refused" || e.kind === "bad_code" || e.kind === "exhausted" || e.kind === "low_stock" || e.kind === "seller_alert" ? "text-rose-700" : ""}>{text(e)}<span className="block text-xs text-slate-500">{fmtDate(e.at)} {fmtTime(e.at)}{e.by ? ` · ${e.by}` : ""}</span></span>
             {e.amount !== null && e.kind !== "exhausted" && <b className={"shrink-0 tabular-nums " + (e.kind === "topup" ? "text-emerald-700" : "")}>{money(e.amount, currency)}</b>}
           </li>))}</ul>
       )}

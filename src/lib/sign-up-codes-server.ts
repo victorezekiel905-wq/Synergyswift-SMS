@@ -190,7 +190,7 @@ export async function listCodes(svc: Svc, tenantId: string): Promise<CodeRow[]> 
 }
 
 /** Sends people their codes: staff and parents to themselves; a student's codes to that student's parents. */
-export async function sendCodes(svc: Svc, p: { tenantId: string; items: { kind: CodeKind; id: string }[]; baseUrl: string; actor: string }) {
+export async function sendCodes(svc: Svc, p: { tenantId: string; items: { kind: CodeKind; id: string }[]; baseUrl: string; actor: string | null }) {
   const brand = await loadBrand(svc, p.tenantId);
   const join = `${p.baseUrl}/join`;
   const how = (code: string) => [`Your sign-up code: ${formatCode(code)}`, `Go to ${join}, type the code, your email and a password of your own.`];
