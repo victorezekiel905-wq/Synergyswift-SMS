@@ -334,7 +334,7 @@ Phases: **1** assessment and report cards (done) · **2** admissions CRM (done) 
 
 | Feature | Status |
 |---|---|
-| SwiftCipher moved into Synergy Swift as the Live lessons module | ✅ its whole engine (lesson builder with slides and activities, live control room, Present view on the projector, student and guest join, Challenge games, question bank, media library, reports, lesson library, AI slides and questions 🔑) runs inside the app under **Teaching → Live lessons**; its database lives in its own `live` schema, generated from SwiftCipher by `scripts/port-swiftcipher.mjs` and its screens by `scripts/port-swiftcipher-ui.mjs` |
+| SwiftCipher moved into Synergy Swift as the Live lessons module | ✅ its whole engine (lesson builder with slides and activities, live control room, Present view on the projector, student and guest join, Challenge games, question bank, media library, reports, lesson library, AI slides and questions 🔑) runs inside the app under **Teaching → Live lessons**; its database lives in its own `live` schema (ported from SwiftCipher once; the port scripts have since been removed) |
 | One set of accounts and classes | ✅ schools, students, teachers, admins, classes, subject teachers, class members and co-teachers are copied into the engine automatically (triggers): no join codes for classes, no separate rosters, no second sign-in |
 | Module switch enforced in the database | ✅ turning **Live lessons** off for a school (or closing the school) blocks it inside the engine itself |
 | Safe Exam Browser lock for classes and lessons | ✅ a **Locked / Unlocked** switch on each class (every new live lesson in it starts locked) and on each running lesson (under More in the control room); a locked lesson refuses students in a normal browser at the database; students download the lesson's Safe Exam Browser file, sign in inside it and join; locking during a lesson sends students who are not in Safe Exam Browser back to the join screen. The school can add its Safe Exam Browser config keys for the stronger check |
@@ -536,7 +536,7 @@ Also: parents and students can now ask the exams office for extra time, a late s
 
 ## Database updates to run
 
-Paste **`supabase/updates/RUN_THIS_UPDATE.sql`** into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again. (Regenerate it with `node scripts/bundle-update.mjs` after new migrations.)
+Run `node scripts/bundle-update.mjs` to produce `supabase/updates/RUN_THIS_UPDATE.sql` (not kept in git), then paste it into the Supabase SQL editor and run it once. It holds every migration below, in order, and is safe to run again.
 
 | Migration | Phase |
 |---|---|

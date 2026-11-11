@@ -18,3 +18,7 @@ scripts/load/out/
 # Playwright
 /test-results/
 /playwright-report/
+
+# Supabase CLI cache and the generated SQL bundle (node scripts/bundle-update.mjs)
+supabase/.temp
+supabase/updates/

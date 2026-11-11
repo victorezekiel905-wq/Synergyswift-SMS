@@ -30,11 +30,11 @@ seed:
 	psql "$$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20260101000100_seed.sql
 
 zip:
-	@rm -f /tmp/educlass-fusion-saas.zip
-	@cd .. && zip -r /tmp/educlass-fusion-saas.zip educlass-fusion \
-	  -x 'educlass-fusion/node_modules/*' \
-	     'educlass-fusion/.next/*' \
-	     'educlass-fusion/tsconfig.tsbuildinfo' \
+	@rm -f /tmp/synergyswift-sms-saas.zip
+	@cd .. && zip -r /tmp/synergyswift-sms-saas.zip synergyswift-sms \
+	  -x 'synergyswift-sms/node_modules/*' \
+	     'synergyswift-sms/.next/*' \
+	     'synergyswift-sms/tsconfig.tsbuildinfo' \
 	     '*/.git/*'
 
 clean:

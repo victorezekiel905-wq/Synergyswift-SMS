@@ -54,7 +54,7 @@ Apply **all** files in `supabase/migrations` in order. The instructions below li
 ## 1. Quick start
 
 ```bash
-cd educlass-fusion
+cd synergyswift-sms
 cp .env.example .env.local          # already prefilled with your URL + anon key
 npm install
 npm run dev                          # http://localhost:3000
@@ -71,7 +71,7 @@ Migration files are **idempotent** (everything uses `create table if not exists`
 ## 2. What's in the box
 
 ```
-educlass-fusion/
+synergyswift-sms/
 ├── package.json                         # Next 14, @supabase/ssr, Tailwind, Zod
 ├── next.config.mjs
 ├── tailwind.config.ts / postcss.config.js

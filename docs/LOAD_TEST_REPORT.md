@@ -124,7 +124,7 @@ busy" message rather than a frozen screen.
 
 | # | Action | Who | Effort |
 |---|---|---|---|
-| 1 | Run `supabase/updates/RUN_THIS_UPDATE.sql` on the live database (includes the speed-up) | you, or me once Supabase is reconnected | 10 minutes |
+| 1 | Run the migrations on the live database (`node scripts/bundle-update.mjs`, then paste the file into the Supabase SQL editor) (includes the speed-up) | you, or me once Supabase is reconnected | 10 minutes |
 | 2 | Supabase → API → Max rows: 50000 | you | 2 minutes |
 | 3 | Render: Standard plan, 2 instances; Supabase Pro + compute add-on | you | 15 minutes, monthly cost |
 | 4 | Make a staging Supabase project + Render service, seed with `seed-staging.mjs`, run k6 | me, with the staging keys | half a day |

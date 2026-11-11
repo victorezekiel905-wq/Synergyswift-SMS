@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "EduClass Fusion — Classroom Agent",
+  "name": "Synergy Swift — Classroom Agent",
   "version": "1.0.0",
-  "description": "Managed-device agent for EduClass Fusion: presence heartbeat, tab telemetry, screen thumbnails and teacher commands. School-managed devices only.",
+  "description": "Managed-device agent for Synergy Swift: presence heartbeat, tab telemetry, screen thumbnails and teacher commands. School-managed devices only.",
   "permissions": ["storage", "tabs", "activeTab", "alarms"],
   "host_permissions": ["<all_urls>", "https://*.supabase.co/*"],
   "background": { "service_worker": "background.js" },
-  "action": { "default_popup": "popup.html", "default_title": "EduClass Fusion Agent" },
+  "action": { "default_popup": "popup.html", "default_title": "Synergy Swift Agent" },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

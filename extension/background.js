@@ -1,4 +1,4 @@
-// EduClass Fusion Classroom Agent — service worker
+// Synergy Swift Classroom Agent — service worker
 importScripts("api.js");
 const api = globalThis.__agentApi;
 
@@ -20,7 +20,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name === "poll") await pollAndDispatch();
     if (alarm.name === "snap") await captureAndPost();
   } catch (e) {
-    console.warn("[EduClass Fusion agent]", e.message);
+    console.warn("[Synergy Swift agent]", e.message);
   }
 });
 

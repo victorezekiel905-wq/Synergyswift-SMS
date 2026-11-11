@@ -22,7 +22,7 @@ There are two ways onto a phone.
 
 2. In `capacitor.config.json`, set:
    - `server.url` to the live address, e.g. `https://app.yourschool.com`
-   - `appId` to your reverse-domain id, e.g. `com.yourcompany.educlass`
+   - `appId` to your reverse-domain id, e.g. `com.yourcompany.synergyswift`
    - `appName`
 
 3. Create the native projects: `npx cap add android` and (on a Mac) `npx cap add ios`. Then run `npx cap sync` after any change to the config.
