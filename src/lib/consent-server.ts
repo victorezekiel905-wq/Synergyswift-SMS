@@ -67,7 +67,7 @@ export async function consentRegister(svc: any, tenantId: string) {
   const purposes = await ensurePurposes(svc, tenantId);
   const [students, links, records] = await Promise.all([
     fetchAll<any>(() => svc.from("students").select("id,first_name,last_name,other_names,admission_no,class_groups(name)").eq("tenant_id", tenantId).eq("status", "active").order("id")),
-    fetchAll<any>(() => svc.from("student_guardians").select("guardian_id,student_id,students!inner(status)").eq("tenant_id", tenantId).eq("students.status", "active").order("student_id")),
+    fetchAll<any>(() => svc.from("student_guardians").select("guardian_id,student_id,students!inner(status)").eq("tenant_id", tenantId).eq("students.status", "active").order("student_id").order("guardian_id")),
     fetchAll<ConsentRecord>(() => svc.from("consent_records").select("purpose_id,version,guardian_id,student_id,granted,method,created_at").eq("tenant_id", tenantId).order("created_at").order("id"))
   ]);
   return { purposes, students, guardianIds: [...new Set(links.map(l => l.guardian_id))] as string[], records };

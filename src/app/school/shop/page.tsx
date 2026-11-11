@@ -304,7 +304,8 @@ function Activity({ currency }: { currency: string }) {
   const list = (data?.events ?? []).filter(e => !only || e.kind === only);
   const text = (e: Event) => {
     switch (e.kind) {
-      case "purchase": return `${e.student} bought ${(e.detail.items ?? []).map((l: any) => `${l.qty}× ${l.name}`).join(", ") || "an item"} (${e.detail.method}) · balance ${money(e.detail.balance, currency)}`;
+      // Sellers never see a child's balance; admins look it up under Wallets.
+      case "purchase": return `${e.student} bought ${(e.detail.items ?? []).map((l: any) => `${l.qty}× ${l.name}`).join(", ") || "an item"} (${e.detail.method})`;
       case "refused": return `${e.student ?? "A student"}: refused, ${REASONS[e.detail.reason] ?? e.detail.reason}`;
       case "bad_code": return "A wrong or used code was typed";
       case "exhausted": return `${e.student}'s wallet is empty (family told)`;

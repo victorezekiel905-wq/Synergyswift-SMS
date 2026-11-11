@@ -281,14 +281,14 @@ export async function exportTable(sb: any, tid: string, entityKey: string): Prom
   switch (entityKey) {
     case "students": {
       const st = await fetchAll<any>(() => sb.from("students").select("id,admission_no,first_name,last_name,other_names,gender,date_of_birth,address,status,class_groups(name)").eq("tenant_id", tid).order("admission_no"));
-      const links = await fetchAll<any>(() => sb.from("student_guardians").select("student_id,relation,is_primary,guardians(full_name,phone,email)").eq("tenant_id", tid).order("student_id"));
+      const links = await fetchAll<any>(() => sb.from("student_guardians").select("student_id,relation,is_primary,guardians(full_name,phone,email)").eq("tenant_id", tid).order("student_id").order("guardian_id"));
       const main = new Map<string, any>();
       for (const l of links) if (!main.has(l.student_id) || l.is_primary) main.set(l.student_id, l);
       return { headers: [...headers, "status"], rows: st.map(x => { const g = main.get(x.id); return [x.admission_no, x.first_name, x.last_name, x.other_names, x.gender, x.date_of_birth, x.class_groups?.name, x.address,
         g?.guardians?.full_name, g?.guardians?.phone, g?.guardians?.email, g?.relation, x.status].map(s); }) };
     }
     case "guardians": {
-      const links = await fetchAll<any>(() => sb.from("student_guardians").select("relation,is_primary,students(admission_no),guardians(full_name,phone,whatsapp_phone,email)").eq("tenant_id", tid).order("student_id"));
+      const links = await fetchAll<any>(() => sb.from("student_guardians").select("relation,is_primary,students(admission_no),guardians(full_name,phone,whatsapp_phone,email)").eq("tenant_id", tid).order("student_id").order("guardian_id"));
       return { headers, rows: links.filter(l => l.students && l.guardians).map(l => [l.students.admission_no, l.guardians.full_name, l.guardians.phone, l.guardians.whatsapp_phone, l.guardians.email, l.relation, l.is_primary ? "yes" : "no"].map(s)) };
     }
     case "staff": {
@@ -312,7 +312,7 @@ export async function exportTable(sb: any, tid: string, entityKey: string): Prom
       return { headers: [...headers, "invoice_no", "student"], rows: inv.map(x => [x.students?.admission_no, (Number(x.total) - Number(x.amount_paid)).toFixed(2), x.title, x.due_date, x.invoice_no, studentName(x.students)].map(s)) };
     }
     case "alumni": {
-      const al = await fetchAll<any>(() => sb.from("alumni").select("full_name,graduation_year,email,phone,occupation,employer,city,country").eq("tenant_id", tid).order("full_name"));
+      const al = await fetchAll<any>(() => sb.from("alumni").select("full_name,graduation_year,email,phone,occupation,employer,city,country").eq("tenant_id", tid).order("full_name").order("id"));
       return { headers, rows: al.map(x => headers.map(h => s(x[h]))) };
     }
     case "partners": {

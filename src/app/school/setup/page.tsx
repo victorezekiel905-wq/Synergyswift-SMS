@@ -120,7 +120,7 @@ function Profile() {
     const r = await send("/api/school/settings", body, "PUT");
     // The new colour shows across the app straight away, for everyone on their next page.
     if (r.ok) applyBrand(s.brand_color ?? null, s.brand_color_2 ?? null);
-    flash(r.ok, r.ok ? "Settings saved." : r.error ?? "Save failed");
+    flash(r.ok && !(r.data as { warning?: string } | null)?.warning, r.ok ? ((r.data as { warning?: string } | null)?.warning ?? "Settings saved.") : r.error ?? "Save failed");
   }
   function useMyLocation() {
     navigator.geolocation?.getCurrentPosition(p => setS(x => ({ ...x, geofence_lat: +p.coords.latitude.toFixed(6), geofence_lng: +p.coords.longitude.toFixed(6), geofence_radius_m: x.geofence_radius_m ?? 200 })),

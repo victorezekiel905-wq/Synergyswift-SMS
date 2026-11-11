@@ -29,7 +29,8 @@ export async function POST(req: NextRequest) {
     if (!st) return jsonError("only students can work through content", 403);
     const { data: att } = await svc.from("content_attempts").upsert({ tenant_id: tid, package_id: pkg.id, user_id: ctx.userId, student_id: st.id },
       { onConflict: "package_id,user_id", ignoreDuplicates: true }).select("id,launches").maybeSingle();
-    const row = att ?? (await svc.from("content_attempts").select("id,launches").eq("package_id", pkg.id).eq("user_id", ctx.userId).single()).data;
+    const row = att ?? (await svc.from("content_attempts").select("id,launches").eq("package_id", pkg.id).eq("user_id", ctx.userId).maybeSingle()).data;
+    if (!row) return jsonError("could not start this content just now; please try again", 500);
     attemptId = row.id;
     await svc.from("content_attempts").update({ launches: (row.launches ?? 0) + 1 }).eq("id", row.id);
   }

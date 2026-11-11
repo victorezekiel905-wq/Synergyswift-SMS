@@ -18,7 +18,7 @@ export const POST = withErrorLog(async function POST(req: Request) {
     const r = await callRpc(sb, "class_analytics", { p_class: body.class_id, p_days: days });
     if (r.response) return r.response;
     payload = r.data; scopeType = "class"; scopeId = body.class_id!;
-    const { data: c } = await sb.from("classes").select("name").eq("id", body.class_id!).single();
+    const { data: c } = await sb.from("classes").select("name").eq("id", body.class_id!).maybeSingle();
     title = `Class analytics: ${c?.name ?? ""} (${days} days)`;
   } else if (body.kind === "attendance") {
     const since = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);

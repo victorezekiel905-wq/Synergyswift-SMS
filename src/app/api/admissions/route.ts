@@ -94,7 +94,8 @@ export async function POST(req: NextRequest) {
       case "status": {
         const extra: Record<string, unknown> = {};
         if (b.status === "waitlisted") {
-          const { data: cur } = await ctx.sb.from("applications").select("applying_for,waitlist_position").eq("tenant_id", tid).eq("id", b.id).single();
+          const { data: cur } = await ctx.sb.from("applications").select("applying_for,waitlist_position").eq("tenant_id", tid).eq("id", b.id).maybeSingle();
+          if (!cur) return jsonError("application not found", 404);
           if (!cur.waitlist_position) {
             const { data: last } = await ctx.sb.from("applications").select("waitlist_position").eq("tenant_id", tid).eq("status", "waitlisted").eq("applying_for", cur.applying_for)
               .order("waitlist_position", { ascending: false, nullsFirst: false }).limit(1);

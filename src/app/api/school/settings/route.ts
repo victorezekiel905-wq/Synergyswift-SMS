@@ -22,9 +22,18 @@ export async function PUT(req: NextRequest) {
     if (aal !== "aal2") return jsonError("Set up two-factor sign-in on your own account first (Account security), then turn this on.", 409);
   }
   const clean = Object.fromEntries(Object.entries(parsed.data).map(([k, v]) => [k, v === "" ? null : v]));
-  const { data, error } = await ctx.sb.from("tenant_settings")
-    .upsert({ ...clean, tenant_id: ctx.tenant.id, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" })
+  const save = (row: Record<string, unknown>) => ctx.sb.from("tenant_settings")
+    .upsert({ ...row, tenant_id: ctx.tenant.id, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" })
     .select("*").single();
+  let { data, error } = await save(clean);
+  // A column from a database update the school has not run yet must not stop every other setting from saving.
+  const missing = error && /column .*"?(\w+)"? .*does not exist|Could not find the '(\w+)' column/i.exec(error.message);
+  const col = missing?.[1] ?? missing?.[2];
+  if (col && col in clean) {
+    const { [col]: _skipped, ...rest } = clean;
+    ({ data, error } = await save(rest));
+    if (!error) return NextResponse.json({ ...data, warning: `Saved, except "${col.replace(/_/g, " ")}": that setting needs the database update first.` });
+  }
   if (error) return jsonError(error.message);
   await ctx.sb.from("audit_logs").insert({ tenant_id: ctx.tenant.id, actor_id: ctx.userId, action: "settings.updated" });
   return NextResponse.json(data);
