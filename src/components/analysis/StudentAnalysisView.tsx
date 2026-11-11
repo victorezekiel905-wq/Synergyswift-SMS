@@ -146,7 +146,7 @@ export default function StudentAnalysisView({ a, currency, forParent }: { a: Stu
             )}
             {a.shop && (
               <>
-                <p className="text-sm text-slate-600">{whose} tuck shop: <b className="text-slate-900">{money(a.shop.spent, currency)}</b> in {a.shop.buys} buy{a.shop.buys === 1 ? "" : "s"}.</p>
+                <p className="text-sm text-slate-600">{whose} tuck shop: <b className="text-slate-900">{money(a.shop.spent, currency)}</b> in {a.shop.buys} buy{a.shop.buys === 1 ? "" : "s"}.{a.shop.balance !== null && <> Balance now <b className="text-slate-900">{money(a.shop.balance, currency)}</b>{a.shop.frozen ? " (frozen)" : ""}.</>}</p>
                 <Bars title="Spent on" rows={a.shop.by_category.map(c => ({ key: c.key, count: c.count }))} />
               </>
             )}

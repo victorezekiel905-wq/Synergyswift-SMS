@@ -151,7 +151,11 @@ export async function studentAnalysis(svc: Svc, p: { tenantId: string; studentId
     }) : null,
 
     on("wallet") ? part("shop", async () => {
-      const tx = await fetchAll<{ amount: number; items: any; created_at: string }>(() => svc.from("wallet_transactions").select("id,amount,items,created_at").eq("tenant_id", tid).eq("student_id", sid).eq("kind", "purchase").eq("status", "success").gte("created_at", fromIso).order("id"));
+      // The balance is for the child, their parents and admins (sellers never see it; they use the till, not this).
+      const [tx, { data: wallet }] = await Promise.all([
+        fetchAll<{ amount: number; items: any; created_at: string }>(() => svc.from("wallet_transactions").select("id,amount,items,created_at").eq("tenant_id", tid).eq("student_id", sid).eq("kind", "purchase").eq("status", "success").gte("created_at", fromIso).order("id")),
+        svc.from("wallets").select("balance,frozen").eq("tenant_id", tid).eq("student_id", sid).maybeSingle()
+      ]);
       const cats = new Map<string, number>();
       for (const t of tx) {
         const lines = Array.isArray(t.items) ? t.items : [];
@@ -159,7 +163,7 @@ export async function studentAnalysis(svc: Svc, p: { tenantId: string; studentId
         for (const l of lines) cats.set(l.category ?? "Other", (cats.get(l.category ?? "Other") ?? 0) + (Number(l.qty) || 0) * (Number(l.price) || 0));
       }
       const spent = tx.reduce((a, t) => a + Math.abs(Number(t.amount) || 0), 0);
-      return { buys: tx.length, spent: Math.round(spent * 100) / 100, by_category: [...cats.entries()].map(([key, v]) => ({ key, count: Math.round(v) })).sort((a, b) => b.count - a.count) };
+      return { balance: wallet ? Number(wallet.balance) || 0 : null, frozen: Boolean(wallet?.frozen), buys: tx.length, spent: Math.round(spent * 100) / 100, by_category: [...cats.entries()].map(([key, v]) => ({ key, count: Math.round(v) })).sort((a, b) => b.count - a.count) };
     }) : null
   ]);
 

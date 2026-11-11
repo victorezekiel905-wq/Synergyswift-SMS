@@ -33,7 +33,7 @@ export default function ShopPage() {
         ...(ov.data?.can_credit ? [{ id: "wallets" as const, label: "Wallets" }] : []), ...(ov.data?.can_settings ? [{ id: "settings" as const, label: "Rules" }] : [])]} />
       {tab === "sale" && ov.data && <QuickSale ov={ov.data} reload={ov.reload} />}
       {tab === "stock" && <Stock currency={cur} reload={ov.reload} />}
-      {tab === "activity" && <Activity currency={cur} />}
+      {tab === "activity" && <Activity currency={cur} showBalance={Boolean(ov.data?.can_credit)} />}
       {tab === "wallets" && ov.data && <Wallets currency={cur} />}
       {tab === "settings" && ov.data && <Rules s={ov.data.settings} reload={ov.reload} />}
     </Page>
@@ -297,15 +297,15 @@ type Event = { id: number; kind: string; amount: number | null; detail: Record<s
 const REASONS: Record<string, string> = { over_limit: "over the daily limit", not_enough: "not enough money", empty: "empty wallet", bought_max: "bought enough today", wait: "too soon after the last buy",
   frozen: "wallet frozen", out_of_stock: "out of stock", not_for_sale: "item not for sale" };
 
-function Activity({ currency }: { currency: string }) {
+/** `showBalance`: admins see the balance after each buy; sellers never do. */
+function Activity({ currency, showBalance }: { currency: string; showBalance: boolean }) {
   const { data, reload } = useApi<{ events: Event[] }>("/api/shop?view=activity");
   const [only, setOnly] = useState("");
   useEffect(() => { const t = setInterval(reload, 15_000); return () => clearInterval(t); }, [reload]);
   const list = (data?.events ?? []).filter(e => !only || e.kind === only);
   const text = (e: Event) => {
     switch (e.kind) {
-      // Sellers never see a child's balance; admins look it up under Wallets.
-      case "purchase": return `${e.student} bought ${(e.detail.items ?? []).map((l: any) => `${l.qty}× ${l.name}`).join(", ") || "an item"} (${e.detail.method})`;
+      case "purchase": return `${e.student} bought ${(e.detail.items ?? []).map((l: any) => `${l.qty}× ${l.name}`).join(", ") || "an item"} (${e.detail.method})${showBalance && e.detail.balance != null ? ` · balance ${money(e.detail.balance, currency)}` : ""}`;
       case "refused": return `${e.student ?? "A student"}: refused, ${REASONS[e.detail.reason] ?? e.detail.reason}`;
       case "bad_code": return "A wrong or used code was typed";
       case "exhausted": return `${e.student}'s wallet is empty (family told)`;

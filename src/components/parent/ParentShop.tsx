@@ -37,6 +37,7 @@ export default function ParentShop({ token }: { token?: string }) {
             <div className="flex flex-wrap items-center gap-2">
               <b className="mr-auto">{c.name}</b>
               <span className="text-sm text-slate-600">{s.left} of {s.max} buy{s.max === 1 ? "" : "s"} left today{s.next_at ? ` · next from ${at(s.next_at)}` : ""}</span>
+              <span className="text-sm">Balance <b className="tabular-nums">{money(s.balance, cur)}</b>{s.frozen ? <span className="ml-1 text-xs text-rose-700">(frozen)</span> : null}</span>
             </div>
             {s.code
               ? <p className="mt-2 text-sm">Today&apos;s buy code: <b className="font-mono text-lg tracking-widest">{formatBuyCode(s.code)}</b> <span className="text-slate-500">(works once{s.code_expires ? `, until ${at(s.code_expires)}` : ""})</span></p>

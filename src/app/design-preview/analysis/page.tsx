@@ -28,7 +28,7 @@ export default function AnalysisPreview() {
     health: { visits: 2, by_reason: [{ key: "headache", count: 1 }, { key: "stomach ache", count: 1 }] },
     library: { borrowed_this_term: 4, read_all_time: 17, on_loan: 1, overdue: 0 },
     fees: { this_term: { billed: 285000, collected: 200000, outstanding: 85000, rate: 70.2, overdue_invoices: 0, overdue_amount: 0 }, all_time: { billed: 285000, collected: 200000, outstanding: 85000, rate: 70.2, overdue_invoices: 0, overdue_amount: 0 }, overdue: 0 },
-    shop: { buys: 21, spent: 6300, by_category: [{ key: "Drinks", count: 2800 }, { key: "Pastry", count: 2100 }, { key: "Biscuits", count: 1400 }] },
+    shop: { balance: 3700, frozen: false, buys: 21, spent: 6300, by_category: [{ key: "Drinks", count: 2800 }, { key: "Pastry", count: 2100 }, { key: "Biscuits", count: 1400 }] },
     notes: [
       { tone: "warn", text: "Adaeze's attendance is 92.5%. Aim for 95% or more.", href: null },
       { tone: "warn", text: "2 pieces of homework past the due date and not handed in.", href: null },
