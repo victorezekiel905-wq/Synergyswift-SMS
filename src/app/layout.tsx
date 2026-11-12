@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans, IBM_Plex_Serif, IBM_Plex_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
 import RegisterServiceWorker from "@/components/RegisterServiceWorker";
@@ -9,9 +9,19 @@ import Toaster from "@/components/Toaster";
 import { BRAND_BOOT_SCRIPT } from "@/lib/theme";
 
 // One type family throughout: Plex Sans for the interface, Plex Serif for titles, Plex Mono for codes.
-const sans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-sans", display: "swap" });
-const serif = IBM_Plex_Serif({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-serif", display: "swap" });
-const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono", display: "swap" });
+// The files are in the project (src/app/fonts, IBM Plex, SIL Open Font Licence), so building never
+// depends on reaching Google Fonts: a failed download there once stopped a deploy.
+const sans = localFont({ variable: "--font-sans", display: "swap", fallback: ["system-ui", "sans-serif"], src: [
+  { path: "./fonts/ibm-plex-sans-latin-400-normal.woff2", weight: "400", style: "normal" },
+  { path: "./fonts/ibm-plex-sans-latin-500-normal.woff2", weight: "500", style: "normal" },
+  { path: "./fonts/ibm-plex-sans-latin-600-normal.woff2", weight: "600", style: "normal" },
+  { path: "./fonts/ibm-plex-sans-latin-700-normal.woff2", weight: "700", style: "normal" }] });
+const serif = localFont({ variable: "--font-serif", display: "swap", fallback: ["Georgia", "serif"], src: [
+  { path: "./fonts/ibm-plex-serif-latin-500-normal.woff2", weight: "500", style: "normal" },
+  { path: "./fonts/ibm-plex-serif-latin-600-normal.woff2", weight: "600", style: "normal" }] });
+const mono = localFont({ variable: "--font-mono", display: "swap", fallback: ["ui-monospace", "monospace"], src: [
+  { path: "./fonts/ibm-plex-mono-latin-400-normal.woff2", weight: "400", style: "normal" },
+  { path: "./fonts/ibm-plex-mono-latin-500-normal.woff2", weight: "500", style: "normal" }] });
 
 export const metadata: Metadata = {
   title: "Synergy Swift",
