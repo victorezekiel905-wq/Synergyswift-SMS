@@ -24,8 +24,15 @@ export async function GET(req: NextRequest) {
   if (!student) return jsonError("student not found", 404);
   // A parent (not staff, not the student) opens a transcript only with the code the school's admins made for this child (migration 10100).
   const self = (await ctx.sb.from("students").select("id").eq("tenant_id", tid).eq("id", studentId).eq("user_id", ctx.userId).maybeSingle()).data;
-  if (!staff && !self && !(await parentHasTranscript(createServiceClient(), { tenantId: tid, studentId, userId: ctx.userId }))) {
-    return NextResponse.json({ error: "Enter the transcript code from the school to open this transcript.", code: "transcript_code_required" }, { status: 403 });
+  if (!staff && !self) {
+    // A second lock besides the database rule above: this must be the parent's own child (linked to
+    // their account). Anyone else's child is "not found", whatever codes they hold.
+    const { data: link } = await createServiceClient().from("student_guardians").select("student_id,guardians!inner(user_id)")
+      .eq("tenant_id", tid).eq("student_id", studentId).eq("guardians.user_id", ctx.userId).limit(1);
+    if (!link?.length) return jsonError("student not found", 404);
+    if (!(await parentHasTranscript(createServiceClient(), { tenantId: tid, studentId, userId: ctx.userId }))) {
+      return NextResponse.json({ error: "Enter the transcript code from the school to open this transcript.", code: "transcript_code_required" }, { status: 403 });
+    }
   }
   const publishedOnly = !staff || u.searchParams.get("published") === "1";
   // Phase 14o: families can see the transcript, but download or print it only once the school releases it for this child.

@@ -104,6 +104,20 @@ end$$;
 revoke execute on function public.issue_transcript_code(uuid, uuid, int), public.unlock_transcript(text, uuid) from public, anon, authenticated;
 grant execute on function public.issue_transcript_code(uuid, uuid, int), public.unlock_transcript(text, uuid) to service_role;
 
+-- A parent no longer linked to a child loses that child's transcript at once: linking them again
+-- later needs a fresh code from the school.
+create or replace function public.transcript_access_on_unlink() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  delete from public.transcript_access ta
+   where ta.student_id = old.student_id
+     and ta.user_id = (select g.user_id from public.guardians g where g.id = old.guardian_id);
+  return old;
+end$$;
+drop trigger if exists transcript_access_on_unlink on public.student_guardians;
+create trigger transcript_access_on_unlink after delete on public.student_guardians
+  for each row execute function public.transcript_access_on_unlink();
+
 -- Codes are secrets: never kept in the recycle bin (9400).
 do $$ begin
   drop trigger if exists aaa_recycle_bin on public.transcript_codes;

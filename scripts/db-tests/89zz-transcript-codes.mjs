@@ -1,6 +1,7 @@
 // Transcript codes (migration 10100): a parent opens a child's transcript only with a code the
 // school's admins made for that child; the code works only for a parent linked to that child.
-export default async function ({ q, expectError, check, U, T }) {
+export default async function ({ q, as, expectError, check, U, T }) {
+  const ctxAs = { as };
   console.log("\nTranscript codes: made by admins, used by the child's own parents");
   const ADA = "a8000000-0000-0000-0000-000000000001", BOLA = "a8000000-0000-0000-0000-000000000002";   // Parent A is linked to Ada only
   const issue = async (sid, days = null) => (await q(`select issue_transcript_code('${sid}', '${U.adminA}', ${days === null ? "null" : days}) c`))[0].c;
@@ -33,6 +34,24 @@ export default async function ({ q, expectError, check, U, T }) {
   await expectError("staff can't read who unlocked", U.adminA, "select * from transcript_access", /permission denied/);
   await expectError("nobody signed in can make codes", U.adminA, `select issue_transcript_code('${ADA}', '${U.adminA}', null)`, /permission denied/);
   await expectError("…or call the unlock directly", U.parentA, `select unlock_transcript('${c2}', '${U.parentA}')`, /permission denied/);
+
+  // A parent's own children only: the database itself hides everyone else's child and results.
+  const asParent = async sql => { const { as } = ctxAs; return await as(U.parentA, () => q(sql)); };
+  check("a parent reads their own child's record", (await asParent(`select id from students where id = '${ADA}'`)).length === 1);
+  check("…but not another child's, even in the same class", (await asParent(`select id from students where id = '${BOLA}'`)).length === 0);
+  check("…nor a child in another school", (await asParent(`select id from students where id = 'b8000000-0000-0000-0000-000000000001'`)).length === 0);
+  check("a parent sees report cards for their own child only", (await asParent(`select distinct student_id from report_cards`)).every(r => r.student_id === ADA));
+  check("holding a code for another child unlocks nothing", await fails(cBola, U.parentA, /not right for any of your children/)
+    && !(await q(`select 1 x from transcript_access where student_id = '${BOLA}'`))[0]);
+
+  // Unlinked from the child: the transcript goes at once, and linking again needs the code again.
+  check("the parent has the transcript open", Boolean((await q(`select 1 x from transcript_access where student_id = '${ADA}' and user_id = '${U.parentA}' and revoked_at is null`))[0]));
+  await q(`delete from student_guardians where student_id = '${ADA}' and guardian_id = 'a9000000-0000-0000-0000-000000000001'`);
+  check("unlinking the parent removes their transcript access", !(await q(`select 1 x from transcript_access where student_id = '${ADA}' and user_id = '${U.parentA}'`))[0]);
+  check("…and the code no longer works for them", await fails(c2, U.parentA, /not right for any of your children/));
+  check("…and they can no longer read the child", (await asParent(`select id from students where id = '${ADA}'`)).length === 0);
+  await q(`insert into student_guardians (tenant_id, student_id, guardian_id) values ('${T.A}', '${ADA}', 'a9000000-0000-0000-0000-000000000001')`);
+  check("linked again, the transcript stays shut until the code is entered", !(await q(`select 1 x from transcript_access where student_id = '${ADA}' and user_id = '${U.parentA}'`))[0]);
 
   await q(`delete from transcript_access where tenant_id = '${T.A}'`);
   await q(`delete from transcript_codes where tenant_id = '${T.A}'`);
