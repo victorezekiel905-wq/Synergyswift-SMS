@@ -115,7 +115,8 @@ begin
   return false;
 end$$;
 
-/** The school's day and settings for one student: buys left, the wait, the limits, the wallet. */create or replace function public.shop_status(p_tenant uuid, p_student uuid) returns jsonb
+/** The school's day and settings for one student: buys left, the wait, the limits, the wallet. */
+create or replace function public.shop_status(p_tenant uuid, p_student uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare
   s        public.tenant_settings;
