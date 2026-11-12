@@ -20,11 +20,19 @@ export function reminderDue(createdAt: string, sends: string[], now: Date, rule:
   return now.getTime() - last >= gap * DAY;
 }
 
-/** The Monday line for admins: who has still not signed up. Null when there is nothing to say. */
-export function digestText(p: { staffWaiting: number; parentsWaiting: number }): string | null {
+/**
+ * The Monday line for admins. Waiting: people who were sent a code, link or one-time password
+ * and have not signed in. No contact: parents with no working email or phone, whom nothing
+ * could be sent to. (Parents using their private link on a phone are not waiting.) Null when
+ * there is nothing to say.
+ */
+export function digestText(p: { staffWaiting: number; parentsWaiting: number; parentsNoContact?: number }): string | null {
   const parts: string[] = [];
   if (p.staffWaiting) parts.push(`${p.staffWaiting} member${p.staffWaiting === 1 ? "" : "s"} of staff`);
   if (p.parentsWaiting) parts.push(`${p.parentsWaiting} parent${p.parentsWaiting === 1 ? "" : "s"}`);
-  if (!parts.length) return null;
-  return `${parts.join(" and ")} ${p.staffWaiting + p.parentsWaiting === 1 ? "has" : "have"} not signed up yet. Reminders are sent by themselves; you can also send a code or link again from School office → Onboarding, or check parents' email addresses and phone numbers.`;
+  const none = p.parentsNoContact ?? 0;
+  const out: string[] = [];
+  if (parts.length) out.push(`${parts.join(" and ")} ${p.staffWaiting + p.parentsWaiting === 1 ? "has" : "have"} not signed in yet. Reminders are sent by themselves; you can also send a link or code again from School office → Onboarding.`);
+  if (none) out.push(`${none} parent${none === 1 ? " has" : "s have"} no working email or phone on record, so nothing could be sent: check their details under Students & parents.`);
+  return out.length ? out.join(" ") : null;
 }

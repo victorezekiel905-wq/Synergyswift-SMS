@@ -31,7 +31,7 @@ export default function StudentAnalysisView({ a, currency, forParent }: { a: Stu
 
       <div className="grid gap-5 lg:grid-cols-2">
         {r && (
-          <Card title="Results" href={forParent ? "/parent/transcript" : "/student/transcript"}>
+          <Card title="Results" href={forParent ? `/parent/transcript?student=${a.student.id}` : "/student/transcript"}>
             {r.trend.length ? <Columns title="Average, term by term" max={100} rows={r.trend.map(t => ({ label: t.term, value: t.average, text: `${t.average}%` }))} />
               : <p className="text-sm text-slate-500">No published report card yet.</p>}
             {r.subjects.length > 0 && (

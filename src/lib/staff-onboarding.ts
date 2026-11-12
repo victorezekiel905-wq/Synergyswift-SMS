@@ -77,9 +77,13 @@ export function staffListFromGrid(grid: string[][], subjects: Subject[]): ListRo
   });
 }
 
-/** Where someone is: invited and waiting, joined but in no class, or ready. */
-export function stageOf(p: { has_account: boolean; classes: number; planned?: number }): Stage {
-  if (!p.has_account) return "waiting";
+/**
+ * Where someone is: invited and waiting, joined but in no class, or ready. An email link or a
+ * one-time password makes the account at once, so "joined" means they have signed in
+ * (`signed_in` false: not yet; null: not known, before migration 10200, counted as joined).
+ */
+export function stageOf(p: { has_account: boolean; classes: number; signed_in?: boolean | null }): Stage {
+  if (!p.has_account || p.signed_in === false) return "waiting";
   return p.classes > 0 ? "ready" : "needs_classes";
 }
 

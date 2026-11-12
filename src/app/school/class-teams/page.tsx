@@ -9,7 +9,7 @@ type Data = {
   offerings: { id: string; class_group_id: string; subject_id: string; teacher_id: string | null; subjects: { name: string } | null }[];
   team: Member[]; staff: Staff[]; subjects: { id: string; name: string }[];
   teaches?: Record<string, string[]>;
-  newcomers?: { user_id: string; full_name: string; subject_ids: string[] }[];
+  newcomers?: { user_id: string; full_name: string; subject_ids: string[]; signed_in?: boolean | null }[];
   waiting?: { id: string; full_name: string; subject_ids: string[] }[];
   settings: { auto_student_logins?: boolean; auto_parent_invites?: boolean; story_photo_consent?: boolean; ussd_enabled?: boolean; all_classes_roles?: string[] };
   accounts: { students: number; students_without_login: number; students_waiting: { id: string; first_name: string; last_name: string; login_sent_at: string | null }[]; parents: number; parents_without_login: number; parents_waiting: { id: string; full_name: string; email: string | null; phone: string | null }[] };
@@ -101,9 +101,9 @@ export default function ClassTeamsPage() {
             <a className="text-sm text-brand-700 hover:underline" href="/school/onboarding?tab=staff">Onboarding →</a>
           </div>
           {newcomers.length > 0 && <>
-            <p className="mt-1 text-sm text-slate-600">They have signed up but are in no class yet. Open a class below: they are listed first for the subjects they teach.</p>
+            <p className="mt-1 text-sm text-slate-600">They have an account but are in no class yet. Open a class below: they are listed first for the subjects they teach.</p>
             <ul className="mt-2 flex flex-wrap gap-2">{newcomers.map(n => (
-              <li key={n.user_id} className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-sm"><b>{n.full_name}</b>{n.subject_ids.length > 0 && <span className="text-slate-600"> · {n.subject_ids.map(subjectName).join(", ")}</span>}</li>))}</ul>
+              <li key={n.user_id} className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-sm"><b>{n.full_name}</b>{n.subject_ids.length > 0 && <span className="text-slate-600"> · {n.subject_ids.map(subjectName).join(", ")}</span>}{n.signed_in === false && <span className="text-amber-700"> · has not signed in yet</span>}</li>))}</ul>
           </>}
           {waiting.length > 0 && <>
             <p className="mt-3 text-sm text-slate-600">Still to sign up (they can be put in classes once they have):</p>

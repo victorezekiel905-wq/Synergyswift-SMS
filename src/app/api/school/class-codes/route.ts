@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireCtx, ROLES, hasAny, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { appUrl } from "@/lib/school";
+import { chunks } from "@/lib/fetch-all";
 import { sendCodes } from "@/lib/sign-up-codes-server";
 import { formatCode } from "@/lib/sign-up-codes";
 import { codeClasses, classCodes } from "@/lib/onboarding-codes-server";
@@ -50,8 +51,13 @@ export async function POST(req: NextRequest) {
   // Only students in classes this person may see.
   const classes = (await codeClasses(svc, { tenantId: tid, userId: ctx.userId, admin })).map(c => c.id);
   const ids = b.action === "send" ? b.ids : [b.id];
-  const { data: ok } = classes.length ? await svc.from("students").select("id").eq("tenant_id", tid).in("id", ids).in("class_group_id", classes) : { data: [] };
-  if ((ok ?? []).length !== new Set(ids).size) return jsonError("you can only use codes for students in your own class", 403);
+  const mine = new Set(classes);
+  let allowed = 0;
+  for (const c of chunks([...new Set(ids)])) {
+    const { data: ok } = await svc.from("students").select("id,class_group_id").eq("tenant_id", tid).in("id", c);
+    allowed += (ok ?? []).filter((s: { class_group_id: string | null }) => s.class_group_id && mine.has(s.class_group_id)).length;
+  }
+  if (allowed !== new Set(ids).size) return jsonError("you can only use codes for students in your own class", 403);
 
   if (b.action === "new_code") {
     if (!admin) return jsonError("only a school admin can make a new code", 403);

@@ -5,7 +5,8 @@ import { staffListFromGrid, stageOf, STAGE_TEXT, assignmentKey, type Assignment,
 import { parseGrid, readXlsxGrid } from "@/lib/spreadsheet";
 
 type Row = { id: string; full_name: string; email: string | null; staff_no: string; position: string | null; created_at: string;
-  subject_ids: string[]; has_account: boolean; role: string | null; code: string | null; classes: number; active: boolean | null; assignments: Assignment[] };
+  subject_ids: string[]; has_account: boolean; role: string | null; code: string | null; classes: number; active: boolean | null; assignments: Assignment[];
+  signed_in?: boolean | null };
 type Subject = { id: string; name: string; code?: string | null };
 type ClassGroup = { id: string; name: string; level: string | null };
 type Data = { subjects: Subject[]; classes: ClassGroup[]; taken: Record<string, string>; staff: Row[]; roles: string[] };
@@ -274,7 +275,7 @@ function People({ data, focus, onDone }: { data: Data; focus: string | null; onD
               <li key={s.id} id={`staff-${s.id}`} className={"flex flex-wrap items-start gap-3 py-3 " + (focus === s.id ? "rounded-md bg-amber-50 px-2" : "")}>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{s.full_name} <Badge tone={STAGE_TONE[s.stage]}>{STAGE_TEXT[s.stage]}</Badge></p>
-                  <p className="text-xs text-slate-500">{s.staff_no}{s.email ? ` · ${s.email}` : " · no email"}{s.role ? ` · ${words(s.role)}` : ""}{s.code ? ` · code ${s.code}` : ""}{s.active === false ? " · login disabled" : ""}</p>
+                  <p className="text-xs text-slate-500">{s.staff_no}{s.email ? ` · ${s.email}` : " · no email"}{s.role ? ` · ${words(s.role)}` : ""}{s.code ? ` · code ${s.code}` : ""}{s.has_account && s.signed_in === false ? " · sign-in sent, not used yet" : ""}{s.active === false ? " · login disabled" : ""}</p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {s.subject_ids.map(id => <Badge key={id}>{subjectName.get(id) ?? "?"}</Badge>)}
                     {s.assignments.length > 0 && <span className="text-xs text-slate-600">{s.has_account ? "" : "Waiting for them: "}{s.assignments.length} class{s.assignments.length === 1 ? "" : "es"}</span>}
@@ -282,9 +283,10 @@ function People({ data, focus, onDone }: { data: Data; focus: string | null; onD
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   {s.stage === "waiting" && <>
-                    {!s.email && <input className="input w-48 py-1 text-sm" type="email" placeholder="Their email" value={a.email} onChange={e => setAgain({ ...again, [s.id]: { ...a, email: e.target.value } })} aria-label={`Email for ${s.full_name}`} />}
+                    {!s.email && !s.has_account && <input className="input w-48 py-1 text-sm" type="email" placeholder="Their email" value={a.email} onChange={e => setAgain({ ...again, [s.id]: { ...a, email: e.target.value } })} aria-label={`Email for ${s.full_name}`} />}
                     <select className="input py-1 text-sm" value={a.method} onChange={e => setAgain({ ...again, [s.id]: { ...a, method: e.target.value as Method } })} aria-label={`How ${s.full_name} signs in`}>
-                      {METHODS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}</select>
+                      {/* Their account exists already once a link or password was sent: a code no longer applies. */}
+                      {METHODS.filter(m => !s.has_account || m.id !== "code").map(m => <option key={m.id} value={m.id}>{m.label}</option>)}</select>
                     <button className="btn btn-primary px-3 py-1 text-sm" disabled={busy === s.id} onClick={() => resend(s)}>{busy === s.id ? "Sending…" : "Send again"}</button>
                     <button className="btn btn-ghost px-2 py-1 text-sm" onClick={() => setOpen(s)}>Subjects &amp; classes</button>
                   </>}

@@ -20,7 +20,10 @@ describe("sign-up reminders", () => {
   });
   it("the Monday line says who is still waiting", () => {
     expect(digestText({ staffWaiting: 0, parentsWaiting: 0 })).toBeNull();
-    expect(digestText({ staffWaiting: 1, parentsWaiting: 0 })).toMatch(/^1 member of staff has not signed up yet/);
-    expect(digestText({ staffWaiting: 4, parentsWaiting: 31 })).toMatch(/^4 members of staff and 31 parents have not signed up yet/);
+    expect(digestText({ staffWaiting: 1, parentsWaiting: 0 })).toMatch(/^1 member of staff has not signed in yet/);
+    expect(digestText({ staffWaiting: 4, parentsWaiting: 31 })).toMatch(/^4 members of staff and 31 parents have not signed in yet/);
+    // Parents nothing could be sent to are said separately; parents using their private link are not counted at all.
+    expect(digestText({ staffWaiting: 0, parentsWaiting: 0, parentsNoContact: 2 })).toMatch(/^2 parents have no working email or phone/);
+    expect(digestText({ staffWaiting: 1, parentsWaiting: 0, parentsNoContact: 1 })).toMatch(/not signed in yet\..* 1 parent has no working email or phone/);
   });
 });

@@ -137,6 +137,25 @@ export async function createOneTimeLogin(svc: Svc, p: { tenantId: string; kind: 
 }
 
 /**
+ * A fresh one-time password for an account that was made but never used (the first one was
+ * lost or never arrived). The person must still choose their own at the first sign-in.
+ */
+export async function renewOneTimeLogin(svc: Svc, p: { tenantId: string; userId: string; name: string; email: string; actor: string | null; baseUrl: string }) {
+  const password = startingPassword();
+  const { error } = await svc.auth.admin.updateUserById(p.userId, { password });
+  if (error) throw new Error("could not make a new one-time password just now");
+  await svc.from("users").update({ must_change_password: true }).eq("tenant_id", p.tenantId).eq("id", p.userId);
+  await svc.from("audit_logs").insert({ tenant_id: p.tenantId, actor_id: p.actor, action: "account.one_time_password_renewed", target: p.userId });
+  const brand = await loadBrand(svc, p.tenantId);
+  const note = communityNote(brand, { name: p.name, subject: `Your ${brand.schoolName} sign-in`, link: `${p.baseUrl}/login`, linkLabel: "Sign in",
+    lines: [`Here is a new one-time password for your ${brand.schoolName} account.`, `Username: ${p.email}`, `One-time password: ${password}`,
+      "Sign in with these, then choose your own password. Any earlier one-time password no longer works."] });
+  await enqueue(svc, [{ tenant_id: p.tenantId, channel: "email", to_address: p.email, to_name: p.name, kind: "account_key", subject: note.subject, body_text: note.text, body_html: note.html, ref_id: p.userId, created_by: p.actor }]);
+  await tryDispatch(svc, { budgetMs: 6000 }).catch(() => null);
+  return { username: p.email, password, sent: 1 };
+}
+
+/**
  * The third way in: an emailed invitation link. The person opens it and sets their password;
  * the account has the role chosen for them (staff: the role on their code) and is joined to
  * their record. Their sign-up code is spent.

@@ -3,7 +3,8 @@ import { z } from "zod";
 import { requireCtx, readJson, jsonError, ROLES, STAFF_ROLE_OPTIONS, denyUnless } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { appUrl } from "@/lib/school";
-import { sendCodes } from "@/lib/sign-up-codes-server";
+import { sendCodes, renewOneTimeLogin } from "@/lib/sign-up-codes-server";
+import { provisionUser } from "@/lib/provision";
 import { grantStaffAccess, rolesOutsidePlan, type AccessResult } from "@/lib/staff-access-server";
 import { onboardingList, setStaffSubjects, nextStaffNo, setStaffClasses } from "@/lib/staff-onboarding-server";
 
@@ -81,7 +82,25 @@ export async function POST(req: NextRequest) {
   if (b.action === "resend") {
     const { data: s } = await svc.from("staff").select("id,full_name,email,user_id").eq("tenant_id", tid).eq("id", b.staff_id).maybeSingle();
     if (!s) return jsonError("staff not found", 404);
-    if (s.user_id) return jsonError(`${s.full_name} has an account already. Change their roles in HR, or reset their password.`);
+    if (s.user_id) {
+      // The account was made when they were invited (link or one-time password). If they never signed in, send a fresh one.
+      const { data: au, error: aErr } = await svc.auth.admin.getUserById(s.user_id);
+      if (aErr || !au?.user) return jsonError("Could not check this person's sign-in just now. Please try again.");
+      if (au.user.last_sign_in_at) return jsonError(`${s.full_name} has signed in already. Change their roles in HR; they can use "Forgot password" on the sign-in page.`);
+      const { data: u } = await svc.from("users").select("email,role,extra_roles,active").eq("tenant_id", tid).eq("id", s.user_id).maybeSingle();
+      if (u?.active === false) return jsonError(`${s.full_name}'s login is switched off. Enable it in HR first, then send again.`);
+      const to = String(u?.email || s.email || "").toLowerCase();
+      if (!u || !EMAIL.test(to)) return jsonError("This account has no email to send to. Ask the platform team for help.");
+      try {
+        if (b.method === "otp") {
+          const r = await renewOneTimeLogin(svc, { tenantId: tid, userId: s.user_id, name: s.full_name, email: to, actor: ctx.userId, baseUrl: appUrl(req) });
+          return NextResponse.json({ ok: true, otp: r, message: `New one-time password for ${s.full_name}. Username: ${r.username} · One-time password: ${r.password} (emailed to them; shown only now).` });
+        }
+        await provisionUser(svc, { tenantId: tid, email: to, fullName: s.full_name, role: u.role, extraRoles: u.extra_roles ?? [], redirectTo: `${appUrl(req)}/auth/welcome?next=/dashboard`, createdBy: ctx.userId });
+        await svc.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "account.invitation_resent", target: s.user_id });
+        return NextResponse.json({ ok: true, message: `A new link was emailed to ${to}. ${s.full_name} opens it and sets a password; the link lasts 24 hours.` });
+      } catch (e) { return jsonError((e as Error).message); }
+    }
     // A record with no email (added before, or imported): the email typed now is kept on it.
     const typed = (b.email ?? "").trim().toLowerCase();
     if (typed && typed !== (s.email ?? "").toLowerCase()) {

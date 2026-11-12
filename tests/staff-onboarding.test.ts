@@ -48,6 +48,10 @@ describe("staff onboarding: where everyone is", () => {
     expect(stageOf({ has_account: false, classes: 0 })).toBe("waiting");
     expect(stageOf({ has_account: true, classes: 0 })).toBe("needs_classes");
     expect(stageOf({ has_account: true, classes: 2 })).toBe("ready");
+    // An email link or one-time password makes the account at once: until they sign in, they are still waiting.
+    expect(stageOf({ has_account: true, classes: 2, signed_in: false })).toBe("waiting");
+    expect(stageOf({ has_account: true, classes: 0, signed_in: true })).toBe("needs_classes");
+    expect(stageOf({ has_account: true, classes: 1, signed_in: null })).toBe("ready");     // not known (before the database update)
   });
   it("works out which classes to add and take away", () => {
     const have = [{ class_group_id: "1A", subject_id: "m" }, { class_group_id: "2B", subject_id: null }];

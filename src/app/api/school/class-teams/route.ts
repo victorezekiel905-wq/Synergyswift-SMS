@@ -37,7 +37,7 @@ export async function GET() {
   for (const o of onboard) { const uid = userOf.get(o.id); if (uid && o.subject_ids.length) teaches[uid] = o.subject_ids; }
   return NextResponse.json({
     classes: classes.data ?? [], offerings: offerings.data ?? [], team: team.data ?? [], staff: staff.data ?? [], subjects: subjects.data ?? [], teaches,
-    newcomers: onboard.filter(o => o.has_account && o.active !== false && o.classes === 0).map(o => ({ user_id: userOf.get(o.id) ?? null, full_name: o.full_name, subject_ids: o.subject_ids })).filter(o => o.user_id),
+    newcomers: onboard.filter(o => o.has_account && o.active !== false && o.classes === 0).map(o => ({ user_id: userOf.get(o.id) ?? null, full_name: o.full_name, subject_ids: o.subject_ids, signed_in: o.signed_in })).filter(o => o.user_id),
     waiting: onboard.filter(o => !o.has_account).map(o => ({ id: o.id, full_name: o.full_name, subject_ids: o.subject_ids })),
     settings: Object.fromEntries(["auto_student_logins", "auto_parent_invites", "story_photo_consent", "points_allow_needs_work", "ussd_enabled", "all_classes_roles"].map(k => [k, (settings.data as any)?.[k]])),
     accounts: {

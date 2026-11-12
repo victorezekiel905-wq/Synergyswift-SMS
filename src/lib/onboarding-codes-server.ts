@@ -86,12 +86,17 @@ export async function transcriptCodes(svc: Svc, tenantId: string): Promise<Trans
 
 /** Makes (or replaces) transcript codes for these students. Returns how many were made. */
 export async function makeTranscriptCodes(svc: Svc, p: { tenantId: string; studentIds: string[]; by: string; days: number | null }) {
-  const { data: mine } = await svc.from("students").select("id").eq("tenant_id", p.tenantId).in("id", p.studentIds);
+  // A whole school at once: ids in batches (a long list does not fit in one request), ten codes at a time.
   let made = 0;
-  for (const s of mine ?? []) {
-    const { error } = await svc.rpc("issue_transcript_code", { p_student: s.id, p_by: p.by, p_days: p.days });
-    if (error) throw new Error(transcriptNeedsUpdate(error.message) ? "Transcript codes need the database update (migration 20260101010100)." : error.message);
-    made++;
+  for (const c of chunks([...new Set(p.studentIds)])) {
+    const { data: mine } = await svc.from("students").select("id").eq("tenant_id", p.tenantId).in("id", c);
+    const ids = (mine ?? []).map((s: { id: string }) => s.id);
+    for (let i = 0; i < ids.length; i += 10) {
+      const results = await Promise.all(ids.slice(i, i + 10).map((id: string) => svc.rpc("issue_transcript_code", { p_student: id, p_by: p.by, p_days: p.days })));
+      const failed = results.find((r: any) => r.error);
+      if (failed) throw new Error(transcriptNeedsUpdate(failed.error.message) ? "Transcript codes need the database update (migration 20260101010100)." : failed.error.message);
+      made += results.length;
+    }
   }
   return made;
 }

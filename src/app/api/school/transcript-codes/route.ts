@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { appUrl } from "@/lib/school";
+import { chunks } from "@/lib/fetch-all";
 import { transcriptCodes, makeTranscriptCodes, sendTranscriptCodes, transcriptNeedsUpdate } from "@/lib/onboarding-codes-server";
 
 export const dynamic = "force-dynamic";
@@ -62,9 +63,11 @@ export async function POST(req: NextRequest) {
       await audit("transcript.access_withdrawn", { student_id: b.student_id, user_id: b.user_id });
       return NextResponse.json({ ok: true });
     }
-    const { error } = await svc.from("students").update({ transcript_allowed: b.allowed, transcript_allowed_by: ctx.userId, transcript_allowed_at: new Date().toISOString() })
-      .eq("tenant_id", tid).in("id", b.student_ids);
-    if (error) throw new Error(error.message);
+    for (const c of chunks(b.student_ids)) {
+      const { error } = await svc.from("students").update({ transcript_allowed: b.allowed, transcript_allowed_by: ctx.userId, transcript_allowed_at: new Date().toISOString() })
+        .eq("tenant_id", tid).in("id", c);
+      if (error) throw new Error(error.message);
+    }
     await audit(b.allowed ? "transcript.released" : "transcript.held", { count: b.student_ids.length });
     return NextResponse.json({ ok: true });
   } catch (e) {

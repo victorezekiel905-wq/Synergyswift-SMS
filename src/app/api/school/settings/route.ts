@@ -27,14 +27,15 @@ export async function PUT(req: NextRequest) {
     .select("*").single();
   let { data, error } = await save(clean);
   // A column from a database update the school has not run yet must not stop every other setting from saving.
-  const missing = error && /column .*"?(\w+)"? .*does not exist|Could not find the '(\w+)' column/i.exec(error.message);
+  const missing = error && /column "?(?:\w+\.)?(\w+)"? (?:of relation "?\w+"? )?does not exist|Could not find the '(\w+)' column/i.exec(error.message);
   const col = missing?.[1] ?? missing?.[2];
+  let warning: string | null = null;
   if (col && col in clean) {
     const { [col]: _skipped, ...rest } = clean;
     ({ data, error } = await save(rest));
-    if (!error) return NextResponse.json({ ...data, warning: `Saved, except "${col.replace(/_/g, " ")}": that setting needs the database update first.` });
+    if (!error) warning = `Saved, except "${col.replace(/_/g, " ")}": that setting needs the database update first.`;
   }
   if (error) return jsonError(error.message);
   await ctx.sb.from("audit_logs").insert({ tenant_id: ctx.tenant.id, actor_id: ctx.userId, action: "settings.updated" });
-  return NextResponse.json(data);
+  return NextResponse.json(warning ? { ...data, warning } : data);
 }

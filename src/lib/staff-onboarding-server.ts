@@ -50,9 +50,22 @@ export async function nextStaffNo(svc: Svc, tenantId: string): Promise<string> {
   return `STF-${String(max + 1).padStart(4, "0")}`;
 }
 
+/**
+ * When each account in the school last signed in (migration 10200), by user id. Null before
+ * the database update, when it cannot be known.
+ */
+export async function tenantSignIns(svc: Svc, tenantId: string): Promise<Map<string, string | null> | null> {
+  try {
+    const rows = await fetchAll<{ user_id: string; last_sign_in_at: string | null }>(() => svc.rpc("tenant_sign_ins", { p_tenant: tenantId }).order("user_id"));
+    return new Map(rows.map(r => [r.user_id, r.last_sign_in_at]));
+  } catch { return null; }
+}
+
 export type OnboardRow = {
   id: string; full_name: string; email: string | null; staff_no: string; position: string | null; created_at: string;
   subject_ids: string[]; has_account: boolean; role: string | null; code: string | null; classes: number; active: boolean | null;
+  /** Has the person ever signed in? False: the account was made (link or one-time password) but not used. Null: not known yet. */
+  signed_in: boolean | null;
   /** Their classes now (signed up) or the classes waiting for them (not yet). */
   assignments: Assignment[];
 };
@@ -62,7 +75,7 @@ export type OnboardRow = {
  * signed up, and how many classes they are in (form teacher, subject teacher or class team).
  */
 export async function onboardingList(svc: Svc, tenantId: string): Promise<OnboardRow[]> {
-  const [staff, subjects, codes, users, offerings, forms, team, plans] = await Promise.all([
+  const [staff, subjects, codes, users, offerings, forms, team, plans, signIns] = await Promise.all([
     fetchAll<any>(() => svc.from("staff").select("id,full_name,email,staff_no,position,created_at,user_id,status").eq("tenant_id", tenantId).neq("status", "exited").order("id")),
     subjectsByStaff(svc, tenantId),
     fetchAll<any>(() => svc.from("account_codes").select("staff_id,code,role,used_at,uses,max_uses").eq("tenant_id", tenantId).eq("kind", "staff").is("revoked_at", null).order("id")).catch(() => []),
@@ -70,7 +83,8 @@ export async function onboardingList(svc: Svc, tenantId: string): Promise<Onboar
     fetchAll<any>(() => svc.from("subject_offerings").select("class_group_id,subject_id,teacher_id").eq("tenant_id", tenantId).not("teacher_id", "is", null).order("id")),
     fetchAll<any>(() => svc.from("class_groups").select("id,form_teacher_id").eq("tenant_id", tenantId).not("form_teacher_id", "is", null).order("id")),
     fetchAll<any>(() => svc.from("class_staff").select("class_group_id,user_id").eq("tenant_id", tenantId).order("id")).catch(() => []),
-    fetchAll<any>(() => svc.from("staff_class_plans").select("staff_id,class_group_id,subject_id").eq("tenant_id", tenantId).order("id")).catch(() => [])
+    fetchAll<any>(() => svc.from("staff_class_plans").select("staff_id,class_group_id,subject_id").eq("tenant_id", tenantId).order("id")).catch(() => []),
+    tenantSignIns(svc, tenantId)
   ]);
   const own = new Map<string, Assignment[]>();
   const put = (key: string | null, a: Assignment) => { if (key) own.set(key, [...(own.get(key) ?? []), a]); };
@@ -92,7 +106,8 @@ export async function onboardingList(svc: Svc, tenantId: string): Promise<Onboar
       id: s.id, full_name: s.full_name, email: s.email, staff_no: s.staff_no, position: s.position, created_at: s.created_at,
       subject_ids: subjects.get(s.id) ?? [], has_account: Boolean(s.user_id), role: u?.role ?? c?.role ?? null,
       code: !s.user_id && live ? formatCode(c.code) : null, classes: s.user_id ? (classesOf.get(s.user_id)?.size ?? 0) : 0, active: u ? Boolean(u.active) : null,
-      assignments: s.user_id ? own.get(`u:${s.user_id}`) ?? [] : own.get(`s:${s.id}`) ?? []
+      assignments: s.user_id ? own.get(`u:${s.user_id}`) ?? [] : own.get(`s:${s.id}`) ?? [],
+      signed_in: !s.user_id ? false : signIns ? Boolean(signIns.get(s.user_id)) : null
     };
   }).sort((a: OnboardRow, b: OnboardRow) => b.created_at.localeCompare(a.created_at));
 }
