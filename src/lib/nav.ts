@@ -44,6 +44,7 @@ export const NAV: NavGroup[] = [
   { id: "teaching", title: "Teaching", links: [
     { href: "/teacher", label: "My teaching day", roles: TEACH },
     { href: "/school/attendance", label: "Class register", roles: TEACH, module: "attendance" },
+    { href: "/school/class-codes", label: "My class codes", roles: TEACH, hint: "Parent and student codes for the class you are class teacher of" },
     { href: "/school/classroom", label: "Classroom points & story", roles: [...TEACH, "counsellor"], module: "classroom" },
     { href: "/school/homework", label: "Homework", roles: TEACH, module: "homework" },
     { href: "/school/lesson-notes", label: "Lesson notes", roles: [...TEACH, "qa_officer"], module: "lesson_notes" },
@@ -128,7 +129,8 @@ export const NAV: NavGroup[] = [
     { href: "/school/compliance", label: "Policies & compliance", roles: STAFF },
     { href: "/school/signatures", label: "E-signatures", roles: STAFF },
     { href: "/school/setup", label: "School setup", roles: ADMIN },
-    { href: "/school/staff-onboarding", label: "Staff onboarding", roles: ADMIN, hint: "Add staff with their email and subjects, then how they sign in" },
+    { href: "/school/onboarding", label: "Onboarding", roles: ADMIN, hint: "Staff, students and parents: sign-up codes and logins" },
+    { href: "/school/transcripts", label: "Transcripts", roles: ADMIN, module: "results", hint: "Codes parents need to open a child's transcript" },
     { href: "/school/class-teams", label: "Class teams & accounts", roles: ADMIN },
     { href: "/school/account-codes", label: "Sign-up codes & logins", roles: ADMIN, hint: "Codes and one-time passwords for staff, students and parents" },
     { href: "/school/signups", label: "Sign-ups to confirm", roles: ADMIN },

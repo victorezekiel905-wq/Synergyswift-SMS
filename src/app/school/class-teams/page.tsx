@@ -98,7 +98,7 @@ export default function ClassTeamsPage() {
         <section className="card mb-5 p-5" aria-labelledby="new-staff">
           <div className="flex flex-wrap items-center gap-2">
             <h2 id="new-staff" className="mr-auto font-semibold">New staff to put in classes</h2>
-            <a className="text-sm text-brand-700 hover:underline" href="/school/staff-onboarding">Staff onboarding →</a>
+            <a className="text-sm text-brand-700 hover:underline" href="/school/onboarding?tab=staff">Onboarding →</a>
           </div>
           {newcomers.length > 0 && <>
             <p className="mt-1 text-sm text-slate-600">They have signed up but are in no class yet. Open a class below: they are listed first for the subjects they teach.</p>

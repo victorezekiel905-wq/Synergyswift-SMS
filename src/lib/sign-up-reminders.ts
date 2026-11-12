@@ -26,5 +26,5 @@ export function digestText(p: { staffWaiting: number; parentsWaiting: number }):
   if (p.staffWaiting) parts.push(`${p.staffWaiting} member${p.staffWaiting === 1 ? "" : "s"} of staff`);
   if (p.parentsWaiting) parts.push(`${p.parentsWaiting} parent${p.parentsWaiting === 1 ? "" : "s"}`);
   if (!parts.length) return null;
-  return `${parts.join(" and ")} ${p.staffWaiting + p.parentsWaiting === 1 ? "has" : "have"} not signed up yet. Reminders are sent by themselves; you can also send a code or link again from Staff onboarding, or check parents' email addresses and phone numbers.`;
+  return `${parts.join(" and ")} ${p.staffWaiting + p.parentsWaiting === 1 ? "has" : "have"} not signed up yet. Reminders are sent by themselves; you can also send a code or link again from School office → Onboarding, or check parents' email addresses and phone numbers.`;
 }

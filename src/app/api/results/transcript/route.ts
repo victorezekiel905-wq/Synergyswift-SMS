@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireCtx, ROLES, jsonError, hasAny } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { studentName } from "@/lib/school";
+import { parentHasTranscript } from "@/lib/onboarding-codes-server";
 
 /**
  * Academic transcript: every end-of-term result for one student, grouped by
@@ -21,6 +22,11 @@ export async function GET(req: NextRequest) {
   const { data: student } = await ctx.sb.from("students").select("id,first_name,last_name,other_names,admission_no,date_of_birth,gender,photo_url,class_groups(name)")
     .eq("tenant_id", tid).eq("id", studentId).maybeSingle();
   if (!student) return jsonError("student not found", 404);
+  // A parent (not staff, not the student) opens a transcript only with the code the school's admins made for this child (migration 10100).
+  const self = (await ctx.sb.from("students").select("id").eq("tenant_id", tid).eq("id", studentId).eq("user_id", ctx.userId).maybeSingle()).data;
+  if (!staff && !self && !(await parentHasTranscript(createServiceClient(), { tenantId: tid, studentId, userId: ctx.userId }))) {
+    return NextResponse.json({ error: "Enter the transcript code from the school to open this transcript.", code: "transcript_code_required" }, { status: 403 });
+  }
   const publishedOnly = !staff || u.searchParams.get("published") === "1";
   // Phase 14o: families can see the transcript, but download or print it only once the school releases it for this child.
   const { data: release } = await createServiceClient().from("students").select("*").eq("tenant_id", tid).eq("id", studentId).maybeSingle();

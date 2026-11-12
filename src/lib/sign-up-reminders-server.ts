@@ -54,7 +54,7 @@ export async function remindUnansweredInvites(svc: Svc, baseUrl: string, now = n
         if (text) {
           const { data: admins } = await svc.from("users").select("id,role,extra_roles").eq("tenant_id", tid).eq("active", true);
           const to = (admins ?? []).filter((u: any) => ["school_admin", "principal"].some(r => u.role === r || (u.extra_roles ?? []).includes(r))).map((u: any) => u.id);
-          await tellStaff(svc, tid, to, "signup_digest", "Sign-ups still waiting", text, `${baseUrl}/school/staff-onboarding`);
+          await tellStaff(svc, tid, to, "signup_digest", "Sign-ups still waiting", text, `${baseUrl}/school/onboarding`);
           out.digests++;
         }
       }

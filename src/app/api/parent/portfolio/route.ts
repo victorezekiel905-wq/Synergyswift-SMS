@@ -3,6 +3,7 @@ import { requireCtx, readJson, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { appUrl } from "@/lib/school";
 import { studentPortfolio, targetsFor, sharesFor, createShare } from "@/lib/portfolio-server";
+import { parentHasTranscript } from "@/lib/onboarding-codes-server";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,8 @@ export async function GET(req: NextRequest) {
   const svc = createServiceClient();
   const [portfolio, targets, shares] = await Promise.all([
     studentPortfolio(svc, tid, child.id, { shared: true }), targetsFor(ctx.sb, tid, child.id), sharesFor(svc, tid, { student_id: child.id }, appUrl(req))]);
-  return NextResponse.json({ children, child: { id: child.id, name: `${child.first_name} ${child.last_name}`, transcript_allowed: Boolean(child.transcript_allowed) }, ...portfolio, targets, shares });
+  const transcript_unlocked = await parentHasTranscript(svc, { tenantId: tid, studentId: child.id, userId: ctx.userId });
+  return NextResponse.json({ children, child: { id: child.id, name: `${child.first_name} ${child.last_name}`, transcript_allowed: Boolean(child.transcript_allowed), transcript_unlocked }, ...portfolio, targets, shares });
 }
 
 /** Share the portfolio (or one achievement), stop a link, or add a target from home. */
