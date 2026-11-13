@@ -43,7 +43,8 @@ export default function PracticePage() {
     const q = run.questions[i];
     const fb = feedback[q.id];
     const done = Object.keys(feedback).length;
-    const last = Object.values(feedback).at(-1);
+    const all = Object.values(feedback);
+    const last = all[all.length - 1];
     return (
       <Page>
         <PageHeader eyebrow="Practice" title={`Question ${i + 1} of ${run.questions.length}`}

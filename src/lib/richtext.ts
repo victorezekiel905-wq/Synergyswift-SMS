@@ -54,7 +54,8 @@ function inline(s: string, slots: string[]): string {
   out = out.replace(/`([^`\n]+)`/g, (_, x) => { slots.push(`<code class="rt-inline">${x}</code>`); return SLOT(slots.length - 1); });
   out = out.replace(/\\\((.+?)\\\)/g, (_, x) => { slots.push(renderMath(unescape(x), false)); return SLOT(slots.length - 1); });
   // $x$ only when it looks like maths, so "$5 and $10" stays money.
-  out = out.replace(/(^|[^\\$\w])\$(?![\s\d])([^$\n]+?)(?<!\s)\$(?![\w\d])/g, (_, pre, x) => { slots.push(renderMath(unescape(x), false)); return pre + SLOT(slots.length - 1); });
+  // (No lookbehind: iPhones before iOS 16.4 cannot load a file that has one. "Ends in a non-space" is written out instead.)
+  out = out.replace(/(^|[^\\$\w])\$(?![\s\d])([^$\n]*?[^$\s])\$(?![\w\d])/g, (_, pre, x) => { slots.push(renderMath(unescape(x), false)); return pre + SLOT(slots.length - 1); });
   out = out.replace(/\[([^\]\n]+)\]\((https:\/\/[^\s)]+)\)/g, (_, text, url) => `<a href="${url}" target="_blank" rel="noopener noreferrer nofollow">${text}</a>`);
   out = out.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
   out = out.replace(/(^|[\s(])_([^_\n]+)_(?=[\s.,;:!?)]|$)/g, "$1<em>$2</em>");

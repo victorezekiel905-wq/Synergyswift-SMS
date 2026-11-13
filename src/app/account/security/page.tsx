@@ -106,7 +106,7 @@ export default function AccountSecurityPage() {
       <PageHeader eyebrow="Account" title="Account security"
         subtitle="Two-factor sign-in stops anyone who learns your password from getting in. You enter a code from an app on your phone as well as your password." />
       {/* Back from a "Forgot password" email: the new password first. */}
-      {reset && <div className="mb-4"><Alert tone="green">Choose your new password below.</Alert><div className="mt-3"><PasswordCard onChanged={() => router.push("/dashboard")} /></div></div>}
+      {reset && <div className="mb-4"><Alert tone="green">Choose your new password below.</Alert><div className="mt-3"><PasswordCard onChanged={() => window.location.assign("/dashboard")} /></div></div>}
       {required && !sessionVerified && (
         <div className="mb-4"><Alert tone="amber">
           {required === "platform"

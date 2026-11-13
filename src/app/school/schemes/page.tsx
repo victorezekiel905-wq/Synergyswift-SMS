@@ -140,7 +140,7 @@ function Scheme({ id, terms, onBack, onOpen }: { id: string; terms: Term[]; onBa
 
       <section className="card space-y-2 p-4">
         <div className="flex items-center"><h3 className="mr-auto font-semibold">Weeks</h3>
-          {editable && <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => setWeek({ week_no: (weeks.at(-1)?.week_no ?? 0) + 1, topic: "", objective_ids: [] })}>+ Add week</button>}</div>
+          {editable && <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => setWeek({ week_no: (weeks[weeks.length - 1]?.week_no ?? 0) + 1, topic: "", objective_ids: [] })}>+ Add week</button>}</div>
         {!weeks.length ? <Empty>No weeks yet.</Empty> : (
           <ol className="divide-y divide-slate-100">{weeks.map(w => (
             <li key={w.id} className="flex flex-wrap items-start gap-3 py-2">

@@ -67,6 +67,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bare]);
   useEffect(() => { setOpen(false); setPicked(null); }, [pathname]);
+  // Whatever page they try while a password must be chosen, they are taken to the password page (never left waiting).
+  const mustSetPassword = me?.account?.state === "password_expired";
+  useEffect(() => {
+    if (mustSetPassword && !bare && !pathname.startsWith("/account/security")) router.replace("/account/security?required=password");
+  }, [mustSetPassword, bare, pathname, router]);
   // The school's logo is the icon in the browser tab too.
   const logo = me?.profile && !me.platform ? me.prefs?.logo_url ?? null : null;
   useEffect(() => {

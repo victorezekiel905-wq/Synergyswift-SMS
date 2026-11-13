@@ -23,7 +23,8 @@ export default function Toaster() {
       const n = (e as CustomEvent<Notice>).detail;
       const id = next++;
       // The same message twice in a row (a double click) shows once.
-      setList(l => (l.at(-1)?.text === n.text ? l : [...l.slice(-2), { ...n, id }]));
+      // (The last item by index, not the newer "at" helper: older phone browsers lack it and the page would crash on every save.)
+      setList(l => (l[l.length - 1]?.text === n.text ? l : [...l.slice(-2), { ...n, id }]));
       setTimeout(() => setList(l => l.filter(x => x.id !== id)), n.tone === "error" ? 8000 : 3000);
     };
     window.addEventListener(EVENT, on);
