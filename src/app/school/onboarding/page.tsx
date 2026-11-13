@@ -19,7 +19,7 @@ export default function OnboardingPage() {
   return (
     <Page wide>
       <PageHeader eyebrow="School office" title="Onboarding"
-        subtitle="Bring staff, students and parents onto the platform. Each student has their own sign-up code and a parent code; only you and the class teacher can see them."
+        subtitle="Bring staff, students and parents onto the platform. Students and parents sign in with a one-time password and then choose their own; parents add each child with that child's code. Only you and the class teacher see a class's details."
         actions={<><Link href="/school/students" className="btn btn-outline text-xs">Add students and parents</Link><Link href="/school/account-codes" className="btn btn-ghost text-xs">All codes &amp; logins</Link></>} />
       <Tabs value={tab} onChange={pick} tabs={[{ id: "staff", label: "Staff onboarding" }, { id: "students", label: "Student onboarding" }, { id: "parents", label: "Parent onboarding" }]} />
       <div className="mt-4">

@@ -44,7 +44,8 @@ export async function ensureStudentLogin(svc: Svc, studentId: string, baseUrl: s
     .map(r => ({ ...r, recipient_guardian_id: l.guardians.id })) : []);
   if (rows.length) await enqueue(svc, rows);
   await svc.from("audit_logs").insert({ tenant_id: s.tenant_id, actor_id: actor, action: "student.login_created", target: s.id, meta: { username, sent_to: rows.length } });
-  return { created: true, username, password: rows.length ? null : password, sent: rows.length };
+  // The school sees the one-time password once too (to print or read out), as for staff.
+  return { created: true, username, password, sent: rows.length };
 }
 
 /** Resets a student's password to a new starting one and sends it to their parents. */
@@ -64,7 +65,7 @@ export async function resendStudentKey(svc: Svc, studentId: string, baseUrl: str
     .map(r => ({ ...r, recipient_guardian_id: l.guardians.id })) : []);
   if (rows.length) await enqueue(svc, rows);
   await svc.from("audit_logs").insert({ tenant_id: s.tenant_id, actor_id: actor, action: "student.login_reset", target: s.id, meta: { sent_to: rows.length } });
-  return { username: u.username, password: rows.length ? null : password, sent: rows.length };
+  return { username: u.username, password, sent: rows.length };
 }
 
 /** Invites one parent: an account invitation by email, or the private portal link by WhatsApp/SMS. */

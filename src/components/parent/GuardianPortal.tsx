@@ -8,6 +8,7 @@ import { useOfflineApi, OfflineNote } from "@/components/offline";
 import NativeBridge from "@/components/NativeBridge";
 import NotificationChoices from "@/components/NotificationChoices";
 import InstallApp from "@/components/InstallApp";
+import { REPORT_TITLE } from "@/lib/report-kind";
 
 type Overview = {
   guardian: { id: string; full_name: string; notify_email: boolean; notify_whatsapp: boolean; email: string | null; phone: string | null; language?: string | null };
@@ -17,7 +18,7 @@ type Overview = {
     id: string; name: string; admission_no: string; photo_url: string | null; class_name: string | null; class_group_id?: string | null; can_pickup: boolean; on_site: boolean;
     today: { direction: string; at: string; method: string; late: boolean; note: string | null }[];
     recent_events: { direction: string; at: string; method: string; late: boolean }[];
-    results: { id: string; term: string; average: number | null; position: number | null; class_size: number | null; access_token: string; published_at: string }[];
+    results: { id: string; kind: "midterm" | "term"; term: string; average: number | null; position: number | null; class_size: number | null; access_token: string; published_at: string }[];
     pickup_codes: { id: string; delegate_name: string | null; expires_at: string }[];
     loans: { title: string; due_at: string }[];
     glance?: GlanceData | null;
@@ -109,7 +110,7 @@ export default function GuardianPortal({ api, act, mode, token }: { api: string;
                   <ul className="space-y-2 text-sm">
                     {c.results.map(r => (
                       <li key={r.id} className="flex items-center justify-between rounded-lg border border-slate-200 p-2">
-                        <span>{r.term}<br /><span className="text-xs text-slate-500">Average {r.average ?? "—"}%{r.position ? ` · position ${r.position}/${r.class_size}` : ""}</span></span>
+                        <span><b>{REPORT_TITLE[r.kind] ?? "Report"}</b> · {r.term}<br /><span className="text-xs text-slate-500">Average {r.average ?? "—"}%{r.position ? ` · position ${r.position}/${r.class_size}` : ""}</span></span>
                         <a className="btn btn-primary px-3 py-1 text-xs" href={`/r/${r.access_token}`} target="_blank" rel="noreferrer">Report card</a>
                       </li>
                     ))}

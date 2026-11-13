@@ -9,13 +9,16 @@ import { formatCode } from "./sign-up-codes";
 import { studentName } from "./school";
 import { loadBrand, rowsForGuardian, enqueue, tryDispatch, type OutboxRow } from "./messaging/outbox";
 import { communityNote } from "./messaging/notices";
+import { tenantSignIns } from "./staff-onboarding-server";
 
 type Svc = any;
 
 export type ClassCodeRow = {
   id: string; name: string; admission_no: string | null; class_id: string | null; class_name: string | null; has_account: boolean;
   student_code: string | null; parent_code: string | null; parent_uses: number; parent_max: number;
-  parents: { name: string; has_account: boolean }[];
+  parents: { id: string; name: string; email: string | null; has_account: boolean; signed_in: boolean | null }[];
+  /** The student's sign-in name (username logins) and whether they have signed in (null: not known before the database update). */
+  username: string | null; signed_in: boolean | null; must_change: boolean;
 };
 
 /** The classes a person may see codes for: every class for admins, else the classes they are class (form) teacher of. */
@@ -30,16 +33,18 @@ export async function codeClasses(svc: Svc, p: { tenantId: string; userId: strin
 export async function classCodes(svc: Svc, tenantId: string, classIds: string[]): Promise<ClassCodeRow[]> {
   if (!classIds.length) return [];
   const students = (await Promise.all(chunks(classIds).map(c => fetchAll<any>(() =>
-    svc.from("students").select("id,first_name,last_name,other_names,admission_no,class_group_id,user_id,class_groups(name)")
+    svc.from("students").select("id,first_name,last_name,other_names,admission_no,class_group_id,user_id,class_groups(name),users:user_id(username,email,must_change_password)")
       .eq("tenant_id", tenantId).eq("status", "active").in("class_group_id", c).order("id"))))).flat();
   const ids = students.map((s: any) => s.id as string);
   const [codes, links] = ids.length ? await Promise.all([
     Promise.all(chunks(ids).map(c => fetchAll<any>(() => svc.from("account_codes").select("id,kind,student_id,code,uses,max_uses,used_at")
       .eq("tenant_id", tenantId).in("kind", ["student", "parent_link"]).is("revoked_at", null).in("student_id", c).order("id")))).then(x => x.flat()).catch(() => []),
-    Promise.all(chunks(ids).map(c => fetchAll<any>(() => svc.from("student_guardians").select("student_id,guardian_id,guardians(full_name,user_id)")
+    Promise.all(chunks(ids).map(c => fetchAll<any>(() => svc.from("student_guardians").select("student_id,guardian_id,guardians(full_name,email,user_id)")
       .eq("tenant_id", tenantId).in("student_id", c).order("student_id").order("guardian_id")))).then(x => x.flat())
   ]) : [[], []];
   const live = (c: any) => c && !c.used_at && c.uses < c.max_uses;
+  const signIns = await tenantSignIns(svc, tenantId);
+  const signed = (uid: string | null) => !uid ? false : signIns ? Boolean(signIns.get(uid)) : null;
   return students.map((s: any) => {
     const sc = codes.find((c: any) => c.kind === "student" && c.student_id === s.id);
     const pc = codes.find((c: any) => c.kind === "parent_link" && c.student_id === s.id);
@@ -48,7 +53,9 @@ export async function classCodes(svc: Svc, tenantId: string, classIds: string[])
       has_account: Boolean(s.user_id),
       student_code: !s.user_id && live(sc) ? formatCode(sc.code) : null,
       parent_code: live(pc) ? formatCode(pc.code) : null, parent_uses: pc?.uses ?? 0, parent_max: pc?.max_uses ?? 4,
-      parents: links.filter((l: any) => l.student_id === s.id && l.guardians).map((l: any) => ({ name: l.guardians.full_name, has_account: Boolean(l.guardians.user_id) }))
+      parents: links.filter((l: any) => l.student_id === s.id && l.guardians).map((l: any) => ({ id: l.guardian_id, name: l.guardians.full_name, email: l.guardians.email ?? null,
+        has_account: Boolean(l.guardians.user_id), signed_in: signed(l.guardians.user_id ?? null) })),
+      username: s.users?.username ?? s.users?.email ?? null, signed_in: signed(s.user_id ?? null), must_change: Boolean(s.users?.must_change_password)
     };
   }).sort((a: ClassCodeRow, b: ClassCodeRow) => (a.class_name ?? "").localeCompare(b.class_name ?? "") || a.name.localeCompare(b.name));
 }

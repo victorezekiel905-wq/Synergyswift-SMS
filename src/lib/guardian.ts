@@ -6,6 +6,7 @@ import { startOfTodayIso, studentName } from "./school";
 import { familyExtras } from "./family";
 import { familyGlance } from "./portal-server";
 import { beginRequest } from "./request-actor";
+import { reportKindOf, termName } from "./report-kind";
 
 export async function guardianByToken(svc: any, token: string) {
   const store = beginRequest();
@@ -34,7 +35,7 @@ export async function guardianOverview(svc: any, tenantId: string, guardianId: s
   const [gate, reports, codes, loans] = ids.length ? await Promise.all([
     svc.from("gate_events").select("student_id,direction,method,late,at,note").eq("tenant_id", tenantId).in("student_id", ids)
       .order("at", { ascending: false }).limit(60),
-    svc.from("report_cards").select("id,student_id,average,position,class_size,published_at,access_token,data")
+    svc.from("report_cards").select("id,student_id,kind,average,position,class_size,published_at,access_token,data")
       .eq("tenant_id", tenantId).in("student_id", ids).eq("status", "published").order("published_at", { ascending: false }),
     svc.from("pickup_codes").select("id,student_id,delegate_name,expires_at,created_at").eq("tenant_id", tenantId)
       .eq("guardian_id", guardianId).eq("status", "active").gt("expires_at", new Date().toISOString()),
@@ -74,7 +75,7 @@ export async function guardianOverview(svc: any, tenantId: string, guardianId: s
         today: todays.reverse(),
         recent_events: events.slice(0, 15),
         results: (reports.data ?? []).filter((r: any) => r.student_id === s.id).map((r: any) => ({
-          id: r.id, term: r.data?.term_label, average: r.average, position: r.data?.scheme?.show_position ? r.position : null,
+          id: r.id, kind: reportKindOf(r.kind, r.data), term: termName(r.data?.term_label), average: r.average, position: r.data?.scheme?.show_position ? r.position : null,
           class_size: r.class_size, published_at: r.published_at, access_token: r.access_token
         })),
         pickup_codes: (codes.data ?? []).filter((c: any) => c.student_id === s.id),

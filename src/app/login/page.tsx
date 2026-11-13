@@ -19,8 +19,8 @@ const REASONS: Record<string, string> = {
 type Who = "staff" | "parent" | "student";
 const WHO: Record<Who, { tab: string; title: string; lead: string; field: string; join: string }> = {
   staff: { tab: "Staff", title: "Staff sign in", lead: "Teachers, administrators and every member of staff.", field: "Email", join: "New staff? Make your account with the sign-up code from your school" },
-  parent: { tab: "Parent", title: "Parent sign in", lead: "See your children's results, fees, attendance and messages.", field: "Email", join: "New parent? Make your account with your sign-up code or your child's parent code" },
-  student: { tab: "Student", title: "Student sign in", lead: "Your lessons, homework, exams and results.", field: "Email or username", join: "New student? Make your account with your sign-up code" }
+  parent: { tab: "Parent", title: "Parent sign in", lead: "See your children's results, fees, attendance and messages.", field: "Email", join: "" },
+  student: { tab: "Student", title: "Student sign in", lead: "Your class, lessons, homework, exams, results and progress.", field: "Username", join: "" }
 };
 /** Which tab an account belongs on. */
 const whoFor = (role?: string | null): Who | null => !role ? null : role === "parent" ? "parent" : role === "student" ? "student" : "staff";
@@ -184,10 +184,11 @@ export default function LoginPage() {
                 {unconfirmed && <button type="button" className="font-medium text-brand-700 hover:underline" onClick={() => mail("resend")}>Send the confirmation email again</button>}
               </div>
               <p className="text-center text-xs leading-relaxed text-slate-500">
-                Got a one-time password from the school? Sign in with it above; you will choose your own password next.
+                {who === "parent" ? "New parent? Sign in with your email and the one-time password from the school; you choose your own password next. Then add each of your children with their child's code."
+                  : who === "student" ? "New student? Sign in with the username and one-time password from your school (your parents have them too); you choose your own password next."
+                  : "Got a one-time password from the school? Sign in with it above; you will choose your own password next."}
               </p>
-              <Link href={`/join?as=${who}`} className="btn btn-outline w-full no-underline">{WHO[who].join}</Link>
-              {who === "student" && <p className="text-center text-xs text-slate-500">Have a class code instead? <Link href="/student/join" className="font-medium text-brand-700 hover:underline">Join a class</Link></p>}
+              {who === "staff" && <Link href="/join?as=staff" className="btn btn-outline w-full no-underline">{WHO.staff.join}</Link>}
               {who === "staff" && <p className="text-center text-xs text-slate-500">New school with an onboarding code? <Link href="/onboard" className="font-medium text-brand-700 hover:underline">Onboard your school</Link></p>}
             </form>
             )}

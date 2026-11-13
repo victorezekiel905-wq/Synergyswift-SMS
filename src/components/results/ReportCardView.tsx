@@ -78,7 +78,7 @@ export default function ReportCardView({ card, school, studentPhoto, verifyUrl, 
           <h1 className="text-2xl font-bold uppercase tracking-wide" style={{ color }}>{school?.school_name ?? tenantName}</h1>
           {school?.motto && <p className="text-sm italic text-slate-600">{school.motto}</p>}
           {school?.address && <p className="text-xs text-slate-600">{school.address}{school.phone ? ` · ${school.phone}` : ""}{school.email ? ` · ${school.email}` : ""}</p>}
-          <p className="mt-2 text-sm font-bold uppercase tracking-widest">{early ? "Early years report" : midterm ? "Mid-term progress report" : template === "american" ? "Report card" : template === "british" ? "School report" : "Report card"}: {d.term_label}</p>
+          <p className="mt-2 text-sm font-bold uppercase tracking-widest">{early ? "Early years report" : midterm ? "Mid-term report" : "End of term report"}: {String(d.term_label ?? "").replace(/\s*\(mid-term\)\s*$/i, "")}</p>
         </div>
         {studentPhoto && (
           // eslint-disable-next-line @next/next/no-img-element

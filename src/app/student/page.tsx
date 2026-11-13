@@ -12,9 +12,11 @@ import MyClubs from "@/components/student/MyClubs";
 import MyDay from "@/components/student/MyDay";
 import MyTools from "@/components/student/MyTools";
 import MyShop from "@/components/student/MyShop";
+import MyClass from "@/components/student/MyClass";
+import { REPORT_TITLE } from "@/lib/report-kind";
 
 type Exam = { id: string; title: string; subject: string | null; duration_minutes: number; opens_at: string | null; closes_at: string | null; window: string; require_seb: boolean; attempt_status: string | null; score: { total: number; max: number } | null };
-type Result = { id: string; term: string; class_name: string; average: number | null; position: number | null; class_size: number | null; published_at: string; access_token: string };
+type Result = { id: string; kind: "midterm" | "term"; term: string; class_name: string; average: number | null; position: number | null; class_size: number | null; published_at: string; access_token: string };
 
 export default function StudentHome() {
   const exams = useApi<Exam[]>("/api/student/exams");
@@ -22,6 +24,7 @@ export default function StudentHome() {
   return (
     <Page>
       <PageHeader eyebrow="Student" title="My school" />
+      <MyClass />
       <MyDay />
       <MyShop />
       <NoticeBoard />
@@ -61,12 +64,13 @@ export default function StudentHome() {
       </section>
       <section>
         <h2 className="mb-3 text-lg font-semibold">Report cards</h2>
+        <p className="-mt-2 mb-3 text-sm text-slate-500">Each term has a mid-term report and an end of term report.</p>
         {results.error && <Alert tone="amber">{results.error}</Alert>}
         {results.data && !results.data.length && <Empty>No published results yet.</Empty>}
         <ul className="space-y-2">
           {(results.data ?? []).map(r => (
             <li key={r.id} className="card flex items-center justify-between p-4">
-              <div><p className="font-semibold">{r.term}</p><p className="text-sm text-slate-500">{r.class_name} · average {r.average ?? "—"}%{r.position ? ` · position ${r.position} of ${r.class_size}` : ""}</p></div>
+              <div><p className="font-semibold">{REPORT_TITLE[r.kind] ?? "Report"} · {r.term}</p><p className="text-sm text-slate-500">{r.class_name} · average {r.average ?? "—"}%{r.position ? ` · position ${r.position} of ${r.class_size}` : ""}</p></div>
               <a className="btn btn-primary" href={`/r/${r.access_token}`} target="_blank" rel="noreferrer">View</a>
             </li>
           ))}
