@@ -81,6 +81,6 @@ export async function GET() {
     prefs,
     is_guardian: Boolean(guardian),
     is_staff_record: Boolean(staff),
-    ...(mustChange ? { account: { state: "password_expired", message: "Choose your own password to continue." } } : {})
+    ...(mustChange ? { account: { state: "password_expired", first_time: true, message: "Choose your own password to continue." } } : {})
   });
 }

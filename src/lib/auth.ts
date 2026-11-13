@@ -111,7 +111,10 @@ export async function resolveCtx(): Promise<Ctx | CtxError> {
   const access = await checkAccess(user.id, session?.access_token ?? null);
   if (!access.ok) return { error: access.message, status: 403, code: "access_restricted" };
   const { data: profile } = await sb.from("users")
-    .select("id,tenant_id,email,full_name,role,extra_roles,custom_role_id").eq("id", user.id).maybeSingle();
+    .select("id,tenant_id,email,full_name,role,extra_roles,custom_role_id,must_change_password").eq("id", user.id).maybeSingle();
+  // Signed in with a one-time (or starting) password: nothing opens until they choose their own.
+  if (profile?.must_change_password) return { error: "Choose your own password to continue.", status: 403, code: "password_change_required" };
+  if (profile) delete (profile as { must_change_password?: boolean }).must_change_password;
   if (!profile) {
     const { data: st } = await sb.rpc("my_account_state");
     const e = STATE_ERRORS[st?.state as string];

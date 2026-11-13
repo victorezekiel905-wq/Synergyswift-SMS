@@ -49,12 +49,13 @@ export default function WelcomePage() {
     if (pw !== pw2) return setErr("The passwords do not match.");
     setBusy(true); setErr(null);
     // The server applies the school's password rules.
-    const r = await fetch("/api/account/password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pw }) });
+    const r = await fetch("/api/account/password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pw, password2: pw2 }) });
     const j = await r.json().catch(() => ({}));
     setBusy(false);
     if (!r.ok) return setErr(j.error ?? "could not save the password");
     await fetch("/api/auth/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => null);
-    router.replace(next);
+    // A full load, so the app opens with the new password state.
+    window.location.assign(next);
   }
 
   return (
@@ -69,7 +70,7 @@ export default function WelcomePage() {
           <label className="block"><span className="label">Confirm password</span><input className="input" type="password" autoComplete="new-password" value={pw2} onChange={e => setPw2(e.target.value)} required /></label>
           {err && <p role="alert" className="text-sm text-rose-600">{err}</p>}
           <button className="btn btn-primary w-full" disabled={busy}>{busy ? "Saving…" : "Save and continue"}</button>
-          <button type="button" className="btn btn-ghost w-full text-xs" onClick={() => router.replace(next)}>Skip for now</button>
+          <p className="text-center text-xs text-slate-500">You need your own password before you can use your account.</p>
         </form>
       )}
     </main>

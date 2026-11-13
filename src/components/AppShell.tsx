@@ -108,6 +108,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [open]);
 
   if (bare) return <>{children}</>;
+  // Until a one-time (or expired) password is replaced: the password page only, no menus.
+  if (me?.account?.state === "password_expired") {
+    return pathname.startsWith("/account/security") ? <div className="min-h-screen bg-slate-50">{children}</div> : <p className="p-8 text-sm text-slate-500">Opening the password page…</p>;
+  }
   if (me?.account?.state === "access_restricted") return <AccessBlocked message={me.account.message ?? null} device={(me.account as { device?: string | null }).device ?? null} />;
 
   async function signOut() {

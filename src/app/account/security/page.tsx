@@ -24,6 +24,7 @@ export default function AccountSecurityPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [required, setRequired] = useState<string | null>(null);
+  const [reset, setReset] = useState(false);
 
   const load = useCallback(async () => {
     const sb = createClient();
@@ -36,6 +37,7 @@ export default function AccountSecurityPage() {
 
   useEffect(() => {
     setRequired(new URLSearchParams(window.location.search).get("required"));
+    setReset(new URLSearchParams(window.location.search).get("reset") === "1");
     load();
   }, [load]);
 
@@ -45,7 +47,10 @@ export default function AccountSecurityPage() {
   async function continueOn() {
     const r = await fetch("/api/auth/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
     const j = await r.json().catch(() => ({}));
-    router.push(j.next && !j.mfa ? j.next : "/dashboard");
+    const to = j.next && !j.mfa ? j.next : "/dashboard";
+    // After a forced password change the whole app reloads, so menus and pages open for the new state.
+    if (required === "password") { window.location.assign(to); return; }
+    router.push(to);
     router.refresh();
   }
 
@@ -86,12 +91,23 @@ export default function AccountSecurityPage() {
     </Field>
   );
 
+  // A one-time or expired password: only the new password, nothing else, until it is chosen.
+  if (required === "password") {
+    return (
+      <Page>
+        <PageHeader eyebrow="Account" title="Choose your password" subtitle="You need your own password before you can use your account." />
+        <PasswordCard required onChanged={continueOn} />
+        <button className="btn btn-ghost mt-4 text-sm" onClick={async () => { await createClient().auth.signOut(); router.replace("/login"); }}>Sign out</button>
+      </Page>
+    );
+  }
   return (
     <Page>
       <PageHeader eyebrow="Account" title="Account security"
         subtitle="Two-factor sign-in stops anyone who learns your password from getting in. You enter a code from an app on your phone as well as your password." />
-      {required === "password" && <div className="mb-4"><PasswordCard required onChanged={continueOn} /></div>}
-      {required && required !== "password" && !sessionVerified && (
+      {/* Back from a "Forgot password" email: the new password first. */}
+      {reset && <div className="mb-4"><Alert tone="green">Choose your new password below.</Alert><div className="mt-3"><PasswordCard onChanged={() => router.push("/dashboard")} /></div></div>}
+      {required && !sessionVerified && (
         <div className="mb-4"><Alert tone="amber">
           {required === "platform"
             ? "Platform administrators must use two-factor sign-in. Set it up below to open the platform console."
@@ -147,7 +163,7 @@ export default function AccountSecurityPage() {
         )}
       </section>
 
-      {required !== "password" && <div className="mt-4"><PasswordCard /></div>}
+      {!reset && <div className="mt-4"><PasswordCard /></div>}
       <div className="mt-4"><SessionsCard /></div>
 
       <section className="card mt-4 space-y-2 p-5">
@@ -158,7 +174,7 @@ export default function AccountSecurityPage() {
         <div className="border-t border-slate-100 pt-3"><NotificationChoices /></div>
       </section>
 
-      {sessionVerified && required && required !== "password" && (
+      {sessionVerified && required && (
         <div className="mt-4"><button className="btn btn-primary" onClick={continueOn}>Continue</button></div>
       )}
     </Page>

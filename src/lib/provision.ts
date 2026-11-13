@@ -8,6 +8,7 @@
  */
 import { enqueue, loadBrand, tryDispatch } from "./messaging/outbox";
 import { escapeHtml } from "./messaging/templates";
+import { linkFrom, safeNext } from "./auth-mail";
 
 export type ProvisionInput = {
   tenantId: string;
@@ -42,14 +43,21 @@ export async function provisionUser(svc: any, p: ProvisionInput): Promise<{ user
   // Platform admins never get an account inside a school, so no school can see them.
   const { data: platform } = await svc.from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle();
   if (platform) throw new Error("this email is already registered to another account; use a different email");
-  const actionLink: string | null = link.data?.properties?.action_link ?? null;
+  // The link goes to the app's own confirm page (a button there spends it, so mail scanners can't, and it
+  // does not depend on Supabase's list of allowed redirect addresses). Supabase's own link is the fallback.
+  let base = "", next = "/dashboard";
+  try { const u = new URL(p.redirectTo); base = u.origin; next = safeNext(u.searchParams.get("next")); } catch { /* keep Supabase's link */ }
+  const actionLink: string | null = (base ? linkFrom(base, link.data, link.data?.properties?.verification_type === "magiclink" ? "magiclink" : "invite", next) : null)
+    ?? link.data?.properties?.action_link ?? null;
+  // Someone who has never signed in chooses their own password at their first sign-in, whichever way they come in.
+  const fresh = !user.last_sign_in_at;
 
   if (existingProfile) {
-    const { error } = await svc.from("users").update({ full_name: p.fullName, role: p.role, extra_roles: p.extraRoles ?? [], active: true }).eq("tenant_id", p.tenantId).eq("id", user.id);
+    const { error } = await svc.from("users").update({ full_name: p.fullName, role: p.role, extra_roles: p.extraRoles ?? [], active: true, ...(fresh ? { must_change_password: true } : {}) }).eq("tenant_id", p.tenantId).eq("id", user.id);
     if (error) throw new Error(error.message);
   } else {
     const { error } = await svc.from("users").insert({
-      id: user.id, tenant_id: p.tenantId, email, full_name: p.fullName, role: p.role, extra_roles: p.extraRoles ?? []
+      id: user.id, tenant_id: p.tenantId, email, full_name: p.fullName, role: p.role, extra_roles: p.extraRoles ?? [], must_change_password: true
     });
     if (error) throw new Error(error.message);
   }

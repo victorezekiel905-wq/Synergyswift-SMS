@@ -8,7 +8,7 @@ import { inviteByEmail, createOneTimeLogin } from "@/lib/sign-up-codes-server";
 
 export type StaffMethod = "code" | "invite" | "otp";
 export type AccessResult =
-  | { ok: true; code?: string; invited?: boolean; email?: string | null; otp?: { username: string; password: string }; rolesOnly?: boolean }
+  | { ok: true; code?: string; invited?: boolean; email?: string | null; link?: string | null; otp?: { username: string; password: string }; rolesOnly?: boolean }
   | { ok: false; error: string; status?: number };
 
 /** Roles outside what Synergy Swift allows this school (its plan). */
@@ -42,18 +42,18 @@ export async function grantStaffAccess(ctx: Ctx, svc: any, req: NextRequest, p: 
   if (cErr) {
     // Before the database update: the old email invitation.
     try {
-      const { userId } = await provisionUser(svc, { tenantId: tid, email: String(p.email || s.email || ""), fullName: s.full_name, role: p.role, extraRoles: extra,
+      const { userId, actionLink } = await provisionUser(svc, { tenantId: tid, email: String(p.email || s.email || ""), fullName: s.full_name, role: p.role, extraRoles: extra,
         redirectTo: `${appUrl(req)}/auth/welcome?next=/dashboard`, createdBy: ctx.userId });
       await svc.from("staff").update({ user_id: userId }).eq("tenant_id", tid).eq("id", s.id);
       await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "staff.login_created", target: userId, meta: { role: p.role, extra } });
-      return { ok: true, invited: true, email: p.email || s.email };
+      return { ok: true, invited: true, email: p.email || s.email, link: actionLink };
     } catch (e) { return { ok: false, error: (e as Error).message }; }
   }
   await ctx.sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "account.code_role_set", target: s.id, meta: { role: p.role, extra } });
   try {
     if (p.method === "invite") {
       const r = await inviteByEmail(svc, { tenantId: tid, kind: "staff", id: s.id, email: p.email || s.email, actor: ctx.userId, baseUrl: appUrl(req) });
-      return { ok: true, invited: true, email: r.email };
+      return { ok: true, invited: true, email: r.email, link: r.link };
     }
     if (p.method === "otp") {
       const r = await createOneTimeLogin(svc, { tenantId: tid, kind: "staff", id: s.id, email: String(p.email || s.email || ""), actor: ctx.userId, baseUrl: appUrl(req) });

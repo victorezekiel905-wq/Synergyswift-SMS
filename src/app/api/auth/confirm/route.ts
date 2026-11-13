@@ -25,8 +25,9 @@ export async function POST(req: NextRequest) {
       .eq("user_id", data.user.id).is("confirmed_at", null);
   }
   if (type === "recovery") return go(next);
-  // Invited people choose their password first.
-  if (type === "invite") return go(`/auth/welcome?next=${encodeURIComponent(next)}`);
+  // Invited people, and anyone who has not chosen a password yet, choose it first.
+  const { data: u } = await createServiceClient().from("users").select("must_change_password").eq("id", data.user.id).maybeSingle();
+  if (type === "invite" || u?.must_change_password) return go(`/auth/welcome?next=${encodeURIComponent(next)}`);
   // The sign-in page finishes setting up (school, approval, second factor).
   return go(`/login?finish=1&next=${encodeURIComponent(next)}`);
 }

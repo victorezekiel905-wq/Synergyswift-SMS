@@ -172,12 +172,12 @@ export async function inviteByEmail(svc: Svc, p: { tenantId: string; kind: "staf
   const { data: code } = await svc.from("account_codes").select("role,extra_roles").eq("kind", p.kind).eq(col, p.id).is("revoked_at", null).maybeSingle();
   const role = p.kind === "staff" ? (code?.role ?? "teacher") : p.kind === "student" ? "student" : "parent";
   const { provisionUser } = await import("./provision");
-  const { userId } = await provisionUser(svc, { tenantId: p.tenantId, email, fullName: name, role, extraRoles: p.kind === "staff" ? (code?.extra_roles ?? []) : [],
+  const { userId, actionLink } = await provisionUser(svc, { tenantId: p.tenantId, email, fullName: name, role, extraRoles: p.kind === "staff" ? (code?.extra_roles ?? []) : [],
     redirectTo: `${p.baseUrl}/auth/welcome?next=${homeFor(role)}`, createdBy: p.actor });
   await svc.from(t.table).update({ user_id: userId, ...(p.kind !== "student" ? { email } : {}) }).eq("id", p.id);
   await svc.from("account_codes").update({ used_at: new Date().toISOString(), used_by: userId }).eq("kind", p.kind).eq(col, p.id).is("revoked_at", null);
   await svc.from("audit_logs").insert({ tenant_id: p.tenantId, actor_id: p.actor, action: "account.invitation_sent", target: userId, meta: { kind: p.kind, role } });
-  return { email };
+  return { email, link: actionLink };
 }
 
 export type CodeRow = { kind: CodeKind; id: string; name: string; detail: string | null; code: string | null; role: string | null; extra_roles: string[];

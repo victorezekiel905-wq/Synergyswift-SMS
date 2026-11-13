@@ -81,7 +81,9 @@ export default function LoginPage() {
     }
     // Each account signs in from its own tab: a parent on the Staff tab is told where to go.
     const actual = j.platform || j.group ? "staff" : whoFor(j.role);
-    if (actual && actual !== who) {
+    // Back from an email link the person has already shown who they are: no wrong-tab stop.
+    const fromLink = new URLSearchParams(window.location.search).get("finish") === "1";
+    if (actual && actual !== who && !fromLink) {
       await sb.auth.signOut();
       setErr(`This is a ${WHO[actual].tab.toLowerCase()} account. Choose "${WHO[actual].tab}" above and sign in there.`);
       return;

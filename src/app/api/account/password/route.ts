@@ -63,14 +63,15 @@ export async function POST(req: NextRequest) {
     // The new password must not be the one-time password itself.
     const plain = createPlainClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data: same } = await plain.auth.signInWithPassword({ email: w.user.email!, password: pw });
-    if (same?.session) { await plain.auth.signOut(); return jsonError("choose a new password, not the one-time password"); }
+    // (Only this check's own session is closed: a plain signOut() would end every session, the person's own included.)
+    if (same?.session) { await plain.auth.signOut({ scope: "local" }); return jsonError("choose a new password, not the one-time password"); }
   } else if (methods.includes("password")) {
     if (!b.current_password) return jsonError("enter your current password");
     if (b.current_password === pw) return jsonError("choose a password different from your current one");
     const plain = createPlainClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data: check, error } = await plain.auth.signInWithPassword({ email: w.user.email!, password: b.current_password });
     if (error) return jsonError("your current password is not right", 403);
-    if (check.session) await plain.auth.signOut();     // the check's own session is not kept
+    if (check.session) await plain.auth.signOut({ scope: "local" });     // the check's own session is not kept (not "global": that would sign the person out)
   }
   const { error } = await w.svc.auth.admin.updateUserById(w.user.id, { password: pw });
   if (error) return jsonError(error.message);

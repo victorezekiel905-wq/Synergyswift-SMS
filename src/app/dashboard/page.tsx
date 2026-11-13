@@ -4,12 +4,15 @@ import { createClient } from "@/lib/supabase/server";
 import MyExamTimetable from "@/components/exams/MyExamTimetable";
 import NoticeBoard from "@/components/comms/NoticeBoard";
 import MyTeaching from "@/components/portal/MyTeaching";
+import MyAccess from "@/components/portal/MyAccess";
 
 export default async function Dashboard() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login");
-  const { data: me } = await sb.from("users").select("id,tenant_id,role,full_name").eq("id", user.id).maybeSingle();
+  const { data: me } = await sb.from("users").select("id,tenant_id,role,full_name,must_change_password").eq("id", user.id).maybeSingle();
+  // A one-time password must be replaced first.
+  if (me?.must_change_password) redirect("/account/security?required=password");
   if (!me) {
     const { data: state } = await sb.rpc("my_account_state");
     if (state?.state === "suspended" || state?.state === "paused" || state?.state === "deactivated") {
@@ -49,6 +52,7 @@ export default async function Dashboard() {
         <div className="mt-4 flex flex-wrap gap-2"><Link href="/school/results" className="btn btn-primary">Enter scores</Link><Link href="/teacher" className="btn btn-outline">My teaching day</Link><Link href="/exams" className="btn btn-outline">Exams</Link></div>
       </header>
 
+      <MyAccess />
       <NoticeBoard />
       <MyTeaching compact />
       <MyExamTimetable />

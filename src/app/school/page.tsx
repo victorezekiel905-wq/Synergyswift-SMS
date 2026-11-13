@@ -5,6 +5,7 @@ import { useApi, send, Page, PageHeader, Stat, Alert } from "@/components/ui";
 import { SECTIONS, STATS, DEFAULT_LAYOUT, move, type Layout, type SectionId } from "@/lib/dashboard-layout";
 import KpiBoard from "@/components/school/KpiBoard";
 import HeadSummary from "@/components/school/HeadSummary";
+import MyAccess from "@/components/portal/MyAccess";
 
 type Overview = {
   school: string; term: string | null; roles: string[];
@@ -73,6 +74,8 @@ export default function SchoolHome() {
         setNote(r.ok ? "Saved for the school." : r.error ?? "failed"); if (r.ok) { setEditing(false); reloadLayout(); }
       }} onCancel={() => { setLayout(saved.layout); setEditing(false); }} />}
       {note && <div className="mb-4"><Alert tone={note.startsWith("Saved") ? "green" : "red"}>{note}</Alert></div>}
+      {/* Everyone but the head sees their own role, classes and what their privileges open first. */}
+      {data && !isHead && <MyAccess />}
       {layout.sections.map(id => <div key={id}>{section(id)}</div>)}
     </Page>
   );

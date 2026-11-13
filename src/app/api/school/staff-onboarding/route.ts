@@ -51,7 +51,7 @@ const Body = z.discriminatedUnion("action", [
 /** What the admin is told after a way in was given. */
 function said(name: string, r: Extract<AccessResult, { ok: true }>, sent: number): string {
   if (r.otp) return `${name}'s login is ready. Username: ${r.otp.username} · One-time password: ${r.otp.password} (emailed to them; shown only now). They choose their own password at the first sign-in.`;
-  if (r.invited) return `Invitation link emailed to ${r.email}. ${name} opens it and sets a password.`;
+  if (r.invited) return `Invitation link emailed to ${r.email}. ${name} opens it and chooses a password before anything else opens.${r.link ? ` If the email does not arrive, send them this link (it works once, for 24 hours): ${r.link}` : ""}`;
   if (r.code) return `${name}'s sign-up code is ${r.code}.${sent ? " It has been emailed to them." : ""} They make their account at /join with it.`;
   return "Saved.";
 }
@@ -96,9 +96,9 @@ export async function POST(req: NextRequest) {
           const r = await renewOneTimeLogin(svc, { tenantId: tid, userId: s.user_id, name: s.full_name, email: to, actor: ctx.userId, baseUrl: appUrl(req) });
           return NextResponse.json({ ok: true, otp: r, message: `New one-time password for ${s.full_name}. Username: ${r.username} · One-time password: ${r.password} (emailed to them; shown only now).` });
         }
-        await provisionUser(svc, { tenantId: tid, email: to, fullName: s.full_name, role: u.role, extraRoles: u.extra_roles ?? [], redirectTo: `${appUrl(req)}/auth/welcome?next=/dashboard`, createdBy: ctx.userId });
+        const { actionLink } = await provisionUser(svc, { tenantId: tid, email: to, fullName: s.full_name, role: u.role, extraRoles: u.extra_roles ?? [], redirectTo: `${appUrl(req)}/auth/welcome?next=/dashboard`, createdBy: ctx.userId });
         await svc.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "account.invitation_resent", target: s.user_id });
-        return NextResponse.json({ ok: true, message: `A new link was emailed to ${to}. ${s.full_name} opens it and sets a password; the link lasts 24 hours.` });
+        return NextResponse.json({ ok: true, message: `A new link was emailed to ${to}. ${s.full_name} opens it and chooses a password; the link lasts 24 hours.${actionLink ? ` If the email does not arrive, send them this link: ${actionLink}` : ""}` });
       } catch (e) { return jsonError((e as Error).message); }
     }
     // A record with no email (added before, or imported): the email typed now is kept on it.

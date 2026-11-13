@@ -25,7 +25,12 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   const { data: existing } = await sb.from("users").select("id,tenant_id,role").eq("id", user.id).maybeSingle();
-  if (existing) return NextResponse.json({ ok: true, role: existing.role, already: true, next: "/dashboard" });
+  if (existing) {
+    // A one-time password (or an invitation) must be replaced before anything else opens.
+    const { data: u } = await createServiceClient().from("users").select("must_change_password").eq("id", user.id).maybeSingle();
+    if (u?.must_change_password) return NextResponse.json({ ok: true, role: existing.role, already: true, next: "/account/security?required=password" });
+    return NextResponse.json({ ok: true, role: existing.role, already: true, next: "/dashboard" });
+  }
 
   const { data: state } = await sb.rpc("my_account_state");
   if (state?.state === "suspended" || state?.state === "paused") {
