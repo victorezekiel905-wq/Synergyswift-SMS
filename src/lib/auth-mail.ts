@@ -8,7 +8,7 @@
  * link would otherwise use it up before the person does.
  */
 import { sendEmail, emailConfigured, type SendResult } from "@/lib/messaging/providers";
-import { escapeHtml } from "@/lib/richtext";
+import { escapeHtml } from "@/lib/richtext-core";
 import { isUsernameEmail } from "@/lib/login-name";
 
 export type AuthMailKind = "confirm" | "reset" | "invite";

@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { browserClient, warmBrowserClient } from "@/lib/supabase/lazy";
 import { Monogram } from "@/components/AppShell";
 import { cleanCode, formatCode, isCodeShape, passwordsMatch } from "@/lib/sign-up-codes";
 
@@ -29,7 +29,7 @@ function Join() {
   const [f, setF] = useState({ name: "", email: "", pw: "", pw2: "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { if (isCodeShape(code) && params.get("code")) void check(); /* a link with the code in it */ }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { warmBrowserClient(); if (isCodeShape(code) && params.get("code")) void check(); /* a link with the code in it */ }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function check(e?: React.FormEvent) {
     e?.preventDefault();
@@ -52,7 +52,7 @@ function Join() {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { setBusy(false); setErr(j.error ?? "Please try again."); return; }
     // Signed straight in, onto the dashboard for their role.
-    const sb = createClient();
+    const sb = (await browserClient());
     const { error } = await sb.auth.signInWithPassword({ email: j.email, password: f.pw });
     if (error) { setBusy(false); router.push(`/login?as=${info?.as ?? "staff"}`); return; }
     await fetch("/api/auth/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => null);

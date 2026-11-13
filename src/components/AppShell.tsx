@@ -2,10 +2,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import dynamic from "next/dynamic";
 import { Icon, rolesOf, type Me } from "@/components/ui";
-import SearchPalette from "@/components/SearchPalette";
-import { EmergencyBanner } from "@/components/comms/NoticeBoard";
+// Loaded after the page shows: the search box and the emergency banner are not needed for the first paint.
+const SearchPalette = dynamic(() => import("@/components/SearchPalette"), { ssr: false });
+const EmergencyBanner = dynamic(() => import("@/components/comms/NoticeBoard").then(m => m.EmergencyBanner), { ssr: false });
+
 import NativeBridge, { forgetDevice } from "@/components/NativeBridge";
 import { claimDevice } from "@/components/offline";
 import { applyBrand, clearBrandOnPage, PUBLIC_PAGES } from "@/lib/theme";
@@ -54,7 +56,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       if (state === "password_expired" && !pathname.startsWith("/account/security")) { router.replace("/account/security?required=password"); return; }
       if (state === "alumni") { router.replace("/alumni/me"); return; }
       if (state === "sso_required" || state === "session_expired") {
-        await createClient().auth.signOut();
+        await endSession();
         router.replace(`/login?error=${state}`);
         return;
       }
@@ -100,7 +102,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       const left = idle * 60_000 - (Date.now() - lastActive.current);
       if (left <= 0) {
         clearInterval(t);
-        await createClient().auth.signOut();
+        await endSession();
         router.replace("/login?error=idle");
       } else setIdleWarn(left <= 60_000);
     }, 10_000);
@@ -126,7 +128,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (unsent && !confirm(`${unsent} register${unsent === 1 ? " has" : "s have"} not been sent yet. Signing out deletes ${unsent === 1 ? "it" : "them"} from this device. Sign out anyway?`)) return;
     // This device stops getting the person's notifications.
     await forgetDevice();
-    await createClient().auth.signOut();
+    await endSession();
     // Class lists, unsent registers and saved copies kept for offline use belong to this user only.
     try { Object.keys(localStorage).filter(k => k.startsWith("educlass:")).forEach(k => localStorage.removeItem(k)); } catch { /* storage blocked */ }
     router.push("/login");
@@ -204,6 +206,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Signs out of this browser. The sign-in library is loaded only when it is needed, not with every page. */
+async function endSession() {
+  const { createClient } = await import("@/lib/supabase/client");
+  await createClient().auth.signOut();
+}
+
 const PREVIEW_ME = {
   user: { id: "preview", email: "head@example.com" }, platform: false, is_guardian: false,
   profile: { id: "preview", tenant_id: "preview", full_name: "Folake Adebayo", role: "principal", extra_roles: [] },
@@ -232,7 +240,7 @@ function AccessBlocked({ message, device }: { message: string | null; device: st
       {device === "pending" && <p className="mt-2 text-sm text-slate-500">Your school admin can approve this device under Security &amp; sign-in. Then press Try again.</p>}
       <div className="mt-6 flex justify-center gap-2">
         <button className="btn btn-primary" onClick={() => window.location.reload()}>Try again</button>
-        <button className="btn btn-outline" onClick={async () => { await createClient().auth.signOut(); window.location.href = "/login"; }}>Sign out</button>
+        <button className="btn btn-outline" onClick={async () => { await endSession(); window.location.href = "/login"; }}>Sign out</button>
       </div>
     </main>
   );

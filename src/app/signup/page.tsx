@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { browserClient, warmBrowserClient } from "@/lib/supabase/lazy";
 import { Monogram } from "@/components/AppShell";
 import { passwordsMatch, isCodeShape, cleanCode, formatCode } from "@/lib/sign-up-codes";
 
@@ -13,7 +13,7 @@ import { passwordsMatch, isCodeShape, cleanCode, formatCode } from "@/lib/sign-u
 export default function ParentSignupPage() {
   const [f, setF] = useState({ name: "", email: "", pw: "", pw2: "", code: "" });
   // A link from the school's email can carry the code (?code=…).
-  useEffect(() => { const c = new URLSearchParams(window.location.search).get("code"); if (c) setF(x => ({ ...x, code: formatCode(c) })); }, []);
+  useEffect(() => { warmBrowserClient(); const c = new URLSearchParams(window.location.search).get("code"); if (c) setF(x => ({ ...x, code: formatCode(c) })); }, []);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -34,7 +34,7 @@ export default function ParentSignupPage() {
       const k = await post("/api/auth/code", { action: "claim", code: cleanCode(f.code), email: f.email, password: f.pw, password2: f.pw2, full_name: f.name });
       const kj = await k.json().catch(() => ({}));
       if (!k.ok) { setBusy(false); setErr(kj.error ?? "Please try again."); return; }
-      const { error } = await createClient().auth.signInWithPassword({ email: kj.email, password: f.pw });
+      const { error } = await (await browserClient()).auth.signInWithPassword({ email: kj.email, password: f.pw });
       try { localStorage.setItem("ss-login-as", "parent"); } catch { /* storage off */ }
       window.location.assign(error ? "/login?as=parent" : "/parent");
       return;
@@ -43,7 +43,7 @@ export default function ParentSignupPage() {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { setBusy(false); setErr(j.error ?? "Please try again."); return; }
     // Signed straight in, onto the parent page.
-    const { error } = await createClient().auth.signInWithPassword({ email: j.email, password: f.pw });
+    const { error } = await (await browserClient()).auth.signInWithPassword({ email: j.email, password: f.pw });
     try { localStorage.setItem("ss-login-as", "parent"); } catch { /* storage off */ }
     window.location.assign(error ? "/login?as=parent" : "/parent");
   }

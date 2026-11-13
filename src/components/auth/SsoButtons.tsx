@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { browserClient } from "@/lib/supabase/lazy";
 
 // Providers switched on in Supabase Auth, e.g. NEXT_PUBLIC_SSO_PROVIDERS=google,azure
 const ENABLED = (process.env.NEXT_PUBLIC_SSO_PROVIDERS ?? "").split(",").map(s => s.trim()).filter(p => p === "google" || p === "azure") as ("google" | "azure")[];
@@ -15,7 +15,7 @@ export default function SsoButtons() {
 
   async function signIn(provider: "google" | "azure") {
     setBusy(provider); setError(null);
-    const sb = createClient();
+    const sb = (await browserClient());
     const { error: authError } = await sb.auth.signInWithOAuth({
       provider,
       options: { redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`, scopes: provider === "azure" ? "email" : undefined }

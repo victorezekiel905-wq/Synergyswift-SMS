@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { browserClient } from "@/lib/supabase/lazy";
 import { Monogram } from "@/components/AppShell";
 
 type State = { state: "waiting" | "approved" | "none"; name?: string; class_name?: string | null; school?: string | null; logo_url?: string | null };
@@ -27,7 +27,7 @@ export default function WaitingPage() {
     return () => { stop = true; clearInterval(t); };
   }, []);
 
-  async function signOut() { await createClient().auth.signOut(); window.location.assign("/login?as=student"); }
+  async function signOut() { await (await browserClient()).auth.signOut(); window.location.assign("/login?as=student"); }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[440px] flex-col px-5 py-10 sm:py-16">

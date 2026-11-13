@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { browserClient, warmBrowserClient } from "@/lib/supabase/lazy";
 import { signInEmail, isUsernameEmail } from "@/lib/login-name";
 import SsoButtons, { ssoEnabled } from "@/components/auth/SsoButtons";
 import PhoneLogin from "@/components/auth/PhoneLogin";
@@ -41,6 +41,8 @@ export default function LoginPage() {
   const [info, setInfo] = useState<string | null>(null);
   const [unconfirmed, setUnconfirmed] = useState(false);
   useEffect(() => {
+    // The sign-in library downloads right after the form shows, so "Sign in" never waits for it.
+    warmBrowserClient();
     const as = new URLSearchParams(window.location.search).get("as");
     if (as === "staff" || as === "parent" || as === "student") setWho(as);
     else { try { const saved = localStorage.getItem("ss-login-as"); if (saved === "parent" || saved === "student") setWho(saved); } catch { /* storage off */ } }
@@ -54,7 +56,7 @@ export default function LoginPage() {
 
   // After a phone-code sign-in: ask for the second factor if the account has one.
   async function afterPhone() {
-    const sb = createClient();
+    const sb = (await browserClient());
     const { data: aal } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
       const { data: f } = await sb.auth.mfa.listFactors();
@@ -66,7 +68,7 @@ export default function LoginPage() {
   }
 
   async function finish() {
-    const sb = createClient();
+    const sb = (await browserClient());
     // Resolve where this account belongs (tenant profile, platform console, or not yet invited).
     const r = await fetch("/api/auth/setup", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -97,7 +99,7 @@ export default function LoginPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(null);
-    const sb = createClient();
+    const sb = (await browserClient());
     setInfo(null); setUnconfirmed(false);
     const { error } = await sb.auth.signInWithPassword({ email: signInEmail(email), password });
     if (error) {
@@ -129,7 +131,7 @@ export default function LoginPage() {
     e.preventDefault();
     if (!factorId) return;
     setBusy(true); setErr(null);
-    const { error } = await createClient().auth.mfa.challengeAndVerify({ factorId, code: code.replace(/\s/g, "") });
+    const { error } = await (await browserClient()).auth.mfa.challengeAndVerify({ factorId, code: code.replace(/\s/g, "") });
     if (error) { setBusy(false); setErr("That code did not work. Try the newest code from your authenticator app."); return; }
     await finish();
   }
@@ -154,7 +156,7 @@ export default function LoginPage() {
               value={code} onChange={e => setCode(e.target.value.replace(/[^\d ]/g, ""))} aria-label="Authentication code" />
             {err && <p className="text-sm text-rose-600">{err}</p>}
             <button className="btn btn-primary w-full" disabled={busy || code.replace(/\s/g, "").length !== 6}>{busy ? "Checking…" : "Verify"}</button>
-            <button type="button" className="w-full text-center text-xs text-slate-500" onClick={async () => { await createClient().auth.signOut(); setFactorId(null); setCode(""); }}>Use a different account</button>
+            <button type="button" className="w-full text-center text-xs text-slate-500" onClick={async () => { await (await browserClient()).auth.signOut(); setFactorId(null); setCode(""); }}>Use a different account</button>
           </form>
         ) : (
           <>
