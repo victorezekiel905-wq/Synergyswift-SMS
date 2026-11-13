@@ -383,7 +383,7 @@ function ReportCards({ termId, cg, classes, isAdmin, isFormTeacher }: { termId: 
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-lg border border-slate-200 p-0.5" role="group" aria-label="Report type">
-          {(["term", "midterm"] as const).map(k => <button key={k} className={"rounded-md px-3 py-1 text-sm " + (kind === k ? "bg-brand-600 text-white" : "text-slate-600")} onClick={() => setKind(k)} aria-pressed={kind === k}>{k === "term" ? "End of term" : "Mid-term"}</button>)}
+          {(["term", "midterm"] as const).map(k => <button key={k} className={"rounded-md px-3 py-1 text-sm " + (kind === k ? "bg-brand-600 text-white" : "text-slate-600")} onClick={() => setKind(k)} aria-pressed={kind === k}>{k === "term" ? "End of term report" : "Mid-term report"}</button>)}
         </div>
         {data && data.length > 0 && <>
           <a className="btn btn-ghost text-xs" href={printUrl("cards")} target="_blank" rel="noreferrer">Print all cards (PDF)</a>
