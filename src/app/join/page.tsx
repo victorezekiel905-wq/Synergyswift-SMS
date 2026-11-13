@@ -7,7 +7,7 @@ import { Monogram } from "@/components/AppShell";
 import { cleanCode, formatCode, isCodeShape, passwordsMatch } from "@/lib/sign-up-codes";
 
 type Who = "staff" | "parent" | "student";
-type Check = { kind: string; as: Who; school: string; name: string | null; child: string | null; role: string; rules: string; needs_name: boolean };
+type Check = { kind: string; as: Who; school: string; name: string | null; child: string | null; role: string; rules: string; needs_name: boolean; class_name?: string };
 
 const ROLE_WORDS: Record<string, string> = { school_admin: "school administrator", it_admin: "IT administrator", hr_manager: "HR manager", qa_officer: "quality assurance officer" };
 const roleWord = (r: string) => ROLE_WORDS[r] ?? r.replace(/_/g, " ");
@@ -67,7 +67,7 @@ function Join() {
       <Link href="/" className="flex items-center gap-2.5 self-start"><Monogram /><span className="text-[15px] font-semibold tracking-tight">Synergy Swift</span></Link>
       <h1 className="mt-14 font-serif text-[30px] font-semibold leading-tight tracking-[-0.01em]">{title}</h1>
       <p className="mt-2 text-[15px] text-slate-600 sm:text-sm">
-        {as === "student" ? "Type the sign-up code your school gave you, then choose a username and a password. You go straight to your own student page."
+        {as === "student" ? "Type your own sign-up code or your class's code, then choose a username and a password."
           : as === "parent" ? "Use the sign-up code the school sent you, or your child's code. Your email becomes your username."
           : "Use the sign-up code your school gave you. Your email becomes your username."}
       </p>
@@ -86,14 +86,17 @@ function Join() {
       ) : (
         <form onSubmit={create} className="card mt-7 space-y-4 p-6">
           <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-700">
-            {info.kind === "parent_link"
+            {info.kind === "class"
+              ? <>Class code for <b>{info.class_name}</b> at <b>{info.school}</b>. Your class teacher confirms it is you, then your student page opens.</>
+              : info.kind === "parent_link"
               ? <>Parent code for <b>{info.child ?? "your child"}</b> at <b>{info.school}</b>.</>
               : <>{info.name ? <>Hello <b>{info.name}</b>. </> : null}This makes your <b>{info.as === "staff" ? roleWord(info.role) : info.as}</b> account at <b>{info.school}</b>.</>}
             <button type="button" className="ml-1 text-brand-700 underline" onClick={() => { setInfo(null); setErr(null); }}>Not you?</button>
           </div>
           {info.needs_name && (
             <div><label className="label" htmlFor="name">Your full name</label>
-              <input id="name" className="input" autoComplete="name" required value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></div>
+              <input id="name" className="input" autoComplete="name" required value={f.name} onChange={e => setF({ ...f, name: e.target.value })} />
+              {info.kind === "class" && <p className="mt-1 text-xs text-slate-500">Your first name and surname, as the school has them, so your teacher can find you.</p>}</div>
           )}
           {info.as === "student" ? (
             <div><label className="label" htmlFor="email">Choose a username</label>

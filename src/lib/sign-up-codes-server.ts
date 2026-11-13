@@ -266,7 +266,9 @@ export async function sendCodes(svc: Svc, p: { tenantId: string; items: { kind: 
     }
     if (it.kind === "guardian") {
       const { data: g } = await svc.from("guardians").select("id,full_name,email,phone,whatsapp_phone,notify_email,notify_whatsapp,notify_sms").eq("id", it.id).maybeSingle();
-      const got = g ? rowsForGuardian(p.tenantId, { ...g, notify_email: true }, "account_key", communityNote(brand, { name: g.full_name, subject: `Your ${brand.schoolName} parent account`, lines: how(c.code), link: join, linkLabel: "Make my account" }), it.id, p.actor) : [];
+      const signup = `${p.baseUrl}/signup?code=${formatCode(c.code)}`;
+      const got = g ? rowsForGuardian(p.tenantId, { ...g, notify_email: true }, "account_key", communityNote(brand, { name: g.full_name, subject: `Your ${brand.schoolName} parent account`,
+        lines: [`Your sign-up code: ${formatCode(c.code)}`, `Go to ${p.baseUrl}/signup, type your name, email, a password of your own and this code. Your children are on your page at once.`], link: signup, linkLabel: "Make my account" }), it.id, p.actor) : [];
       if (got.length) rows.push(...got); else skipped++;
       continue;
     }

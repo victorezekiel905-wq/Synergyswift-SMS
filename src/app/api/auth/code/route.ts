@@ -8,6 +8,7 @@ import { passwordsMatch } from "@/lib/sign-up-codes";
 import { passwordRulesText } from "@/lib/security";
 import { staffJoined } from "@/lib/staff-onboarding-server";
 import { appUrl } from "@/lib/school";
+import { classCodeInfo, signUpWithClassCode, classSignupNotice } from "@/lib/class-signup-server";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,20 @@ export async function POST(req: NextRequest) {
   if (await codeTriesExceeded(svc, ip, b.code)) return jsonError("Too many tries. Wait 15 minutes, then check the code with your school.", 429);
 
   const info = await codeInfo(svc, b.code).catch(() => null);
+  // Not a personal code: a class's shared sign-up code? The student waits for the class teacher to confirm them.
+  const cls = info ? null : await classCodeInfo(svc, b.code).catch(() => null);
+  if (cls) {
+    if (b.action === "check") {
+      return NextResponse.json({ kind: "class", as: "student", school: cls.school, name: null, child: null, role: "student", class_name: cls.className,
+        rules: passwordRulesText(await policyFor(svc, cls.tenantId)), needs_name: true });
+    }
+    const mismatch = passwordsMatch(b.password, b.password2);
+    if (mismatch) return jsonError(mismatch);
+    const r = await signUpWithClassCode(svc, { code: b.code, login: b.email, password: b.password, fullName: b.full_name ?? "" });
+    if (!r.ok) return jsonError(r.error, r.status);
+    await classSignupNotice(svc, { tenantId: r.tenantId, classId: r.classId, className: r.className, studentName: (b.full_name ?? "").trim(), baseUrl: appUrl(req) }).catch(() => {});
+    return NextResponse.json({ ok: true, email: r.email, username: r.username, role: "student", next: "/student/waiting", school: r.school, waiting: true });
+  }
   if (!info) {
     await recordCodeTry(svc, ip, b.code).catch(() => {});
     return jsonError("That code is not right, or it has been used. Check it, or ask the school for a new one.", 404);

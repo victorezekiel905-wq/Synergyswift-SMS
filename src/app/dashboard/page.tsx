@@ -28,7 +28,8 @@ export default async function Dashboard() {
     if (platform === "mfa_required") redirect("/account/security?required=platform");
     if (platform === "ok") redirect("/platform");
     // A parent who signed up on their own: their page, where they add a child.
-    redirect((user.user_metadata as { signup_as?: string } | null)?.signup_as === "parent" ? "/parent" : "/student/join");
+    const as = (user.user_metadata as { signup_as?: string } | null)?.signup_as;
+    redirect(as === "parent" ? "/parent" : as === "class_student" ? "/student/waiting" : "/student/join");
   }
   if (me.role === "parent") redirect("/parent");
   if (me.role === "cashier") redirect("/school/shop");

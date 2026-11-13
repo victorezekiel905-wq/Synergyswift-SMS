@@ -55,6 +55,8 @@ export async function POST(req: NextRequest) {
   const signedUp = (user.user_metadata ?? {}) as { signup_as?: string; join_code?: string };
   // A parent who signed up on their own (/signup): no school until they add a child with the child's code.
   if (signedUp.signup_as === "parent") return NextResponse.json({ ok: true, role: "parent", already: true, next: "/parent" });
+  // A student who signed up with their class's code: waiting for the class teacher to confirm them.
+  if (signedUp.signup_as === "class_student") return NextResponse.json({ ok: true, already: true, next: "/student/waiting" });
   const role = String(body.role ?? (signedUp.signup_as === "student" ? "student" : ""));
   const fullName = String(body.full_name ?? user.user_metadata?.full_name ?? user.email ?? "User").slice(0, 120);
   const svc = createServiceClient();

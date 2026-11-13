@@ -2,14 +2,18 @@
 import { useMemo, useState } from "react";
 import { useApi, send, Alert, Badge, Empty, Loading } from "@/components/ui";
 import type { ClassCodeRow } from "@/lib/onboarding-codes-server";
+import type { ClassCode, WaitingSignup } from "@/lib/class-signup-server";
+import { bestMatch } from "@/lib/class-signup";
+import AddParents from "@/components/onboarding/AddParents";
 
-type Data = { admin: boolean; classes: { id: string; name: string }[]; selected: string | null; rows: ClassCodeRow[] };
+type Data = { admin: boolean; classes: { id: string; name: string }[]; selected: string | null; rows: ClassCodeRow[];
+  class_codes: ClassCode[] | null; waiting: WaitingSignup[] };
 type Login = { id: string; name: string; username: string | null; password: string | null; sent?: number; error?: string };
 export type CodeMode = "students" | "parents";
 
 const HELP: Record<CodeMode, string> = {
-  students: "Each student has their own sign-up code. On the sign-in page they choose Student, then \"Sign up with your code\": they type the code, choose a username and a password, and go straight to their own page. A student sees only their own class and their own things (results, portfolio, tuck shop, analysis).",
-  parents: "Parents make their own account on the sign-in page (Parent, then \"Make your account\"): no code is needed. On their page they add each child with that child's code below. A parent sees only the children they have added (up to 4 parents per code)."
+  students: "Students sign up on the sign-in page (Student, then \"Sign up with your code\"), with either the class's code or their own code, and choose a username and a password. With the class's code they wait until you confirm them below; with their own code they go straight in. A student sees only their own class and their own things (results, portfolio, tuck shop, analysis).",
+  parents: "Add parents above (like staff), or let them make their own account on the sign-in page (Parent, then \"Make your account\") and add each child with that child's code below. A parent sees only their own children (up to 4 parents per child's code)."
 };
 
 /** Who is where: no account, waiting to choose their own password, or signed in. */
@@ -17,6 +21,54 @@ function state(hasAccount: boolean, signedIn: boolean | null, mustChange = false
   if (!hasAccount) return { tone: "slate", text: "Not signed up yet" };
   if (signedIn === false || mustChange) return { tone: "amber", text: signedIn ? "Choosing their password" : "Not signed in yet" };
   return { tone: "green", text: "Signed up" };
+}
+
+/**
+ * Students who signed up with a class's shared code and wait to be confirmed. The teacher matches
+ * each one to a student in that class who has no account yet (the likeliest is chosen for them),
+ * or adds them as a new student, or declines.
+ */
+function Waiting({ waiting, rows, selected, onOpenClass, act }: {
+  waiting: WaitingSignup[]; rows: ClassCodeRow[]; selected: string | null; onOpenClass: (id: string) => void;
+  act: (body: Record<string, unknown>, ok: (d: any) => string) => Promise<void>;
+}) {
+  const [pick, setPick] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const run = async (id: string, body: Record<string, unknown>, ok: (d: any) => string) => { setBusy(id); await act(body, ok); setBusy(null); };
+  return (
+    <section className="card border-amber-200 p-4 print:hidden">
+      <h3 className="font-semibold">Waiting for you to confirm ({waiting.length})</h3>
+      <p className="mt-0.5 text-xs text-slate-500">These students signed up with the class code. Check each is really in the class and choose their record, so they see their own results and their parents stay linked. Choose &quot;New student&quot; only for someone not on the class list yet.</p>
+      <ul className="mt-3 divide-y divide-slate-100">
+        {waiting.map(w => {
+          const loaded = selected === "all" || selected === w.class_id || rows.some(r => r.class_id === w.class_id);
+          const options = rows.filter(r => r.class_id === w.class_id && !r.has_account).map(r => ({ id: r.id, name: r.name }));
+          const guess = bestMatch(w.full_name, options);
+          const chosen = pick[w.id] ?? guess?.id ?? "";
+          return (
+            <li key={w.id} className="flex flex-wrap items-center gap-2 py-2.5">
+              <div className="mr-auto min-w-[12rem]">
+                <b>{w.full_name}</b>
+                <span className="block text-xs text-slate-500">{w.class_name} · {w.username} · signed up {new Date(w.created_at).toLocaleDateString()}</span>
+              </div>
+              {!loaded ? <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => onOpenClass(w.class_id)}>Open {w.class_name ?? "the class"} to confirm</button> : (<>
+                <select className="input w-56 py-1 text-sm" value={chosen} onChange={e => setPick({ ...pick, [w.id]: e.target.value })} aria-label={`Record for ${w.full_name}`}>
+                  <option value="">Choose their record…</option>
+                  {options.map(o => <option key={o.id} value={o.id}>{o.name}{guess?.id === o.id ? " (best match)" : ""}</option>)}
+                  <option value="new">New student (not on the list)</option>
+                </select>
+                <button className="btn btn-primary px-3 py-1 text-xs" disabled={!chosen || busy === w.id}
+                  onClick={() => (chosen !== "new" || confirm(`Add ${w.full_name} to ${w.class_name} as a new student? Do this only if they are not on the class list.`))
+                    && run(w.id, { action: "approve_signup", id: w.id, student_id: chosen === "new" ? null : chosen }, d => `${d.name} confirmed${d.new_student ? " and added to the class" : ""}. Their student page is open now.`)}>Confirm</button>
+              </>)}
+              <button className="btn btn-ghost px-2 py-1 text-xs text-rose-600" disabled={busy === w.id}
+                onClick={() => confirm(`Decline ${w.full_name}? The sign-in they made is removed; they can sign up again.`) && run(w.id, { action: "decline_signup", id: w.id }, d => `${d.name}'s sign-up was declined.`)}>Decline</button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
 }
 
 /**
@@ -64,6 +116,31 @@ export default function ClassCodes({ mode }: { mode: CodeMode }) {
     <div className="space-y-3">
       <p className="text-sm text-slate-600 print:hidden">{HELP[mode]}</p>
       {msg && <div className="print:hidden"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
+
+      {mode === "parents" && <AddParents onAdded={reload} />}
+
+      {mode === "students" && data.waiting.length > 0 && (
+        <Waiting waiting={data.waiting} rows={data.rows} selected={selected} onOpenClass={id => { setCls(id); setLogins(null); setSlips(false); }}
+          act={(body, ok) => act(body, ok)} />
+      )}
+      {mode === "students" && data.class_codes === null && <div className="print:hidden"><Alert tone="amber">Class sign-up codes need the database update (migration 20260101010300).</Alert></div>}
+      {mode === "students" && (data.class_codes ?? []).length > 0 && (
+        <section className="card p-4 print:hidden">
+          <h3 className="font-semibold">Class sign-up code{(data.class_codes ?? []).length === 1 ? "" : "s"}</h3>
+          <p className="mt-0.5 text-xs text-slate-500">One code for the whole class: write it on the board or share it. Students who use it appear under &quot;Waiting for you to confirm&quot;; nothing opens for them until you confirm.</p>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {(data.class_codes ?? []).map(c => (
+              <li key={c.class_id} className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
+                <span className="text-sm font-medium">{c.class_name}</span>
+                {c.code ? <span className="font-mono text-lg tracking-widest">{c.code}</span> : <Badge tone="amber">No code</Badge>}
+                {c.code && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => copy(c.code!)}>Copy</button>}
+                {data.admin && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => confirm(`Make a new class code for ${c.class_name}? The old one stops working (students already waiting stay on the list).`)
+                  && act({ action: "new_class_code", class_id: c.class_id }, d => `New code for ${c.class_name}: ${d.code}`)}>New code</button>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {logins && logins.length > 0 && (
         <section className="card p-4">
