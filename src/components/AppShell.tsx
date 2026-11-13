@@ -62,6 +62,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         if (j.platform) router.replace("/platform");
         else if (j.group && !j.profile) router.replace("/group");
         else if (j.profile) router.replace("/dashboard");
+        else if (j.new_parent) router.replace("/parent");
       }
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,6 +139,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     ? PLATFORM_NAV
     : me?.group && !me.profile
     ? [{ id: "group", title: "Group", links: [{ href: "/group", label: "All branches", roles: [] }] }]
+    : me?.new_parent
+    ? [{ id: "parent", title: "Parent", links: [{ href: "/parent", label: "My children", roles: [] }] }]
     : visibleNav(roles, modules, NAV);
   const closedState = me?.account?.state === "paused" || me?.account?.state === "suspended" ? me.account.state : me?.tenant?.status !== "active" && me?.tenant ? me.tenant.status : null;
   // Main modules across the top; the side menu shows the chosen one's pages (it follows the page you are on).

@@ -8,19 +8,19 @@ type Login = { id: string; name: string; username: string | null; password: stri
 export type CodeMode = "students" | "parents";
 
 const HELP: Record<CodeMode, string> = {
-  students: "Each student signs in with a username and a one-time password, then chooses their own password before anything opens. The one-time password is shown to you once and sent to the student's parents. Students see their own class, lessons, results and analysis.",
-  parents: "Each parent signs in with their email and a one-time password, then chooses their own password before anything opens. Their children linked here show on their page at once. To add another child, they type that child's code under \"Add a child\" (up to 4 parents per code)."
+  students: "Each student has their own sign-up code. On the sign-in page they choose Student, then \"Sign up with your code\": they type the code, choose a username and a password, and go straight to their own page. A student sees only their own class and their own things (results, portfolio, tuck shop, analysis).",
+  parents: "Parents make their own account on the sign-in page (Parent, then \"Make your account\"): no code is needed. On their page they add each child with that child's code below. A parent sees only the children they have added (up to 4 parents per code)."
 };
 
-/** Who is where: no login, waiting to choose their own password, or signed in. */
+/** Who is where: no account, waiting to choose their own password, or signed in. */
 function state(hasAccount: boolean, signedIn: boolean | null, mustChange = false): { tone: "green" | "amber" | "slate"; text: string } {
-  if (!hasAccount) return { tone: "slate", text: "No login yet" };
+  if (!hasAccount) return { tone: "slate", text: "Not signed up yet" };
   if (signedIn === false || mustChange) return { tone: "amber", text: signedIn ? "Choosing their password" : "Not signed in yet" };
-  return { tone: "green", text: "Signed in" };
+  return { tone: "green", text: "Signed up" };
 }
 
 /**
- * Sign-in for students and parents, class by class. Admins choose any class (or all); a class
+ * Sign-up for students and parents, class by class. Admins choose any class (or all); a class
  * teacher sees only their own class. Subject teachers and students never reach this (the server checks).
  */
 export default function ClassCodes({ mode }: { mode: CodeMode }) {
@@ -29,23 +29,23 @@ export default function ClassCodes({ mode }: { mode: CodeMode }) {
   const [q, setQ] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [logins, setLogins] = useState<Login[] | null>(null);
-  const [emails, setEmails] = useState<Record<string, string>>({});
+  const [slips, setSlips] = useState(false);
   const [busy, setBusy] = useState(false);
   const rows = useMemo(() => (data?.rows ?? []).filter(r => !q.trim() || `${r.name} ${r.admission_no ?? ""} ${r.parents.map(p => p.name).join(" ")}`.toLowerCase().includes(q.trim().toLowerCase())), [data, q]);
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Loading />;
-  if (!data.classes.length) return <Empty>{data.admin ? "No classes yet. Add them under School setup." : "You are not the class teacher of any class. Only a class's class teacher and the school's admins see its students' sign-in details."}</Empty>;
+  if (!data.classes.length) return <Empty>{data.admin ? "No classes yet. Add them under School setup." : "You are not the class teacher of any class. Only a class's class teacher and the school's admins see its students' sign-up codes."}</Empty>;
   const selected = data.selected ?? cls;
 
-  async function make(body: Record<string, unknown>) {
+  /** A new password for a student who forgot theirs: shown once, and they choose their own at the next sign-in. */
+  async function resetPassword(id: string) {
     setBusy(true); setMsg(null);
-    const r = await send("/api/school/class-codes", body, "POST", { quiet: true });
+    const r = await send("/api/school/class-codes", { action: "student_login", ids: [id] }, "POST", { quiet: true });
     setBusy(false);
     if (!r.ok) { setMsg({ ok: false, text: r.error ?? "failed" }); return; }
     const list = (r.data as { logins: Login[] }).logins;
-    setLogins(list);
-    const bad = list.filter(l => l.error).length;
-    setMsg({ ok: !bad, text: `${list.length - bad} one-time password${list.length - bad === 1 ? "" : "s"} made${bad ? `; ${bad} could not be made (see below)` : ""}. Shown only now: print or copy them.` });
+    setLogins(list); setSlips(false);
+    setMsg(list.some(l => l.error) ? { ok: false, text: "The password could not be reset (see below)." } : { ok: true, text: "New password made. It is shown only now: print or copy it." });
     reload();
   }
   async function act(body: Record<string, unknown>, ok: (d: any) => string) {
@@ -55,22 +55,21 @@ export default function ClassCodes({ mode }: { mode: CodeMode }) {
   }
   const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); setMsg({ ok: true, text: "Copied." }); } catch { setMsg({ ok: false, text: "Copy is blocked in this browser: select the text and copy it." }); } };
 
-  const noLoginStudents = rows.filter(r => !r.has_account);
-  const parents = rows.flatMap(r => r.parents.map(p => ({ ...p, child: r.name })));
-  const uniqueParents = [...new Map(parents.map(p => [p.id, p])).values()];
-  const noLoginParents = uniqueParents.filter(p => !p.has_account && (emails[p.id] || p.email));
+  const kind = mode === "students" ? "student" : "parent_link";
+  const codeOf = (r: ClassCodeRow) => mode === "students" ? r.student_code : r.parent_code;
+  const withCode = rows.filter(r => codeOf(r));
+  const sendable = withCode.filter(r => r.parents.length);
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-600">{HELP[mode]}</p>
-      {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
+      <p className="text-sm text-slate-600 print:hidden">{HELP[mode]}</p>
+      {msg && <div className="print:hidden"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
 
       {logins && logins.length > 0 && (
         <section className="card p-4">
           <div className="mb-2 flex items-center gap-2 print:hidden">
-            <h3 className="mr-auto font-semibold">One-time passwords (shown only now)</h3>
-            <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => copy(logins.filter(l => l.password).map(l => `${l.name}\tUsername: ${l.username}\tOne-time password: ${l.password}`).join("\n"))}>Copy all</button>
-            <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => window.print()}>Print slips</button>
+            <h3 className="mr-auto font-semibold">New password (shown only now)</h3>
+            <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => window.print()}>Print</button>
             <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setLogins(null)}>Close</button>
           </div>
           <ul className="grid gap-2 sm:grid-cols-2">
@@ -79,8 +78,8 @@ export default function ClassCodes({ mode }: { mode: CodeMode }) {
                 <b>{l.name}</b>
                 {l.error ? <p className="text-rose-700">{l.error}</p> : (<>
                   <p>Username: <span className="font-mono">{l.username}</span></p>
-                  <p>One-time password: <span className="font-mono text-base tracking-wider">{l.password}</span></p>
-                  <p className="text-xs text-slate-500">Sign in at the {mode === "students" ? "Student" : "Parent"} tab, then choose your own password.{mode === "students" && l.sent ? ` Also sent to ${l.sent} parent contact${l.sent === 1 ? "" : "s"}.` : mode === "parents" ? " Also emailed to them." : ""}</p>
+                  <p>Password for now: <span className="font-mono text-base tracking-wider">{l.password}</span></p>
+                  <p className="text-xs text-slate-500">Sign in at the Student tab, then choose your own password.{l.sent ? ` Also sent to ${l.sent} parent contact${l.sent === 1 ? "" : "s"}.` : ""}</p>
                 </>)}
               </li>
             ))}
@@ -88,28 +87,46 @@ export default function ClassCodes({ mode }: { mode: CodeMode }) {
         </section>
       )}
 
+      {slips && withCode.length > 0 && (
+        <section className="card p-4">
+          <div className="mb-2 flex items-center gap-2 print:hidden">
+            <h3 className="mr-auto font-semibold">{mode === "students" ? "Student sign-up slips" : "Child's code slips for parents"} ({withCode.length})</h3>
+            <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => copy(withCode.map(r => `${r.name}\t${r.class_name ?? ""}\t${codeOf(r)}`).join("\n"))}>Copy all</button>
+            <button className="btn btn-primary px-2 py-1 text-xs" onClick={() => window.print()}>Print</button>
+            <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setSlips(false)}>Close</button>
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {withCode.map(r => (
+              <li key={r.id} className="break-inside-avoid rounded-lg border border-slate-200 p-3 text-sm">
+                <b>{r.name}</b><span className="ml-2 text-xs text-slate-500">{[r.admission_no, r.class_name].filter(Boolean).join(" · ")}</span>
+                <p className="mt-1">{mode === "students" ? "Sign-up code" : "Child's code"}: <span className="font-mono text-base tracking-widest">{codeOf(r)}</span></p>
+                <p className="mt-1 text-xs text-slate-500">{mode === "students"
+                  ? "Open the sign-in page, choose Student, then \"Sign up with your code\". Type this code, choose a username and a password."
+                  : "Open the sign-in page, choose Parent, then \"Make your account\" (no code needed). On your page, type this code under \"Add a child\"."}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="flex flex-wrap items-center gap-2 print:hidden">
-        <select className="input w-auto" value={selected ?? ""} onChange={e => { setCls(e.target.value || null); setLogins(null); }} aria-label="Class">
+        <select className="input w-auto" value={selected ?? ""} onChange={e => { setCls(e.target.value || null); setLogins(null); setSlips(false); }} aria-label="Class">
           {data.admin && <option value="">Choose a class</option>}
           {data.admin && <option value="all">All classes</option>}
           {data.classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <input className="input w-56" placeholder={mode === "students" ? "Find a student" : "Find a student or parent"} value={q} onChange={e => setQ(e.target.value)} aria-label="Find" />
         <span className="ml-auto" />
-        {mode === "students" ? (
-          <button className="btn btn-primary" disabled={busy || !noLoginStudents.length} onClick={() => confirm(`Make one-time passwords for the ${noLoginStudents.length} student${noLoginStudents.length === 1 ? "" : "s"} shown with no login yet?`)
-            && make({ action: "student_login", ids: noLoginStudents.slice(0, 200).map(r => r.id) })}>{busy ? "Making…" : `One-time passwords for all without a login (${noLoginStudents.length})`}</button>
-        ) : (
-          <button className="btn btn-primary" disabled={busy || !noLoginParents.length} onClick={() => confirm(`Make one-time passwords for the ${noLoginParents.length} parent${noLoginParents.length === 1 ? "" : "s"} shown with an email and no login yet?`)
-            && make({ action: "parent_login", guardian_ids: noLoginParents.slice(0, 200).map(p => p.id), emails })}>{busy ? "Making…" : `One-time passwords for all without a login (${noLoginParents.length})`}</button>
-        )}
+        <button className="btn btn-outline" disabled={!sendable.length} onClick={() => confirm(`Send ${mode === "students" ? "the sign-up codes" : "the children's codes"} of the ${sendable.length} student${sendable.length === 1 ? "" : "s"} shown to their parents?`)
+          && act({ action: "send", kind, ids: sendable.map(r => r.id) }, d => `${d.messages} message${d.messages === 1 ? "" : "s"} sent${d.skipped ? `; ${d.skipped} had no parent contact` : ""}.`)}>Send to parents ({sendable.length})</button>
+        <button className="btn btn-primary" disabled={!withCode.length} onClick={() => { setSlips(true); setLogins(null); }}>Print slips ({withCode.length})</button>
       </div>
 
       {!selected ? <Empty>Choose a class.</Empty> : !rows.length ? <Empty>No students in this class.</Empty> : mode === "students" ? (
         <div className="card overflow-x-auto print:hidden">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr><th className="p-3">Student</th><th className="p-3">Username</th><th className="p-3">Sign-in</th><th className="p-3 text-right">Actions</th></tr>
+              <tr><th className="p-3">Student</th><th className="p-3">Sign-up code</th><th className="p-3">Account</th><th className="p-3 text-right">Actions</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {rows.map(r => {
@@ -117,12 +134,15 @@ export default function ClassCodes({ mode }: { mode: CodeMode }) {
                 return (
                   <tr key={r.id}>
                     <td className="p-3"><b>{r.name}</b><span className="block text-xs text-slate-500">{[r.admission_no, r.class_name].filter(Boolean).join(" · ")}</span></td>
-                    <td className="p-3 font-mono text-xs">{r.username ?? "—"}</td>
-                    <td className="p-3"><Badge tone={s.tone}>{s.text}</Badge></td>
+                    <td className="p-3">{r.has_account ? <span className="text-xs text-slate-500">Used</span>
+                      : r.student_code ? <span className="font-mono text-base tracking-widest">{r.student_code}</span> : <Badge tone="amber">No code</Badge>}</td>
+                    <td className="p-3"><Badge tone={s.tone}>{s.text}</Badge>{r.has_account && r.username && <span className="mt-0.5 block font-mono text-xs text-slate-500">{r.username}</span>}</td>
                     <td className="p-3 text-right">
-                      <button className="btn btn-ghost px-2 py-1 text-xs" disabled={busy}
-                        onClick={() => (!r.has_account || confirm(r.signed_in ? `${r.name} has signed in already. Make a new one-time password? Their own password stops working.` : `Make a new one-time password for ${r.name}? The old one stops working.`))
-                          && make({ action: "student_login", ids: [r.id] })}>{r.has_account ? "New one-time password" : "One-time password"}</button>
+                      {r.student_code && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => copy(r.student_code!)}>Copy</button>}
+                      {r.student_code && r.parents.length > 0 && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => act({ action: "send", kind: "student", ids: [r.id] }, d => d.messages ? "Sign-up code sent to the parents." : "No parent contact on record: hand the code over in person.")}>Send</button>}
+                      {!r.has_account && data.admin && <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => (!r.student_code || confirm("Make a new sign-up code? The old one stops working.")) && act({ action: "new_code", kind: "student", id: r.id }, d => `New code: ${d.code}`)}>New code</button>}
+                      {r.has_account && <button className="btn btn-ghost px-2 py-1 text-xs" disabled={busy}
+                        onClick={() => confirm(`Reset ${r.name}'s password? Their present password stops working; they choose a new one at the next sign-in.`) && resetPassword(r.id)}>Reset password</button>}
                     </td>
                   </tr>
                 );
@@ -134,7 +154,7 @@ export default function ClassCodes({ mode }: { mode: CodeMode }) {
         <div className="card overflow-x-auto print:hidden">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr><th className="p-3">Child</th><th className="p-3">Child&apos;s code (to add the child)</th><th className="p-3">Parents and their sign-in</th></tr>
+              <tr><th className="p-3">Child</th><th className="p-3">Child&apos;s code (parents type it to add the child)</th><th className="p-3">Parents linked to this child</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {rows.map(r => (
@@ -150,21 +170,15 @@ export default function ClassCodes({ mode }: { mode: CodeMode }) {
                     </div>
                   </td>
                   <td className="p-3">
-                    {!r.parents.length ? <span className="text-xs text-slate-500">No parent on record. Add one under Students &amp; parents, or give the parent the child&apos;s code.</span> : (
-                      <ul className="space-y-2">
-                        {r.parents.map(p => {
-                          const s = state(p.has_account, p.signed_in);
-                          return (
-                            <li key={p.id} className="flex flex-wrap items-center gap-2">
-                              <span className="min-w-[8rem] font-medium">{p.name}</span>
-                              <Badge tone={s.tone}>{s.text}</Badge>
-                              {!p.has_account && !p.email && <input className="input w-52 py-1 text-xs" type="email" placeholder="Their email" value={emails[p.id] ?? ""} onChange={e => setEmails({ ...emails, [p.id]: e.target.value })} aria-label={`${p.name}'s email`} />}
-                              {p.email && <span className="text-xs text-slate-500">{p.email}</span>}
-                              {!p.signed_in && <button className="btn btn-ghost px-2 py-1 text-xs" disabled={busy || (!p.email && !emails[p.id])}
-                                onClick={() => (!p.has_account || confirm(`Make a new one-time password for ${p.name}? The old one stops working.`)) && make({ action: "parent_login", guardian_ids: [p.id], emails })}>{p.has_account ? "New one-time password" : "One-time password"}</button>}
-                            </li>
-                          );
-                        })}
+                    {!r.parents.length ? <span className="text-xs text-slate-500">No parent yet. Give the parent this child&apos;s code: they sign up and add the child themselves.</span> : (
+                      <ul className="space-y-1.5">
+                        {r.parents.map(p => (
+                          <li key={p.id} className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium">{p.name}</span>
+                            <Badge tone={p.has_account ? "green" : "slate"}>{p.has_account ? "Has an account" : "No account yet"}</Badge>
+                            {p.email && <span className="text-xs text-slate-500">{p.email}</span>}
+                          </li>
+                        ))}
                       </ul>
                     )}
                   </td>

@@ -56,6 +56,7 @@ function Join() {
     const { error } = await sb.auth.signInWithPassword({ email: j.email, password: f.pw });
     if (error) { setBusy(false); router.push(`/login?as=${info?.as ?? "staff"}`); return; }
     await fetch("/api/auth/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => null);
+    try { localStorage.setItem("ss-login-as", info?.as ?? "staff"); } catch { /* storage off */ }
     router.push(j.next ?? "/dashboard");
     router.refresh();
   }
@@ -66,8 +67,11 @@ function Join() {
       <Link href="/" className="flex items-center gap-2.5 self-start"><Monogram /><span className="text-[15px] font-semibold tracking-tight">Synergy Swift</span></Link>
       <h1 className="mt-14 font-serif text-[30px] font-semibold leading-tight tracking-[-0.01em]">{title}</h1>
       <p className="mt-2 text-[15px] text-slate-600 sm:text-sm">
-        {as === "parent" ? "Use the sign-up code the school sent you, or your child's parent code." : "Use the sign-up code your school gave you."} Your email becomes your username.
+        {as === "student" ? "Type the sign-up code your school gave you, then choose a username and a password. You go straight to your own student page."
+          : as === "parent" ? "Use the sign-up code the school sent you, or your child's code. Your email becomes your username."
+          : "Use the sign-up code your school gave you. Your email becomes your username."}
       </p>
+      {as === "parent" && !info && <p className="mt-2 text-sm text-slate-600">No code? <Link href="/signup" className="font-medium text-brand-700">Make your parent account without one</Link>, then add your child on your page.</p>}
 
       {!info ? (
         <form onSubmit={check} className="card mt-7 space-y-4 p-6">
@@ -91,8 +95,15 @@ function Join() {
             <div><label className="label" htmlFor="name">Your full name</label>
               <input id="name" className="input" autoComplete="name" required value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></div>
           )}
-          <div><label className="label" htmlFor="email">Email (your username)</label>
-            <input id="email" className="input" type="email" autoComplete="email" required value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div>
+          {info.as === "student" ? (
+            <div><label className="label" htmlFor="email">Choose a username</label>
+              <input id="email" className="input" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} required maxLength={254} placeholder="for example ada.obi7"
+                value={f.email} onChange={e => setF({ ...f, email: e.target.value.toLowerCase().replace(/\s/g, "") })} />
+              <p className="mt-1 text-xs text-slate-500">Small letters, numbers and dots. You sign in with it on the Student tab, so write it down. (You can type an email address instead.)</p></div>
+          ) : (
+            <div><label className="label" htmlFor="email">Email (your username)</label>
+              <input id="email" className="input" type="email" autoComplete="email" required value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div>
+          )}
           <div><label className="label" htmlFor="pw">Password</label>
             <input id="pw" className="input" type="password" autoComplete="new-password" required value={f.pw} onChange={e => setF({ ...f, pw: e.target.value })} />
             <p className="mt-1 text-xs text-slate-500">Use {info.rules}.</p></div>
@@ -105,7 +116,7 @@ function Join() {
           <button className="btn btn-primary w-full" disabled={busy || !f.pw || f.pw !== f.pw2}>{busy ? "Making your account…" : "Make my account"}</button>
         </form>
       )}
-      <p className="mt-6 text-center text-xs text-slate-500">Already have an account? <Link href={`/login${as ? `?as=${as}` : ""}`} className="font-medium text-brand-700">Sign in</Link>. Got a one-time password from the school? Sign in with it.</p>
+      <p className="mt-6 text-center text-xs text-slate-500">Already have an account? <Link href={`/login${as ? `?as=${as}` : ""}`} className="font-medium text-brand-700">Sign in</Link>.{as !== "student" && as !== "parent" ? " Got a one-time password from the school? Sign in with it." : ""}</p>
     </main>
   );
 }

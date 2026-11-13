@@ -10,9 +10,11 @@ import { enqueue, loadBrand, rowsForGuardian, tryDispatch, type OutboxRow } from
 import { communityNote } from "./messaging/notices";
 import { normalizePhone, smsText } from "./messaging/providers";
 import { fetchAll } from "./fetch-all";
+import { loginEmailFor } from "./login-name";
 
 type Svc = any;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const USERNAME = /^[a-z0-9][a-z0-9.]{2,29}$/;
 const TRIES = { windowMin: 15, perAddress: 20, perCode: 8 };
 
 /** Wrong guesses are limited per address and per code (the table keeps a day). */
@@ -66,13 +68,23 @@ export async function policyFor(svc: Svc, tenantId: string): Promise<Partial<Pas
 export async function signUpWithCode(svc: Svc, p: { code: string; email: string; password: string; fullName?: string | null }) {
   const info = await codeInfo(svc, p.code);
   if (!info) return { ok: false as const, status: 400, error: "That code is not right, or it has been used. Check it, or ask the school for a new one." };
-  const email = p.email.trim().toLowerCase();
-  if (!EMAIL.test(email)) return { ok: false as const, status: 400, error: "Enter your email address. It is what you sign in with." };
-  const problems = checkPassword(p.password, await policyFor(svc, info.tenantId), { email, name: p.fullName ?? info.name });
+  let email = p.email.trim().toLowerCase();
+  // Students usually have no email: they choose a username instead (signed in on the Student tab).
+  let username: string | null = null;
+  if (info.kind === "student" && !email.includes("@")) {
+    if (!USERNAME.test(email)) return { ok: false as const, status: 400, error: "Choose a username of 3 to 30 small letters, numbers or dots, with no spaces (for example ada.obi7). Or type an email address." };
+    const { data: taken } = await svc.from("users").select("id").ilike("username", email).limit(1);
+    if (taken?.length) return { ok: false as const, status: 409, error: "That username is taken. Try another, for example with a number at the end." };
+    username = email;
+    email = loginEmailFor(username);
+  }
+  if (!EMAIL.test(email)) return { ok: false as const, status: 400, error: info.kind === "student" ? "Choose a username. It is what you sign in with." : "Enter your email address. It is what you sign in with." };
+  const problems = checkPassword(p.password, await policyFor(svc, info.tenantId), { email: username ?? email, name: p.fullName ?? info.name });
   if (problems.length) return { ok: false as const, status: 400, error: `Please ${problems.join(", ")}.` };
   const { data: made, error } = await svc.auth.admin.createUser({ email, password: p.password, email_confirm: true, user_metadata: { full_name: p.fullName ?? info.name ?? undefined } });
   if (error || !made?.user) {
     if (/already|exists|registered/i.test(error?.message ?? "")) {
+      if (username) return { ok: false as const, status: 409, error: "That username is taken. Try another, for example with a number at the end." };
       return { ok: false as const, status: 409, error: info.kind === "parent_link"
         ? "This email already has an account. Sign in, then add your child with this code on your page."
         : "This email already has an account. Sign in instead, or use a different email." };
@@ -84,7 +96,30 @@ export async function signUpWithCode(svc: Svc, p: { code: string; email: string;
     await svc.auth.admin.deleteUser(made.user.id);
     return { ok: false as const, status: 400, error: cErr.message.includes("does not exist") ? "Sign-up codes need the database update (migration 20260101009600)." : cErr.message };
   }
-  return { ok: true as const, email, role: r.role as string, next: (r.next as string) ?? homeFor(r.role), school: info.school, kind: info.kind, tenantId: info.tenantId, userId: made.user.id as string };
+  if (username) await svc.from("users").update({ username }).eq("id", made.user.id);
+  return { ok: true as const, email, username, role: r.role as string, next: (r.next as string) ?? homeFor(r.role), school: info.school, kind: info.kind, tenantId: info.tenantId, userId: made.user.id as string };
+}
+
+/**
+ * A parent who signed up on their own adds their first child: the child's code joins the
+ * parent to that child's school (their profile and parent record are made there) and links
+ * the child. Only a child's code works here, never a staff or student code.
+ */
+export async function joinSchoolWithChildCode(svc: Svc, p: { code: string; userId: string; email: string; fullName: string | null }) {
+  const wrong = { ok: false as const, status: 404, miss: true, error: "That child's code is not right, or it has been used by as many parents as it allows. Check it with the school." };
+  if (!isCodeShape(p.code)) return wrong;
+  const info = await codeInfo(svc, p.code);
+  if (!info || info.kind !== "parent_link") return wrong;
+  const email = p.email.trim().toLowerCase();
+  const { data: c } = await svc.from("account_codes").select("student_id").eq("code", cleanCode(p.code)).maybeSingle();
+  // The school may already hold a parent record with this email. It is joined to this account only
+  // when that record is for this very child; otherwise knowing someone's email would open their children.
+  const { data: held } = await svc.from("guardians").select("id,student_guardians(student_id)").eq("tenant_id", info.tenantId).is("user_id", null).ilike("email", email.replace(/[\\%_]/g, "\\$&")).limit(5);
+  const other = ((held ?? []) as { student_guardians: { student_id: string }[] | null }[]).some(g => !(g.student_guardians ?? []).some(l => l.student_id === c?.student_id));
+  if (other) return { ok: false as const, status: 409, miss: false, error: `${info.school} already has a parent record with this email for a different child. Add that child first with their code, or ask the school office to put this child on your record.` };
+  const { data: r, error } = await svc.rpc("claim_account_code", { p_code: cleanCode(p.code), p_user: p.userId, p_email: email, p_full_name: p.fullName });
+  if (error) return { ok: false as const, status: 400, miss: false, error: error.message.includes("does not exist") ? "Adding children needs the database update (migration 20260101009600)." : error.message };
+  return { ok: true as const, tenantId: (r?.tenant_id as string) ?? info.tenantId, school: info.school, childName: info.childName, studentId: (c?.student_id as string) ?? null };
 }
 
 /** Kinds of people a one-time password can be made for, and their tables. */
@@ -243,8 +278,8 @@ export async function sendCodes(svc: Svc, p: { tenantId: string; items: { kind: 
     for (const l of links ?? []) {
       if (!l.guardians) continue;
       const lines = it.kind === "student"
-        ? [`${child}'s student sign-up code: ${formatCode(c.code)}`, `${child} goes to ${join}, types the code, an email and a password.`]
-        : [`Parent code for ${child}: ${formatCode(c.code)}`, `New to Synergy Swift? Go to ${join} and use it to make your parent account. Already signed in? Type it under "Add a child" on your page.`];
+        ? [`${child}'s student sign-up code: ${formatCode(c.code)}`, `${child} goes to ${join}, types the code, then chooses a username and a password, and lands on their own student page.`]
+        : [`${child}'s code for parents: ${formatCode(c.code)}`, `Make your parent account at ${p.baseUrl}/signup (no code needed) or sign in, then type this code under "Add a child" on your page.`];
       rows.push(...rowsForGuardian(p.tenantId, { ...l.guardians, notify_email: true }, "account_key", communityNote(brand, { name: l.guardians.full_name, subject: `${child}: sign-up code`, lines, link: join, linkLabel: "Open" }), it.id, p.actor));
     }
     if (rows.length === before) skipped++;

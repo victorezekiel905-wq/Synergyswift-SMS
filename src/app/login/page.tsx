@@ -183,12 +183,12 @@ export default function LoginPage() {
                 <button type="button" className="font-medium text-brand-700 hover:underline" onClick={() => mail("reset")}>Forgot password?</button>
                 {unconfirmed && <button type="button" className="font-medium text-brand-700 hover:underline" onClick={() => mail("resend")}>Send the confirmation email again</button>}
               </div>
-              <p className="text-center text-xs leading-relaxed text-slate-500">
-                {who === "parent" ? "New parent? Sign in with your email and the one-time password from the school; you choose your own password next. Then add each of your children with their child's code."
-                  : who === "student" ? "New student? Sign in with the username and one-time password from your school (your parents have them too); you choose your own password next."
-                  : "Got a one-time password from the school? Sign in with it above; you will choose your own password next."}
-              </p>
+              {who === "staff" && <p className="text-center text-xs leading-relaxed text-slate-500">Got a one-time password from the school? Sign in with it above; you will choose your own password next.</p>}
               {who === "staff" && <Link href="/join?as=staff" className="btn btn-outline w-full no-underline">{WHO.staff.join}</Link>}
+              {who === "parent" && <Link href="/signup" className="btn btn-outline w-full no-underline">New parent? Make your account</Link>}
+              {who === "parent" && <p className="text-center text-xs leading-relaxed text-slate-500">No code is needed to sign up. On your page, add each child with the child&apos;s code from the school.</p>}
+              {who === "student" && <Link href="/join?as=student" className="btn btn-outline w-full no-underline">New student? Sign up with your code</Link>}
+              {who === "student" && <p className="text-center text-xs leading-relaxed text-slate-500">Your school gives you a sign-up code. You choose your own username and password and go straight to your student page.</p>}
               {who === "staff" && <p className="text-center text-xs text-slate-500">New school with an onboarding code? <Link href="/onboard" className="font-medium text-brand-700 hover:underline">Onboard your school</Link></p>}
             </form>
             )}

@@ -51,5 +51,5 @@ export async function POST(req: NextRequest) {
   if (!r.ok) return jsonError(r.error, r.status);
   // The handshake: the school's admins hear that a member of staff has joined, to put them in classes.
   if (r.kind === "staff") await staffJoined(svc, { tenantId: r.tenantId, userId: r.userId, baseUrl: appUrl(req) }).catch(() => {});
-  return NextResponse.json({ ok: true, email: r.email, role: r.role, next: r.next, school: r.school });
+  return NextResponse.json({ ok: true, email: r.email, username: r.username, role: r.role, next: r.next, school: r.school });
 }

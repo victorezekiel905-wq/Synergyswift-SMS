@@ -72,8 +72,11 @@ export async function GET() {
     // A starting password (sent to the parents) must be replaced at the first sign-in.
     if (u?.must_change_password) mustChange = true;
   }
+  // A parent who signed up on their own and has not added a child yet: no school, only "Add a child".
+  const newParent = !profile && !platform && !group && (user.user_metadata as { signup_as?: string } | null)?.signup_as === "parent";
   return NextResponse.json({
     user: who,
+    ...(newParent ? { new_parent: { full_name: String(user.user_metadata?.full_name ?? "") } } : {}),
     profile: profile ?? null,
     tenant,
     platform,

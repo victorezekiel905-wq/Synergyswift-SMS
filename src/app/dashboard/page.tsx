@@ -26,7 +26,9 @@ export default async function Dashboard() {
     if (state?.state === "mfa_required") redirect("/account/security?required=school");
     const { data: platform } = await sb.rpc("platform_admin_state");
     if (platform === "mfa_required") redirect("/account/security?required=platform");
-    redirect(platform === "ok" ? "/platform" : "/student/join");
+    if (platform === "ok") redirect("/platform");
+    // A parent who signed up on their own: their page, where they add a child.
+    redirect((user.user_metadata as { signup_as?: string } | null)?.signup_as === "parent" ? "/parent" : "/student/join");
   }
   if (me.role === "parent") redirect("/parent");
   if (me.role === "cashier") redirect("/school/shop");

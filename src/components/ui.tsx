@@ -272,6 +272,8 @@ export type Me = {
   prefs?: { currency: string; idle_minutes: number; password_days_left: number | null; brand_color?: string | null; brand_color_2?: string | null; logo_url?: string | null } | null;
   platform_mfa?: boolean;
   is_guardian: boolean;
+  /** A parent who signed up on their own and has not added a child yet (no school). */
+  new_parent?: { full_name: string };
 };
 
 export function rolesOf(me: Me | null): Set<string> {
