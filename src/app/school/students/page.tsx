@@ -36,8 +36,8 @@ export default function StudentsPage() {
           <option value="active">Active</option><option value="graduated">Graduated</option><option value="withdrawn">Withdrawn</option><option value="suspended">Suspended</option><option value="all">All</option>
         </select>
       </div>
-      {error && <Alert>{error}</Alert>}
-      {loading && !data ? <Loading /> : !data?.length ? <Empty>No students match.</Empty> : (
+      {error && <div className="mb-3"><Alert>{error} <button type="button" className="ml-1 font-semibold underline" onClick={() => reload()}>Try again</button></Alert></div>}
+      {loading && !data ? <Loading label="Loading students…" /> : !data?.length ? (error ? null : <Empty>No students match.</Empty>) : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-[13px] text-slate-500">

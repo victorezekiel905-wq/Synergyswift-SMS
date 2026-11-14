@@ -11,15 +11,21 @@ export function useApi<T>(url: string | null, deps: unknown[] = []) {
   const reload = useCallback(async () => {
     if (!url) return;
     setLoading(true);
+    // A request that never answers (a dropped connection) is given up after 40 seconds, so the page
+    // shows what happened and can be tried again instead of loading for ever.
+    const ctl = new AbortController();
+    const timer = window.setTimeout(() => ctl.abort(), 40_000);
     try {
-      const r = await fetch(url, { cache: "no-store" });
+      const r = await fetch(url, { cache: "no-store", signal: ctl.signal });
       if (isSecurityCheck(r)) { announceSecurityCheck(); setError(SECURITY_CHECK_TEXT); return; }
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { setError(j.error ?? `Request failed (${r.status})`); setData(null); }
       else { setError(null); setData(j as T); }
     } catch (e) {
-      setError((e as Error).message);
-    } finally { setLoading(false); }
+      setError(ctl.signal.aborted ? "This is taking too long to load. Check the internet connection, then reload the page."
+        : /failed to fetch|network|load failed/i.test((e as Error).message) ? "Could not reach the server. Check the internet connection, then reload the page."
+        : (e as Error).message);
+    } finally { window.clearTimeout(timer); setLoading(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, ...deps]);
   useEffect(() => { reload(); }, [reload]);
@@ -221,10 +227,16 @@ export function statusTone(s: string): "slate" | "green" | "amber" | "red" | "bl
 
 /** Spinner with a live-region label, for data that is on its way. */
 export function Loading({ label = "Loading…" }: { label?: string }) {
+  // A long wait is said plainly, with a way out, instead of a spinner that looks stuck.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => { const t = window.setTimeout(() => setSlow(true), 8000); return () => window.clearTimeout(t); }, []);
   return (
-    <div role="status" aria-live="polite" className="flex items-center justify-center gap-2.5 p-8 text-sm text-slate-500">
-      <span aria-hidden className="h-3.5 w-3.5 animate-spin rounded-full border-[1.5px] border-slate-300 border-t-slate-700" />
-      {label}
+    <div role="status" aria-live="polite" className="flex flex-col items-center justify-center gap-2 p-8 text-sm text-slate-500">
+      <span className="flex items-center gap-2.5">
+        <span aria-hidden className="h-3.5 w-3.5 animate-spin rounded-full border-[1.5px] border-slate-300 border-t-slate-700" />
+        {slow ? "Still loading: this is taking longer than usual…" : label}
+      </span>
+      {slow && <span className="text-xs text-slate-400">A weak connection, or the server starting up after a quiet spell, can take up to a minute. <button type="button" className="font-semibold text-brand-700 underline" onClick={() => window.location.reload()}>Reload the page</button></span>}
     </div>
   );
 }
