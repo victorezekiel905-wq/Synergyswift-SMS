@@ -78,12 +78,16 @@ describe("admission numbers for a list without them", () => {
       { admission_no: "", first_name: "Tunde", last_name: "Bello", class_name: "JSS 1A" },
       { admission_no: "GFC/9", first_name: "Chidi", last_name: "Okafor", class_name: "JSS 1B" },
       { admission_no: "", first_name: "Musa", last_name: "Ibrahim", class_name: "JSS 1B" }
-    ], existing, 2026);
+    ], existing, "2026/");
     expect(r.numbers).toEqual(["2026/0007", "2026/0008", "GFC/9", "2026/0009"]);
     expect(r).toMatchObject({ reused: 1, made: 2 });
   });
   it("never gives a number that is already taken", () => {
-    const r = fillAdmissionNumbers([{ admission_no: "2026/0001", first_name: "A", last_name: "B", class_name: "" }, { admission_no: "", first_name: "C", last_name: "D", class_name: "" }], [], 2026);
+    const r = fillAdmissionNumbers([{ admission_no: "2026/0001", first_name: "A", last_name: "B", class_name: "" }, { admission_no: "", first_name: "C", last_name: "D", class_name: "" }], [], "2026/");
     expect(r.numbers).toEqual(["2026/0001", "2026/0002"]);
+    // The school's initials (migration 10600): GC-0001, GC-0002, …
+    const g = fillAdmissionNumbers([{ admission_no: "", first_name: "Ada", last_name: "Obi", class_name: "" }, { admission_no: "", first_name: "Tunde", last_name: "Bello", class_name: "" }],
+      [{ admission_no: "GC-0004", first_name: "X", last_name: "Y", class_name: null }], "GC-");
+    expect(g.numbers).toEqual(["GC-0005", "GC-0006"]);
   });
 });

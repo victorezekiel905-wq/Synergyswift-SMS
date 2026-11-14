@@ -6,6 +6,7 @@ import RegisterServiceWorker from "@/components/RegisterServiceWorker";
 import EmbedResize from "@/components/EmbedResize";
 import WebVitals from "@/components/WebVitals";
 import Toaster from "@/components/Toaster";
+import NavProgress from "@/components/NavProgress";
 import { BRAND_BOOT_SCRIPT } from "@/lib/theme";
 
 // One type family throughout: Plex Sans for the interface, Plex Serif for titles, Plex Mono for codes.
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head><script dangerouslySetInnerHTML={{ __html: BRAND_BOOT_SCRIPT }} /></head>
       <body className="min-h-screen bg-canvas font-sans text-[15px] text-slate-900 antialiased sm:text-sm">
         <WebVitals />
+        <NavProgress />
         <AppShell>{children}</AppShell>
         <Toaster />
         <RegisterServiceWorker />

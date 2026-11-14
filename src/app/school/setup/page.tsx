@@ -115,7 +115,7 @@ function Profile() {
     const keys = ["school_name", "motto", "address", "phone", "email", "logo_url", "principal_name", "brand_color", "brand_color_2", "sender_name", "reply_to_email",
       "notify_gate_events", "notify_results", "staff_start_time", "student_start_time", "geofence_lat", "geofence_lng", "geofence_radius_m",
       "library_loan_days", "library_fine_per_day", "currency", "pickup_code_ttl_min", "exam_violation_limit", "sms_mode", "require_mfa", "default_language",
-      "principal_signature_url", "stamp_url", "report_footer"];
+      "principal_signature_url", "stamp_url", "report_footer", "student_id_prefix"];
     const body = Object.fromEntries(keys.filter(k => s[k] !== undefined && !(k === "brand_color" && !s[k])).map(k => [k, typeof s[k] === "string" && /time$/.test(k) ? s[k].slice(0, 5) : s[k]]));
     const r = await send("/api/school/settings", body, "PUT");
     // The new colour shows across the app straight away, for everyone on their next page.
@@ -143,6 +143,7 @@ function Profile() {
           <ImageUpload kind="stamp" label="School stamp" hint="Printed beside the signature on report cards." value={s.stamp_url} onChange={v => setS(x => ({ ...x, stamp_url: v }))} />
         </div>
         <div className="md:col-span-2"><Field label="Report card footer" hint="For example the school's fees reminder or contact line."><textarea className="input h-16" {...text("report_footer")} /></Field></div>
+        <div className="md:col-span-2"><StudentIds value={s.student_id_prefix ?? ""} onChange={v => setS(x => ({ ...x, student_id_prefix: v }))} /></div>
         <div className="md:col-span-2"><BrandColour value={s.brand_color ?? null} value2={s.brand_color_2 ?? null} logoUrl={s.logo_url} schoolName={s.school_name} onChange={v => setS(x => ({ ...x, brand_color: v }))} onChange2={v => setS(x => ({ ...x, brand_color_2: v }))} /></div>
         <Field label="Message sender name"><input className="input" {...text("sender_name")} /></Field>
         <Field label="Reply-to email for parents"><input className="input" type="email" {...text("reply_to_email")} /></Field>
@@ -387,6 +388,36 @@ function ImageUpload({ kind, label, hint, value, onChange }: { kind: "logo" | "s
       </div>
       <p className="mt-1.5 text-xs text-slate-500">{hint} PNG, JPG or WebP, up to 2 MB.{value === "" ? " Press Save to remove it." : ""}</p>
       {err && <p className="mt-1 text-xs text-rose-700" role="alert">{err}</p>}
+    </div>
+  );
+}
+
+/** Student IDs: the school's letters and a running number (GC-0001). Renumbering everyone is a separate, careful step. */
+function StudentIds({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data, reload } = useApi<{ prefix: string | null; next: string | null; students?: number; needs_update?: boolean }>("/api/school/student-ids");
+  const [busy, setBusy] = useState(false);
+  const typed = value.trim().toUpperCase();
+  const shown = typed || data?.prefix || "";
+  async function renumber() {
+    const word = prompt(`Give all ${data?.students ?? ""} students a new ID (${shown}-0001, ${shown}-0002 … in the order they were added)?\n\nParents use the student ID to check results, and it is printed on ID cards and documents: anything printed with the old ID will no longer match. Each student's old ID is kept on their record.\n\nSave any change to the letters first. Type RENUMBER to go ahead.`);
+    if (word !== "RENUMBER") return;
+    setBusy(true);
+    const r = await send<{ renumbered: number }>("/api/school/student-ids", { action: "renumber", confirm: "RENUMBER" });
+    setBusy(false);
+    if (r.ok) { notify({ tone: "ok", text: `${r.data.renumbered} students now have IDs in the ${shown}-0001 format.` }); reload(); }
+  }
+  return (
+    <div className="rounded-lg border border-slate-200 p-3">
+      <p className="text-sm font-medium text-slate-800">Student IDs</p>
+      {data?.needs_update ? <p className="mt-1 text-xs text-amber-700">Student IDs in the school&apos;s format need the database update (migration 20260101010600).</p> : (
+        <div className="mt-2 flex flex-wrap items-end gap-3">
+          <Field label="Letters" hint={`Blank: the school's initials${data?.prefix && !typed ? ` (${data.prefix})` : ""}. Up to 8 letters or numbers.`}>
+            <input className="input w-32 font-mono uppercase" maxLength={8} placeholder={data?.prefix ?? "GC"} value={value} onChange={e => onChange(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} />
+          </Field>
+          <p className="pb-2 text-sm text-slate-600">New students get <b className="font-mono">{typed ? `${typed}-0001…` : data?.next ?? "…"}</b> automatically when no ID is typed.</p>
+          <button type="button" className="btn btn-ghost mb-1 text-xs text-rose-700" disabled={busy || !data?.students} onClick={renumber}>{busy ? "Renumbering…" : "Renumber all current students"}</button>
+        </div>
+      )}
     </div>
   );
 }

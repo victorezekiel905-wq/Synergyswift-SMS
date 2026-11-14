@@ -66,7 +66,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("acceptance_paid"), id: z.string().uuid(), paid: z.boolean() }),
   z.object({ action: z.literal("assign_entrance"), ids: z.array(z.string().uuid()).min(1).max(500), exam_id: z.string().uuid(), opens_at: iso.nullish(), closes_at: iso.nullish(), notify: z.boolean().default(true) }),
   z.object({ action: z.literal("document_url"), doc_id: z.string().uuid() }),
-  z.object({ action: z.literal("enroll"), id: z.string().uuid(), admission_no: z.string().trim().min(1).max(40), class_group_id: z.string().uuid().nullish() }),
+  z.object({ action: z.literal("enroll"), id: z.string().uuid(), admission_no: z.string().trim().max(40).nullish(), class_group_id: z.string().uuid().nullish() }),
   z.object({ action: z.literal("walk_in"), first_name: z.string().trim().min(1).max(60), last_name: z.string().trim().min(1).max(60), gender: z.enum(["male", "female", "other"]).nullish(),
     date_of_birth: date.nullish(), applying_for: z.string().trim().min(1).max(60), guardian_name: z.string().trim().min(2).max(120), guardian_phone: z.string().trim().min(5).max(30),
     guardian_email: z.string().trim().email().nullish().or(z.literal("")), previous_school: z.string().trim().max(120).nullish(), source: z.enum(["walk_in", "referral", "agent", "phone"]).default("walk_in") }),

@@ -71,6 +71,8 @@ function AddStudent({ open, onClose, groups, onDone }: { open: boolean; onClose:
   const [f, setF] = useState(blank);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The next student ID in the school's format, shown as the hint (it is given when the student is saved).
+  const ids = useApi<{ prefix: string | null; next: string | null }>(open ? "/api/school/student-ids" : null, [open]);
   const bind = (k: keyof typeof blank) => ({ value: f[k], onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value }) });
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setErr(null);
@@ -86,7 +88,7 @@ function AddStudent({ open, onClose, groups, onDone }: { open: boolean; onClose:
   return (
     <Modal open={open} onClose={onClose} title="Add student" wide>
       <form onSubmit={submit} className="grid gap-3 sm:grid-cols-3">
-        <Field label="Admission number"><input className="input" required {...bind("admission_no")} /></Field>
+        <Field label="Student ID" hint={ids.data?.next ? `Leave blank to give the next one: ${ids.data.next}` : "Leave blank to give the next one automatically"}><input className="input" placeholder={ids.data?.next ?? "Given automatically"} {...bind("admission_no")} /></Field>
         <Field label="First name"><input className="input" required {...bind("first_name")} /></Field>
         <Field label="Last name"><input className="input" required {...bind("last_name")} /></Field>
         <Field label="Other names"><input className="input" {...bind("other_names")} /></Field>

@@ -71,7 +71,10 @@ export async function POST(req: NextRequest) {
       const cell = (r: string[], k: string) => (col(k) >= 0 ? (r[col(k)] ?? "").trim() : "");
       if (b.rows.some(r => !cell(r, "admission_no"))) {
         const existing = await fetchAllRows(ctx.sb, ctx.tenant.id);
-        const filled = fillAdmissionNumbers(b.rows.map(r => ({ admission_no: cell(r, "admission_no"), first_name: cell(r, "first_name"), last_name: cell(r, "last_name"), class_name: cell(r, "class") })), existing, new Date().getFullYear());
+        // The school's student ID format (GC-0001); before the database update (10600), the year (2026/0001).
+        const { data: pre, error: preErr } = await createServiceClient().rpc("student_id_prefix", { p_tenant: ctx.tenant.id });
+        const prefix = !preErr && pre ? `${pre}-` : `${new Date().getFullYear()}/`;
+        const filled = fillAdmissionNumbers(b.rows.map(r => ({ admission_no: cell(r, "admission_no"), first_name: cell(r, "first_name"), last_name: cell(r, "last_name"), class_name: cell(r, "class") })), existing, prefix);
         let at = col("admission_no");
         if (at < 0) { at = b.headers.length; b.headers.push("Admission number (given by Synergy Swift)"); b.map.admission_no = at; }
         b.rows = b.rows.map((r, i) => { const x = [...r]; while (x.length <= at) x.push(""); x[at] = filled.numbers[i]; return x; });

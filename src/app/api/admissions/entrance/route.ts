@@ -245,8 +245,8 @@ export async function POST(req: NextRequest) {
         const problems: string[] = [];
         for (const a of ready) {
           try {
-            const { data: no } = await svc.rpc("next_doc_no", { p_tenant: tid, p_kind: "adm" });
-            const r = await enrollApplication(svc, { tenantId: tid, applicationId: a.id, admissionNo: no, classGroupId: p.class_group_id ?? null });
+            // The student ID is the next in the school's format (GC-0001), given by the database.
+            const r = await enrollApplication(svc, { tenantId: tid, applicationId: a.id, classGroupId: p.class_group_id ?? null });
             const { data: done } = await svc.from("applications").select("*").eq("id", a.id).single();
             await syncLeadFromApplication(svc, done);
             if (!r.already) { created.push(r.student_id); await notifyApplicant(svc, done, base, null, true); }

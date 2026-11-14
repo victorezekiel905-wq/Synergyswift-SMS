@@ -48,7 +48,10 @@ export async function POST(req: NextRequest) {
       });
       if (!parsed.success) throw new Error(parsed.error.issues.map(x => `${x.path.join(".")}: ${x.message}`).join("; "));
 
-      const { data: existing } = await sb.from("students").select("id").eq("tenant_id", tid).eq("admission_no", parsed.data.admission_no).maybeSingle();
+      // No student ID in the row: a new student, given the next ID in the school's format.
+      const { data: existing } = parsed.data.admission_no
+        ? await sb.from("students").select("id").eq("tenant_id", tid).eq("admission_no", parsed.data.admission_no).maybeSingle()
+        : { data: null };
       let studentId: string;
       if (existing) {
         const { error } = await sb.from("students").update(cleanStudent(parsed.data)).eq("id", existing.id);

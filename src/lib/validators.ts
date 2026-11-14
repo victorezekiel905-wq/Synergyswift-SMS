@@ -16,7 +16,8 @@ export const GuardianInput = z.object({
 });
 
 export const StudentInput = z.object({
-  admission_no: z.string().trim().min(1).max(40),
+  // Left blank: the database gives the next student ID in the school's format (GC-0001, migration 10600).
+  admission_no: z.string().trim().max(40).optional(),
   first_name: z.string().trim().min(1).max(60),
   last_name: z.string().trim().min(1).max(60),
   other_names: z.string().trim().max(80).nullish(),
@@ -32,6 +33,8 @@ export const StudentInput = z.object({
 export function cleanStudent(s: Partial<z.infer<typeof StudentInput>>) {
   const out: Record<string, unknown> = { ...s };
   for (const k of ["date_of_birth", "class_group_id", "photo_url"]) if (out[k] === "") out[k] = null;
+  // A blank student ID is never written: a new student gets the next one, an existing student keeps theirs.
+  if (!String(out.admission_no ?? "").trim()) delete out.admission_no;
   return out;
 }
 
@@ -75,5 +78,7 @@ export const TenantSettingsInput = z.object({
   require_moderation: z.boolean().optional(),
   principal_signature_url: z.string().trim().url().or(z.literal("")).nullish(),
   stamp_url: z.string().trim().url().or(z.literal("")).nullish(),
-  report_footer: z.string().trim().max(500).nullish()
+  report_footer: z.string().trim().max(500).nullish(),
+  // Student IDs: these letters, then a running number (GC-0001). Blank: the initials of the school's name.
+  student_id_prefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{0,8}$/, "use up to 8 letters or numbers").nullish().transform(v => v || null)
 });

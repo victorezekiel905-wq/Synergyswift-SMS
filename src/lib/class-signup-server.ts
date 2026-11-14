@@ -3,7 +3,6 @@
  * A student who signs up with a class code has a sign-in but no profile: nothing opens until the
  * class teacher or an admin confirms them.
  */
-import { randomBytes } from "crypto";
 import { checkPassword } from "./security";
 import { cleanCode, formatCode, isCodeShape } from "./sign-up-codes";
 import { policyFor } from "./sign-up-codes-server";
@@ -125,7 +124,7 @@ export async function approveSignup(svc: Svc, p: { tenantId: string; id: string;
     student = data;
   } else {
     const n = splitName(s.full_name);
-    const { data, error } = await svc.from("students").insert({ tenant_id: p.tenantId, admission_no: `NEW-${randomBytes(4).toString("hex").toUpperCase()}`, first_name: n.first, last_name: n.last || n.first, class_group_id: s.class_group_id })
+    const { data, error } = await svc.from("students").insert({ tenant_id: p.tenantId, first_name: n.first, last_name: n.last || n.first, class_group_id: s.class_group_id })
       .select("id,first_name,last_name,other_names").single();
     if (error || !data) throw new Error(error?.message ?? "could not add the student");
     student = data; made = true;
