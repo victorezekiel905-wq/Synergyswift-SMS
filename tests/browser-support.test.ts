@@ -29,4 +29,11 @@ describe("works on older phones", () => {
       && /\.at\(-?\d+\)|\.toSorted\(|\.toReversed\(|\.toSpliced\(|\.findLast(Index)?\(|Object\.groupBy\(/.test(f.text)).map(f => f.p);
     expect(bad).toEqual([]);
   });
+  it("no bare AbortSignal.timeout in browser code (missing before iOS 16)", () => {
+    // Server code (api routes, lib) may use it; pages, components and live lessons check for it first.
+    const bad = files.filter(f => /[\\/](app|components|live)[\\/]/.test(f.p) && !/[\\/]app[\\/]api[\\/]/.test(f.p)
+      && !/^import "server-only";/m.test(f.text)
+      && /AbortSignal\.timeout\(/.test(f.text) && !/typeof AbortSignal\.timeout === "function"|"timeout" in AbortSignal/.test(f.text)).map(f => f.p);
+    expect(bad).toEqual([]);
+  });
 });

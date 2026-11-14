@@ -64,11 +64,19 @@ export function withPulse(state: SessionState | null, pulse: Pulse | null): Sess
 
 const TIMEOUT_MS = 10_000;
 
+/** A signal that gives up after `ms`. AbortSignal.timeout is missing on iPhones before iOS 16: a timer does the same there. */
+function timeoutSignal(ms: number): AbortSignal {
+  if (typeof AbortSignal.timeout === "function") return AbortSignal.timeout(ms);
+  const c = new AbortController();
+  setTimeout(() => c.abort(), ms);
+  return c.signal;
+}
+
 export function useLiveState(sessionId: string, opts: { intervalMs: number }) {
   const okAt = useRef(0);
   const q = useLoader<SessionState>(async () => {
     // A request that stalls is given up on, so the next one can go.
-    const { data, error } = await createClient().rpc("teacher_session_state", { p_session: sessionId }).abortSignal(AbortSignal.timeout(TIMEOUT_MS));
+    const { data, error } = await createClient().rpc("teacher_session_state", { p_session: sessionId }).abortSignal(timeoutSignal(TIMEOUT_MS));
     if (error) throw new Error(messageForError(error));
     okAt.current = Date.now();
     return data as SessionState;
