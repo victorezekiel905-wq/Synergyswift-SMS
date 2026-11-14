@@ -26,7 +26,9 @@ export async function classCodeInfo(svc: Svc, code: string): Promise<ClassCodeIn
   if (!isCodeShape(code)) return null;
   const { data: c, error } = await svc.from("class_signup_codes").select("class_group_id,tenant_id,class_groups(name),tenants(name,status)").eq("code", cleanCode(code)).maybeSingle();
   if (error || !c || c.tenants?.status !== "active") return null;
-  const { data: s } = await svc.from("tenant_settings").select("school_name").eq("tenant_id", c.tenant_id).maybeSingle();
+  const { data: s, error: sErr } = await svc.from("tenant_settings").select("school_name,class_signup_enabled").eq("tenant_id", c.tenant_id).maybeSingle();
+  // Students sign up with their own code; a class code works only when the school has turned class codes on.
+  if (sErr || !s?.class_signup_enabled) return null;
   return { classId: c.class_group_id, tenantId: c.tenant_id, className: c.class_groups?.name ?? "your class", school: s?.school_name ?? c.tenants?.name ?? "your school" };
 }
 
@@ -82,7 +84,13 @@ export async function classSignupNotice(svc: Svc, p: { tenantId: string; classId
     `${p.baseUrl}/school/class-codes`, p.classId);
 }
 
-export type ClassCode ={ class_id: string; class_name: string; code: string | null };
+/** Whether the school lets students sign up with their class's shared code. False before the database update. */
+export async function classSignupEnabled(svc: Svc, tenantId: string): Promise<boolean> {
+  const { data, error } = await svc.from("tenant_settings").select("class_signup_enabled").eq("tenant_id", tenantId).maybeSingle();
+  return !error && Boolean(data?.class_signup_enabled);
+}
+
+export type ClassCode = { class_id: string; class_name: string; code: string | null };
 export type WaitingSignup = { id: string; class_id: string; class_name: string | null; full_name: string; username: string | null; created_at: string };
 
 /** These classes' codes and the students waiting to be confirmed. Null before the database update. */

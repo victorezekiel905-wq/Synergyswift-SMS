@@ -10,7 +10,7 @@ import { resendStudentKey } from "@/lib/accounts-server";
 import { tenantSignIns } from "@/lib/staff-onboarding-server";
 import { formatCode } from "@/lib/sign-up-codes";
 import { codeClasses, classCodes } from "@/lib/onboarding-codes-server";
-import { classCodesAndWaiting, approveSignup, declineSignup, classCodesNeedUpdate } from "@/lib/class-signup-server";
+import { classCodesAndWaiting, approveSignup, declineSignup, classCodesNeedUpdate, classSignupEnabled } from "@/lib/class-signup-server";
 
 export const dynamic = "force-dynamic";
 
@@ -41,8 +41,10 @@ export async function GET(req: NextRequest) {
     const rows = await classCodes(svc, ctx.tenant.id, shown);
     // The shared class codes and the students waiting to be confirmed (every class this person has, so nobody waits unseen).
     const shared = await classCodesAndWaiting(svc, ctx.tenant.id, classes).catch(() => null);
-    return NextResponse.json({ admin, classes, selected: admin && want === "all" ? "all" : pick[0] ?? null, rows,
-      class_codes: shared ? shared.codes.filter(c => shown.includes(c.class_id)) : null, waiting: shared?.waiting ?? [] }, { headers: { "Cache-Control": "no-store" } });
+    // Students sign up with their own code; class codes show only when the school has turned them on.
+    const classOn = await classSignupEnabled(svc, ctx.tenant.id);
+    return NextResponse.json({ admin, classes, selected: admin && want === "all" ? "all" : pick[0] ?? null, rows, class_signup: classOn,
+      class_codes: shared ? (classOn ? shared.codes.filter(c => shown.includes(c.class_id)) : []) : null, waiting: shared?.waiting ?? [] }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     const m = (e as Error).message;
     return jsonError(/account_codes/.test(m) ? "Sign-up codes need the database update (migration 20260101009600)." : m, 503);
@@ -60,6 +62,8 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("parent_login"), guardian_ids: z.array(z.string().uuid()).min(1).max(200), emails: z.record(z.string().uuid(), z.string().trim().max(254)).default({}) }),
   // A class's shared sign-up code: a new one (the old one stops working). Admins only.
   z.object({ action: z.literal("new_class_code"), class_id: z.string().uuid() }),
+  // Class codes on or off for the whole school (off: students use only their own code). Admins only.
+  z.object({ action: z.literal("class_signup"), on: z.boolean() }),
   // A student who signed up with the class code: confirmed (matched to their record, or added as new), or declined.
   z.object({ action: z.literal("approve_signup"), id: z.string().uuid(), student_id: z.string().uuid().nullable() }),
   z.object({ action: z.literal("decline_signup"), id: z.string().uuid() }),
@@ -81,6 +85,13 @@ export async function POST(req: NextRequest) {
   // Only students in classes this person may see.
   const classes = (await codeClasses(svc, { tenantId: tid, userId: ctx.userId, admin })).map(c => c.id);
 
+  if (b.action === "class_signup") {
+    if (!admin) return jsonError("only a school admin can turn class codes on or off", 403);
+    const { error } = await svc.from("tenant_settings").update({ class_signup_enabled: b.on }).eq("tenant_id", tid);
+    if (error) return jsonError(/class_signup_enabled/.test(error.message) ? "Turning class codes on needs the database update (migration 20260101010400)." : error.message, 400);
+    await svc.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: b.on ? "account.class_codes_on" : "account.class_codes_off" });
+    return NextResponse.json({ ok: true, on: b.on });
+  }
   if (b.action === "new_class_code") {
     if (!admin) return jsonError("only a school admin can make a new class code", 403);
     if (!classes.includes(b.class_id)) return jsonError("not found", 404);

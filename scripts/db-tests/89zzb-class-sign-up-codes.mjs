@@ -30,6 +30,9 @@ export default async function ({ q, expectError, check, U, T }) {
   await expectError("staff read requests only through the server", U.teacherA, "select * from class_signups", /permission denied/);
   await expectError("nobody signed in can make a class code", U.adminA, `select issue_class_code('${CG}')`, /permission denied/);
 
+  const col = await one(`select column_default, is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'tenant_settings' and column_name = 'class_signup_enabled'`);
+  check("class codes are off unless the school turns them on (students use their own code)", col?.column_default === "false" && col?.is_nullable === "NO", col);
+
   await q(`delete from class_groups where id = '${CG}'`);
   check("deleting the class removes its code and its waiting requests",
     !(await one(`select 1 x from class_signup_codes where class_group_id = '${CG}'`)) && !(await one(`select 1 x from class_signups where class_group_id = '${CG}'`)));

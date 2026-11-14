@@ -67,7 +67,7 @@ function Join() {
       <Link href="/" className="flex items-center gap-2.5 self-start"><Monogram /><span className="text-[15px] font-semibold tracking-tight">Synergy Swift</span></Link>
       <h1 className="mt-14 font-serif text-[30px] font-semibold leading-tight tracking-[-0.01em]">{title}</h1>
       <p className="mt-2 text-[15px] text-slate-600 sm:text-sm">
-        {as === "student" ? "Type your own sign-up code or your class's code, then choose a username and a password."
+        {as === "student" ? "Type the sign-up code your school gave you, then choose a username and a password. You go straight to your own student page."
           : as === "parent" ? "Use the sign-up code the school sent you, or your child's code. Your email becomes your username."
           : "Use the sign-up code your school gave you. Your email becomes your username."}
       </p>

@@ -7,12 +7,12 @@ import { bestMatch } from "@/lib/class-signup";
 import AddParents from "@/components/onboarding/AddParents";
 
 type Data = { admin: boolean; classes: { id: string; name: string }[]; selected: string | null; rows: ClassCodeRow[];
-  class_codes: ClassCode[] | null; waiting: WaitingSignup[] };
+  class_codes: ClassCode[] | null; waiting: WaitingSignup[]; class_signup?: boolean };
 type Login = { id: string; name: string; username: string | null; password: string | null; sent?: number; error?: string };
 export type CodeMode = "students" | "parents";
 
 const HELP: Record<CodeMode, string> = {
-  students: "Students sign up on the sign-in page (Student, then \"Sign up with your code\"), with either the class's code or their own code, and choose a username and a password. With the class's code they wait until you confirm them below; with their own code they go straight in. A student sees only their own class and their own things (results, portfolio, tuck shop, analysis).",
+  students: "Each student has their own sign-up code (below). Give each child their slip, or send it to their parents. On the sign-in page they choose Student, then \"Sign up with your code\", type the code and choose a username and a password, and go straight to their own page. A student sees only their own class and their own things (results, portfolio, tuck shop, analysis).",
   parents: "Add parents above (like staff), or let them make their own account on the sign-in page (Parent, then \"Make your account\") and add each child with that child's code below. A parent sees only their own children (up to 4 parents per child's code)."
 };
 
@@ -123,7 +123,16 @@ export default function ClassCodes({ mode }: { mode: CodeMode }) {
         <Waiting waiting={data.waiting} rows={data.rows} selected={selected} onOpenClass={id => { setCls(id); setLogins(null); setSlips(false); }}
           act={(body, ok) => act(body, ok)} />
       )}
-      {mode === "students" && data.class_codes === null && <div className="print:hidden"><Alert tone="amber">Class sign-up codes need the database update (migration 20260101010300).</Alert></div>}
+      {mode === "students" && data.admin && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 print:hidden">
+          <span className="mr-auto">{data.class_signup
+            ? "Class codes are on: students can also sign up with their class's shared code, and you confirm each one. Turn them off when the sign-up session is over."
+            : "Class codes are off: students sign up only with their own code. Turn class codes on only for a supervised session where the teacher confirms each student in the room."}</span>
+          <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => (data.class_signup || confirm("Turn class codes on? Anyone who has a class's code can then ask to join that class, and the class teacher must check and confirm each one."))
+            && act({ action: "class_signup", on: !data.class_signup }, d => d.on ? "Class codes are on." : "Class codes are off. Students sign up with their own code.")}>{data.class_signup ? "Turn class codes off" : "Turn class codes on"}</button>
+        </div>
+      )}
+      {mode === "students" && data.class_signup && data.class_codes === null && <div className="print:hidden"><Alert tone="amber">Class sign-up codes need the database update (migration 20260101010300).</Alert></div>}
       {mode === "students" && (data.class_codes ?? []).length > 0 && (
         <section className="card p-4 print:hidden">
           <h3 className="font-semibold">Class sign-up code{(data.class_codes ?? []).length === 1 ? "" : "s"}</h3>
