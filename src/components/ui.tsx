@@ -123,6 +123,22 @@ export function AutosaveStatus({ state, error, onRetry }: { state: AutosaveState
   );
 }
 
+/**
+ * The general Save button beside a form that also saves by itself: saves everything now and
+ * says so ("Saved" / "Not saved: …"), for anyone who wants to be sure before moving on.
+ */
+export function SaveNow({ flush, label = "Save" }: { flush: () => Promise<boolean>; label?: string }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button type="button" className="btn btn-primary" disabled={busy} onClick={async () => {
+      setBusy(true);
+      const ok = await flush().catch(() => false);
+      setBusy(false);
+      notify(ok ? { tone: "ok", text: "Saved. Everything on this page is saved." } : { tone: "error", text: "Not saved: some changes could not be saved. Check the message beside the button and try again." });
+    }}>{busy ? "Saving…" : label}</button>
+  );
+}
+
 /** POST/PUT/PATCH/DELETE JSON; returns { ok, data, error }. */
 /**
  * Calls an API. Every change also tells the person whether it worked ("Saved" /

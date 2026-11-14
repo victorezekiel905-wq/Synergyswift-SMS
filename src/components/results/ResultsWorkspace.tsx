@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useApi, send, Page, PageHeader, Alert, Badge, statusTone, Empty, Field, Modal, Loading, fmtDate, useAutosave, AutosaveStatus } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Badge, statusTone, Empty, Field, Modal, Loading, fmtDate, useAutosave, AutosaveStatus, SaveNow } from "@/components/ui";
 import { subjectTotal, gradeFor as bandFor, round, midtermParts } from "@/lib/grading";
 import { DEFAULT_SCALE, SCALE_PRESETS, TRAIT_PRESETS, areaTitle, scaleKey, type ScaleItem } from "@/lib/traits";
 import { useResultsPicker, type ResultsStructure as Structure } from "./useResultsPicker";
@@ -165,6 +165,7 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
         {data?.can_set_parts && <button type="button" className="mb-1 text-xs font-semibold text-brand-700 underline" onClick={async () => { await auto.flush(); setPartsOpen(true); }}>Set {mine.find(s => s.id === subject)?.name ?? "this subject"}&apos;s parts</button>}
         <div className="ml-auto flex gap-2 pb-0.5">
           {!notes && data?.can_edit && <AutosaveStatus state={auto.state} error={auto.error} onRetry={() => void auto.flush()} />}
+          {!notes && data?.can_edit && <SaveNow flush={auto.flush} label="Save scores" />}
           <button className="btn btn-ghost" onClick={async () => { await auto.flush(); setNotes(n => !n); }}>{notes ? "Back to scores" : "Comments & targets"}</button>
         </div>
       </div>
@@ -331,7 +332,7 @@ function SubjectNotes({ termId, cg, subject, students, canEdit, bands }: { termI
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-600">Effort uses 1 (excellent) to 4 (cause for concern). Leave <i>Predicted</i> blank to let the system forecast it from the student&apos;s results so far.</p>
-      {canEdit && <div className="flex justify-end"><AutosaveStatus state={auto.state} error={auto.error} onRetry={() => void auto.flush()} /></div>}
+      {canEdit && <div className="flex justify-end gap-3"><AutosaveStatus state={auto.state} error={auto.error} onRetry={() => void auto.flush()} /><SaveNow flush={auto.flush} label="Save comments & targets" /></div>}
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Comment</th><th className="p-2">Effort</th><th className="p-2">Target</th><th className="p-2">Predicted</th></tr></thead>
@@ -346,7 +347,7 @@ function SubjectNotes({ termId, cg, subject, students, canEdit, bands }: { termI
           ))}</tbody>
         </table>
       </div>
-      {canEdit && <p className="text-right text-xs text-slate-500">Saved as you type. Recompile report cards to include them.</p>}
+      {canEdit && <div className="flex items-center justify-end gap-3"><span className="text-xs text-slate-500">Saved as you type. Recompile report cards to include them.</span><SaveNow flush={auto.flush} label="Save comments & targets" /></div>}
     </div>
   );
 }
