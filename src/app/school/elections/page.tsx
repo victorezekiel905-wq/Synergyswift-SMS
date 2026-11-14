@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useApi, send, Page, PageHeader, Alert, Empty, Loading, Badge, Modal, Field, Stat, fmtDate } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Empty, Loading, Badge, Modal, Field, Stat, fmtDate, usePoll } from "@/components/ui";
 import { CandidateFace, ElectionResults, type Results } from "@/components/elections/Ballot";
 
 type Election = { id: string; title: string; kind: string; description: string | null; audience: "students" | "parents" | "staff" | "everyone"; class_group_ids: string[] | null;
@@ -58,7 +58,7 @@ function ElectionDetail({ id, classes, onEdit, onChanged }: { id: string; classe
   const [cand, setCand] = useState<Partial<Cand> | null>(null);
   const [kioskClass, setKioskClass] = useState("");
   // Live turnout while voting is open.
-  useEffect(() => { if (data?.election.status !== "open") return; const t = setInterval(reload, 15000); return () => clearInterval(t); }, [data?.election.status, reload]);
+  usePoll(reload, 15000, data?.election.status === "open");
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Loading />;
   const e = data.election;

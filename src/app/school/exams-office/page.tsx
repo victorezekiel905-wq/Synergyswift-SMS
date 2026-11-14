@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Loading, Modal, Field, Badge, Stat, fmtDate, fmtTime } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Loading, Modal, Field, Badge, Stat, fmtDate, fmtTime, usePoll } from "@/components/ui";
 
 type ExamRef = { id: string; title: string; class_name: string | null; teacher: string | null; opens_at: string | null; closes_at: string | null };
 type Office = {
@@ -32,7 +32,7 @@ export default function ExamsOffice() {
 
 function Glance({ onRequests }: { onRequests: () => void }) {
   const { data, error, reload } = useApi<Office>("/api/exams/office");
-  useEffect(() => { const t = setInterval(reload, 30_000); return () => clearInterval(t); }, [reload]);
+  usePoll(reload, 30_000);
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Loading />;
   const writing = data.live.reduce((t, e) => t + e.writing, 0);

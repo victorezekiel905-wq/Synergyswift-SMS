@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useApi, send, Page, PageHeader, Alert, Badge, Stat, Empty, Loading, Modal, fmtDate, fmtTime } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Badge, Stat, Empty, Loading, Modal, fmtDate, fmtTime, usePoll } from "@/components/ui";
 
 type Duty = { id: string; hall_id: string; staff_user_id: string; name: string; chief: boolean; checked_in_at: string | null; cover_for: string | null; state: "here" | "expected" | "late" | "away" };
 type Hall = { hall_id: string; name: string; expected: number; checked_in: number; started: number; submitted: number; missing_after_start: number;
@@ -36,7 +36,7 @@ function HallBoard() {
   const [cover, setCover] = useState<Duty | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
-  useEffect(() => { const t = setInterval(reload, 20_000); return () => clearInterval(t); }, [reload]);
+  usePoll(reload, 20_000);
   useEffect(() => {
     if (!data || hall) return;
     const mine = data.halls.find(h => h.duties.some(d => d.staff_user_id === data.me));

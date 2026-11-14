@@ -43,7 +43,8 @@ export function EmergencyBanner() {
       if (!off) setE(r?.emergency ?? null);
     };
     void load();
-    const t = window.setInterval(load, 120_000);
+    // Checked again every two minutes while the page is on screen (not from tabs left in the background).
+    const t = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 120_000);
     return () => { off = true; window.clearInterval(t); };
   }, []);
   if (!e) return null;

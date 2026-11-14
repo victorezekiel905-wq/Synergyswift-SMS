@@ -20,3 +20,21 @@ export function reloadOnceForStaleBuild(e: { name?: string; message?: string } |
   window.location.reload();
   return true;
 }
+
+/**
+ * The website's security service (Cloudflare, in front of the server) sometimes asks a browser
+ * to prove it is a person. A request made in the background then gets that check instead of
+ * data. Only a full page load can show it, so the person is told and offered a reload; the
+ * page is never reloaded by itself, so nothing typed is lost without warning.
+ */
+export const SECURITY_CHECK_EVENT = "ss-security-check";
+
+export function isSecurityCheck(r: { status: number; headers: { get(name: string): string | null } }): boolean {
+  return r.headers.get("cf-mitigated") === "challenge" || ((r.status === 403 || r.status === 503) && /text\/html/i.test(r.headers.get("content-type") ?? "") && Boolean(r.headers.get("cf-ray")));
+}
+
+export function announceSecurityCheck() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(SECURITY_CHECK_EVENT));
+}
+
+export const SECURITY_CHECK_TEXT = "The website's security check needs you to confirm you are a person. Reload the page, tick the box, and carry on.";

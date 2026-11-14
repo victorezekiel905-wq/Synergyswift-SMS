@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { notify, noticeFor } from "@/components/Toaster";
+import { isSecurityCheck, announceSecurityCheck, SECURITY_CHECK_TEXT } from "@/lib/client-errors";
 
 /** Fetch JSON with loading / error state. `reload()` re-fetches. */
 export function useApi<T>(url: string | null, deps: unknown[] = []) {
@@ -12,6 +13,7 @@ export function useApi<T>(url: string | null, deps: unknown[] = []) {
     setLoading(true);
     try {
       const r = await fetch(url, { cache: "no-store" });
+      if (isSecurityCheck(r)) { announceSecurityCheck(); setError(SECURITY_CHECK_TEXT); return; }
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { setError(j.error ?? `Request failed (${r.status})`); setData(null); }
       else { setError(null); setData(j as T); }
@@ -22,6 +24,26 @@ export function useApi<T>(url: string | null, deps: unknown[] = []) {
   }, [url, ...deps]);
   useEffect(() => { reload(); }, [reload]);
   return { data, error, loading, reload, setData };
+}
+
+/**
+ * Runs `fn` every `ms` while the page is on screen, and once as soon as it comes back after
+ * being hidden long enough to have missed a turn. Tabs left open in the background make no
+ * requests: less data and battery, and no steady machine-like traffic for the security service
+ * in front of the server to mistake for a bot.
+ */
+export function usePoll(fn: () => unknown, ms: number, enabled = true) {
+  const ref = useRef(fn);
+  ref.current = fn;
+  useEffect(() => {
+    if (!enabled) return;
+    let last = Date.now();
+    const run = () => { last = Date.now(); void ref.current(); };
+    const t = window.setInterval(() => { if (document.visibilityState === "visible") run(); }, ms);
+    const back = () => { if (document.visibilityState === "visible" && Date.now() - last >= ms) run(); };
+    document.addEventListener("visibilitychange", back);
+    return () => { window.clearInterval(t); document.removeEventListener("visibilitychange", back); };
+  }, [ms, enabled]);
 }
 
 /** POST/PUT/PATCH/DELETE JSON; returns { ok, data, error }. */
@@ -36,6 +58,12 @@ export async function send<T = any>(url: string, body?: unknown, method = "POST"
       method, headers: body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body)
     });
+    // Stopped by the security check: nothing was saved. Said plainly, so the person reloads and tries again.
+    if (isSecurityCheck(r)) {
+      announceSecurityCheck();
+      if (say) notify({ tone: "error", text: `${say.failed}: ${SECURITY_CHECK_TEXT}` });
+      return { ok: false, data: {} as T, error: SECURITY_CHECK_TEXT };
+    }
     const j = await r.json().catch(() => ({}));
     const error = r.ok ? null : (j.error ?? `Request failed (${r.status})`);
     if (say) {

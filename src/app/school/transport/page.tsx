@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, Icon, fmtTime, rolesOf, type Me } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, Icon, fmtTime, rolesOf, type Me, usePoll } from "@/components/ui";
 import { Fleet } from "@/components/transport/Fleet";
 
 type Route = { id: string; name: string; vehicle: string | null; driver_name: string | null; driver_phone: string | null; attendant_id: string | null; capacity: number | null;
@@ -209,7 +209,7 @@ function BusChecks() {
   const [closing, setClosing] = useState<Check | null>(null);
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
-  useEffect(() => { const t = setInterval(reload, 60_000); return () => clearInterval(t); }, [reload]);
+  usePoll(reload, 60_000);
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <p className="text-sm text-slate-500">Loading…</p>;
   const open = data.checks.filter(c => !c.resolved_at), done = data.checks.filter(c => c.resolved_at);

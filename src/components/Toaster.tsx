@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { SECURITY_CHECK_EVENT, SECURITY_CHECK_TEXT } from "@/lib/client-errors";
 
 /**
  * Short notices after an action ("Saved", "Not saved: …"), at the bottom of the
@@ -18,6 +19,13 @@ let next = 1;
 
 export default function Toaster() {
   const [list, setList] = useState<Shown[]>([]);
+  // The website's security check stopped a request: stays until the person reloads or closes it.
+  const [check, setCheck] = useState(false);
+  useEffect(() => {
+    const on = () => setCheck(true);
+    window.addEventListener(SECURITY_CHECK_EVENT, on);
+    return () => window.removeEventListener(SECURITY_CHECK_EVENT, on);
+  }, []);
   useEffect(() => {
     const on = (e: Event) => {
       const n = (e as CustomEvent<Notice>).detail;
@@ -32,6 +40,15 @@ export default function Toaster() {
   }, []);
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4 lg:bottom-6 lg:items-end lg:px-6" aria-live="polite" role="status">
+      {check && (
+        <div className="pointer-events-auto max-w-sm rounded-lg bg-white px-4 py-3 text-[13.5px] text-slate-800 shadow-pop ring-1 ring-amber-300">
+          <p>{SECURITY_CHECK_TEXT} Anything not saved yet on this page: copy it first.</p>
+          <div className="mt-2 flex gap-2">
+            <button type="button" className="btn btn-primary px-3 py-1 text-xs" onClick={() => window.location.reload()}>Reload page</button>
+            <button type="button" className="btn btn-ghost px-3 py-1 text-xs" onClick={() => setCheck(false)}>Not now</button>
+          </div>
+        </div>
+      )}
       {list.map(n => (
         <div key={n.id} className={"pointer-events-auto flex max-w-sm items-start gap-2.5 rounded-lg px-4 py-2.5 text-[13.5px] shadow-pop ring-1 " + (n.tone === "ok"
           ? "bg-white text-slate-800 ring-emerald-200" : "bg-white text-rose-800 ring-rose-200")}>

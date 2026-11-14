@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useApi, send, Alert, Badge, Empty, Field, fmtDate, fmtTime, money, Loading } from "@/components/ui";
+import { useApi, send, Alert, Badge, Empty, Field, fmtDate, fmtTime, money, Loading, usePoll } from "@/components/ui";
 import { LANGUAGES } from "@/lib/languages";
 
 const withToken = (url: string, token?: string) => token ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}` : url;
@@ -19,7 +19,7 @@ export function ParentMessages({ token }: { token?: string }) {
   const [f, setF] = useState({ student_id: "", staff_user_id: "", subject: "", body: "" });
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [orig, setOrig] = useState<Set<string>>(new Set());
-  useEffect(() => { const t = setInterval(reload, 30_000); return () => clearInterval(t); }, [reload]);
+  usePoll(reload, 30_000);
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Loading />;
   const thread = data.threads.find(t => t.id === open);
@@ -154,7 +154,7 @@ type Bus = { student_id: string; route: string; vehicle: string | null; driver: 
 /** Where the bus is now. Uses an OpenStreetMap view; position is shared only during a trip. */
 export function ParentBus({ token, kids }: { token?: string; kids: { id: string; name: string }[] }) {
   const { data, error, reload } = useApi<{ buses: Bus[] }>(withToken("/api/family/bus", token));
-  useEffect(() => { const t = setInterval(reload, 20_000); return () => clearInterval(t); }, [reload]);
+  usePoll(reload, 20_000);
   if (error) return <Alert>{error}</Alert>;
   if (!data) return <Loading />;
   if (!data.buses.length) return <Empty>Your children are not on a school bus.</Empty>;

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useApi, send, Page, PageHeader, Alert, Badge, Empty, Field, Modal, fmtDate, fmtTime, Loading } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Badge, Empty, Field, Modal, fmtDate, fmtTime, Loading, usePoll } from "@/components/ui";
 import { languageName } from "@/lib/languages";
 
 type Thread = { id: string; subject: string; status: string; unread: number; last_message_at: string; started_by: string; guardian: string; student: string; staff: string; mine: boolean; channel?: "app" | "whatsapp" };
@@ -23,10 +23,7 @@ export default function InboxPage() {
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [detail.data]);
   // New replies appear without a refresh.
   const reloadList = list.reload, reloadDetail = detail.reload;
-  useEffect(() => {
-    const t = setInterval(() => { reloadList(); if (open) reloadDetail(); }, 20_000);
-    return () => clearInterval(t);
-  }, [open, reloadList, reloadDetail]);
+  usePoll(() => { reloadList(); if (open) reloadDetail(); }, 20_000);
 
   async function sendReply(e: React.FormEvent) {
     e.preventDefault();

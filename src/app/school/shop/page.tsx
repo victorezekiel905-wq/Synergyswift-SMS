@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useApi, send, Page, PageHeader, Alert, Badge, Empty, Field, Tabs, Stat, money, fmtTime, fmtDate } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Badge, Empty, Field, Tabs, Stat, money, fmtTime, fmtDate, usePoll } from "@/components/ui";
 import { byCategory, receipt, pauseSale, MAX_PAUSED, formatBuyCode, cleanBuyCode, type PausedSale } from "@/lib/tuck-shop";
 
 type Item = { id: string; name: string; price: number; category: string | null; active: boolean; stock: number | null; stock_alert: number | null; barcode?: string | null };
@@ -301,7 +301,7 @@ const REASONS: Record<string, string> = { over_limit: "over the daily limit", no
 function Activity({ currency, showBalance }: { currency: string; showBalance: boolean }) {
   const { data, reload } = useApi<{ events: Event[] }>("/api/shop?view=activity");
   const [only, setOnly] = useState("");
-  useEffect(() => { const t = setInterval(reload, 15_000); return () => clearInterval(t); }, [reload]);
+  usePoll(reload, 15_000);
   const list = (data?.events ?? []).filter(e => !only || e.kind === only);
   const text = (e: Event) => {
     switch (e.kind) {
