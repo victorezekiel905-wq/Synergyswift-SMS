@@ -46,6 +46,83 @@ export function usePoll(fn: () => unknown, ms: number, enabled = true) {
   }, [ms, enabled]);
 }
 
+export type AutosaveState = "idle" | "pending" | "saving" | "saved" | "error";
+
+/**
+ * Saves by itself a moment after typing stops: `hasChanges` says whether anything differs from
+ * what was last saved, `save` sends it. One save at a time; changes made during a save are sent
+ * right after. Leaving the page, or hiding it, saves first; closing with unsaved work asks first.
+ * `flush()` saves now (before switching subject, submitting, and so on).
+ */
+export function useAutosave(o: { hasChanges: () => boolean; save: () => Promise<{ ok: boolean; error?: string | null }>; trigger: unknown; enabled: boolean; delay?: number }) {
+  const [state, setState] = useState<AutosaveState>("idle");
+  const [error, setError] = useState<string | null>(null);
+  const opts = useRef(o);
+  opts.current = o;
+  const timer = useRef<number | null>(null);
+  const running = useRef<Promise<void> | null>(null);
+  const again = useRef(false);
+
+  const run = useCallback(async (): Promise<void> => {
+    if (timer.current) { window.clearTimeout(timer.current); timer.current = null; }
+    if (running.current) { again.current = true; return running.current; }
+    if (!opts.current.enabled || !opts.current.hasChanges()) return;
+    const p = (async () => {
+      setState("saving");
+      const r = await opts.current.save().catch(e => ({ ok: false, error: (e as Error).message }));
+      if (r.ok) { setError(null); setState(opts.current.hasChanges() ? "pending" : "saved"); }
+      else {
+        setError(r.error ?? "Not saved"); setState("error");
+        // A dropped connection: tried again on its own in a little while (and at the next change).
+        timer.current = window.setTimeout(() => { void run(); }, 15_000);
+      }
+    })();
+    running.current = p;
+    await p;
+    running.current = null;
+    if (again.current) { again.current = false; await run(); }
+  }, []);
+
+  // Each change: wait for a pause in typing, then save.
+  useEffect(() => {
+    if (!o.enabled || !opts.current.hasChanges()) return;
+    setState(s => (s === "saving" ? s : "pending"));
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => { void run(); }, o.delay ?? 1200);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [o.trigger, o.enabled]);
+
+  // Hiding the page (switching app, locking the phone) saves at once; closing with unsaved work asks.
+  useEffect(() => {
+    const hide = () => { if (document.visibilityState === "hidden") void run(); };
+    const leave = (e: BeforeUnloadEvent) => { if (opts.current.enabled && (opts.current.hasChanges() || running.current)) { void run(); e.preventDefault(); e.returnValue = ""; } };
+    document.addEventListener("visibilitychange", hide);
+    window.addEventListener("beforeunload", leave);
+    return () => {
+      document.removeEventListener("visibilitychange", hide); window.removeEventListener("beforeunload", leave);
+      if (timer.current) window.clearTimeout(timer.current);
+      // Leaving the form (another tab or page in the app): whatever is waiting is still sent.
+      if (opts.current.enabled && opts.current.hasChanges()) void opts.current.save().catch(() => {});
+    };
+  }, [run]);
+
+  /** Saves anything waiting now. Resolves true when nothing is left unsaved. */
+  const flush = useCallback(async () => { await run(); if (running.current) await running.current; return !opts.current.hasChanges(); }, [run]);
+  return { state, error, flush };
+}
+
+/** "Saving…", "All changes saved", or what went wrong, for beside a form that saves by itself. */
+export function AutosaveStatus({ state, error, onRetry }: { state: AutosaveState; error: string | null; onRetry?: () => void }) {
+  if (state === "idle") return <span className="self-center text-xs text-slate-400">Saves automatically</span>;
+  if (state === "pending" || state === "saving") return <span className="self-center text-xs text-slate-500" role="status">Saving…</span>;
+  if (state === "saved") return <span className="self-center text-xs text-emerald-700" role="status">✓ All changes saved</span>;
+  return (
+    <span className="flex items-center gap-2 self-center text-xs text-rose-700" role="alert">
+      Not saved: {error}{onRetry && <button type="button" className="font-semibold underline" onClick={onRetry}>Try again</button>}
+    </span>
+  );
+}
+
 /** POST/PUT/PATCH/DELETE JSON; returns { ok, data, error }. */
 /**
  * Calls an API. Every change also tells the person whether it worked ("Saved" /

@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useApi, send, Page, PageHeader, Alert, Badge, statusTone, Empty, Field, Modal, Loading, fmtDate } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Alert, Badge, statusTone, Empty, Field, Modal, Loading, fmtDate, useAutosave, AutosaveStatus } from "@/components/ui";
 import { subjectTotal, gradeFor as bandFor, round, midtermParts } from "@/lib/grading";
 import { DEFAULT_SCALE, SCALE_PRESETS, TRAIT_PRESETS, areaTitle, scaleKey, type ScaleItem } from "@/lib/traits";
 import { useResultsPicker, type ResultsStructure as Structure } from "./useResultsPicker";
@@ -76,9 +76,9 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
   }, [mineKey, subject]);
   const { data, error, reload } = useApi<Sheet>(subject ? `/api/results/scores?term_id=${termId}&class_group_id=${cg}&subject_id=${subject}` : null, [termId, cg, subject]);
   const [grid, setGrid] = useState<Record<string, Record<string, string>>>({});
-  const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [busy, setBusy] = useState(false);
+  // What the server has: scores are saved by themselves, a moment after typing stops.
+  const saved = useRef<{ key: string; scores: Record<string, Record<string, number | null>> }>({ key: "", scores: {} });
   const [notes, setNotes] = useState(false);
   const [partsOpen, setPartsOpen] = useState(false);
   // Which report the teacher is filling scores for: mid-term shows only the mid-term parts (remembered on this device).
@@ -93,7 +93,9 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
       g[s.id] = {};
       for (const c of data.scheme.components) { const v = data.scores[s.id]?.[c.id]; g[s.id][c.id] = v === null || v === undefined ? "" : String(v); }
     }
-    setGrid(g); setDirty(false); setMsg(null);
+    saved.current = { key: `${termId}|${cg}|${subject}`, scores: JSON.parse(JSON.stringify(data.scores ?? {})) };
+    setGrid(g); setMsg(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
   const allComps = data?.scheme.components ?? [];
@@ -112,28 +114,34 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
   const invalid = (c: { max_score: number }, v: string) => v !== "" && (isNaN(Number(v)) || Number(v) < 0 || Number(v) > c.max_score);
   const hasInvalid = data ? data.students.some(s => allComps.some(c => invalid(c, grid[s.id]?.[c.id] ?? ""))) : false;
 
+  // Scores that differ from what was saved, leaving out any that are not a valid mark.
+  const changes = () => {
+    if (!data || saved.current.key !== `${termId}|${cg}|${subject}`) return [];
+    return data.students.flatMap(s => allComps.map(c => {
+      const v = grid[s.id]?.[c.id] ?? "";
+      return { student_id: s.id, component_id: c.id, score: v === "" ? null : Number(v), bad: invalid(c, v) };
+    })).filter(e => !e.bad && (saved.current.scores[e.student_id]?.[e.component_id] ?? null) !== e.score).map(({ bad: _bad, ...e }) => e);
+  };
+  const auto = useAutosave({
+    enabled: Boolean(data?.can_edit), trigger: grid,
+    hasChanges: () => changes().length > 0,
+    save: async () => {
+      const entries = changes();
+      if (!entries.length) return { ok: true };
+      const [t, c, s] = saved.current.key.split("|");
+      const r = await send("/api/results/scores", { term_id: t, class_group_id: c, subject_id: s, entries }, "PUT", { quiet: true });
+      if (r.ok) for (const e of entries) (saved.current.scores[e.student_id] ??= {})[e.component_id] = e.score;
+      return { ok: r.ok, error: r.error };
+    }
+  });
+
   async function moderate(action: "submit") {
-    if (dirty && !confirm("You have unsaved scores. Submit without them?")) return;
+    if (!(await auto.flush()) && !confirm("Some scores could not be saved. Submit without them?")) return;
     const r = await send("/api/results/moderation", { term_id: termId, class_group_id: cg, subject_id: subject, action });
     setMsg({ ok: r.ok, text: r.ok ? "Submitted for approval. The scores are locked until they are approved or returned." : r.error ?? "failed" });
     if (r.ok) reload();
   }
 
-  async function save() {
-    if (!data) return;
-    setBusy(true);
-    const entries = data.students.flatMap(s => allComps.map(c => {
-      const v = grid[s.id]?.[c.id] ?? "";
-      return { student_id: s.id, component_id: c.id, score: v === "" ? null : Number(v) };
-    })).filter(e => {
-      const orig = data.scores[e.student_id]?.[e.component_id];
-      return (orig ?? null) !== e.score;
-    });
-    const r = await send("/api/results/scores", { term_id: termId, class_group_id: cg, subject_id: subject, entries }, "PUT");
-    setBusy(false);
-    setMsg({ ok: r.ok, text: r.ok ? `Saved ${r.data.saved} scores${r.data.cleared ? `, cleared ${r.data.cleared}` : ""}.` : r.error ?? "failed" });
-    if (r.ok) reload();
-  }
 
   // Enter moves down the column like a spreadsheet.
   function onKey(e: React.KeyboardEvent<HTMLInputElement>, row: number, col: number) {
@@ -149,16 +157,15 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
     <div>
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <Field label="Subject">
-          <select className="input min-w-[200px]" value={subject} onChange={e => { if (!dirty || confirm("Discard unsaved scores?")) setSubject(e.target.value); }}>
+          <select className="input min-w-[200px]" value={subject} onChange={async e => { const to = e.target.value; await auto.flush(); setSubject(to); }}>
             {mine.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </Field>
         {data && <p className="pb-2 text-xs text-slate-500">{data.own_parts ? "This subject's own parts" : `Scheme: ${data.scheme.name}`}. {allComps.map(c => `${c.name} /${c.max_score} (${c.weight}%)`).join(" · ")}</p>}
-        {data?.can_set_parts && <button type="button" className="mb-1 text-xs font-semibold text-brand-700 underline" onClick={() => { if (!dirty || confirm("Discard unsaved scores?")) setPartsOpen(true); }}>Set {mine.find(s => s.id === subject)?.name ?? "this subject"}&apos;s parts</button>}
+        {data?.can_set_parts && <button type="button" className="mb-1 text-xs font-semibold text-brand-700 underline" onClick={async () => { await auto.flush(); setPartsOpen(true); }}>Set {mine.find(s => s.id === subject)?.name ?? "this subject"}&apos;s parts</button>}
         <div className="ml-auto flex gap-2 pb-0.5">
-          <button className="btn btn-ghost" onClick={() => { if (!dirty || confirm("Discard unsaved scores?")) setNotes(n => !n); }}>{notes ? "Back to scores" : "Comments & targets"}</button>
-          {dirty && <span className="self-center text-xs text-amber-600">Unsaved changes</span>}
-          {!notes && <button className="btn btn-primary" onClick={save} disabled={!dirty || busy || hasInvalid || !data?.can_edit}>{busy ? "Saving…" : "Save scores"}</button>}
+          {!notes && data?.can_edit && <AutosaveStatus state={auto.state} error={auto.error} onRetry={() => void auto.flush()} />}
+          <button className="btn btn-ghost" onClick={async () => { await auto.flush(); setNotes(n => !n); }}>{notes ? "Back to scores" : "Comments & targets"}</button>
         </div>
       </div>
       {data && !notes && (
@@ -183,6 +190,7 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
       {error && <Alert>{error}</Alert>}
       {partsOpen && <SubjectPartsDialog cg={cg} subject={subject} onClose={() => setPartsOpen(false)} onSaved={() => { setPartsOpen(false); reload(); }} />}
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
+      {hasInvalid && !notes && <div className="mb-3"><Alert tone="amber">Marks shown in red are not a number or are above the maximum for that column. They are not saved until they are corrected.</Alert></div>}
       {data?.moderation && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm">
           <span>Approval:</span><Badge tone={SHEET_TONE[data.sheet.status] ?? "slate"}>{SHEET_LABEL[data.sheet.status] ?? data.sheet.status}</Badge>
@@ -213,7 +221,7 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
                           <input data-cell={`${i}-${j}`} inputMode="decimal" disabled={!data.can_edit} aria-label={`${s.first_name} ${c.name}`}
                             className={"w-20 rounded border px-2 py-1 text-center tabular-nums " + (invalid(c, v) ? "border-rose-400 bg-rose-50" : "border-slate-300")}
                             value={v} onKeyDown={e => onKey(e, i, j)}
-                            onChange={e => { setGrid(g => ({ ...g, [s.id]: { ...g[s.id], [c.id]: e.target.value.trim() } })); setDirty(true); }} />
+                            onChange={e => { setGrid(g => ({ ...g, [s.id]: { ...g[s.id], [c.id]: e.target.value.trim() } })); }} />
                         </td>
                       );
                     })}
@@ -295,25 +303,35 @@ type Note = { comment: string; effort: string; target_grade: string; predicted_g
 
 /** Per-subject report comments, effort, target and predicted grades (printed on British-style cards). */
 function SubjectNotes({ termId, cg, subject, students, canEdit, bands }: { termId: string; cg: string; subject: string; students: Sheet["students"]; canEdit: boolean; bands: { grade: string }[] }) {
-  const { data, reload } = useApi<{ notes: Record<string, Partial<Note>> }>(`/api/results/subject-comments?term_id=${termId}&class_group_id=${cg}&subject_id=${subject}`, [termId, cg, subject]);
+  const { data } = useApi<{ notes: Record<string, Partial<Note>> }>(`/api/results/subject-comments?term_id=${termId}&class_group_id=${cg}&subject_id=${subject}`, [termId, cg, subject]);
   const [rows, setRows] = useState<Record<string, Note>>({});
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // What the server has: comments save by themselves a moment after typing stops.
+  const saved = useRef<Record<string, string>>({});
   useEffect(() => {
     if (!data) return;
-    setRows(Object.fromEntries(students.map(s => { const n = data.notes[s.id] ?? {}; return [s.id, { comment: n.comment ?? "", effort: n.effort ?? "", target_grade: n.target_grade ?? "", predicted_grade: n.predicted_grade ?? "" }]; })));
+    const r: Record<string, Note> = Object.fromEntries(students.map(s => { const n = data.notes[s.id] ?? {}; return [s.id, { comment: n.comment ?? "", effort: n.effort ?? "", target_grade: n.target_grade ?? "", predicted_grade: n.predicted_grade ?? "" }]; }));
+    saved.current = Object.fromEntries(Object.entries(r).map(([id, n]) => [id, JSON.stringify(n)]));
+    setRows(r);
   }, [data, students]);
   const set = (id: string, k: keyof Note, v: string) => setRows(r => ({ ...r, [id]: { ...r[id], [k]: v } }));
-  async function save() {
-    const r = await send("/api/results/subject-comments", { term_id: termId, subject_id: subject, notes: students.map(s => ({ student_id: s.id, ...rows[s.id] })) }, "PUT");
-    setMsg({ ok: r.ok, text: r.ok ? "Saved. Recompile report cards to include them." : r.error ?? "failed" });
-    if (r.ok) reload();
-  }
+  const changed = () => students.filter(s => rows[s.id] && JSON.stringify(rows[s.id]) !== saved.current[s.id]);
+  const auto = useAutosave({
+    enabled: canEdit && Boolean(data), trigger: rows, delay: 1500,
+    hasChanges: () => changed().length > 0,
+    save: async () => {
+      const list = changed().map(s => ({ student_id: s.id, ...rows[s.id] }));
+      if (!list.length) return { ok: true };
+      const r = await send("/api/results/subject-comments", { term_id: termId, subject_id: subject, notes: list }, "PUT", { quiet: true });
+      if (r.ok) for (const n of list) { const { student_id, ...rest } = n; saved.current[student_id] = JSON.stringify(rest); }
+      return { ok: r.ok, error: r.error };
+    }
+  });
   if (!data) return <Loading />;
   const grades = bands.map(b => b.grade);
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-600">Effort uses 1 (excellent) to 4 (cause for concern). Leave <i>Predicted</i> blank to let the system forecast it from the student&apos;s results so far.</p>
-      {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
+      {canEdit && <div className="flex justify-end"><AutosaveStatus state={auto.state} error={auto.error} onRetry={() => void auto.flush()} /></div>}
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Student</th><th className="p-2">Comment</th><th className="p-2">Effort</th><th className="p-2">Target</th><th className="p-2">Predicted</th></tr></thead>
@@ -328,7 +346,7 @@ function SubjectNotes({ termId, cg, subject, students, canEdit, bands }: { termI
           ))}</tbody>
         </table>
       </div>
-      {canEdit && <div className="flex justify-end"><button className="btn btn-primary" onClick={save}>Save comments &amp; targets</button></div>}
+      {canEdit && <p className="text-right text-xs text-slate-500">Saved as you type. Recompile report cards to include them.</p>}
     </div>
   );
 }
