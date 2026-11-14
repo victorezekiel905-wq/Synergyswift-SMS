@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { browserClient, warmBrowserClient } from "@/lib/supabase/lazy";
 import { signInEmail, isUsernameEmail } from "@/lib/login-name";
@@ -13,7 +12,8 @@ const REASONS: Record<string, string> = {
   idle: "You were signed out after a period of inactivity.",
   session_expired: "Your session reached the time limit your school set. Please sign in again.",
   sso_required: "Your school requires you to sign in with your school Google or Microsoft account.",
-  missing_oauth_code: "Single sign-on did not finish. Please try again."
+  missing_oauth_code: "Single sign-on did not finish. Please try again.",
+  account_ready: "Your account is ready. Sign in with the username (or email) and password you just chose."
 };
 
 type Who = "staff" | "parent" | "student";
@@ -26,7 +26,6 @@ const WHO: Record<Who, { tab: string; title: string; lead: string; field: string
 const whoFor = (role?: string | null): Who | null => !role ? null : role === "parent" ? "parent" : role === "student" ? "student" : "staff";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [who, setWho] = useState<Who>("staff");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -92,15 +91,18 @@ export default function LoginPage() {
     }
     try { localStorage.setItem("ss-login-as", who); } catch { /* storage off */ }
     const after = new URLSearchParams(window.location.search).get("next");
-    router.push(j.next && j.next !== "/dashboard" ? j.next : after && after.startsWith("/") && !after.startsWith("//") ? after : "/dashboard");
-    router.refresh();
+    // A full page load, so every part of the app starts fresh as the person who just signed in.
+    window.location.assign(j.next && j.next !== "/dashboard" ? j.next : after && after.startsWith("/") && !after.startsWith("//") ? after : "/dashboard");
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(null);
-    const sb = (await browserClient());
     setInfo(null); setUnconfirmed(false);
+    // The sign-in library could not load (a weak connection, or this page open from before an update): never a button stuck on "Signing in…".
+    let sb: Awaited<ReturnType<typeof browserClient>>;
+    try { sb = await browserClient(); }
+    catch { setBusy(false); setErr("Sign-in could not start: the connection may be weak. Reload the page and try again."); return; }
     const { error } = await sb.auth.signInWithPassword({ email: signInEmail(email), password });
     if (error) {
       setBusy(false);

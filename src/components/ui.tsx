@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { notify, noticeFor } from "@/components/Toaster";
-import { isSecurityCheck, announceSecurityCheck, SECURITY_CHECK_TEXT } from "@/lib/client-errors";
+import { isSecurityCheck, announceSecurityCheck, SECURITY_CHECK_TEXT, freshReload } from "@/lib/client-errors";
 
 /** Fetch JSON with loading / error state. `reload()` re-fetches. */
 export function useApi<T>(url: string | null, deps: unknown[] = []) {
@@ -236,7 +236,7 @@ export function Loading({ label = "Loading…" }: { label?: string }) {
         <span aria-hidden className="h-3.5 w-3.5 animate-spin rounded-full border-[1.5px] border-slate-300 border-t-slate-700" />
         {slow ? "Still loading: this is taking longer than usual…" : label}
       </span>
-      {slow && <span className="text-xs text-slate-400">A weak connection, or the server starting up after a quiet spell, can take up to a minute. <button type="button" className="font-semibold text-brand-700 underline" onClick={() => window.location.reload()}>Reload the page</button></span>}
+      {slow && <span className="text-xs text-slate-400">A weak connection, or the server starting up after a quiet spell, can take up to a minute. <button type="button" className="font-semibold text-brand-700 underline" onClick={freshReload}>Reload the page</button></span>}
     </div>
   );
 }

@@ -17,7 +17,18 @@ export function reloadOnceForStaleBuild(e: { name?: string; message?: string } |
   try { last = Number(sessionStorage.getItem(KEY) ?? 0); } catch { /* storage blocked */ }
   if (Date.now() - last < 60_000) return false;
   try { sessionStorage.setItem(KEY, String(Date.now())); } catch { /* storage blocked */ }
-  window.location.reload();
+  // A broken copy of a code file kept on this device would fail again after the reload: the saved
+  // copies of the app's files are cleared first (they are fetched fresh). School data is never kept there.
+  const reload = () => window.location.reload();
+  try {
+    if ("caches" in window) {
+      void caches.keys()
+        .then(keys => Promise.all(keys.filter(k => k.startsWith("educlass-static") || k.startsWith("educlass-pages")).map(k => caches.delete(k))))
+        .then(reload, reload);
+      return true;
+    }
+  } catch { /* storage blocked */ }
+  reload();
   return true;
 }
 
@@ -38,3 +49,17 @@ export function announceSecurityCheck() {
 }
 
 export const SECURITY_CHECK_TEXT = "The website's security check needs you to confirm you are a person. Reload the page, tick the box, and carry on.";
+/** Reloads the page with fresh copies of the app's files (the saved ones on this device are cleared first). */
+export function freshReload() {
+  if (typeof window === "undefined") return;
+  const reload = () => window.location.reload();
+  try {
+    if ("caches" in window) {
+      void caches.keys()
+        .then(keys => Promise.all(keys.filter(k => k.startsWith("educlass-static") || k.startsWith("educlass-pages")).map(k => caches.delete(k))))
+        .then(reload, reload);
+      return;
+    }
+  } catch { /* storage blocked */ }
+  reload();
+}

@@ -1,6 +1,6 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { browserClient, warmBrowserClient } from "@/lib/supabase/lazy";
 import { Monogram } from "@/components/AppShell";
@@ -21,7 +21,6 @@ export default function JoinPage() {
  * so the person sees it is theirs, then their email (the username) and a password typed twice.
  */
 function Join() {
-  const router = useRouter();
   const params = useSearchParams();
   const as = (params.get("as") as Who | null) ?? null;
   const [code, setCode] = useState(formatCode(params.get("code") ?? ""));
@@ -51,14 +50,21 @@ function Join() {
       body: JSON.stringify({ action: "claim", code: cleanCode(code), email: f.email, password: f.pw, password2: f.pw2, full_name: f.name || null }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { setBusy(false); setErr(j.error ?? "Please try again."); return; }
-    // Signed straight in, onto the dashboard for their role.
-    const sb = (await browserClient());
-    const { error } = await sb.auth.signInWithPassword({ email: j.email, password: f.pw });
-    if (error) { setBusy(false); router.push(`/login?as=${info?.as ?? "staff"}`); return; }
-    await fetch("/api/auth/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => null);
-    try { localStorage.setItem("ss-login-as", info?.as ?? "staff"); } catch { /* storage off */ }
-    router.push(j.next ?? "/dashboard");
-    router.refresh();
+    // The account exists now. Signed straight in, onto their own page, with a full page load so every
+    // part of the app starts fresh as them. If signing in fails for any reason (a weak connection, the
+    // page open from before an update), they are never left waiting: the sign-in page says the account is ready.
+    const who = info?.as ?? "staff";
+    try { localStorage.setItem("ss-login-as", who); } catch { /* storage off */ }
+    const ready = `/login?as=${who}&error=account_ready`;
+    try {
+      const sb = await browserClient();
+      const { error } = await sb.auth.signInWithPassword({ email: j.email, password: f.pw });
+      if (error) { window.location.assign(ready); return; }
+      await fetch("/api/auth/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => null);
+      window.location.assign(j.next ?? "/dashboard");
+    } catch {
+      window.location.assign(ready);
+    }
   }
 
   const title = info ? (info.kind === "parent_link" ? "Make your parent account" : `Make your ${info.as} account`) : "Make your account";

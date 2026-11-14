@@ -34,18 +34,18 @@ export default function ParentSignupPage() {
       const k = await post("/api/auth/code", { action: "claim", code: cleanCode(f.code), email: f.email, password: f.pw, password2: f.pw2, full_name: f.name });
       const kj = await k.json().catch(() => ({}));
       if (!k.ok) { setBusy(false); setErr(kj.error ?? "Please try again."); return; }
-      const { error } = await (await browserClient()).auth.signInWithPassword({ email: kj.email, password: f.pw });
+      const { error } = await browserClient().then(sb => sb.auth.signInWithPassword({ email: kj.email, password: f.pw })).catch(() => ({ error: true }));
       try { localStorage.setItem("ss-login-as", "parent"); } catch { /* storage off */ }
-      window.location.assign(error ? "/login?as=parent" : "/parent");
+      window.location.assign(error ? "/login?as=parent&error=account_ready" : "/parent");
       return;
     }
     const r = await post("/api/auth/parent-signup", { full_name: f.name, email: f.email, password: f.pw, password2: f.pw2 });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { setBusy(false); setErr(j.error ?? "Please try again."); return; }
     // Signed straight in, onto the parent page.
-    const { error } = await (await browserClient()).auth.signInWithPassword({ email: j.email, password: f.pw });
+    const { error } = await browserClient().then(sb => sb.auth.signInWithPassword({ email: j.email, password: f.pw })).catch(() => ({ error: true }));
     try { localStorage.setItem("ss-login-as", "parent"); } catch { /* storage off */ }
-    window.location.assign(error ? "/login?as=parent" : "/parent");
+    window.location.assign(error ? "/login?as=parent&error=account_ready" : "/parent");
   }
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { reloadOnceForStaleBuild, isStaleBuildError } from "@/lib/client-errors";
+import { reloadOnceForStaleBuild, isStaleBuildError, freshReload } from "@/lib/client-errors";
 
 /** The last line of defence (the app's frame itself failed): plain markup, no app styles needed. */
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
@@ -15,7 +15,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
           {!stale && <p style={{ fontFamily: "monospace", fontSize: 12, background: "#f1f5f9", padding: 12, borderRadius: 6, wordBreak: "break-word" }}>{error.message || "Unknown error"}{error.digest ? ` · ref ${error.digest}` : ""}</p>}
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
             {!stale && <button onClick={() => reset()} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#0f172a", color: "#fff" }}>Try again</button>}
-            <button onClick={() => window.location.reload()} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#fff" }}>Reload the page</button>
+            <button onClick={freshReload} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#fff" }}>Reload the page</button>
           </div>
         </main>
       </body>

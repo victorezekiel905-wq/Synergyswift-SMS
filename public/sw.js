@@ -8,11 +8,14 @@
  * - Learning content a student chose to keep offline ("ecf-content-<id>"
  *   caches, filled by the page) opens without a connection.
  */
-const CACHE = "educlass-static-v4";
+// v5: earlier versions could keep an error reply (a deploy in progress, the security check's page)
+// as if it were a code file, and every page needing that file then failed on that device until its
+// data was cleared. The new name makes every device drop the old copies when this version starts.
+const CACHE = "educlass-static-v5";
 // App pages that must open without a connection. They hold no school data:
 // the data is fetched by the page, and the register and the portals' "today"
 // views keep their own copy on the device (removed on sign-out).
-const PAGES = "educlass-pages-v1";
+const PAGES = "educlass-pages-v2";
 const OFFLINE_PAGES = ["/school/attendance", "/student", "/teacher", "/parent"];
 // The exam room (/exam/<id>) too: its page holds no data, and the exam in progress is kept on the
 // device, so a student who reloads without a connection carries on writing.
@@ -43,11 +46,16 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Immutable build assets: cache first.
+  // Immutable build assets: cache first. Only a real file is kept: a reply that is an error, or an
+  // HTML page where a script or stylesheet was asked for (the security check, a deploy in progress),
+  // is passed on once and never saved, so the next try fetches the real file.
   if (url.pathname.startsWith("/_next/static/") || url.pathname === "/icon.svg") {
     event.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE).then((c) => c.put(req, copy));
+      const type = res.headers.get("content-type") || "";
+      if (res.ok && res.status === 200 && !/text\/html/i.test(type)) {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy));
+      }
       return res;
     })));
     return;
@@ -56,7 +64,8 @@ self.addEventListener("fetch", (event) => {
   // Offline-capable pages: network first, then the last copy saved on this device.
   if (req.mode === "navigate" && offlinePage(url.pathname)) {
     event.respondWith(fetch(req).then((res) => {
-      if (res.ok) { const copy = res.clone(); caches.open(PAGES).then((c) => c.put(url.pathname, copy)); }
+      // Only the app's own page is kept (never the security check's page, which also comes back as 200).
+      if (res.ok && !res.headers.get("cf-mitigated")) { const copy = res.clone(); caches.open(PAGES).then((c) => c.put(url.pathname, copy)); }
       return res;
     }).catch(() => caches.match(url.pathname).then((hit) => hit || new Response(OFFLINE_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } }))));
     return;
