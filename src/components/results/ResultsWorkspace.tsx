@@ -2,12 +2,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useApi, send, Page, PageHeader, Alert, Badge, statusTone, Empty, Field, Modal, Loading, fmtDate } from "@/components/ui";
-import { subjectTotal, gradeFor as bandFor, round } from "@/lib/grading";
+import { subjectTotal, gradeFor as bandFor, round, midtermParts } from "@/lib/grading";
 import { DEFAULT_SCALE, SCALE_PRESETS, TRAIT_PRESETS, areaTitle, scaleKey, type ScaleItem } from "@/lib/traits";
 import { useResultsPicker, type ResultsStructure as Structure } from "./useResultsPicker";
 import SubjectPartsDialog from "./SubjectPartsDialog";
 type Sheet = {
-  scheme: { name: string; components: { id: string; name: string; max_score: number; weight: number }[]; bands: { grade: string; min_score: number; max_score: number }[]; pass_mark: number; decimals: number };
+  scheme: { name: string; components: { id: string; name: string; max_score: number; weight: number; midterm?: boolean }[]; bands: { grade: string; min_score: number; max_score: number }[]; pass_mark: number; decimals: number };
   students: { id: string; admission_no: string; first_name: string; last_name: string; other_names: string | null }[];
   scores: Record<string, Record<string, number | null>>;
   can_edit: boolean;
@@ -81,6 +81,10 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
   const [busy, setBusy] = useState(false);
   const [notes, setNotes] = useState(false);
   const [partsOpen, setPartsOpen] = useState(false);
+  // Which report the teacher is filling scores for: mid-term shows only the mid-term parts (remembered on this device).
+  const [forReport, setForReport] = useState<"midterm" | "term">("term");
+  useEffect(() => { try { if (localStorage.getItem("ss-scores-for") === "midterm") setForReport("midterm"); } catch { /* storage off */ } }, []);
+  const pickReport = (k: "midterm" | "term") => { setForReport(k); try { localStorage.setItem("ss-scores-for", k); } catch { /* storage off */ } };
 
   useEffect(() => {
     if (!data) return;
@@ -92,7 +96,12 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
     setGrid(g); setDirty(false); setMsg(null);
   }, [data]);
 
-  const comps = data?.scheme.components ?? [];
+  const allComps = data?.scheme.components ?? [];
+  // Mid-term: only the parts ticked "On mid-term reports", weights scaled to 100, exactly as the mid-term report card.
+  const midComps = midtermParts(allComps);
+  const comps = forReport === "midterm" ? midComps ?? [] : allComps;
+  const midNames = allComps.filter(c => c.midterm).map(c => c.name);
+  const endNames = allComps.filter(c => !c.midterm).map(c => c.name);
   // Same arithmetic and rounding as the compiled report card.
   const totalFor = (sid: string) => {
     const scores = Object.fromEntries(comps.map(c => { const v = grid[sid]?.[c.id] ?? ""; return [c.id, v === "" ? null : Number(v)]; }));
@@ -101,7 +110,7 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
   };
   const gradeFor = (t: number | null) => bandFor(t, data?.scheme.bands ?? [])?.grade ?? "";
   const invalid = (c: { max_score: number }, v: string) => v !== "" && (isNaN(Number(v)) || Number(v) < 0 || Number(v) > c.max_score);
-  const hasInvalid = data ? data.students.some(s => comps.some(c => invalid(c, grid[s.id]?.[c.id] ?? ""))) : false;
+  const hasInvalid = data ? data.students.some(s => allComps.some(c => invalid(c, grid[s.id]?.[c.id] ?? ""))) : false;
 
   async function moderate(action: "submit") {
     if (dirty && !confirm("You have unsaved scores. Submit without them?")) return;
@@ -113,7 +122,7 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
   async function save() {
     if (!data) return;
     setBusy(true);
-    const entries = data.students.flatMap(s => comps.map(c => {
+    const entries = data.students.flatMap(s => allComps.map(c => {
       const v = grid[s.id]?.[c.id] ?? "";
       return { student_id: s.id, component_id: c.id, score: v === "" ? null : Number(v) };
     })).filter(e => {
@@ -144,7 +153,7 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
             {mine.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </Field>
-        {data && <p className="pb-2 text-xs text-slate-500">{data.own_parts ? "This subject's own parts" : `Scheme: ${data.scheme.name}`}. {comps.map(c => `${c.name} /${c.max_score} (${c.weight}%)`).join(" · ")}</p>}
+        {data && <p className="pb-2 text-xs text-slate-500">{data.own_parts ? "This subject's own parts" : `Scheme: ${data.scheme.name}`}. {allComps.map(c => `${c.name} /${c.max_score} (${c.weight}%)`).join(" · ")}</p>}
         {data?.can_set_parts && <button type="button" className="mb-1 text-xs font-semibold text-brand-700 underline" onClick={() => { if (!dirty || confirm("Discard unsaved scores?")) setPartsOpen(true); }}>Set {mine.find(s => s.id === subject)?.name ?? "this subject"}&apos;s parts</button>}
         <div className="ml-auto flex gap-2 pb-0.5">
           <button className="btn btn-ghost" onClick={() => { if (!dirty || confirm("Discard unsaved scores?")) setNotes(n => !n); }}>{notes ? "Back to scores" : "Comments & targets"}</button>
@@ -152,6 +161,25 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
           {!notes && <button className="btn btn-primary" onClick={save} disabled={!dirty || busy || hasInvalid || !data?.can_edit}>{busy ? "Saving…" : "Save scores"}</button>}
         </div>
       </div>
+      {data && !notes && (
+        <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium">Scores for:</span>
+            <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5" role="group" aria-label="Which report">
+              {(["midterm", "term"] as const).map(k => (
+                <button key={k} type="button" aria-pressed={forReport === k} onClick={() => pickReport(k)}
+                  className={"rounded px-3 py-1 text-sm font-medium " + (forReport === k ? "bg-brand-600 text-white" : "text-slate-600 hover:text-slate-900")}>
+                  {k === "midterm" ? "Mid-term report" : "End of term report"}</button>))}
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-slate-600">
+            {forReport === "midterm"
+              ? midComps ? <>You are entering <b>mid-term</b> scores: {midNames.join(", ")}. The total is out of 100 for the work done so far, as on the mid-term report. These scores also count on the end of term report.</>
+                : <>No part of this subject counts for the mid-term report yet. {data.can_set_parts ? "Tick \"On mid-term reports\" for the right parts with the link above." : "A school admin ticks \"On mid-term reports\" for the right parts under Results → Grading systems."}</>
+              : <>You are entering scores for the <b>end of term</b> report: every part. {midNames.length ? <>Parts marked <span className="rounded bg-amber-100 px-1 text-amber-800">Mid-term</span> ({midNames.join(", ")}) also appear on the mid-term report{endNames.length ? `; ${endNames.join(", ")} count only at the end of term` : ""}.</> : "No part is marked for the mid-term report."}</>}
+          </p>
+        </div>
+      )}
       {error && <Alert>{error}</Alert>}
       {partsOpen && <SubjectPartsDialog cg={cg} subject={subject} onClose={() => setPartsOpen(false)} onSaved={() => { setPartsOpen(false); reload(); }} />}
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
@@ -169,7 +197,7 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-[13px] text-slate-500">
-              <tr><th className="p-2">#</th><th className="p-2">Student</th>{comps.map(c => <th key={c.id} className="p-2 text-center">{c.name}<div className="font-normal normal-case">/ {c.max_score}</div></th>)}<th className="p-2 text-center">Total</th><th className="p-2 text-center">Grade</th></tr>
+              <tr><th className="p-2">#</th><th className="p-2">Student</th>{comps.map(c => <th key={c.id} className="p-2 text-center">{c.name}<div className="font-normal normal-case">/ {c.max_score}</div>{forReport === "term" && c.midterm && <span className="mt-0.5 inline-block rounded bg-amber-100 px-1 text-[10px] font-semibold uppercase tracking-wide text-amber-800">Mid-term</span>}</th>)}<th className="p-2 text-center">{forReport === "midterm" ? "Mid-term total" : "Total"}</th><th className="p-2 text-center">Grade</th></tr>
             </thead>
             <tbody>
               {data.students.map((s, i) => {
