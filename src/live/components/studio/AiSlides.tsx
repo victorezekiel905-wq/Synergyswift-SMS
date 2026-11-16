@@ -139,7 +139,13 @@ export function AiSlides({ lesson, onAdded }: {
             <Button loading={busy === "save"} disabled={!!busy || !deck.slides.length} onClick={save}>{lesson ? `Add ${deck.slides.length} slides to this lesson` : "Create the lesson"}</Button>
           </div>
         </div>
-        {!deck.pictures && pictures && <Alert tone="info">Photos aren&apos;t set up on this site yet, so these slides have none. Ask your administrator to add an Unsplash key.</Alert>}
+        {!deck.pictures && pictures && <Alert tone="info">Pictures aren&apos;t set up on this site yet, so these slides have none. Ask your administrator to add a Pixabay, Unsplash or OpenAI key.</Alert>}
+        {deck.slides.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-sky-50 p-3 text-sm">
+            <span className="mr-auto"><b>Make it even more beautiful in Canva.</b> Open the slides in your own Canva account, then use Canva&apos;s <i>Design → Styles</i> to restyle every slide in one click, or swap in Canva&apos;s photos and elements. Your lesson here keeps this version.</span>
+            <Button variant="secondary" loading={busy === "canva"} disabled={!!busy} onClick={openInCanva}><ExternalLink className="h-4 w-4" aria-hidden /> Open in Canva</Button>
+          </div>
+        )}
         {err && <Alert tone="error">{err}</Alert>}
         <ol className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {deck.slides.map((s, i) => (

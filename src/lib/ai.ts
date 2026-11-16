@@ -49,6 +49,8 @@ export type ExtraProvider = { name: string; url: string; key: string; model: str
 
 /** Services that need only a key. Setting names are matched ignoring case, "_" and the Groq/Grog slip. */
 const KNOWN: { name: string; url: string; model: string; keys: string[]; modelKey: string }[] = [
+  // OpenAI (OPENAI_API_KEY): tried straight after Gemini. OPENAI_MODEL changes the model.
+  { name: "openai", url: "https://api.openai.com/v1", model: "gpt-4.1-mini", keys: ["OPENAIAPIKEY", "OPENAIKEY", "OPENAIAPI"], modelKey: "OPENAI_MODEL" },
   // Groq retired its Llama 3.x models on 16 August 2026; gpt-oss-120b is its suggested replacement.
   { name: "groq", url: "https://api.groq.com/openai/v1", model: "openai/gpt-oss-120b", keys: ["GROQAPIKEY", "GROQAPI", "GROQKEY", "GROGAPIKEY", "GROGAPI", "GROGKEY"], modelKey: "GROQ_MODEL" },
   // openrouter/free sends each request to one of OpenRouter's free models that can answer in JSON.
