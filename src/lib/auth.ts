@@ -108,10 +108,12 @@ export async function resolveCtx(): Promise<Ctx | CtxError> {
   const supportUntil = (user.app_metadata as { support_until?: string } | undefined)?.support_until;
   if (supportUntil && Date.parse(supportUntil) <= Date.now()) return { error: "This support session has ended.", status: 403, code: "support_ended" };
   const { data: { session } } = await sb.auth.getSession();
-  const access = await checkAccess(user.id, session?.access_token ?? null);
+  // The access rules and the profile at the same time (one wait instead of two on every request).
+  const [access, { data: profile }] = await Promise.all([
+    checkAccess(user.id, session?.access_token ?? null),
+    sb.from("users").select("id,tenant_id,email,full_name,role,extra_roles,custom_role_id,must_change_password").eq("id", user.id).maybeSingle()
+  ]);
   if (!access.ok) return { error: access.message, status: 403, code: "access_restricted" };
-  const { data: profile } = await sb.from("users")
-    .select("id,tenant_id,email,full_name,role,extra_roles,custom_role_id,must_change_password").eq("id", user.id).maybeSingle();
   // Signed in with a one-time (or starting) password: nothing opens until they choose their own.
   if (profile?.must_change_password) return { error: "Choose your own password to continue.", status: 403, code: "password_change_required" };
   if (profile) delete (profile as { must_change_password?: boolean }).must_change_password;
@@ -120,14 +122,15 @@ export async function resolveCtx(): Promise<Ctx | CtxError> {
     const e = STATE_ERRORS[st?.state as string];
     return e ? { ...e, code: st.state } : { error: "unauthenticated", status: 401 };
   }
-  const { data: tenant } = await sb.from("tenants")
-    .select("id,name,status,modules,timezone,allowed_roles").eq("id", profile.tenant_id).maybeSingle();
+  // The school and any custom role at the same time.
+  const [{ data: tenant }, roleRes] = await Promise.all([
+    sb.from("tenants").select("id,name,status,modules,timezone,allowed_roles").eq("id", profile.tenant_id).maybeSingle(),
+    profile.custom_role_id
+      ? sb.from("tenant_roles").select("id,name,grants,deny_modules,deny_permissions").eq("id", profile.custom_role_id).maybeSingle()
+      : Promise.resolve({ data: null })
+  ]);
   if (!tenant) return { error: "unauthenticated", status: 401 };
-  let customRole: CustomRole | null = null;
-  if (profile.custom_role_id) {
-    const { data: r } = await sb.from("tenant_roles").select("id,name,grants,deny_modules,deny_permissions").eq("id", profile.custom_role_id).maybeSingle();
-    customRole = r ?? null;
-  }
+  const customRole: CustomRole | null = (roleRes as { data: CustomRole | null }).data ?? null;
   // Own role and extra roles, plus a custom role's grants, within the roles the platform allows this school.
   const roles = effectiveRoles([profile.role, ...(profile.extra_roles ?? [])], customRole, tenant.allowed_roles ?? null);
   store.tenantId = tenant.id;

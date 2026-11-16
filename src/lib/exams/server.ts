@@ -21,6 +21,21 @@ export async function loadQuestions(svc: any, examId: string): Promise<Question[
   return (data ?? []).map((q: any) => ({ ...q, points: Number(q.points) }));
 }
 
+/**
+ * The classes an exam is for: the class set on the exam, else the classes of the exam-planner
+ * papers it is timetabled as. Empty: the whole school (the teacher chose "Whole school").
+ */
+export async function examClasses(svc: any, exam: { id: string; class_group_id: string | null }): Promise<string[]> {
+  if (exam.class_group_id) return [exam.class_group_id];
+  const { data } = await svc.from("exam_papers").select("class_group_ids").eq("exam_id", exam.id);
+  return [...new Set(((data ?? []) as { class_group_ids: string[] | null }[]).flatMap(p => p.class_group_ids ?? []))];
+}
+
+/** Whether a student in this class may see and sit the exam. */
+export function classMaySit(classes: string[], studentClass: string | null): boolean {
+  return !classes.length || (Boolean(studentClass) && classes.includes(studentClass!));
+}
+
 export function computeDeadline(exam: ExamRow, startedAt: Date, extraMinutes = 0): Date {
   let d = new Date(startedAt.getTime() + (exam.duration_minutes + extraMinutes) * 60_000);
   if (exam.closes_at) {

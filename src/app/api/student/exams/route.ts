@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCtx, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { windowState } from "@/lib/exams/server";
+import { windowState, classMaySit } from "@/lib/exams/server";
 
 /** Exams available to the signed-in student (their class group, or school-wide). */
 export async function GET() {
@@ -10,11 +10,17 @@ export async function GET() {
   const svc = createServiceClient();
   const { data: me } = await svc.from("students").select("id,class_group_id").eq("tenant_id", ctx.tenant.id).eq("user_id", ctx.userId).maybeSingle();
   if (!me) return jsonError("your login is not linked to a student record; ask the school office", 404);
-  let q = svc.from("exams").select("id,title,duration_minutes,opens_at,closes_at,status,results_released,settings,subjects(name)")
+  let q = svc.from("exams").select("id,title,duration_minutes,opens_at,closes_at,status,results_released,settings,class_group_id,subjects(name)")
     .eq("tenant_id", ctx.tenant.id).in("status", ["published", "closed"]).order("opens_at", { ascending: false, nullsFirst: false }).limit(100);
   q = me.class_group_id ? q.or(`class_group_id.is.null,class_group_id.eq.${me.class_group_id}`) : q.is("class_group_id", null);
-  const { data: exams, error } = await q;
+  const { data: found, error } = await q;
   if (error) return jsonError(error.message);
+  // Exams with no class set may still be for certain classes through their exam-planner papers.
+  const open = ((found ?? []) as any[]).filter(e => !e.class_group_id).map(e => e.id);
+  const { data: papers } = open.length ? await svc.from("exam_papers").select("exam_id,class_group_ids").in("exam_id", open) : { data: [] };
+  const paperClasses = new Map<string, string[]>();
+  for (const p of (papers ?? []) as { exam_id: string; class_group_ids: string[] | null }[]) paperClasses.set(p.exam_id, [...(paperClasses.get(p.exam_id) ?? []), ...(p.class_group_ids ?? [])]);
+  const exams = ((found ?? []) as any[]).filter(e => e.class_group_id || classMaySit(paperClasses.get(e.id) ?? [], me.class_group_id));
   const { data: attempts } = await svc.from("exam_attempts").select("exam_id,status,total_score,max_score")
     .eq("tenant_id", ctx.tenant.id).eq("student_user_id", ctx.userId);
   const byExam = new Map((attempts ?? []).map((a: any) => [a.exam_id, a]));

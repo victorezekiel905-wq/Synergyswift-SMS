@@ -63,7 +63,7 @@ export default function ExamsPage() {
         <form onSubmit={create} className="space-y-3">
           <Field label="Title"><input className="input" required value={f.title} onChange={e => setF({ ...f, title: e.target.value })} placeholder="JSS2 Mathematics: First term examination" /></Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Class"><select className="input" value={f.class_group_id} onChange={e => setF({ ...f, class_group_id: e.target.value })}><option value="">All students</option>{(structure?.class_groups ?? []).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
+            <Field label="Class"><select className="input" value={f.class_group_id} onChange={e => setF({ ...f, class_group_id: e.target.value })}><option value="">Whole school (every class)</option>{(structure?.class_groups ?? []).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
             <Field label="Subject"><select className="input" value={f.subject_id} onChange={e => setF({ ...f, subject_id: e.target.value })}><option value="">—</option>{(structure?.subjects ?? []).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
           </div>
           <Field label="Duration (minutes)"><input className="input" type="number" min={1} max={600} value={f.duration_minutes} onChange={e => setF({ ...f, duration_minutes: e.target.value })} /></Field>
@@ -117,7 +117,7 @@ function MockForm({ structure, onCreated }: { structure: { class_groups: { id: s
             </select>
           </Field>
         ))}
-        <Field label="Class"><select className="input" value={f.class_group_id} onChange={e => setF({ ...f, class_group_id: e.target.value })}><option value="">All students</option>{(structure?.class_groups ?? []).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
+        <Field label="Class"><select className="input" value={f.class_group_id} onChange={e => setF({ ...f, class_group_id: e.target.value })}><option value="">Whole school (every class)</option>{(structure?.class_groups ?? []).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
         <Field label="Term"><select className="input" value={f.term_id} onChange={e => setF({ ...f, term_id: e.target.value })}><option value="">—</option>{(sessions ?? []).flatMap(s => s.terms.map(t => <option key={t.id} value={t.id}>{t.name} {s.name}</option>))}</select></Field>
         <Field label="Different paper per student" hint="2× puts twice as many questions in each section and gives every student a random half.">
           <select className="input" value={f.pool} onChange={e => setF({ ...f, pool: e.target.value })}><option value="1">No, same questions for all</option><option value="1.5">Yes, 1.5× pool</option><option value="2">Yes, 2× pool</option><option value="3">Yes, 3× pool</option></select>

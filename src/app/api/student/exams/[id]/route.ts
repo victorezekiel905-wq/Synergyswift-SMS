@@ -6,7 +6,7 @@ import { buildAttemptLayout, toPublicQuestion, questionsForAttempt, type Questio
 import { canRun, gradeCode, runCode } from "@/lib/exams/code-runner";
 import { verifySeb, absoluteRequestUrl, sebLaunchUrl } from "@/lib/exams/seb";
 import {
-  loadQuestions, computeDeadline, windowState, finalizeAttempt, autoSubmitIfExpired, studentResultView,
+  loadQuestions, computeDeadline, windowState, finalizeAttempt, autoSubmitIfExpired, studentResultView, examClasses, classMaySit,
   VIOLATION_KINDS, GRACE_MS, type ExamRow
 } from "@/lib/exams/server";
 import { appUrl } from "@/lib/school";
@@ -24,7 +24,9 @@ async function context(req: NextRequest, examId: string) {
   const { data: me } = await svc.from("students").select("id,class_group_id").eq("tenant_id", ctx.tenant.id).eq("user_id", ctx.userId).maybeSingle();
   if (!me) return { error: jsonError("your login is not linked to a student record", 404) };
   const { data: exam } = await svc.from("exams").select("*").eq("tenant_id", ctx.tenant.id).eq("id", examId).in("status", ["published", "closed"]).maybeSingle();
-  if (!exam || (exam.class_group_id && exam.class_group_id !== me.class_group_id)) return { error: jsonError("exam not found", 404) };
+  // Only the classes the exam is for (set on the exam, or its exam-planner papers); anyone else is told it is not theirs.
+  if (!exam) return { error: jsonError("exam not found", 404) };
+  if (!classMaySit(await examClasses(svc, exam), me.class_group_id)) return { error: jsonError("This exam is for another class. Check with your teacher.", 403) };
   return { ctx: ctx as Ctx, svc, exam: exam as ExamRow, student: me };
 }
 

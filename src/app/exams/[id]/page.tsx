@@ -275,7 +275,8 @@ function Settings({ exam, questions, reload }: { exam: Exam; questions: Question
   const sections = new Map<string, number>();
   for (const q of questions) if (q.section) sections.set(q.section, (sections.get(q.section) ?? 0) + 1);
   const cfgUrl = typeof window !== "undefined" ? `${window.location.origin}/api/exams/${exam.id}/seb` : "";
-  const studentUrl = typeof window !== "undefined" ? `${window.location.origin}/exam/${exam.id}` : "";
+  // The short way in: students type the code at /exam (the exam's own link works too).
+  const studentUrl = typeof window !== "undefined" ? `${window.location.host}/exam` : "synergyswift.com/exam";
   // The chosen subject's own parts in the chosen class (set by its teacher) come first, then the school's grading systems.
   const ownParts = (subjectParts?.own_parts ?? []).map(c => ({ id: c.id, name: `${subjectParts?.subject} (${subjectParts?.class_name}): ${c.name}` }));
   const comps = [...ownParts, ...(schemes ?? []).flatMap(sc => sc.grading_components.map(c => ({ id: c.id, name: `${sc.name}: ${c.name}` })))];
@@ -292,7 +293,7 @@ function Settings({ exam, questions, reload }: { exam: Exam; questions: Question
         <div className="md:col-span-3"><Field label="Instructions shown before starting"><textarea className="input h-24" value={e.instructions ?? ""} onChange={ev => setE({ ...e, instructions: ev.target.value })} /></Field></div>
         <Field label="Opens"><input className="input" type="datetime-local" value={toLocal(e.opens_at)} onChange={ev => setE({ ...e, opens_at: ev.target.value || null })} /></Field>
         <Field label="Closes" hint="Late starters get only the time left before this."><input className="input" type="datetime-local" value={toLocal(e.closes_at)} onChange={ev => setE({ ...e, closes_at: ev.target.value || null })} /></Field>
-        <Field label="Class"><select className="input" value={e.class_group_id ?? ""} onChange={ev => setE({ ...e, class_group_id: ev.target.value })}><option value="">All students</option>{(structure?.class_groups ?? []).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
+        <Field label="Class"><select className="input" value={e.class_group_id ?? ""} onChange={ev => setE({ ...e, class_group_id: ev.target.value })}><option value="">Whole school (every class)</option>{(structure?.class_groups ?? []).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field>
       </section>
 
       <section className="card grid gap-3 p-5 md:grid-cols-2">

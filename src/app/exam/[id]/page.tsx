@@ -55,6 +55,8 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState("");
+  // From synergyswift.com/exam: the code the student typed there is filled in.
+  useEffect(() => { const c = new URLSearchParams(window.location.search).get("code"); if (c) setCode(c.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 20)); }, []);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [current, setCurrent] = useState(0);
   const [flags, setFlags] = useState<Set<string>>(new Set());
@@ -153,7 +155,14 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
     }
     setOpenedOffline(false);
     if (r.data.exam) { setExam(r.data.exam); setError(null); }
-    if (!r.ok && !r.data.exam) { setError(r.data.error ?? "Could not load the exam."); return; }
+    // Not signed in on this device: sign in as the student, then straight back to this exam.
+    if (r.status === 401) { window.location.assign(`/login?as=student&next=${encodeURIComponent(window.location.pathname + window.location.search)}`); return; }
+    if (!r.ok && !r.data.exam) {
+      setError(r.status === 403 && /forbidden/i.test(r.data.error ?? "") ? "Exams are taken with a student account. Sign out and sign in as the student."
+        : r.status === 404 && /exam not found/i.test(r.data.error ?? "") ? "This exam isn't available to you: it may not be published yet, or it is for another class. Check with your teacher."
+        : r.data.error ?? "Could not load the exam.");
+      return;
+    }
     if (r.data.seb_error) { setError(r.data.seb_error); setStatus(r.data.attempt?.status ?? null); return; }
     const a = r.data.attempt;
     if (!a) { setStatus(null); return; }
@@ -333,7 +342,12 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
     const r = await api(id, { action: "start", access_code: code });
     if (!r.ok) {
       cam?.getTracks().forEach(t => t.stop()); setCamera(null);
-      setError(r.status === 0 ? "You're offline. Connect to the internet to start the exam." : r.data.error ?? "Could not start.");
+      const why = String(r.data.error ?? "");
+      setError(r.status === 0 ? "You're offline. Connect to the internet to start the exam."
+        : r.status === 401 ? "You've been signed out. Sign in again, then press Start."
+        : /wrong exam code/i.test(why) ? "That code isn't right for this exam. Check it with your teacher (it is the code shown to your teacher on the exam page)."
+        : /not open right now/i.test(why) ? "This exam isn't open at the moment. Check the start time with your teacher."
+        : why || "Could not start.");
       return;
     }
     const a = r.data.attempt as AttemptState;
