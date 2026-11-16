@@ -69,6 +69,9 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("remove_line"), line_id: z.string().uuid() }),
   z.object({ action: z.literal("void_invoice"), invoice_id: z.string().uuid(), reason: z.string().trim().min(2).max(300) }),
   z.object({ action: z.literal("record_payment"), invoice_id: z.string().uuid(), amount: z.number().positive().max(1e10), method: z.enum(["cash", "transfer", "pos", "cheque"]), reference: z.string().trim().max(80).nullish(), payer_name: z.string().trim().max(120).nullish(), paid_at: z.string().datetime({ offset: true }).nullish() }),
+  // Several students marked "paid in full" at once: each invoice's whole balance is recorded, each with its own receipt.
+  z.object({ action: z.literal("record_payments_bulk"), invoice_ids: z.array(z.string().uuid()).min(1).max(500), method: z.enum(["cash", "transfer", "pos", "cheque"]),
+    reference: z.string().trim().max(60).nullish(), paid_at: z.string().datetime({ offset: true }).nullish() }),
   z.object({ action: z.literal("reverse_payment"), payment_id: z.string().uuid(), reason: z.string().trim().min(2).max(300) }),
   z.object({ action: z.literal("send_reminders"), term_id: z.string().uuid().nullish(), class_group_ids: z.array(z.string().uuid()).default([]) }),
   z.object({ action: z.literal("settings"), payment_provider: z.enum(["paystack", "flutterwave"]).nullable(), payment_subaccount: z.string().trim().max(60).nullish(), bank_details: z.string().trim().max(400).nullish(), withhold_results_for_debtors: z.boolean() })
@@ -147,6 +150,24 @@ export async function POST(req: NextRequest) {
           payerName: b.payer_name, recordedBy: ctx.userId, paidAt: b.paid_at, baseUrl: appUrl(req) });
         await audit("fees.payment_recorded", { invoice_id: b.invoice_id, amount: b.amount, method: b.method, receipt: pay.receipt_no });
         return NextResponse.json(pay, { status: 201 });
+      }
+      case "record_payments_bulk": {
+        // Only this school's invoices that still owe something; void and fully paid ones are left alone.
+        const { data: invs } = await svc.from("fee_invoices").select("id,invoice_no,total,amount_paid,status").eq("tenant_id", ctx.tenant.id).in("id", b.invoice_ids);
+        let done = 0, skipped = 0, total = 0;
+        const failed: string[] = [];
+        for (const inv of (invs ?? []) as { id: string; invoice_no: string; total: number; amount_paid: number; status: string }[]) {
+          const balance = Math.round((Number(inv.total) - Number(inv.amount_paid)) * 100) / 100;
+          if (inv.status === "void" || balance <= 0) { skipped++; continue; }
+          try {
+            // One teller or transfer reference can cover several children: each payment gets its own reference from it.
+            const pay = await recordManualPayment(svc, { tenantId: ctx.tenant.id, invoiceId: inv.id, amount: balance, method: b.method,
+              reference: b.reference ? `${b.reference}/${inv.invoice_no}` : null, recordedBy: ctx.userId, paidAt: b.paid_at, baseUrl: appUrl(req) });
+            await audit("fees.payment_recorded", { invoice_id: inv.id, amount: balance, method: b.method, receipt: pay.receipt_no, bulk: true });
+            done++; total += balance;
+          } catch (e) { failed.push(`${inv.invoice_no}: ${(e as Error).message}`); }
+        }
+        return NextResponse.json({ ok: true, done, skipped, total, failed });
       }
       case "reverse_payment": {
         const { data, error } = await svc.from("fee_payments").update({ status: "reversed", meta: { reversed_by: ctx.userId, reason: b.reason } })

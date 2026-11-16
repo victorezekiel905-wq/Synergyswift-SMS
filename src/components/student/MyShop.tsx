@@ -29,7 +29,19 @@ export default function MyShop() {
   const { data, error, reload } = useApi<Data>("/api/shop/me");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  if (error) return null;           // no shop module, or not a student record: say nothing
+  // The school does not use the tuck shop: nothing to show. Anything else is said, so it can be put right.
+  if (error && /module is not enabled|does not include this area/i.test(error)) return null;
+  if (error) {
+    return (
+      <section className="card mb-8 p-5" id="shop">
+        <h2 className="text-lg font-semibold">Tuck shop</h2>
+        <p className="mt-1 text-sm text-rose-700">{/not linked to a student record/i.test(error)
+          ? "Your sign-in is not linked to your student record yet, so your tuck shop wallet can't be shown. Ask the school office to link it."
+          : `Your tuck shop can't be shown just now: ${error}`}</p>
+        <button type="button" className="btn btn-ghost mt-2 text-xs" onClick={() => reload()}>Try again</button>
+      </section>
+    );
+  }
   if (!data) return null;
   const s = data.status, cur = data.currency;
   const tz = data.timezone;
@@ -80,7 +92,6 @@ export default function MyShop() {
               <b className={`tabular-nums ${Number(t.amount) > 0 ? "text-emerald-700" : ""}`}>{money(t.amount, cur)}</b></li>))}</ul>
         </details>
       )}
-      {error && <Alert>{error}</Alert>}
     </section>
   );
 }

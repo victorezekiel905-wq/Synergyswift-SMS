@@ -168,6 +168,33 @@ function Invoices({ termId, groups, currency }: { termId: string; groups: { id: 
   const params = new URLSearchParams({ term_id: termId, ...(f.cg ? { class_group_id: f.cg } : {}), ...(f.status ? { status: f.status } : {}), ...(f.q ? { q: f.q } : {}) });
   const list = useApi<Invoice[]>(`/api/fees/invoices?${params}`, [termId, f.cg, f.status, f.q]);
   const [open, setOpen] = useState<string | null>(null);
+  // Ticked students, to mark them paid in full together (cash, transfer, POS or cheque).
+  const [sel, setSel] = useState<string[]>([]);
+  const [bulk, setBulk] = useState({ method: "cash", reference: "" });
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => { setSel([]); }, [termId, f.cg, f.status, f.q]);
+  const owing = (list.data ?? []).filter(i => i.status !== "void" && Number(i.total) - Number(i.amount_paid) > 0);
+  const selected = owing.filter(i => sel.includes(i.id));
+  const selBalance = selected.reduce((s, i) => s + Number(i.total) - Number(i.amount_paid), 0);
+  async function markPaid(ids: string[], method = bulk.method, reference = bulk.reference) {
+    setBusy(true); setNote(null);
+    const r = await send<{ done: number; skipped: number; total: number; failed: string[] }>("/api/fees", { action: "record_payments_bulk", invoice_ids: ids, method, reference: reference.trim() || null }, "POST", { quiet: true });
+    setBusy(false);
+    if (!r.ok) { setNote({ ok: false, text: r.error ?? "Not saved." }); return; }
+    setNote({ ok: !r.data.failed.length, text: `${r.data.done} marked paid in full (${money(r.data.total, currency)}); receipts sent to the parents.${r.data.skipped ? ` ${r.data.skipped} had nothing to pay.` : ""}${r.data.failed.length ? ` Not saved: ${r.data.failed.join("; ")}` : ""}` });
+    setSel([]); list.reload();
+  }
+  async function partPay(i: Invoice) {
+    const bal = Number(i.total) - Number(i.amount_paid);
+    const v = prompt(`Amount ${i.students.first_name} ${i.students.last_name} paid (balance ${money(bal, currency)}):`);
+    if (!v) return;
+    const amount = Number(v.replace(/[^\d.]/g, ""));
+    if (!(amount > 0) || amount > bal) { setNote({ ok: false, text: `Type an amount between 1 and ${money(bal, currency)}.` }); return; }
+    const r = await send("/api/fees", { action: "record_payment", invoice_id: i.id, amount, method: bulk.method, reference: bulk.reference.trim() || null }, "POST", { quiet: true });
+    setNote({ ok: r.ok, text: r.ok ? `${money(amount, currency)} recorded for ${i.students.first_name}; receipt sent.` : r.error ?? "Not saved." });
+    if (r.ok) list.reload();
+  }
   const totals = useMemo(() => (list.data ?? []).reduce((a, i) => ({ total: a.total + Number(i.total), paid: a.paid + Number(i.amount_paid) }), { total: 0, paid: 0 }), [list.data]);
   return (
     <div>
@@ -180,18 +207,34 @@ function Invoices({ termId, groups, currency }: { termId: string; groups: { id: 
         <span className="ml-auto self-center text-sm text-slate-600">Total {money(totals.total, currency)} · paid {money(totals.paid, currency)} · balance <b>{money(totals.total - totals.paid, currency)}</b></span>
       </div>
       {list.error && <Alert>{list.error}</Alert>}
+      {note && <div className="mb-3"><Alert tone={note.ok ? "green" : "red"}>{note.text}</Alert></div>}
+      {owing.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
+          <span className="mr-auto self-center">{selected.length ? <><b>{selected.length}</b> ticked · balance {money(selBalance, currency)}</> : "Tick students to mark them paid, or use the buttons on each row."}</span>
+          <Field label="Paid by"><select className="input py-1" value={bulk.method} onChange={e => setBulk({ ...bulk, method: e.target.value })}><option value="cash">Cash</option><option value="transfer">Bank transfer</option><option value="pos">POS</option><option value="cheque">Cheque</option></select></Field>
+          <Field label="Reference (optional)"><input className="input w-44 py-1" value={bulk.reference} maxLength={60} placeholder="Teller / transfer no." onChange={e => setBulk({ ...bulk, reference: e.target.value })} /></Field>
+          <button className="btn btn-primary" disabled={busy || !selected.length}
+            onClick={() => confirm(`Mark ${selected.length} student${selected.length === 1 ? "" : "s"} as paid in full (${money(selBalance, currency)} by ${bulk.method})? A receipt goes to each family.`) && markPaid(selected.map(i => i.id))}>
+            {busy ? "Saving…" : `Mark ${selected.length || ""} paid in full`}</button>
+        </div>
+      )}
       {!list.data?.length ? <Empty>No invoices match.</Empty> : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="p-2">Invoice</th><th className="p-2">Student</th><th className="p-2">Class</th><th className="p-2 text-right">Total</th><th className="p-2 text-right">Paid</th><th className="p-2 text-right">Balance</th><th className="p-2">Status</th></tr></thead>
+            <thead className="bg-slate-50 text-left text-[13px] text-slate-500"><tr><th className="w-8 p-2"><input type="checkbox" aria-label="Tick every student shown who still owes" checked={owing.length > 0 && selected.length === owing.length} onChange={e => setSel(e.target.checked ? owing.map(i => i.id) : [])} /></th><th className="p-2">Invoice</th><th className="p-2">Student</th><th className="p-2">Class</th><th className="p-2 text-right">Total</th><th className="p-2 text-right">Paid</th><th className="p-2 text-right">Balance</th><th className="p-2">Status</th><th className="p-2" /></tr></thead>
             <tbody>{list.data.map(i => (
               <tr key={i.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => setOpen(i.id)}>
+                <td className="p-2" onClick={e => e.stopPropagation()}>{owing.some(o => o.id === i.id) && <input type="checkbox" aria-label={`Tick ${i.students.first_name}`} checked={sel.includes(i.id)} onChange={e => setSel(e.target.checked ? [...sel, i.id] : sel.filter(x => x !== i.id))} />}</td>
                 <td className="p-2 font-mono text-xs">{i.invoice_no}<div className="font-sans text-slate-500">{i.title}</div></td>
                 <td className="p-2">{i.students.last_name}, {i.students.first_name} <span className="text-xs text-slate-400">{i.students.admission_no}</span></td>
                 <td className="p-2">{i.students.class_groups?.name}</td>
                 <td className="p-2 text-right tabular-nums">{money(i.total, currency)}</td><td className="p-2 text-right tabular-nums">{money(i.amount_paid, currency)}</td>
                 <td className="p-2 text-right font-semibold tabular-nums">{money(Number(i.total) - Number(i.amount_paid), currency)}</td>
-                <td className="p-2"><Badge tone={statusTone(i.status === "part_paid" ? "pending" : i.status === "issued" ? "rejected" : i.status)}>{i.status.replace("_", " ")}</Badge></td>
+                <td className="p-2"><Badge tone={statusTone(i.status === "part_paid" ? "pending" : i.status === "issued" ? "rejected" : i.status)}>{i.status === "issued" ? "unpaid" : i.status.replace("_", " ")}</Badge></td>
+                <td className="whitespace-nowrap p-2 text-right" onClick={e => e.stopPropagation()}>{owing.some(o => o.id === i.id) && <>
+                  <button className="btn btn-ghost px-2 py-0.5 text-xs text-emerald-700" disabled={busy} onClick={() => confirm(`Mark ${i.students.first_name} ${i.students.last_name} as paid in full (${money(Number(i.total) - Number(i.amount_paid), currency)} by ${bulk.method})?`) && markPaid([i.id])}>Paid in full</button>
+                  <button className="btn btn-ghost px-2 py-0.5 text-xs" disabled={busy} onClick={() => partPay(i)}>Part payment</button></>}
+                  {i.status !== "issued" && i.status !== "void" && <button className="btn btn-ghost px-2 py-0.5 text-xs text-slate-500" onClick={() => setOpen(i.id)} title="Open the invoice to see or reverse payments">Payments</button>}</td>
               </tr>))}</tbody>
           </table>
         </div>
