@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useApi, send, Page, PageHeader, Stat, Alert } from "@/components/ui";
+import { useApi, send, Page, PageHeader, Stat, Alert, fmtDate } from "@/components/ui";
 import { SECTIONS, STATS, DEFAULT_LAYOUT, move, type Layout, type SectionId } from "@/lib/dashboard-layout";
 import KpiBoard from "@/components/school/KpiBoard";
 import HeadSummary from "@/components/school/HeadSummary";
@@ -9,6 +9,7 @@ import MyAccess from "@/components/portal/MyAccess";
 
 type Overview = {
   school: string; term: string | null; roles: string[];
+  term_check?: { ended_on: string | null; session_typo: string | null } | null;
   counts: Record<string, number>;
 };
 
@@ -68,6 +69,13 @@ export default function SchoolHome() {
       {error && <Alert>{error}</Alert>}
       {data && !data.term && (
         <div className="mb-5"><Alert tone="amber">No current term is set. Go to <Link className="font-semibold underline" href="/school/setup">School setup</Link> to create a session and mark a term as current.</Alert></div>
+      )}
+      {data?.term_check && (
+        <div className="mb-5"><Alert tone="amber">
+          {data.term_check.ended_on && <>{data.term} ended on {fmtDate(data.term_check.ended_on)} but is still the current term, so new results, fees and registers go to it. </>}
+          {data.term_check.session_typo && <>The session name looks mistyped (did you mean {data.term_check.session_typo}?). </>}
+          Fix it in <Link className="font-semibold underline" href="/school/setup">School setup</Link>{data.term_check.ended_on ? " by marking the new term as current" : ""}.
+        </Alert></div>
       )}
       {editing && saved && <Customise layout={layout} setLayout={setLayout} onSave={async () => {
         const r = await send("/api/school/dashboard", { layout });

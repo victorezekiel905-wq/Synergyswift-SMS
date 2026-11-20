@@ -23,6 +23,11 @@ export async function POST(req: NextRequest) {
   if (ctx instanceof NextResponse) return ctx;
   const parsed = Create.safeParse(await readJson(req));
   if (!parsed.success) return jsonError(parsed.error.issues.map(i => i.message).join("; "));
+  // A second click (or a retried request) on a slow connection opens the exam just made, not a copy.
+  const since = new Date(Date.now() - 2 * 60_000).toISOString();
+  const { data: twin } = await ctx.sb.from("exams").select("id").eq("tenant_id", ctx.tenant.id).eq("created_by", ctx.userId)
+    .eq("title", parsed.data.title).gte("created_at", since).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (twin) return NextResponse.json(twin, { status: 200 });
   const { data: s } = await ctx.sb.from("tenant_settings").select("exam_violation_limit").eq("tenant_id", ctx.tenant.id).maybeSingle();
   const { data, error } = await ctx.sb.from("exams").insert({
     ...parsed.data, tenant_id: ctx.tenant.id, created_by: ctx.userId,

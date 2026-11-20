@@ -6,7 +6,7 @@ import { appUrl } from "@/lib/school";
 import { entity, ENTITIES } from "@/lib/importers";
 import { readTable, runImport, exportTable } from "@/lib/importers-server";
 import { toCsv, writeXlsx } from "@/lib/spreadsheet";
-import { fillAdmissionNumbers, type Existing } from "@/lib/admission-numbers";
+import { fillAdmissionNumbers, schoolInitials, type Existing } from "@/lib/admission-numbers";
 import { fetchAll } from "@/lib/results";
 
 export const dynamic = "force-dynamic";
@@ -71,9 +71,9 @@ export async function POST(req: NextRequest) {
       const cell = (r: string[], k: string) => (col(k) >= 0 ? (r[col(k)] ?? "").trim() : "");
       if (b.rows.some(r => !cell(r, "admission_no"))) {
         const existing = await fetchAllRows(ctx.sb, ctx.tenant.id);
-        // The school's student ID format (GC-0001); before the database update (10600), the year (2026/0001).
+        // The school's student ID format (GC-0001); before the database update (10600), its initials from the name.
         const { data: pre, error: preErr } = await createServiceClient().rpc("student_id_prefix", { p_tenant: ctx.tenant.id });
-        const prefix = !preErr && pre ? `${pre}-` : `${new Date().getFullYear()}/`;
+        const prefix = !preErr && pre ? `${pre}-` : `${schoolInitials(ctx.tenant.name)}-`;
         const filled = fillAdmissionNumbers(b.rows.map(r => ({ admission_no: cell(r, "admission_no"), first_name: cell(r, "first_name"), last_name: cell(r, "last_name"), class_name: cell(r, "class") })), existing, prefix);
         let at = col("admission_no");
         if (at < 0) { at = b.headers.length; b.headers.push("Admission number (given by Synergy Swift)"); b.map.admission_no = at; }

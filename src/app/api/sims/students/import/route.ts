@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { parseCsv } from "@/lib/school";
 import { StudentInput, GuardianInput, cleanStudent } from "@/lib/validators";
+import { withStudentId, studentSaveError } from "@/lib/student-ids-server";
 
 /**
  * CSV import. Columns (header names, any order):
@@ -58,8 +59,8 @@ export async function POST(req: NextRequest) {
         if (error) throw new Error(error.message);
         studentId = existing.id; result.updated++;
       } else {
-        const { data: s, error } = await sb.from("students").insert({ ...cleanStudent(parsed.data), tenant_id: tid }).select("id").single();
-        if (error) throw new Error(error.message);
+        const { data: s, error } = await sb.from("students").insert(await withStudentId(tid, { ...cleanStudent(parsed.data), tenant_id: tid })).select("id").single();
+        if (error) throw new Error(studentSaveError(error.message));
         studentId = s.id; result.created++;
       }
 

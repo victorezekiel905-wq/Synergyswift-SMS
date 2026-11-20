@@ -49,7 +49,7 @@ export async function loadCollections(svc: any, tenantId: string) {
     const [c, p, k] = await Promise.all([
       fetchAll<any>(() => svc.from("crm_interactions").select("guardian_id,occurred_at,kind,body").eq("tenant_id", tenantId).in("guardian_id", part).order("occurred_at", { ascending: false }).order("id")),
       fetchAll<any>(() => svc.from("fee_promises").select("*").eq("tenant_id", tenantId).in("guardian_id", part).order("created_at", { ascending: false }).order("id")),
-      fetchAll<any>(() => svc.from("fee_collection_cases").select("*").eq("tenant_id", tenantId).in("guardian_id", part).order("id"))
+      fetchAll<any>(() => svc.from("fee_collection_cases").select("*").eq("tenant_id", tenantId).in("guardian_id", part).order("guardian_id"))
     ]);
     contacts.push(...c); promises.push(...p); cases.push(...k);
   }

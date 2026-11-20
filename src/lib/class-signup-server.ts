@@ -9,6 +9,7 @@ import { policyFor } from "./sign-up-codes-server";
 import { loginEmailFor } from "./login-name";
 import { isFullName, splitName } from "./class-signup";
 import { studentName } from "./school";
+import { withStudentId, studentSaveError } from "./student-ids-server";
 
 type Svc = any;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -124,9 +125,9 @@ export async function approveSignup(svc: Svc, p: { tenantId: string; id: string;
     student = data;
   } else {
     const n = splitName(s.full_name);
-    const { data, error } = await svc.from("students").insert({ tenant_id: p.tenantId, first_name: n.first, last_name: n.last || n.first, class_group_id: s.class_group_id })
+    const { data, error } = await svc.from("students").insert(await withStudentId(p.tenantId, { tenant_id: p.tenantId, first_name: n.first, last_name: n.last || n.first, class_group_id: s.class_group_id } as { admission_no?: string | null; [k: string]: unknown }))
       .select("id,first_name,last_name,other_names").single();
-    if (error || !data) throw new Error(error?.message ?? "could not add the student");
+    if (error || !data) throw new Error(error ? studentSaveError(error.message) : "could not add the student");
     student = data; made = true;
   }
   const undo = async () => { if (made && student) await svc.from("students").delete().eq("id", student.id); };

@@ -125,7 +125,12 @@ function RegisterView({ cg }: { cg: string }) {
         <button className="btn btn-primary ml-auto" disabled={busy || !data?.students.length} onClick={save}>{busy ? "Saving…" : data?.taken ? "Update register" : "Save register"}</button>
       </div>
       {error && !offlineCopy && <Alert>{error}</Alert>}
-      {offlineCopy && !fresh && <div className="mb-3"><Alert tone="amber">You are offline. This is the class list saved on this device; the register will be sent when you reconnect.</Alert></div>}
+      {offlineCopy && !fresh && <div className="mb-3"><Alert tone="amber">
+        {typeof navigator !== "undefined" && !navigator.onLine
+          ? "You are offline. This is the class list saved on this device; the register will be sent when you reconnect."
+          : "Synergy Swift is not answering right now (your internet is fine). This is the class list saved on this device; the register will be sent as soon as the server is back."}
+        {" "}<button type="button" className="underline font-medium" onClick={() => reload()}>Try again</button>
+      </Alert></div>}
       {pending > 0 && <div className="mb-3"><Alert tone="blue">{pending} register{pending === 1 ? "" : "s"} waiting to be sent from this device.</Alert></div>}
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
       {!data?.students.length ? <Empty>No students in this class.</Empty> : (

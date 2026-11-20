@@ -4,6 +4,7 @@
  */
 import { notifyContact } from "./notify";
 import { admissionUpdate } from "./messaging/notices";
+import { withStudentId, studentSaveError } from "./student-ids-server";
 
 export async function tenantBySlug(svc: any, slug: string) {
   if (!/^[a-z0-9][a-z0-9-]{1,48}$/i.test(slug)) return null;
@@ -27,12 +28,12 @@ export async function enrollApplication(svc: any, p: { tenantId: string; applica
   const { data: app } = await svc.from("applications").select("*").eq("tenant_id", p.tenantId).eq("id", p.applicationId).maybeSingle();
   if (!app) throw new Error("application not found");
   if (app.student_id) return { student_id: app.student_id, already: true };
-  const { data: st, error } = await svc.from("students").insert({
-    // No number typed: the database gives the next student ID in the school's format (GC-0001).
+  const { data: st, error } = await svc.from("students").insert(await withStudentId(p.tenantId, {
+    // No number typed: the next student ID in the school's format (GC-0001).
     tenant_id: p.tenantId, ...(p.admissionNo?.trim() ? { admission_no: p.admissionNo.trim() } : {}), first_name: app.first_name, last_name: app.last_name, other_names: app.other_names,
     gender: app.gender, date_of_birth: app.date_of_birth, class_group_id: p.classGroupId ?? app.class_group_id, address: app.address
-  }).select("id").single();
-  if (error) throw new Error(error.message.includes("duplicate") ? "that admission number is already used" : error.message);
+  } as { admission_no?: string | null; [k: string]: unknown })).select("id").single();
+  if (error) throw new Error(studentSaveError(error.message));
   // Reuse a guardian with the same phone or email (siblings).
   const match = [app.guardian_phone ? `phone.eq.${String(app.guardian_phone).replace(/[,()]/g, "")}` : "", app.guardian_email ? `email.eq.${String(app.guardian_email).replace(/[,()]/g, "")}` : ""].filter(Boolean).join(",");
   let gid: string | null = null;

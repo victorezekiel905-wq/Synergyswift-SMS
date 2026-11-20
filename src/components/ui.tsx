@@ -8,8 +8,13 @@ export function useApi<T>(url: string | null, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(Boolean(url));
+  // Only the newest request may change the page: on a slow server an older load (say, the first one)
+  // can finish after a reload, and would otherwise put back the list from before a save.
+  const seq = useRef(0);
   const reload = useCallback(async () => {
     if (!url) return;
+    const mine = ++seq.current;
+    const current = () => mine === seq.current;
     setLoading(true);
     // A request that never answers (a dropped connection) is given up after 40 seconds, so the page
     // shows what happened and can be tried again instead of loading for ever.
@@ -17,15 +22,18 @@ export function useApi<T>(url: string | null, deps: unknown[] = []) {
     const timer = window.setTimeout(() => ctl.abort(), 40_000);
     try {
       const r = await fetch(url, { cache: "no-store", signal: ctl.signal });
+      if (!current()) return;
       if (isSecurityCheck(r)) { announceSecurityCheck(); setError(SECURITY_CHECK_TEXT); return; }
       const j = await r.json().catch(() => ({}));
+      if (!current()) return;
       if (!r.ok) { setError(j.error ?? `Request failed (${r.status})`); setData(null); }
       else { setError(null); setData(j as T); }
     } catch (e) {
+      if (!current()) return;
       setError(ctl.signal.aborted ? "This is taking too long to load. Check the internet connection, then reload the page."
         : /failed to fetch|network|load failed/i.test((e as Error).message) ? "Could not reach the server. Check the internet connection, then reload the page."
         : (e as Error).message);
-    } finally { window.clearTimeout(timer); setLoading(false); }
+    } finally { window.clearTimeout(timer); if (current()) setLoading(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, ...deps]);
   useEffect(() => { reload(); }, [reload]);

@@ -14,6 +14,7 @@ export default function ScanInput({ onCode, placeholder, autoFocus }: { onCode: 
   const video = useRef<HTMLVideoElement | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const supported = typeof window !== "undefined" && "BarcodeDetector" in window;
+  const submit = () => { if (v.trim()) { onCode(v.trim()); setV(""); } };
 
   useEffect(() => {
     if (!cam) return;
@@ -38,11 +39,14 @@ export default function ScanInput({ onCode, placeholder, autoFocus }: { onCode: 
 
   return (
     <div className="space-y-1">
-      <form className="flex gap-2" onSubmit={e => { e.preventDefault(); if (v.trim()) { onCode(v.trim()); setV(""); } }}>
-        <input className="input" value={v} onChange={e => setV(e.target.value)} placeholder={placeholder} autoFocus={autoFocus} aria-label={placeholder} />
+      {/* Not a form element: this box sits inside other forms (Add a title), where a nested form is ignored and
+          "Go" or Enter would submit, and reload, the whole page. */}
+      <div className="flex gap-2">
+        <input className="input" value={v} onChange={e => setV(e.target.value)} placeholder={placeholder} autoFocus={autoFocus} aria-label={placeholder}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submit(); } }} />
         {supported && <button type="button" className="btn btn-outline" onClick={() => { setErr(null); setCam(!cam); }} aria-pressed={cam}>{cam ? "Stop" : "Camera"}</button>}
-        <button className="btn btn-primary">Go</button>
-      </form>
+        <button type="button" className="btn btn-primary" onClick={submit}>Go</button>
+      </div>
       {cam && <video ref={video} className="w-full max-w-sm rounded-lg bg-black" muted playsInline />}
       {err && <p className="text-xs text-rose-700">{err}</p>}
     </div>

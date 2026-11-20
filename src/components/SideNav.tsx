@@ -53,7 +53,9 @@ export default function SideNav({ groups, path, userKey, module }: { groups: Nav
     const isPinned = pins.includes(l.href);
     return (
       <li key={`${inPins ? "p" : ""}${l.href}`} className="group relative">
-        <Link href={l.href} aria-current={on ? "page" : undefined} title={l.hint}
+        {/* No background preloading: dozens of menu links each fetching their page on every visit
+            load the server and look like a bot to the security check in front of it. */}
+        <Link href={l.href} prefetch={false} aria-current={on ? "page" : undefined} title={l.hint}
           className={"relative block rounded-md py-[7px] pl-3 pr-8 text-[13.5px] leading-5 transition-colors " + (on
             ? "bg-slate-100 font-medium text-slate-900 before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-brand-600"
             : "text-slate-600 hover:bg-slate-50 hover:text-slate-900")}>
@@ -120,7 +122,7 @@ export function BottomBar({ items, path, onMenu }: { items: { href: string; labe
       {items.map(i => {
         const on = path === i.href || path.startsWith(i.href + "/");
         return (
-          <Link key={i.href} href={i.href} aria-current={on ? "page" : undefined} className={"flex flex-col items-center gap-0.5 py-2 text-[11px] " + (on ? "font-semibold text-brand-700" : "text-slate-600")}>
+          <Link key={i.href} href={i.href} prefetch={false} aria-current={on ? "page" : undefined} className={"flex flex-col items-center gap-0.5 py-2 text-[11px] " + (on ? "font-semibold text-brand-700" : "text-slate-600")}>
             <Icon name={i.icon as "home"} className="h-5 w-5" />{i.label}
           </Link>
         );

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { fetchAll, fetchAllSafe } from "@/lib/fetch-all";
 import { requireCtx, ROLES } from "@/lib/auth";
 import { currentTerm, startOfTodayIso } from "@/lib/school";
+import { termCheck } from "@/lib/term-check";
 
 /** Numbers for the school operations dashboard. */
 export async function GET() {
@@ -32,6 +33,7 @@ export async function GET() {
   return NextResponse.json({
     school: settings?.school_name ?? ctx.tenant.name,
     term: term ? `${term.name} ${term.academic_sessions?.name ?? ""}`.trim() : null,
+    term_check: termCheck(term as any, new Date().toISOString().slice(0, 10)),
     counts: {
       students: students.count ?? 0, staff: staff.count ?? 0, guardians: guardians.count ?? 0, class_groups: classes.count ?? 0,
       students_on_site: studentsIn, staff_on_site: staffIn,

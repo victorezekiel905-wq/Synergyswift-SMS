@@ -17,13 +17,16 @@ export default function ExamsPage() {
   const [f, setF] = useState({ title: "", class_group_id: "", subject_id: "", duration_minutes: "60" });
   const [err, setErr] = useState<string | null>(null);
   const [mock, setMock] = useState(false);
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return; // one exam per click, however slow the server is
+    setBusy(true); setErr(null);
     const r = await send<{ id: string }>("/api/exams", { title: f.title, class_group_id: f.class_group_id || null, subject_id: f.subject_id || null, duration_minutes: Number(f.duration_minutes) });
-    if (!r.ok) return setErr(r.error);
-    router.push(`/exams/${r.data.id}`);
+    if (!r.ok) { setBusy(false); return setErr(r.error); }
+    router.push(`/exams/${r.data.id}`); // stays "Creating…" until the exam opens
   }
 
   return (
@@ -68,7 +71,7 @@ export default function ExamsPage() {
           </div>
           <Field label="Duration (minutes)"><input className="input" type="number" min={1} max={600} value={f.duration_minutes} onChange={e => setF({ ...f, duration_minutes: e.target.value })} /></Field>
           {err && <Alert>{err}</Alert>}
-          <div className="flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>Cancel</button><button className="btn btn-primary">Create and add questions</button></div>
+          <div className="flex justify-end gap-2"><button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>Cancel</button><button className="btn btn-primary" disabled={busy}>{busy ? "Creating…" : "Create and add questions"}</button></div>
         </form>
       </Modal>
     </Page>

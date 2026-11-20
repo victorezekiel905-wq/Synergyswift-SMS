@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
 import { StudentInput, GuardianInput, cleanStudent } from "@/lib/validators";
+import { withStudentId, studentSaveError } from "@/lib/student-ids-server";
 
 export async function GET(req: NextRequest) {
   const ctx = await requireCtx(ROLES.staff, "sims");
@@ -40,8 +41,9 @@ export async function POST(req: NextRequest) {
     if ((count ?? 0) >= t.student_limit) return jsonError(`your plan allows ${t.student_limit} active students`, 402);
   }
 
-  const { data: s, error } = await ctx.sb.from("students").insert({ ...cleanStudent(student), tenant_id: tid }).select("id").single();
-  if (error) return jsonError(error.message.includes("duplicate") ? "admission number already exists" : error.message);
+  const row = await withStudentId(tid, { ...cleanStudent(student), tenant_id: tid });
+  const { data: s, error } = await ctx.sb.from("students").insert(row).select("id").single();
+  if (error) return jsonError(studentSaveError(error.message));
   for (const g of guardians) {
     const { relation, is_primary, can_pickup, ...gRow } = g;
     const { data: gid, error: gErr } = await ctx.sb.from("guardians")
