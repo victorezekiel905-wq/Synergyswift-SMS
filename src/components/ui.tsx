@@ -158,7 +158,26 @@ export function SaveNow({ flush, label = "Save" }: { flush: () => Promise<boolea
  * Calls an API. Every change also tells the person whether it worked ("Saved" /
  * "Not saved: …", see Toaster); { quiet: true } for calls made in the background.
  */
-export async function send<T = any>(url: string, body?: unknown, method = "POST", opts: { quiet?: boolean } = {}): Promise<{ ok: boolean; data: T; error: string | null }> {
+// Saves still on their way to the server, by method, address and content.
+const inFlight = new Map<string, Promise<{ ok: boolean; data: any; error: string | null }>>();
+
+/**
+ * Sends a change to the server. The same change sent again while the first is still on its way (a
+ * double click, or a second tap because a slow server gave no sign) is not sent twice: it gets the
+ * first one's answer. So one click makes one exam, one invoice, one payment, however slow the server.
+ */
+export function send<T = any>(url: string, body?: unknown, method = "POST", opts: { quiet?: boolean } = {}): Promise<{ ok: boolean; data: T; error: string | null }> {
+  if (method === "GET") return sendNow<T>(url, body, method, opts);
+  let key: string;
+  try { key = `${method} ${url} ${body === undefined ? "" : JSON.stringify(body)}`; } catch { return sendNow<T>(url, body, method, opts); }
+  const same = inFlight.get(key);
+  if (same) return same as Promise<{ ok: boolean; data: T; error: string | null }>;
+  const p = sendNow<T>(url, body, method, opts).finally(() => inFlight.delete(key));
+  inFlight.set(key, p);
+  return p;
+}
+
+async function sendNow<T = any>(url: string, body: unknown, method: string, opts: { quiet?: boolean }): Promise<{ ok: boolean; data: T; error: string | null }> {
   const say = method === "GET" || opts.quiet ? null : noticeFor(method, body);
   try {
     const r = await fetch(url, {

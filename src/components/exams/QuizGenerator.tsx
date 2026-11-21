@@ -30,8 +30,11 @@ export default function QuizGenerator({ subjects, defaults, onSaved }: { subject
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   if (avail && !avail.available) return <Alert tone="amber">Question drafting is not set up on this server (GEMINI_API_KEY).</Alert>;
 
-  async function generate(e: React.FormEvent) {
-    e.preventDefault();
+  // Not a form: this sits inside other forms (a learning path step), where a nested form is ignored
+  // and its button would submit, and save, the outer one.
+  async function generate() {
+    if (busy) return;
+    if (!f.subject_id || !f.level.trim() || !f.topic.trim()) return setMsg({ ok: false, text: "Choose the subject, and type the class level and the topic." });
     setBusy(true); setMsg(null);
     const r = await send<{ questions: Q[]; dropped: number }>("/api/question-bank/generate", { action: "generate", ...f, source: f.source || null });
     setBusy(false);
@@ -52,7 +55,7 @@ export default function QuizGenerator({ subjects, defaults, onSaved }: { subject
 
   return (
     <div className="space-y-3 text-sm">
-      <form className="grid gap-2 sm:grid-cols-4" onSubmit={generate}>
+      <div className="grid gap-2 sm:grid-cols-4">
         <Field label="Subject"><select className="input" value={f.subject_id} onChange={e => setF({ ...f, subject_id: e.target.value, objective_ids: [] })} required><option value="">Choose…</option>{subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
         <Field label="Class level"><input className="input" value={f.level} onChange={e => setF({ ...f, level: e.target.value, objective_ids: [] })} required maxLength={40} placeholder="JSS 1" /></Field>
         <div className="sm:col-span-2"><Field label="Topic"><input className="input" value={f.topic} onChange={e => setF({ ...f, topic: e.target.value })} required maxLength={200} placeholder="Adding fractions" /></Field></div>
@@ -65,8 +68,8 @@ export default function QuizGenerator({ subjects, defaults, onSaved }: { subject
             <li key={o.id}><label className="flex gap-2"><input type="checkbox" checked={f.objective_ids.includes(o.id)} onChange={e => setF({ ...f, objective_ids: e.target.checked ? [...f.objective_ids, o.id] : f.objective_ids.filter(x => x !== o.id) })} />
               <span>{o.code && <b>{o.code} </b>}{o.statement}</span></label></li>))}</ul></Field></div>}
         <div className="sm:col-span-4"><Field label="Lesson notes to base them on (optional)"><textarea className="input min-h-16" value={f.source} onChange={e => setF({ ...f, source: e.target.value })} maxLength={30000} placeholder="Paste notes or a passage" /></Field></div>
-        <div className="sm:col-span-4"><button className="btn btn-primary" disabled={busy || !f.types.length}>{busy ? "Drafting… (up to a minute)" : "Draft questions"}</button></div>
-      </form>
+        <div className="sm:col-span-4"><button type="button" className="btn btn-primary" onClick={generate} disabled={busy || !f.types.length}>{busy ? "Drafting… (up to a minute)" : "Draft questions"}</button></div>
+      </div>
       {msg && <Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert>}
       {drafts.length > 0 && (
         <div className="space-y-2">
@@ -85,8 +88,8 @@ export default function QuizGenerator({ subjects, defaults, onSaved }: { subject
           ))}</ol>
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-1"><input type="checkbox" checked={practice} onChange={e => setPractice(e.target.checked)} /> Open for student practice</label>
-            <button className="btn btn-primary" onClick={save} disabled={!drafts.some(d => d.keep)}>Add {drafts.filter(d => d.keep).length} to the question bank</button>
-            <button className="btn btn-ghost" onClick={() => setDrafts([])}>Discard</button>
+            <button type="button" className="btn btn-primary" onClick={save} disabled={!drafts.some(d => d.keep)}>Add {drafts.filter(d => d.keep).length} to the question bank</button>
+            <button type="button" className="btn btn-ghost" onClick={() => setDrafts([])}>Discard</button>
           </div>
         </div>
       )}
