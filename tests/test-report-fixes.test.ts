@@ -74,3 +74,17 @@ describe("one click, one save", () => {
     } finally { globalThis.fetch = real; }
   });
 });
+describe("the exam room with a full class", () => {
+  const route = readFileSync("src/app/api/student/exams/[id]/route.ts", "utf8");
+  const post = route.slice(route.indexOf("export async function POST"));
+  it("an autosave does not read the whole paper", () => {
+    // Only start, submit, run_code, an expired attempt or an old attempt without its own question list load the questions.
+    expect(post).not.toMatch(/^\s*const questions = await loadQuestions/m);
+    expect(post).toMatch(/getQuestions = \(\) => \(questionsP \?\?= loadQuestions/);
+    expect(post).toMatch(/attempt\.question_order\?\.length \? attempt\.question_order/);
+  });
+  it("leaving the exam once counts as one violation, not two or three", () => {
+    expect(route).toMatch(/LEAVE_KINDS = new Set\(\["blur", "visibility_hidden", "fullscreen_exit"\]\)/);
+    expect(post).toMatch(/same_incident: true/);
+  });
+});

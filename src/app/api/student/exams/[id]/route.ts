@@ -17,13 +17,20 @@ import { examTools } from "@/lib/exams/tools";
 
 export const dynamic = "force-dynamic";
 
+/** Signals that all mean "the student left the exam": several within this window are one incident. */
+const LEAVE_KINDS = new Set(["blur", "visibility_hidden", "fullscreen_exit"]);
+const LEAVE_WINDOW_MS = 3000;
+
 async function context(req: NextRequest, examId: string) {
   const ctx = await requireCtx(["student"], "exams");
   if (ctx instanceof NextResponse) return { error: ctx };
   const svc = createServiceClient();
-  const { data: me } = await svc.from("students").select("id,class_group_id").eq("tenant_id", ctx.tenant.id).eq("user_id", ctx.userId).maybeSingle();
+  // Both at once: every autosave passes through here, so each saved round trip matters with a full class.
+  const [{ data: me }, { data: exam }] = await Promise.all([
+    svc.from("students").select("id,class_group_id").eq("tenant_id", ctx.tenant.id).eq("user_id", ctx.userId).maybeSingle(),
+    svc.from("exams").select("*").eq("tenant_id", ctx.tenant.id).eq("id", examId).in("status", ["published", "closed"]).maybeSingle()
+  ]);
   if (!me) return { error: jsonError("your login is not linked to a student record", 404) };
-  const { data: exam } = await svc.from("exams").select("*").eq("tenant_id", ctx.tenant.id).eq("id", examId).in("status", ["published", "closed"]).maybeSingle();
   // Only the classes the exam is for (set on the exam, or its exam-planner papers); anyone else is told it is not theirs.
   if (!exam) return { error: jsonError("exam not found", 404) };
   if (!classMaySit(await examClasses(svc, exam), me.class_group_id)) return { error: jsonError("This exam is for another class. Check with your teacher.", 403) };
@@ -98,10 +105,16 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     return jsonError("This exam can only be taken on the school network. Connect to the exam room Wi-Fi or use a school computer.", 403);
   }
 
-  const questions = await loadQuestions(svc, exam.id);
+  // The questions (with their answer keys) are loaded only when they are needed: to start, hand in,
+  // run code or close an attempt whose time is up. An ordinary autosave or focus event, the bulk of
+  // the traffic while a class sits an exam, no longer reads the whole paper every few seconds.
+  let questionsP: Promise<Question[]> | null = null;
+  const getQuestions = () => (questionsP ??= loadQuestions(svc, exam.id));
   const { data: existing } = await svc.from("exam_attempts").select("*").eq("exam_id", exam.id).eq("student_user_id", ctx.userId).maybeSingle();
+  const expired = (a: any) => (a.status === "in_progress" || a.status === "locked") && Date.now() > new Date(a.deadline_at).getTime() + GRACE_MS;
 
   if (b.action === "start") {
+    const questions = await getQuestions();
     // Access arrangements: a student on the SEN register with extra time gets it automatically,
     // and the exams office's approved requests (extra time, a late sitting, a resit) apply (phase 14j).
     const { data: me } = await svc.from("students").select("id,sen_profiles(extra_time_pct,status)").eq("tenant_id", ctx.tenant.id).eq("user_id", ctx.userId).maybeSingle();
@@ -146,9 +159,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   }
 
   if (!existing) return jsonError("start the exam first", 400);
-  let attempt = await autoSubmitIfExpired(svc, existing, questions);
+  let attempt = expired(existing) ? await autoSubmitIfExpired(svc, existing, await getQuestions()) : existing;
 
   if (b.action === "run_code") {
+    const questions = await getQuestions();
     // Students may try their code on the visible example tests only; hidden tests are used for marking.
     if (!["in_progress"].includes(attempt.status)) return jsonError("the exam is not in progress", 409);
     const q = questionsForAttempt(questions, attempt).find(x => x.id === b.question_id);
@@ -170,6 +184,17 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (b.action === "event") {
     if (!["in_progress", "locked"].includes(attempt.status)) return NextResponse.json({ status: attempt.status });
     const kind = b.kind.replace(/[^a-z_]/g, "").slice(0, 40);
+    // Leaving the exam once fires several signals together (the window loses focus, the tab is hidden,
+    // full screen ends). They are one incident: logged for the teacher, counted once. Otherwise a single
+    // slip used two or three of the allowed violations and locked students who barely left the page.
+    if (LEAVE_KINDS.has(kind)) {
+      const { data: prev } = await svc.from("exam_events").select("at").eq("attempt_id", attempt.id).in("kind", [...LEAVE_KINDS])
+        .order("at", { ascending: false }).limit(1);
+      if (prev?.[0] && Date.now() - new Date(prev[0].at).getTime() < LEAVE_WINDOW_MS) {
+        await svc.from("exam_events").insert({ attempt_id: attempt.id, kind, meta: { ...(b.meta ?? {}), same_incident: true } });
+        return NextResponse.json({ status: attempt.status, violations: attempt.violations });
+      }
+    }
     await svc.from("exam_events").insert({ attempt_id: attempt.id, kind, meta: b.meta ?? {} });
     if (!VIOLATION_KINDS.has(kind)) return NextResponse.json({ status: attempt.status, violations: attempt.violations });
     const violations = attempt.violations + 1;
@@ -181,7 +206,8 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   }
 
   const incoming = (b.action === "save" ? b.answers : b.answers) ?? {};
-  const valid = new Set(questionsForAttempt(questions, attempt).map(q => q.id));
+  // The attempt keeps its own list of question ids; the paper is read only for older attempts without one.
+  const valid = new Set<string>(attempt.question_order?.length ? attempt.question_order : questionsForAttempt(await getQuestions(), attempt).map(q => q.id));
 
   // Answers that arrive after the exam was handed in or time ran out (typically typed
   // while offline) are not counted, but they are never thrown away: they are kept in the
@@ -219,6 +245,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   attempt = saved ?? attempt;
 
   if (b.action === "submit") {
+    const questions = await getQuestions();
     const done = await finalizeAttempt(svc, attempt, questions, "student");
     return NextResponse.json({ status: done.status, result: studentResultView(exam, done, questions) });
   }
