@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireCtx, jsonError } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { verifySeb, absoluteRequestUrl } from "@/lib/exams/seb";
-import { GRACE_MS } from "@/lib/exams/server";
+import { GRACE_MS, mergeAnswers } from "@/lib/exams/server";
 import { clientIp, ipAllowed } from "@/lib/net";
 
 /** File-upload and recorded (spoken) answers. Stored privately under <tenant>/<exam>/<attempt>/. */
@@ -40,6 +40,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const { error } = await svc.storage.from("exam-uploads").upload(path, Buffer.from(await file.arrayBuffer()), { contentType: file.type || "application/octet-stream" });
   if (error) return jsonError(error.message, 500);
   const value = { path, name: file.name, size: file.size };
-  await svc.from("exam_attempts").update({ answers: { ...(attempt.answers ?? {}), [qid]: value }, last_seen_at: new Date().toISOString() }).eq("id", attempt.id);
+  // Added to the answers saved at this moment, not to the copy read before the (possibly slow) upload:
+  // answers autosaved while the file was on its way are kept.
+  const saved = await mergeAnswers(svc, attempt, { [qid]: value }, ["in_progress"]);
+  if (!saved) return jsonError("the exam was handed in while the file was uploading", 409);
   return NextResponse.json(value);
 }

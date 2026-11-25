@@ -6,7 +6,7 @@ import { buildAttemptLayout, toPublicQuestion, questionsForAttempt, type Questio
 import { canRun, gradeCode, runCode } from "@/lib/exams/code-runner";
 import { verifySeb, absoluteRequestUrl, sebLaunchUrl } from "@/lib/exams/seb";
 import {
-  loadQuestions, computeDeadline, windowState, finalizeAttempt, autoSubmitIfExpired, studentResultView, examClasses, classMaySit,
+  loadQuestions, computeDeadline, windowState, finalizeAttempt, autoSubmitIfExpired, studentResultView, examClasses, classMaySit, mergeAnswers,
   VIOLATION_KINDS, GRACE_MS, type ExamRow
 } from "@/lib/exams/server";
 import { appUrl } from "@/lib/school";
@@ -236,13 +236,12 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     return NextResponse.json({ error: "time is up", status: attempt.status, late_kept: kept }, { status: 409 });
   }
 
-  const merged: Record<string, unknown> = { ...(attempt.answers ?? {}) };
-  for (const [k, v] of Object.entries(incoming)) if (valid.has(k)) merged[k] = v;
-  if (JSON.stringify(merged).length > 500_000) return jsonError("answers are too large", 413);
+  const changes: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(incoming)) if (valid.has(k)) changes[k] = v;
+  if (JSON.stringify({ ...(attempt.answers ?? {}), ...changes }).length > 500_000) return jsonError("answers are too large", 413);
 
-  const { data: saved } = await svc.from("exam_attempts").update({ answers: merged, last_seen_at: new Date().toISOString() })
-    .eq("id", attempt.id).in("status", ["in_progress", "locked"]).select("*").maybeSingle();
-  attempt = saved ?? attempt;
+  // Merged into the answers saved at this instant (one database step), so an upload landing at the same moment is kept.
+  if (Object.keys(changes).length) attempt = (await mergeAnswers(svc, attempt, changes)) ?? attempt;
 
   if (b.action === "submit") {
     const questions = await getQuestions();

@@ -100,6 +100,20 @@ export async function markCodeQuestions(svc: any, attempt: any, questions: Quest
 }
 
 /** If the deadline has passed, submit automatically. Returns the fresh attempt. */
+/**
+ * Adds answers to an attempt in one database step (migration 10700), so an autosave and a file or
+ * voice upload arriving together both keep theirs. Before that update has been run, it reads, merges
+ * and writes as before. Returns the updated attempt, or null when its status no longer allows it.
+ */
+export async function mergeAnswers(svc: any, attempt: { id: string; answers?: Record<string, unknown> | null }, answers: Record<string, unknown>,
+  statuses: string[] = ["in_progress", "locked"]): Promise<any | null> {
+  const { data, error } = await svc.rpc("exam_merge_answers", { p_attempt: attempt.id, p_answers: answers, p_statuses: statuses });
+  if (!error) return (Array.isArray(data) ? data[0] : data) ?? null;
+  const { data: saved } = await svc.from("exam_attempts").update({ answers: { ...(attempt.answers ?? {}), ...answers }, last_seen_at: new Date().toISOString() })
+    .eq("id", attempt.id).in("status", statuses).select("*").maybeSingle();
+  return saved ?? null;
+}
+
 export async function autoSubmitIfExpired(svc: any, attempt: any, questions: Question[]) {
   if ((attempt.status === "in_progress" || attempt.status === "locked") && Date.now() > new Date(attempt.deadline_at).getTime() + GRACE_MS) {
     return finalizeAttempt(svc, attempt, questions, "timeout");

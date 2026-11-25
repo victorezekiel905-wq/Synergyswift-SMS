@@ -88,3 +88,23 @@ describe("the exam room with a full class", () => {
     expect(post).toMatch(/same_incident: true/);
   });
 });
+describe("exam question types that did not respond well", () => {
+  const room = readFileSync("src/app/exam/[id]/page.tsx", "utf8");
+  const view = readFileSync("src/components/exams/QuestionView.tsx", "utf8");
+  it("a phone that cannot go full screen (iPhone) is not stuck behind the full-screen notice", () => {
+    expect(room).toMatch(/!document\.fullscreenEnabled/);
+    expect(room).toMatch(/const needFs = [^;]*!fsUnavailable/);
+    expect(room).toMatch(/requestFullscreen\(\)\.catch\(\(\) => setFsUnavailable\(true\)\)/);
+  });
+  it("drag and drop: tapping a group that already has items still places the held item", () => {
+    expect(view).toMatch(/!\(e\.target as HTMLElement\)\.closest\("button"\)\) place\(held, zoneId\)/);
+    expect(view).not.toMatch(/e\.target === e\.currentTarget && !disabled\) place/);
+  });
+  it("autosaves and uploads add answers in one step instead of writing back an old copy", () => {
+    const save = readFileSync("src/app/api/student/exams/[id]/route.ts", "utf8");
+    const upload = readFileSync("src/app/api/student/exams/[id]/upload/route.ts", "utf8");
+    expect(save).toMatch(/mergeAnswers\(svc, attempt, changes\)/);
+    expect(upload).toMatch(/mergeAnswers\(svc, attempt, \{ \[qid\]: value \}, \["in_progress"\]\)/);
+    expect(upload).not.toMatch(/answers: \{ \.\.\.\(attempt\.answers/);
+  });
+});

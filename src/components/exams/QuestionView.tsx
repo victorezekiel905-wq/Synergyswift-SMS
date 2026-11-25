@@ -265,7 +265,9 @@ function DragDrop({ items, zones, value, onChange, disabled }: { items: { id: st
   const drop = (zoneId: string | null) => ({
     onDragOver: (e: React.DragEvent) => e.preventDefault(),
     onDrop: (e: React.DragEvent) => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain") || held; if (id && !disabled) place(id, zoneId); },
-    onClick: (e: React.MouseEvent) => { if (held && e.target === e.currentTarget && !disabled) place(held, zoneId); }
+    // Anywhere in the group except on an item (tapping an item picks it up instead): the gaps between
+    // items already placed count too, so a group that has items still takes more on a phone.
+    onClick: (e: React.MouseEvent) => { if (held && !disabled && !(e.target as HTMLElement).closest("button")) place(held, zoneId); }
   });
   const unplaced = items.filter(i => !value[i.id]);
   return (

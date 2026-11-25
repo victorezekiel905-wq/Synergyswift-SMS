@@ -66,6 +66,14 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
   const [remaining, setRemaining] = useState<number>(0);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [isFs, setIsFs] = useState(true);
+  // iPhones (and some older Android browsers) cannot put a web page in full screen. There the rule
+  // cannot apply: the exam carries on (leaving the tab is still recorded) instead of a screen that
+  // asks for full screen and can never go away. The same if the browser refuses the request.
+  const [fsUnavailable, setFsUnavailable] = useState(false);
+  useEffect(() => {
+    const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: unknown };
+    if (!document.fullscreenEnabled || typeof el.requestFullscreen !== "function") setFsUnavailable(true);
+  }, []);
   const [camera, setCamera] = useState<MediaStream | null>(null);
   const [consent, setConsent] = useState(false);
   // Handed in while offline: sent by itself as soon as the connection is back.
@@ -283,7 +291,7 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
     const warn = (t: string) => { setWarning(t); setTimeout(() => setWarning(null), 4000); };
     const onVis = () => { if (document.hidden) { report("visibility_hidden"); warn("You left the exam tab. This has been recorded."); } };
     const onBlur = () => { if (Date.now() - lastBlur > 1500) { lastBlur = Date.now(); report("blur"); warn("The exam window lost focus. This has been recorded."); } };
-    const onFs = () => { if (exam.require_fullscreen && !exam.require_seb && !document.fullscreenElement) { report("fullscreen_exit"); warn("Return to full screen to continue."); } };
+    const onFs = () => { if (exam.require_fullscreen && !exam.require_seb && !fsUnavailable && !document.fullscreenElement) { report("fullscreen_exit"); warn("Return to full screen to continue."); } };
     const block = (kind: string) => (e: Event) => { if (exam.block_copy_paste) { e.preventDefault(); report(kind); warn("Copy and paste are disabled in this exam."); } };
     const onCopy = block("copy"), onPaste = block("paste"), onCut = block("copy");
     const onCtx = (e: Event) => { if (exam.block_copy_paste) { e.preventDefault(); report("context_menu"); } };
@@ -316,7 +324,7 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
       window.removeEventListener("beforeprint", onPrint);
       window.removeEventListener("beforeunload", beforeUnload);
     };
-  }, [attempt, exam, status, report]);
+  }, [attempt, exam, status, report, fsUnavailable]);
 
   // While locked, poll for the teacher to unlock.
   useEffect(() => {
@@ -338,7 +346,7 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
       try { cam = await requestCamera(); setCamera(cam); }
       catch { setError("This exam needs your camera. Allow camera access in your browser and press Start again."); return; }
     }
-    if (exam?.require_fullscreen && !exam.require_seb) { try { await document.documentElement.requestFullscreen(); } catch { /* user can re-enter */ } }
+    if (exam?.require_fullscreen && !exam.require_seb && !fsUnavailable) { try { await document.documentElement.requestFullscreen(); } catch { setFsUnavailable(true); } }
     const r = await api(id, { action: "start", access_code: code });
     if (!r.ok) {
       cam?.getTracks().forEach(t => t.stop()); setCamera(null);
@@ -485,7 +493,7 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
   const answered = (qid: string) => { const v = answers[qid]; return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && !v.some(x => x)) && !(typeof v === "object" && !Array.isArray(v) && !Object.keys(v).length); };
   const answeredCount = attempt.questions.filter(x => answered(x.id)).length;
   // SEB is already a kiosk window, so the browser full-screen rule applies only outside SEB.
-  const needFs = exam.require_fullscreen && !exam.require_seb && !isFs;
+  const needFs = exam.require_fullscreen && !exam.require_seb && !isFs && !fsUnavailable;
 
   return (
     <div className="flex min-h-screen select-none flex-col bg-slate-100" style={exam.block_copy_paste ? { WebkitUserSelect: "none" } : undefined}>
@@ -595,7 +603,7 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
         <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/90 p-6 text-center text-white">
           <div>
             <p className="text-xl font-semibold">This exam must be taken in full screen.</p>
-            <button className="btn btn-primary mt-4" onClick={() => document.documentElement.requestFullscreen().catch(() => {})}>Return to full screen</button>
+            <button className="btn btn-primary mt-4" onClick={() => document.documentElement.requestFullscreen().catch(() => setFsUnavailable(true))}>Return to full screen</button>
           </div>
         </div>
       )}
