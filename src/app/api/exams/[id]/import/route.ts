@@ -4,6 +4,9 @@ import { requireCtx, ROLES, jsonError } from "@/lib/auth";
 import { extractDocumentText } from "@/lib/lesson-import";
 import { parsePaper } from "@/lib/exams/paper-import";
 import { validateQuestion, type Question } from "@/lib/exams/engine";
+import { parseAnswerSheet, matchAnswers, type SheetQuestion } from "@/lib/exams/answer-attach";
+import { remarkFinishedAttempts } from "@/lib/exams/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 const MAX_BYTES = 15 * 1024 * 1024;
@@ -30,6 +33,17 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const { data: exam } = await ctx.sb.from("exams").select("id,status").eq("tenant_id", ctx.tenant.id).eq("id", params.id).maybeSingle();
   if (!exam) return jsonError("exam not found", 404);
 
+  // The exam's questions in paper order, for attaching an answer sheet to them.
+  const examQuestions = async (): Promise<SheetQuestion[]> => {
+    const { data } = await ctx.sb.from("exam_questions").select("id,type,prompt,position,data,answer").eq("exam_id", exam.id).order("position");
+    return (data ?? []) as SheetQuestion[];
+  };
+  const answersPreview = async (text: string) => {
+    const qs = await examQuestions();
+    if (!qs.length) return jsonError("add the questions first, then attach their answers");
+    return NextResponse.json({ ...matchAnswers(qs, parseAnswerSheet(text)), text: text.slice(0, 60000) });
+  };
+
   if ((req.headers.get("content-type") ?? "").startsWith("multipart/form-data")) {
     const form = await req.formData().catch(() => null);
     const file = form?.get("file");
@@ -38,12 +52,40 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     try {
       const text = await extractDocumentText(new Uint8Array(await file.arrayBuffer()), file.name);
       if (text.trim().length < 20) return jsonError("No text was found in that file. If it is a scanned paper, type or paste the questions instead.");
+      // An answer sheet or marking guide for the questions already in the exam.
+      if (form?.get("purpose") === "answers") return answersPreview(text);
       return NextResponse.json({ ...parsePaper(text), text: text.slice(0, 60000) });
     } catch (e) {
       return jsonError((e as Error).message);
     }
   }
   const body = await req.json().catch(() => null);
+  if (body?.action === "answers_preview") {
+    const text = String(body.text ?? "").slice(0, 200000);
+    if (text.trim().length < 3) return jsonError("paste the answers first");
+    return answersPreview(text);
+  }
+  if (body?.action === "answers_apply") {
+    // Worked out again here from the same text, so only answers that really match a question are saved.
+    const text = String(body.text ?? "").slice(0, 200000);
+    const skip = new Set<string>(Array.isArray(body.skip) ? body.skip.map(String) : []);
+    const qs = await examQuestions();
+    const { items } = matchAnswers(qs, parseAnswerSheet(text));
+    const chosen = items.filter(i => !skip.has(i.question_id));
+    if (!chosen.length) return jsonError("no answers to attach");
+    for (let i = 0; i < chosen.length; i += 20) {
+      const results = await Promise.all(chosen.slice(i, i + 20).map(it =>
+        ctx.sb.from("exam_questions").update({ answer: it.answer }).eq("exam_id", exam.id).eq("id", it.question_id)));
+      const failed = results.find(r => r.error);
+      if (failed?.error) return jsonError(failed.error.message);
+    }
+    // Scripts already handed in are marked again with the new key (marks a teacher gave are kept).
+    const svc = createServiceClient();
+    const { count } = await svc.from("exam_attempts").select("id", { count: "exact", head: true }).eq("exam_id", exam.id).in("status", ["submitted", "graded"]);
+    const remark = count ? await remarkFinishedAttempts(svc, exam.id) : null;
+    await ctx.sb.from("audit_logs").insert({ tenant_id: ctx.tenant.id, actor_id: ctx.userId, action: "exam.answers_attached", target: exam.id, meta: { answers: chosen.length } });
+    return NextResponse.json({ attached: chosen.length, remarked: remark?.remarked ?? 0, changed: remark?.changed ?? 0 });
+  }
   if (body?.action === "preview") {
     const text = String(body.text ?? "").slice(0, 200000);
     if (text.trim().length < 5) return jsonError("paste the questions first");

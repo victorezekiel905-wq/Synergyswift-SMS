@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useEffect, useState, use } from "react";
+import { Fragment, useEffect, useRef, useState, use } from "react";
 import Link from "next/link";
 import { useApi, send, Page, PageHeader, Tabs, Alert, Empty, Modal, Field, Badge, statusTone, fmtTime, Loading } from "@/components/ui";
 import QuestionEditor, { blankQuestion, TYPE_LABELS, TYPE_GROUPS, type EditorQuestion, type QType } from "@/components/exams/QuestionEditor";
@@ -7,6 +7,7 @@ import QuestionView from "@/components/exams/QuestionView";
 import { EXAM_TOOLS, TOOL_PRESETS, examTools } from "@/lib/exams/tools";
 import BankBrowser, { DIFFICULTIES, BLOOMS, EXAM_BODIES } from "@/components/exams/BankBrowser";
 import PaperImport from "@/components/exams/PaperImport";
+import AttachAnswers from "@/components/exams/AttachAnswers";
 
 type Exam = {
   id: string; title: string; instructions: string | null; status: string; duration_minutes: number; opens_at: string | null; closes_at: string | null;
@@ -46,6 +47,7 @@ function Questions({ exam, questions, reload }: { exam: Exam; questions: Questio
   const [msg, setMsg] = useState<string | null>(null);
   const [bank, setBank] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [attaching, setAttaching] = useState(false);
   const locked = exam.status !== "draft";
   async function toBank(ids: string[]) {
     const r = await send<{ saved: number }>(`/api/exams/${exam.id}/bank`, { action: "to_bank", question_ids: ids });
@@ -104,6 +106,8 @@ function Questions({ exam, questions, reload }: { exam: Exam; questions: Questio
       <aside className="card h-fit p-4">
         <button className="btn btn-primary mb-2 w-full" disabled={locked} onClick={() => setBank(true)}>Add from question bank</button>
         <button className="btn btn-outline mb-2 w-full" disabled={locked} onClick={() => setImporting(true)}>Paste or import questions</button>
+        {/* Answers can be attached at any time: after publishing, handed-in scripts are marked again. */}
+        <button className="btn btn-outline mb-2 w-full" disabled={!questions.length} onClick={() => setAttaching(true)}>Paste or upload the answers</button>
         {questions.some(q => !q.bank_question_id) && <button className="btn btn-ghost mb-3 w-full text-xs" onClick={() => toBank(questions.filter(q => !q.bank_question_id).map(q => q.id))}>Save all new questions to the bank</button>}
         <p className="mb-2 text-sm font-semibold">Or write a new question</p>
         <div className="space-y-3">
@@ -124,6 +128,9 @@ function Questions({ exam, questions, reload }: { exam: Exam; questions: Questio
       </Modal>
       <Modal open={importing} onClose={() => setImporting(false)} title="Paste or import questions" wide>
         {importing && <PaperImport examId={exam.id} onDone={(added, unfinished) => { setImporting(false); setMsg(`Added ${added} question${added === 1 ? "" : "s"}.${unfinished ? ` ${unfinished} still need an answer or a picture: look for them before publishing.` : ""}`); reload(); }} />}
+      </Modal>
+      <Modal open={attaching} onClose={() => setAttaching(false)} title="Paste or upload the answers" wide>
+        {attaching && <AttachAnswers examId={exam.id} onDone={text => { setAttaching(false); setMsg(text); reload(); }} />}
       </Modal>
       <Modal open={bank} onClose={() => setBank(false)} title="Add from the question bank" wide>
         {bank && <AddFromBank exam={exam} onDone={(text) => { setBank(false); setMsg(text); reload(); }} />}
@@ -496,6 +503,48 @@ function Marking({ exam, reload: reloadExam }: { exam: Exam; reload: () => void 
     setMarks(m => ({ ...m, [qid]: { points: String(r.data.points), feedback: r.data.feedback } }));
     setHints(h => ({ ...h, [qid]: { reasons: r.data.reasons } }));
   }
+  // AI marking of whole scripts: every written answer still waiting for a mark gets a mark and a comment
+  // to the student, against the question's marking guide. Marks a teacher gave are never touched, and
+  // nothing reaches students until the teacher releases results.
+  const [aiRun, setAiRun] = useState<{ done: number; total: number; marked: number; failed: number; stop?: boolean } | null>(null);
+  const stopRef = useRef(false);
+  const WRITTEN = ["essay", "short_answer", "math"];
+  const waiting = (a: Attempt) => (data?.questions ?? []).filter(q => WRITTEN.includes(q.type) && (!a.question_order?.length || a.question_order.includes(q.id)) && a.marks?.[q.id]?.points === null);
+  async function aiMark(targets: Attempt[]) {
+    const jobs = targets.flatMap(a => waiting(a).map(q => ({ a, q })));
+    if (!jobs.length) return setMsg({ ok: true, text: "Every written answer already has a mark." });
+    stopRef.current = false;
+    let done = 0, marked = 0, failed = 0;
+    setAiRun({ done, total: jobs.length, marked, failed });
+    const byAttempt = new Map<string, Record<string, { points: number; feedback: string }>>();
+    const saveOne = async (attemptId: string) => {
+      const m = byAttempt.get(attemptId);
+      if (!m || !Object.keys(m).length) return;
+      const r = await send(`/api/exams/${exam.id}/attempts`, { action: "grade", attempt_id: attemptId, marks: m }, "PATCH", { quiet: true });
+      if (r.ok) marked += Object.keys(m).length; else failed += Object.keys(m).length;
+      byAttempt.delete(attemptId);
+    };
+    // Two at a time, one script after another, so the AI service is not flooded.
+    for (const a of targets) {
+      const mine = jobs.filter(j => j.a.id === a.id);
+      for (let i = 0; i < mine.length && !stopRef.current; i += 2) {
+        await Promise.all(mine.slice(i, i + 2).map(async ({ q }) => {
+          const r = await send<{ points: number; feedback: string }>("/api/ai/draft", { kind: "essay_mark", exam_id: exam.id, attempt_id: a.id, question_id: q.id }, "POST", { quiet: true });
+          if (r.ok) byAttempt.set(a.id, { ...(byAttempt.get(a.id) ?? {}), [q.id]: { points: r.data.points, feedback: r.data.feedback } });
+          else failed++;
+          done++;
+          setAiRun({ done, total: jobs.length, marked, failed });
+        }));
+      }
+      await saveOne(a.id);
+      setAiRun({ done, total: jobs.length, marked, failed });
+      if (stopRef.current) break;
+    }
+    setAiRun(null);
+    setMsg({ ok: failed === 0, text: `AI marked ${marked} answer${marked === 1 ? "" : "s"} with comments${failed ? `; ${failed} could not be marked (try again)` : ""}${stopRef.current ? " before you stopped it" : ""}. Check them, change any you disagree with, then release the results.` });
+    reload();
+  }
+
   useEffect(() => {
     if (!attempt) return;
     setMarks(Object.fromEntries(Object.entries(attempt.marks ?? {}).map(([k, m]) => [k, { points: m.points === null ? "" : String(m.points), feedback: m.feedback ?? "" }])));
@@ -534,8 +583,17 @@ function Marking({ exam, reload: reloadExam }: { exam: Exam; reload: () => void 
         <button className="btn btn-primary" onClick={() => release(false)}>Release results to students</button>
         <button className="btn btn-outline" onClick={() => confirm("Push every graded score into the term score sheet for the chosen component?") && release(true)}>Release and push to report cards</button>
         <button className="btn btn-outline" title="Marks every handed-in script again with the current answers. Your own marks are kept." onClick={() => confirm("Mark every handed-in script again with the current answer key? Marks you gave by hand are kept.") && remarkAll()}>Re-mark all scripts</button>
+        <button className="btn btn-outline" disabled={Boolean(aiRun) || !list.some(a => waiting(a).length)} title="A mark and a comment for every written answer still to be marked, against each question's marking guide. Your own marks are kept."
+          onClick={() => confirm(`Mark every unmarked theory answer with AI (${list.reduce((n, a) => n + waiting(a).length, 0)} answers)? Each gets a mark and a comment. Your own marks are kept, and students see nothing until you release the results.`) && aiMark(list)}>Mark all theory with AI</button>
         <a className="btn btn-ghost ml-auto" href={`/api/exams/${exam.id}/attempts?format=csv`}>Download marks (CSV)</a>
       </div>
+      {aiRun && (
+        <div className="mb-3 rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm" role="status">
+          <div className="flex items-center justify-between gap-3"><span>AI marking: {aiRun.done} of {aiRun.total} answers{aiRun.failed ? ` · ${aiRun.failed} failed` : ""}</span>
+            <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => { stopRef.current = true; }}>Stop</button></div>
+          <div className="mt-2 h-2 overflow-hidden rounded bg-white"><div className="h-full bg-brand-600 transition-all" style={{ width: `${Math.round((aiRun.done / Math.max(1, aiRun.total)) * 100)}%` }} /></div>
+        </div>
+      )}
       {msg && <div className="mb-3"><Alert tone={msg.ok ? "green" : "red"}>{msg.text}</Alert></div>}
       <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
         <ul className="card h-fit divide-y divide-slate-100 text-sm">
@@ -549,7 +607,11 @@ function Marking({ exam, reload: reloadExam }: { exam: Exam; reload: () => void 
         </ul>
         {attempt && data ? (
           <div className="space-y-3">
-            <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">{attempt.name}</h3><span className="text-lg font-bold tabular-nums">{attempt.total_score ?? "—"} / {attempt.max_score}</span></div>
+            <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-lg font-semibold">{attempt.name}</h3>
+              <span className="flex items-center gap-3">
+                {waiting(attempt).length > 0 && <button className="btn btn-outline px-3 py-1 text-xs" disabled={Boolean(aiRun)} onClick={() => aiMark([attempt])}>Mark this script with AI ({waiting(attempt).length})</button>}
+                <span className="text-lg font-bold tabular-nums">{attempt.total_score ?? "—"} / {attempt.max_score}</span>
+              </span></div>
             {data.questions.filter(q => !attempt.question_order?.length || attempt.question_order.includes(q.id)).map((q, i) => {
               const m = attempt.marks?.[q.id];
               let pubData = q.data;

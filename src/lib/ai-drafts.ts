@@ -75,7 +75,8 @@ export async function essayMark(ctx: Ctx, svc: any, examId: string, attemptId: s
   const answer = answerText(attempt.answers?.[questionId]);
   const max = Number(q.points) || 0;
   if (!answer) return { points: 0, max, feedback: "No answer was given.", reasons: ["The answer is empty."] };
-  const guide = String(q.answer?.rubric ?? q.answer?.reference ?? "").trim();
+  // "guide" is where papers imported before the fix kept their marking guide.
+  const guide = String(q.answer?.rubric || q.answer?.reference || q.answer?.guide || "").trim();
   const out = await generateJson({
     task: "essay_mark", schema: EssayMark, temperature: 0.2, maxTokens: 1500, quality: "best",
     system: `You help a teacher in Nigeria mark a written exam answer. Mark fairly and consistently against the marking guide when there is one;

@@ -119,7 +119,7 @@ export function parsePaper(raw: string, opts: { defaultPoints?: number; theoryPo
       if (idx < 0 || idx >= opt.length) notes.push("No answer found: mark the correct option.");
       questions.push({ ...base, type: "mcq_single", data: { options: opt }, answer: idx >= 0 && idx < opt.length ? { correct: opt[idx]!.id } : {} });
     } else if (b.theory || prompt.length > 160 || /\b(explain|discuss|describe|write|essay|compare|why)\b/i.test(prompt)) {
-      questions.push({ ...base, type: "essay", data: {}, answer: keyed ? { guide: keyed } : {} });
+      questions.push({ ...base, type: "essay", data: {}, answer: keyed ? { rubric: keyed } : {} });
     } else {
       if (!keyed) notes.push("Add the accepted answer.");
       questions.push({ ...base, type: "short_answer", data: { max_length: 200 }, answer: keyed ? { accepted: [keyed] } : { accepted: [] } });
