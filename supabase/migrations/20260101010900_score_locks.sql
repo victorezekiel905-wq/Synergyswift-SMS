@@ -1,12 +1,13 @@
--- 10900: the school admin locks the mid-term and the end of term scores of a term.
+-- 10900: the school admin locks the mid-term and the end of term scores of a term, so teachers can no
+-- longer change them.
 --
---   * Mid-term locked: nobody can change a score in a part that counts for the mid-term report
+--   * Mid-term locked: teachers cannot change a score in a part that counts for the mid-term report
 --     (CA 1, CA 2… whatever is ticked "On mid-term reports"); the other parts can still be entered.
---   * End of term locked: nobody can change any score of that term.
+--   * End of term locked: teachers cannot change any score of that term.
 --
 -- The lock is kept by the database, so it holds for every page, upload and exam result pushed to the
--- score sheet, and for admins too: an admin unlocks first, makes the change, and locks again. Only a
--- school admin (or principal) can lock or unlock, and each change is recorded. Safe to run again.
+-- score sheet by a teacher. School admins (and principals) are not stopped: they can still correct a
+-- score while it is locked. Only they can lock or unlock, and each change is recorded. Safe to run again.
 
 alter table public.terms
   add column if not exists midterm_scores_locked_at timestamptz,
@@ -46,7 +47,8 @@ declare
   t record;
   mid boolean;
 begin
-  if auth.uid() is null then return coalesce(new, old); end if; -- server housekeeping only
+  -- Server housekeeping, and school admins correcting a score, are not stopped by the lock.
+  if auth.uid() is null or public.is_school_admin() then return coalesce(new, old); end if;
   -- A score removed because its student, term or part is being deleted is not an edit: let it go.
   if tg_op = 'DELETE' and (not exists (select 1 from public.students where id = old.student_id)
                            or not exists (select 1 from public.terms where id = old.term_id)
@@ -55,12 +57,12 @@ begin
   end if;
   select midterm_scores_locked_at, term_scores_locked_at into t from public.terms where id = r.term_id;
   if t.term_scores_locked_at is not null then
-    raise exception 'the end of term scores are locked: a school admin must unlock them before any change';
+    raise exception 'the end of term scores are locked by the school admin: ask an admin to correct a score';
   end if;
   if t.midterm_scores_locked_at is not null then
     select exists (select 1 from public.grading_components gc where gc.midterm
                     and gc.id in (r.component_id, case when tg_op = 'UPDATE' then old.component_id end)) into mid;
-    if mid then raise exception 'the mid-term scores are locked: a school admin must unlock them before any change'; end if;
+    if mid then raise exception 'the mid-term scores are locked by the school admin: ask an admin to correct a score'; end if;
   end if;
   return coalesce(new, old);
 end$$;

@@ -1,5 +1,5 @@
 // Score locks (migration 10900): the admin locks the mid-term scores (only the mid-term parts) and the
-// end of term scores (every part) of a term; nobody, admins included, changes a locked score.
+// end of term scores (every part) of a term; teachers then cannot change them, while admins still can.
 export default async function ({ q, as, expectError, expectOk, check, U, T }) {
   console.log("\nScore locks: mid-term and end of term");
   const TERM = "a5000000-0000-0000-0000-000000000000", SUBJ = "a3000000-0000-0000-0000-000000000000";
@@ -15,12 +15,15 @@ export default async function ({ q, as, expectError, expectOk, check, U, T }) {
   await expectError("a teacher cannot lock scores", U.teacherA, lock("midterm", true), /only a school admin/);
   await expectOk("the admin locks the mid-term scores", U.adminA, lock("midterm", true));
   await expectError("…then a mid-term score cannot be changed", U.teacherA, enter(U.teacherA, CA, 18), /mid-term scores are locked/);
-  await expectError("…not even by the admin", U.adminA, enter(U.adminA, CA, 18), /mid-term scores are locked/);
+  await expectOk("…but the admin can still correct it", U.adminA, enter(U.adminA, CA, 18));
   await expectError("…or removed", U.teacherA, `delete from score_entries where component_id = '${CA}' and student_id = '${STU}'`, /mid-term scores are locked/);
   await expectOk("…but the end of term parts can still be entered", U.teacherA, enter(U.teacherA, EXAM, 60));
 
   await expectOk("the admin locks the end of term scores", U.adminA, lock("term", true));
-  await expectError("…then no score of the term can be changed", U.teacherA, enter(U.teacherA, EXAM, 70), /end of term scores are locked/);
+  await expectError("…then teachers cannot change any score of the term", U.teacherA, enter(U.teacherA, EXAM, 70), /end of term scores are locked/);
+  await expectOk("…while the admin still can", U.adminA, enter(U.adminA, EXAM, 72));
+  const ex = (await q(`select score from score_entries where component_id = '${EXAM}' and student_id = '${STU}'`))[0];
+  check("the admin's correction is saved", Number(ex.score) === 72, ex);
   const t = (await q(`select midterm_scores_locked_at is not null m, term_scores_locked_at is not null e, term_scores_locked_by from terms where id = '${TERM}'`))[0];
   check("the term shows both locks and who locked them", t.m && t.e && t.term_scores_locked_by === U.adminA, t);
   const logged = (await q(`select count(*)::int n from audit_logs where action = 'scores.locked' and target = '${TERM}'`))[0].n;

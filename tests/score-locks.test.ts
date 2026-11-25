@@ -14,8 +14,10 @@ describe("mid-term and end of term score sheets", () => {
     expect(ws).toMatch(/disabled=\{!cellOpen\(c\)\}/);
     expect(ws).toMatch(/Entered on the mid-term sheet/);
   });
-  it("respect the admin's locks: mid-term locks the mid-term parts, end of term locks every part", () => {
-    expect(ws).toMatch(/const cellOpen = \(c: \{ midterm\?: boolean \}\) => Boolean\(data\?\.can_edit\) && !termLocked && !\(c\.midterm && midLocked\) && !fromMidSheet\(c\)/);
+  it("lock teachers out (mid-term: the mid-term parts; end of term: every part) while admins can still correct", () => {
+    expect(ws).toMatch(/const lockedForMe = \(c: \{ midterm\?: boolean \}\) => !isLockAdmin && \(termLocked \|\| \(Boolean\(c\.midterm\) && midLocked\)\)/);
+    expect(ws).toMatch(/const cellOpen = \(c: \{ midterm\?: boolean \}\) => Boolean\(data\?\.can_edit\) && !lockedForMe\(c\) && !fromMidSheet\(c\)/);
+    expect(sql).toMatch(/if auth\.uid\(\) is null or public\.is_school_admin\(\) then return/);
     expect(api).toMatch(/midterm_scores_locked_at,term_scores_locked_at/);
   });
   it("only a school admin can lock, and the database keeps the lock for everyone", () => {

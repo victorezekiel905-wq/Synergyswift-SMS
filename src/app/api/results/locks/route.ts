@@ -8,8 +8,8 @@ const Body = z.object({ term_id: z.string().uuid(), kind: z.enum(["midterm", "te
 
 /**
  * The school admin locks or unlocks the mid-term or the end of term scores of a term, for every class
- * and subject (migration 10900). The database keeps the lock: no page, upload or exam push can change a
- * locked score, admins included, until it is unlocked.
+ * and subject (migration 10900). The database keeps the lock: teachers cannot change a locked score from
+ * any page, upload or exam push; school admins can still correct one.
  */
 export async function POST(req: NextRequest) {
   const ctx = await requireCtx(ROLES.admin, "results");

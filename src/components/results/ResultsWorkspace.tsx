@@ -109,15 +109,17 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
   /**
    * Which cells can be typed in. The mid-term sheet takes the mid-term parts; the end of term sheet shows
    * them as entered (they count there too) and takes the remaining parts. The admin's locks close the
-   * mid-term parts, or every part, for the whole term.
+   * mid-term parts, or every part, to teachers for the whole term; admins can still correct a score.
    */
   const midLocked = Boolean(data?.locks?.midterm), termLocked = Boolean(data?.locks?.term);
+  const isLockAdmin = Boolean(data?.locks?.can_lock);
+  const lockedForMe = (c: { midterm?: boolean }) => !isLockAdmin && (termLocked || (Boolean(c.midterm) && midLocked));
   const fromMidSheet = (c: { midterm?: boolean }) => forReport === "term" && Boolean(c.midterm);
-  const cellOpen = (c: { midterm?: boolean }) => Boolean(data?.can_edit) && !termLocked && !(c.midterm && midLocked) && !fromMidSheet(c);
+  const cellOpen = (c: { midterm?: boolean }) => Boolean(data?.can_edit) && !lockedForMe(c) && !fromMidSheet(c);
   async function setLock(kind: "midterm" | "term", locked: boolean) {
     const what = kind === "midterm" ? "mid-term scores" : "end of term scores (every part)";
     if (!confirm(locked
-      ? `Lock the ${what} for this term, in every class and subject? Nobody can change them, admins included, until you unlock them.`
+      ? `Lock the ${what} for this term, in every class and subject? Teachers will not be able to change them; admins can still correct a score.`
       : `Unlock the ${what} for this term? Teachers will be able to change them again.`)) return;
     if (locked) await auto.flush();
     const r = await send("/api/results/locks", { term_id: termId, kind, locked });
@@ -218,8 +220,8 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
           </p>
           {(midLocked || termLocked) && (
             <p className="mt-2 rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-900" role="status">
-              🔒 {termLocked ? "The end of term scores are locked for this term: no score can be changed." : "The mid-term scores are locked for this term: the mid-term parts cannot be changed; the remaining parts can still be entered."}
-              {data.locks?.can_lock ? " Unlock them above to make a change." : " Ask a school admin if a score needs correcting."}
+              🔒 {termLocked ? "The end of term scores are locked for this term." : "The mid-term scores are locked for this term: the mid-term parts are closed to teachers; the remaining parts can still be entered."}
+              {isLockAdmin ? " Teachers cannot change them; as an admin you can still correct a score here." : " Ask a school admin if a score needs correcting."}
             </p>
           )}
         </div>
@@ -256,7 +258,7 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
                       return (
                         <td key={c.id} className="p-1 text-center">
                           <input data-cell={`${i}-${j}`} inputMode="decimal" disabled={!cellOpen(c)} aria-label={`${s.first_name} ${c.name}`}
-                            title={fromMidSheet(c) ? "Entered on the mid-term sheet" : termLocked || (c.midterm && midLocked) ? "Locked by the school admin" : undefined}
+                            title={fromMidSheet(c) ? "Entered on the mid-term sheet" : lockedForMe(c) ? "Locked by the school admin" : undefined}
                             className={"w-20 rounded border px-2 py-1 text-center tabular-nums " + (invalid(c, v) ? "border-rose-400 bg-rose-50" : fromMidSheet(c) ? "border-amber-200 bg-amber-50 text-slate-700" : "border-slate-300")}
                             value={v} onKeyDown={e => onKey(e, i, j)}
                             onChange={e => { setGrid(g => ({ ...g, [s.id]: { ...g[s.id], [c.id]: e.target.value.trim() } })); }} />
