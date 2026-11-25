@@ -37,14 +37,18 @@ export async function GET(req: NextRequest) {
   const own = (await subjectPartsFor(ctx.sb, tid, cg)).get(subj) ?? null;
   const sheetScheme = own ? { ...scheme, components: own } : scheme;
   const canSetParts = Boolean(offering) && (isAdmin || (offering?.teacher_id === ctx.userId && scheme.subject_parts));
-  const [{ data: settings }, { data: sheet }] = await Promise.all([
+  const [{ data: settings }, { data: sheet }, { data: term }] = await Promise.all([
     ctx.sb.from("tenant_settings").select("require_moderation").eq("tenant_id", tid).maybeSingle(),
-    ctx.sb.from("score_sheets").select("id,status,note,submitted_at,hod_at,approved_at").eq("term_id", termId).eq("class_group_id", cg).eq("subject_id", subj).maybeSingle()
+    ctx.sb.from("score_sheets").select("id,status,note,submitted_at,hod_at,approved_at").eq("term_id", termId).eq("class_group_id", cg).eq("subject_id", subj).maybeSingle(),
+    // The admin's locks (migration 10900); before that update, nothing is locked.
+    ctx.sb.from("terms").select("midterm_scores_locked_at,term_scores_locked_at").eq("tenant_id", tid).eq("id", termId).maybeSingle()
   ]);
   const moderation = Boolean(settings?.require_moderation);
   const locked = moderation && ["submitted", "hod_approved", "approved"].includes(sheet?.status ?? "");
+  const locks = { midterm: Boolean((term as any)?.midterm_scores_locked_at), term: Boolean((term as any)?.term_scores_locked_at),
+    midterm_at: (term as any)?.midterm_scores_locked_at ?? null, term_at: (term as any)?.term_scores_locked_at ?? null, can_lock: isAdmin };
   return NextResponse.json({ scheme: sheetScheme, own_parts: Boolean(own), can_set_parts: canSetParts, school_parts: scheme.components,
-    students: students ?? [], scores: grid, can_edit: teaches && (!locked || isAdmin), teaches, moderation, sheet: sheet ?? { status: "draft" }, locked });
+    students: students ?? [], scores: grid, can_edit: teaches && (!locked || isAdmin), teaches, moderation, sheet: sheet ?? { status: "draft" }, locked, locks });
 }
 
 const Put = z.object({

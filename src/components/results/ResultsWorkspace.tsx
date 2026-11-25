@@ -14,6 +14,8 @@ type Sheet = {
   teaches: boolean; moderation: boolean; locked: boolean;
   own_parts?: boolean; can_set_parts?: boolean;
   sheet: { status: string; note?: string | null };
+  /** The admin's locks for this term (every class and subject). */
+  locks?: { midterm: boolean; term: boolean; midterm_at: string | null; term_at: string | null; can_lock: boolean };
 };
 type SheetStatus = { subject_id: string; subject: string; status: string; note: string | null; i_teach: boolean; i_am_hod: boolean; history: { action: string; note: string | null; at: string; by: string | null }[] };
 const SHEET_LABEL: Record<string, string> = { draft: "Not submitted", submitted: "Waiting for head of department", hod_approved: "Waiting for principal", approved: "Approved", returned: "Returned for correction" };
@@ -104,6 +106,24 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
   const comps = forReport === "midterm" ? midComps ?? [] : allComps;
   const midNames = allComps.filter(c => c.midterm).map(c => c.name);
   const endNames = allComps.filter(c => !c.midterm).map(c => c.name);
+  /**
+   * Which cells can be typed in. The mid-term sheet takes the mid-term parts; the end of term sheet shows
+   * them as entered (they count there too) and takes the remaining parts. The admin's locks close the
+   * mid-term parts, or every part, for the whole term.
+   */
+  const midLocked = Boolean(data?.locks?.midterm), termLocked = Boolean(data?.locks?.term);
+  const fromMidSheet = (c: { midterm?: boolean }) => forReport === "term" && Boolean(c.midterm);
+  const cellOpen = (c: { midterm?: boolean }) => Boolean(data?.can_edit) && !termLocked && !(c.midterm && midLocked) && !fromMidSheet(c);
+  async function setLock(kind: "midterm" | "term", locked: boolean) {
+    const what = kind === "midterm" ? "mid-term scores" : "end of term scores (every part)";
+    if (!confirm(locked
+      ? `Lock the ${what} for this term, in every class and subject? Nobody can change them, admins included, until you unlock them.`
+      : `Unlock the ${what} for this term? Teachers will be able to change them again.`)) return;
+    if (locked) await auto.flush();
+    const r = await send("/api/results/locks", { term_id: termId, kind, locked });
+    setMsg({ ok: r.ok, text: r.ok ? `${kind === "midterm" ? "Mid-term" : "End of term"} scores ${locked ? "locked" : "unlocked"} for this term.` : r.error ?? "failed" });
+    if (r.ok) reload();
+  }
   // Same arithmetic and rounding as the compiled report card.
   const totalFor = (sid: string) => {
     const scores = Object.fromEntries(comps.map(c => { const v = grid[sid]?.[c.id] ?? ""; return [c.id, v === "" ? null : Number(v)]; }));
@@ -172,20 +192,36 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
       {data && !notes && (
         <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium">Scores for:</span>
-            <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5" role="group" aria-label="Which report">
+            <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5" role="group" aria-label="Which score sheet">
               {(["midterm", "term"] as const).map(k => (
-                <button key={k} type="button" aria-pressed={forReport === k} onClick={() => pickReport(k)}
+                <button key={k} type="button" aria-pressed={forReport === k} onClick={async () => { await auto.flush(); pickReport(k); }}
                   className={"rounded px-3 py-1 text-sm font-medium " + (forReport === k ? "bg-brand-600 text-white" : "text-slate-600 hover:text-slate-900")}>
-                  {k === "midterm" ? "Mid-term report" : "End of term report"}</button>))}
+                  {k === "midterm" ? "Mid-term sheet" : "End of term sheet"}
+                  {(k === "midterm" ? midLocked || termLocked : termLocked) && <span aria-label="locked"> 🔒</span>}</button>))}
             </div>
+            {data.locks?.can_lock && (
+              <div className="ml-auto flex flex-wrap gap-2">
+                <button type="button" className={"btn px-3 py-1 text-xs " + (midLocked ? "btn-outline" : "btn-ghost border border-slate-300")} onClick={() => setLock("midterm", !midLocked)}>
+                  {midLocked ? "Unlock mid-term scores" : "Lock mid-term scores"}</button>
+                <button type="button" className={"btn px-3 py-1 text-xs " + (termLocked ? "btn-outline" : "btn-ghost border border-slate-300")} onClick={() => setLock("term", !termLocked)}>
+                  {termLocked ? "Unlock end of term scores" : "Lock end of term scores"}</button>
+              </div>
+            )}
           </div>
           <p className="mt-2 text-xs text-slate-600">
             {forReport === "midterm"
-              ? midComps ? <>You are entering <b>mid-term</b> scores: {midNames.join(", ")}. The total is out of 100 for the work done so far, as on the mid-term report. These scores also count on the end of term report.</>
+              ? midComps ? <>The <b>mid-term sheet</b>: enter {midNames.join(", ")} here. The total is out of 100 for the work done so far, as on the mid-term report. Every score entered here also appears on the end of term sheet and counts on the end of term report.</>
                 : <>No part of this subject counts for the mid-term report yet. {data.can_set_parts ? "Tick \"On mid-term reports\" for the right parts with the link above." : "A school admin ticks \"On mid-term reports\" for the right parts under Results → Grading systems."}</>
-              : <>You are entering scores for the <b>end of term</b> report: every part. {midNames.length ? <>Parts marked <span className="rounded bg-amber-100 px-1 text-amber-800">Mid-term</span> ({midNames.join(", ")}) also appear on the mid-term report{endNames.length ? `; ${endNames.join(", ")} count only at the end of term` : ""}.</> : "No part is marked for the mid-term report."}</>}
+              : midNames.length
+                ? <>The <b>end of term sheet</b>: the mid-term scores ({midNames.join(", ")}) are shown as entered on the mid-term sheet; {endNames.length ? <>enter the remaining parts ({endNames.join(", ")}) here</> : "every part is a mid-term part"}. To correct a mid-term score, use the mid-term sheet.</>
+                : <>The <b>end of term sheet</b>: enter every part here. No part is marked for the mid-term report.</>}
           </p>
+          {(midLocked || termLocked) && (
+            <p className="mt-2 rounded bg-blue-50 px-2 py-1.5 text-xs text-blue-900" role="status">
+              🔒 {termLocked ? "The end of term scores are locked for this term: no score can be changed." : "The mid-term scores are locked for this term: the mid-term parts cannot be changed; the remaining parts can still be entered."}
+              {data.locks?.can_lock ? " Unlock them above to make a change." : " Ask a school admin if a score needs correcting."}
+            </p>
+          )}
         </div>
       )}
       {error && <Alert>{error}</Alert>}
@@ -206,7 +242,7 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-[13px] text-slate-500">
-              <tr><th className="p-2">#</th><th className="p-2">Student</th>{comps.map(c => <th key={c.id} className="p-2 text-center">{c.name}<div className="font-normal normal-case">/ {c.max_score}</div>{forReport === "term" && c.midterm && <span className="mt-0.5 inline-block rounded bg-amber-100 px-1 text-[10px] font-semibold uppercase tracking-wide text-amber-800">Mid-term</span>}</th>)}<th className="p-2 text-center">{forReport === "midterm" ? "Mid-term total" : "Total"}</th><th className="p-2 text-center">Grade</th></tr>
+              <tr><th className="p-2">#</th><th className="p-2">Student</th>{comps.map(c => <th key={c.id} className="p-2 text-center">{c.name}<div className="font-normal normal-case">/ {c.max_score}</div>{forReport === "term" && c.midterm && <span className="mt-0.5 inline-block rounded bg-amber-100 px-1 text-[10px] font-semibold uppercase tracking-wide text-amber-800">From mid-term</span>}</th>)}<th className="p-2 text-center">{forReport === "midterm" ? "Mid-term total" : "Total"}</th><th className="p-2 text-center">Grade</th></tr>
             </thead>
             <tbody>
               {data.students.map((s, i) => {
@@ -219,8 +255,9 @@ function ScoreEntry({ termId, cg, structure, myId, isAdmin }: { termId: string; 
                       const v = grid[s.id]?.[c.id] ?? "";
                       return (
                         <td key={c.id} className="p-1 text-center">
-                          <input data-cell={`${i}-${j}`} inputMode="decimal" disabled={!data.can_edit} aria-label={`${s.first_name} ${c.name}`}
-                            className={"w-20 rounded border px-2 py-1 text-center tabular-nums " + (invalid(c, v) ? "border-rose-400 bg-rose-50" : "border-slate-300")}
+                          <input data-cell={`${i}-${j}`} inputMode="decimal" disabled={!cellOpen(c)} aria-label={`${s.first_name} ${c.name}`}
+                            title={fromMidSheet(c) ? "Entered on the mid-term sheet" : termLocked || (c.midterm && midLocked) ? "Locked by the school admin" : undefined}
+                            className={"w-20 rounded border px-2 py-1 text-center tabular-nums " + (invalid(c, v) ? "border-rose-400 bg-rose-50" : fromMidSheet(c) ? "border-amber-200 bg-amber-50 text-slate-700" : "border-slate-300")}
                             value={v} onKeyDown={e => onKey(e, i, j)}
                             onChange={e => { setGrid(g => ({ ...g, [s.id]: { ...g[s.id], [c.id]: e.target.value.trim() } })); }} />
                         </td>
