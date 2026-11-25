@@ -14,6 +14,9 @@ const nextConfig = {
   reactStrictMode: true,
   eslint: { ignoreDuringBuilds: true },
   images: {
+    // The app shows pictures with plain <img> tags and never uses next/image, so the image optimiser
+    // (/_next/image) is switched off: one less door for attackers (it has had serious security flaws).
+    unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: "*.supabase.co" },
       { protocol: "https", hostname: "*.supabase.in" }

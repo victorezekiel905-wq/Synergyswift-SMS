@@ -189,8 +189,20 @@ export async function requirePlatformAdmin(need: PlatformRole = "support"): Prom
   return { sb, userId: user.id, role };
 }
 
+/**
+ * The largest JSON body any page sends (a big student list or exam answers are well under it). Bigger
+ * bodies are refused before they are parsed or validated, so nobody can tie up the server's memory with
+ * one enormous request.
+ */
+export const MAX_JSON_BYTES = 6 * 1024 * 1024;
+
 export async function readJson<T = Record<string, unknown>>(req: Request): Promise<T> {
-  try { return (await req.json()) as T; } catch { return {} as T; }
+  try {
+    if (Number(req.headers.get("content-length") ?? 0) > MAX_JSON_BYTES) return {} as T;
+    const text = await req.text();
+    if (text.length > MAX_JSON_BYTES) return {} as T;
+    return JSON.parse(text) as T;
+  } catch { return {} as T; }
 }
 
 /** The signed-in user's school and time zone, for routes that also accept a parent link token. */
