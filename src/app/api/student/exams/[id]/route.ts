@@ -14,6 +14,8 @@ import { clientIp, ipAllowed } from "@/lib/net";
 import { extraMinutes } from "@/lib/sis";
 import { allowancesFor, archiveForResit } from "@/lib/exams/requests-server";
 import { examTools } from "@/lib/exams/tools";
+import { cached } from "@/lib/exams/cache";
+import { buildPaper, paperUrl } from "@/lib/exams/paper-server";
 
 export const dynamic = "force-dynamic";
 
@@ -25,22 +27,35 @@ async function context(req: NextRequest, examId: string) {
   const ctx = await requireCtx(["student"], "exams");
   if (ctx instanceof NextResponse) return { error: ctx };
   const svc = createServiceClient();
-  // Both at once: every autosave passes through here, so each saved round trip matters with a full class.
-  const [{ data: me }, { data: exam }] = await Promise.all([
-    svc.from("students").select("id,class_group_id").eq("tenant_id", ctx.tenant.id).eq("user_id", ctx.userId).maybeSingle(),
-    svc.from("exams").select("*").eq("tenant_id", ctx.tenant.id).eq("id", examId).in("status", ["published", "closed"]).maybeSingle()
+  // Every request from a hall sitting the same exam asks the same things: they are looked up once and
+  // shared for a few seconds (lib/exams/cache.ts), and both at once.
+  const [me, exam] = await Promise.all([
+    cached(`stu:${ctx.tenant.id}:${ctx.userId}`, 60_000, async () =>
+      (await svc.from("students").select("id,class_group_id").eq("tenant_id", ctx.tenant.id).eq("user_id", ctx.userId).maybeSingle()).data),
+    cached(`exam:${ctx.tenant.id}:${examId}`, 10_000, async () =>
+      (await svc.from("exams").select("*").eq("tenant_id", ctx.tenant.id).eq("id", examId).in("status", ["published", "closed"]).maybeSingle()).data)
   ]);
   if (!me) return { error: jsonError("your login is not linked to a student record", 404) };
   // Only the classes the exam is for (set on the exam, or its exam-planner papers); anyone else is told it is not theirs.
   if (!exam) return { error: jsonError("exam not found", 404) };
-  if (!classMaySit(await examClasses(svc, exam), me.class_group_id)) return { error: jsonError("This exam is for another class. Check with your teacher.", 403) };
+  const classes = await cached(`exam-classes:${exam.id}`, 30_000, () => examClasses(svc, exam));
+  if (!classMaySit(classes, me.class_group_id)) return { error: jsonError("This exam is for another class. Check with your teacher.", 403) };
   return { ctx: ctx as Ctx, svc, exam: exam as ExamRow, student: me };
 }
 
-function publicExam(exam: ExamRow, req: NextRequest) {
+/** The exam's questions with their answers (server only), shared by everyone sitting it. */
+const examQuestions = (svc: any, examId: string) => cached(`exam-q:${examId}`, 15_000, () => loadQuestions(svc, examId));
+
+function publicExam(exam: ExamRow, req: NextRequest, questions?: Question[]) {
   const s = exam.settings ?? {};
   const cfg = `${appUrl(req)}/api/exams/${exam.id}/seb`;
+  // The encrypted paper to download before the start (served by Cloudflare; read only with the key given at the start).
+  const paper = questions?.length ? buildPaper(exam.id, questions) : null;
   return {
+    paper_url: paper ? paperUrl(exam.id, paper.version) : null,
+    // Autosaves can go straight to the database, unless the exam is tied to the school network or
+    // Safe Exam Browser, which only this server can check.
+    direct_save: !s.require_seb && !(s.allowed_ips ?? []).length,
     id: exam.id, title: exam.title, instructions: exam.instructions, duration_minutes: exam.duration_minutes,
     opens_at: exam.opens_at, closes_at: exam.closes_at, window: windowState(exam),
     require_seb: Boolean(s.require_seb), seb_config_url: cfg, seb_launch_url: sebLaunchUrl(cfg),
@@ -52,15 +67,25 @@ function publicExam(exam: ExamRow, req: NextRequest) {
   };
 }
 
-function attemptPayload(exam: ExamRow, attempt: any, questions: Question[]) {
+/**
+ * The attempt for the student's device. A device that already downloaded the current paper (it says
+ * which version in the x-have-paper header) gets only the key and its order of questions and options,
+ * a few hundred bytes, and builds the paper itself; any other device gets the questions as before.
+ */
+function attemptPayload(exam: ExamRow, attempt: any, questions: Question[], req?: NextRequest) {
   const byId = new Map(questions.map(q => [q.id, q]));
   const order: string[] = attempt.question_order?.length ? attempt.question_order : questions.map(q => q.id);
-  return {
+  const base = {
     id: attempt.id, status: attempt.status, started_at: attempt.started_at, deadline_at: attempt.deadline_at,
     violations: attempt.violations, server_now: new Date().toISOString(),
-    answers: attempt.answers ?? {},
-    questions: order.map(id => byId.get(id)).filter(Boolean).map(q => toPublicQuestion(q as Question, attempt.option_orders?.[(q as Question).id]))
+    answers: attempt.answers ?? {}
   };
+  const have = req?.headers.get("x-have-paper");
+  if (have && questions.length) {
+    const paper = buildPaper(exam.id, questions);
+    if (paper.version === have) return { ...base, questions: null, paper_version: paper.version, paper_key: paper.key, question_order: order, option_orders: attempt.option_orders ?? {} };
+  }
+  return { ...base, questions: order.map(id => byId.get(id)).filter(Boolean).map(q => toPublicQuestion(q as Question, attempt.option_orders?.[(q as Question).id])) };
 }
 
 export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -68,15 +93,17 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
   const c = await context(req, params.id);
   if ("error" in c) return c.error;
   const { svc, exam, ctx } = c;
-  const { data: raw } = await svc.from("exam_attempts").select("*").eq("exam_id", exam.id).eq("student_user_id", ctx.userId).maybeSingle();
-  const pub = publicExam(exam, req);
+  const [{ data: raw }, questions] = await Promise.all([
+    svc.from("exam_attempts").select("*").eq("exam_id", exam.id).eq("student_user_id", ctx.userId).maybeSingle(),
+    examQuestions(svc, exam.id)
+  ]);
+  const pub = publicExam(exam, req, questions);
   if (!raw) return NextResponse.json({ exam: pub, attempt: null });
-  const questions = await loadQuestions(svc, exam.id);
   const attempt = await autoSubmitIfExpired(svc, raw, questions);
   if (attempt.status === "in_progress" || attempt.status === "locked") {
     const seb = verifySeb(absoluteRequestUrl(req), req.headers, exam.settings ?? {});
     if (!seb.ok) return NextResponse.json({ exam: pub, attempt: { id: attempt.id, status: attempt.status }, seb_error: seb.reason }, { status: 403 });
-    return NextResponse.json({ exam: pub, attempt: attemptPayload(exam, attempt, questions) });
+    return NextResponse.json({ exam: pub, attempt: attemptPayload(exam, attempt, questions, req) });
   }
   return NextResponse.json({ exam: pub, attempt: { id: attempt.id, status: attempt.status, submitted_at: attempt.submitted_at }, result: studentResultView(exam, attempt, questions) });
 }
@@ -109,7 +136,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   // run code or close an attempt whose time is up. An ordinary autosave or focus event, the bulk of
   // the traffic while a class sits an exam, no longer reads the whole paper every few seconds.
   let questionsP: Promise<Question[]> | null = null;
-  const getQuestions = () => (questionsP ??= loadQuestions(svc, exam.id));
+  const getQuestions = () => (questionsP ??= examQuestions(svc, exam.id));
   const { data: existing } = await svc.from("exam_attempts").select("*").eq("exam_id", exam.id).eq("student_user_id", ctx.userId).maybeSingle();
   const expired = (a: any) => (a.status === "in_progress" || a.status === "locked") && Date.now() > new Date(a.deadline_at).getTime() + GRACE_MS;
 
@@ -125,7 +152,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       if (fresh.status === "submitted" || fresh.status === "graded") await archiveForResit(svc, fresh, allow.resit!.id);
       else {
         await svc.from("exam_events").insert({ attempt_id: fresh.id, kind: "resumed", meta: { ua: req.headers.get("user-agent")?.slice(0, 200) } });
-        return NextResponse.json({ attempt: attemptPayload(exam, fresh, questions) });
+        return NextResponse.json({ attempt: attemptPayload(exam, fresh, questions, req) });
       }
     }
     const lateSitting = windowState(exam) !== "open" && exam.status !== "draft" && allow.late;
@@ -155,7 +182,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     await svc.from("exam_events").insert({ attempt_id: attempt.id, kind: "started", meta: { seb: seb.level, ...(allow.extra ? { extra_minutes: allow.extra } : {}), ...(lateSitting ? { late_sitting: true } : {}), ...(allow.resit ? { resit: true } : {}) } });
     if (lateSitting) await svc.from("exam_requests").update({ used_at: now.toISOString() }).eq("id", allow.late!.id);
     if (allow.resit && !existing) await svc.from("exam_requests").update({ used_at: now.toISOString() }).eq("id", allow.resit.id);
-    return NextResponse.json({ attempt: attemptPayload(exam, attempt, questions) }, { status: 201 });
+    return NextResponse.json({ attempt: attemptPayload(exam, attempt, questions, req) }, { status: 201 });
   }
 
   if (!existing) return jsonError("start the exam first", 400);

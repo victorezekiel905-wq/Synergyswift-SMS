@@ -49,5 +49,5 @@ export async function middleware(request: NextRequest) {
 // and the public website feeds (/api/public/…) do not use the session. Live lessons' code workers (/sandbox/…)
 // keep the strict policy next.config.mjs gives them.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icons/|pkg/|api/xapi/|api/v1/|api/v1$|api/public/|api/whatsapp/|api/ussd|api/vitals|iclock/|sandbox/|embed\\.js|.*\\.svg$).*)"]
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icons/|pkg/|exam-paper/|api/xapi/|api/v1/|api/v1$|api/public/|api/whatsapp/|api/ussd|api/vitals|iclock/|sandbox/|embed\\.js|.*\\.svg$).*)"]
 };

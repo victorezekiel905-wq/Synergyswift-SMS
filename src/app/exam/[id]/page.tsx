@@ -6,6 +6,7 @@ import ExamTools from "@/components/exams/tools/ExamTools";
 import type { ToolId } from "@/lib/exams/tools";
 import WebcamProctor, { requestCamera } from "@/components/exams/WebcamProctor";
 import { createClient } from "@/lib/supabase/client";
+import { applyLayout, decryptPaper, canOpenPaper } from "@/lib/exams/paper";
 
 /** Who is signed in on this device, read from the saved sign-in (works offline). */
 async function sessionUid(): Promise<string | null> {
@@ -17,20 +18,34 @@ type ExamInfo = {
   window: "not_open" | "open" | "closed"; require_seb: boolean; seb_config_url: string; seb_launch_url: string;
   require_fullscreen: boolean; block_copy_paste: boolean; violation_limit: number; allow_spellcheck: boolean; tools: ToolId[]; reference_text: string | null;
   webcam_snapshots: boolean; snapshot_interval_sec: number; network_restricted: boolean;
+  /** The encrypted paper to download before the start, and whether autosaves may go straight to the database. */
+  paper_url?: string | null; direct_save?: boolean;
 };
 type AttemptState = { id: string; status: string; started_at: string; deadline_at: string; violations: number; server_now: string; answers: Record<string, any>; questions: PublicQuestion[] };
 type Result = { released: boolean; pending_manual?: boolean; total_score?: number; max_score?: number; percent?: number | null; per_question?: { id: string; prompt: string; points: number | null; max: number; feedback: string | null }[] | null };
 
 /**
+ * A whole hall must not do the same thing in the same second: each device waits its own random share
+ * of a few seconds before autosaving, retrying or handing in when time is up (the server allows 30
+ * seconds' grace), so the requests arrive spread out instead of all at once.
+ */
+const jitter = (ms: number) => Math.round(Math.random() * ms);
+
+/** The paper this device downloaded before the start: its version and the encrypted file. */
+type Paper = { version: string; file: ArrayBuffer };
+
+/**
  * Talks to the exam API. Never throws: no connection (or a request that hangs on a weak
  * signal) comes back as status 0, so the caller keeps the answers and tries again later.
+ * `havePaper`: the version of the paper already on this device, so the server sends only the key.
  */
-async function api(id: string, body?: unknown): Promise<{ ok: boolean; status: number; data: any }> {
+async function api(id: string, body?: unknown, havePaper?: string | null): Promise<{ ok: boolean; status: number; data: any }> {
   try {
     const signal = typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(20_000) : undefined;
+    const have: Record<string, string> = havePaper ? { "x-have-paper": havePaper } : {};
     const r = await fetch(`/api/student/exams/${id}`, body === undefined
-      ? { cache: "no-store", signal }
-      : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
+      ? { cache: "no-store", signal, headers: have }
+      : { method: "POST", headers: { "Content-Type": "application/json", ...have }, body: JSON.stringify(body), signal });
     const j = await r.json().catch(() => ({}));
     return { ok: r.ok, status: r.status, data: j };
   } catch {
@@ -89,6 +104,12 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
   const saving = useRef(false);
   const submitting = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // This device's own timing (see jitter): autosave every 5–9 s, 1.5–3 s after typing stops.
+  const timing = useRef({ every: 5000 + jitter(4000), after: 1500 + jitter(1500), retry: 5000 + jitter(4000) });
+  const timeUpScheduled = useRef(false);
+  const deadlineRef = useRef<string | null>(null);
+  // The encrypted paper, downloaded in the lobby before the exam opens (see lib/exams/paper.ts).
+  const paperRef = useRef<Paper | null>(null);
   const backupKey = `exam-backup-${id}`;
   const stateKey = `exam-state-${id}`;
   const submitKey = `exam-submit-pending-${id}`;
@@ -136,8 +157,28 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
     try { localStorage.removeItem(backupKey); localStorage.removeItem(stateKey); localStorage.removeItem(submitKey); } catch { /* blocked */ }
   }, [backupKey, stateKey, submitKey]);
 
+  /**
+   * The attempt with its questions. When the server sent only the key (this device has the paper), the
+   * paper is opened and laid out in this student's order here. Null if that is not possible: the caller
+   * then asks for the questions the ordinary way.
+   */
+  const withQuestions = useCallback(async (a: any): Promise<any | null> => {
+    if (!a || a.questions) return a;
+    const p = paperRef.current;
+    if (!a.paper_key || !p || p.version !== a.paper_version) return null;
+    try {
+      const paper = await decryptPaper(p.file, a.paper_key);
+      return { ...a, questions: applyLayout(paper, a.question_order, a.option_orders) };
+    } catch { paperRef.current = null; return null; }
+  }, []);
+
   const load = useCallback(async () => {
-    const r = await api(id);
+    let r = await api(id, undefined, paperRef.current?.version);
+    if (r.data?.attempt && !r.data.attempt.questions && r.data.attempt.paper_key) {
+      const full = await withQuestions(r.data.attempt);
+      if (full) r = { ...r, data: { ...r.data, attempt: full } };
+      else r = await api(id);
+    }
     if (r.status === 0) {
       // No connection: carry on from the copy kept on this device, if there is one.
       try {
@@ -190,8 +231,24 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
       try { localStorage.removeItem(stateKey); localStorage.removeItem(submitKey); } catch { /* blocked */ }
       if (r.data.result) setResult(r.data.result);
     }
-  }, [id, backupKey, stateKey, submitKey, rememberState]);
+  }, [id, backupKey, stateKey, submitKey, rememberState, withQuestions]);
   useEffect(() => { load(); }, [load]);
+  // In the lobby: download the encrypted paper now (from Cloudflare's cache), so pressing Start at the
+  // opening time only needs the key. If anything fails, the questions simply come with the start.
+  useEffect(() => {
+    const url = exam?.paper_url;
+    if (!url || !canOpenPaper() || paperRef.current) return;
+    const version = /([a-f0-9]{16})\.bin$/.exec(url)?.[1];
+    if (!version) return;
+    let gone = false;
+    const t = window.setTimeout(async () => {
+      try {
+        const r = await fetch(url);
+        if (r.ok && !gone) paperRef.current = { version, file: await r.arrayBuffer() };
+      } catch { /* not needed: the start brings the questions */ }
+    }, jitter(3000));
+    return () => { gone = true; window.clearTimeout(t); };
+  }, [exam?.paper_url]);
   // Not loaded because there was no connection: try again as soon as it's back.
   useEffect(() => {
     if (exam) return;
@@ -225,13 +282,32 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
       : `${count} answer${count === 1 ? "" : "s"} could not be handed in after time was up. They are still saved on this device. Tell your teacher.`);
   }, []);
 
+  /**
+   * An autosave straight to the database (migration 10800), skipping the app server: the bulk of a
+   * hall's traffic no longer queues on it. Null when it cannot be used (the exam needs the server's
+   * network or Safe Exam Browser checks, time is up, the function is not installed, no answer within
+   * 15 seconds): the server then takes the save as before.
+   */
+  const directSave = useCallback(async (answers: Record<string, any>): Promise<{ ok: boolean; status: number; data: any } | null> => {
+    if (!exam?.direct_save) return null;
+    try {
+      const call = createClient().rpc("exam_student_save", { p_exam: id, p_answers: answers });
+      const res = await Promise.race([call, new Promise<null>(r => setTimeout(() => r(null), 15_000))]);
+      if (!res || res.error || !res.data) return null;
+      const d = res.data as { status: string; deadline_at?: string };
+      if (d.status === "in_progress") return { ok: true, status: 200, data: { deadline_at: d.deadline_at } };
+      if (d.status === "locked") return { ok: false, status: 423, data: {} };
+      return null;
+    } catch { return null; }
+  }, [exam?.direct_save, id]);
+
   const flush = useCallback(async () => {
     const pending = { ...dirty.current };
     if (saving.current || !attempt || !Object.keys(pending).length || statusRef.current !== "in_progress") return;
     saving.current = true;
     setSaveState("saving");
     try {
-      const r = await api(id, { action: "save", answers: pending });
+      const r = (await directSave(pending)) ?? await api(id, { action: "save", answers: pending });
       if (r.ok) {
         // Only what was sent is done; anything typed while saving stays waiting (and in the backup).
         const next = { ...dirty.current };
@@ -251,10 +327,10 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
       }
       else setSaveState("offline");
     } finally { saving.current = false; }
-  }, [attempt, id, load, noteLate, writeBackup, keepSaved]);
+  }, [attempt, id, load, noteLate, writeBackup, keepSaved, directSave]);
   const flushRef = useRef(flush);
   flushRef.current = flush;
-  useEffect(() => { const t = setInterval(flush, 5000); return () => clearInterval(t); }, [flush]);
+  useEffect(() => { const t = setInterval(flush, timing.current.every); return () => clearInterval(t); }, [flush]);
   // Back online: send what was kept straight away (and refresh if the exam was opened offline).
   useEffect(() => {
     const onOnline = () => { void flushRef.current().then(() => { if (openedOffline) load(); }); };
@@ -271,7 +347,7 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
     writeBackup(attempt?.id);
     setSaveState("idle");
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => { void flushRef.current(); }, 1500);
+    saveTimer.current = setTimeout(() => { void flushRef.current(); }, timing.current.after);
   }
   useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
 
@@ -329,13 +405,22 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
   // While locked, poll for the teacher to unlock.
   useEffect(() => {
     if (status !== "locked") return;
-    const t = setInterval(async () => { const r = await api(id); const s = r.data.attempt?.status; if (s && s !== "locked") { setStatus(s); if (s !== "in_progress") load(); } }, 5000);
+    const t = setInterval(async () => { const r = await api(id, undefined, paperRef.current?.version); const s = r.data.attempt?.status; if (s && s !== "locked") { setStatus(s); if (s !== "in_progress") load(); } }, 5000);
     return () => clearInterval(t);
   }, [status, id, load]);
 
   // Time up → submit.
   useEffect(() => {
-    if (attempt && status === "in_progress" && remaining === 0 && Date.now() + offset.current > new Date(attempt.deadline_at).getTime()) submit(true);
+    // Time up: hand in after this device's own short wait (up to 15 s, inside the 30 s grace), so a whole
+    // hall does not hand in within the same second. The answers are already kept on the device.
+    if (attempt && status === "in_progress" && remaining === 0 && Date.now() + offset.current > new Date(attempt.deadline_at).getTime() && !timeUpScheduled.current) {
+      timeUpScheduled.current = true;
+      setTimeout(() => {
+        // The teacher may have given more time meanwhile: then carry on instead.
+        if (deadlineRef.current && Date.now() + offset.current <= new Date(deadlineRef.current).getTime()) { timeUpScheduled.current = false; return; }
+        void submitRef.current(true);
+      }, jitter(15_000));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remaining]);
 
@@ -347,7 +432,12 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
       catch { setError("This exam needs your camera. Allow camera access in your browser and press Start again."); return; }
     }
     if (exam?.require_fullscreen && !exam.require_seb && !fsUnavailable) { try { await document.documentElement.requestFullscreen(); } catch { setFsUnavailable(true); } }
-    const r = await api(id, { action: "start", access_code: code });
+    const r = await api(id, { action: "start", access_code: code }, paperRef.current?.version);
+    // Only the key came back (this device has the paper): open it; if that fails, fetch the questions.
+    if (r.ok && r.data.attempt && !r.data.attempt.questions) {
+      const full = (await withQuestions(r.data.attempt)) ?? (await api(id)).data?.attempt;
+      if (full?.questions) r.data.attempt = { ...r.data.attempt, ...full };
+    }
     if (!r.ok) {
       cam?.getTracks().forEach(t => t.stop()); setCamera(null);
       const why = String(r.data.error ?? "");
@@ -400,7 +490,7 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
     if (!submitPending) return;
     const retry = () => { void submitRef.current(true); };
     window.addEventListener("online", retry);
-    const t = setInterval(retry, 5000);
+    const t = setInterval(retry, timing.current.retry);
     retry();
     return () => { window.removeEventListener("online", retry); clearInterval(t); };
   }, [submitPending]);
@@ -488,6 +578,7 @@ export default function ExamRoom(props: { params: Promise<{ id: string }> }) {
     );
   }
 
+  deadlineRef.current = attempt.deadline_at;
   const q = attempt.questions[current];
   const mins = Math.floor(remaining / 60000), secs = Math.floor(remaining / 1000) % 60;
   const answered = (qid: string) => { const v = answers[qid]; return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && !v.some(x => x)) && !(typeof v === "object" && !Array.isArray(v) && !Object.keys(v).length); };
