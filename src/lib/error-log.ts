@@ -1,5 +1,4 @@
 import "server-only";
-import { createHash } from "node:crypto";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendEmail } from "@/lib/messaging/providers";
 
@@ -18,8 +17,20 @@ export function normalise(message: string): string {
     .slice(0, 300);
 }
 
+/**
+ * A short, stable id for a kind of error. Plain JavaScript (two 53-bit hashes), not node:crypto: Next.js
+ * also builds instrumentation for its edge runtime, where node: modules do not exist.
+ */
 export function fingerprint(source: string, location: string, message: string): string {
-  return createHash("sha256").update(`${source}|${location}|${normalise(message)}`).digest("hex").slice(0, 40);
+  const s = `${source}|${location}|${normalise(message)}`;
+  const h = (seed: number) => {
+    let a = 0xdeadbeef ^ seed, b = 0x41c6ce57 ^ seed;
+    for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); a = Math.imul(a ^ c, 2654435761); b = Math.imul(b ^ c, 1597334677); }
+    a = Math.imul(a ^ (a >>> 16), 2246822507) ^ Math.imul(b ^ (b >>> 13), 3266489909);
+    b = Math.imul(b ^ (b >>> 16), 2246822507) ^ Math.imul(a ^ (a >>> 13), 3266489909);
+    return (4294967296 * (2097151 & b) + (a >>> 0)).toString(16).padStart(14, "0");
+  };
+  return `${h(1)}${h(2)}`;
 }
 
 // The same kind is written at most once every 10 seconds by each server, so a crash loop cannot
