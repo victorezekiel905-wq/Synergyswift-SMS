@@ -71,14 +71,14 @@ begin
 end $$;
 
 -- Busy per-school reads (dashboards, registers, change history).
+-- class_attendance(student_id, date), guardians(user_id) and students(user_id) already have
+-- unique indexes from their tables' unique constraints, so they get no second index here
+-- (migration 20260101011200 drops the copies this file used to create).
 create index if not exists class_attendance_tenant_date on public.class_attendance(tenant_id, date);
-create index if not exists class_attendance_student_date on public.class_attendance(student_id, date);
 create index if not exists audit_logs_tenant_ts on public.audit_logs(tenant_id, ts desc);
 create index if not exists report_cards_student on public.report_cards(student_id, term_id);
 create index if not exists student_guardians_guardian on public.student_guardians(guardian_id);
 create index if not exists student_guardians_student on public.student_guardians(student_id);
-create index if not exists guardians_user on public.guardians(user_id);
-create index if not exists students_user on public.students(user_id);
 create index if not exists students_tenant_status on public.students(tenant_id, status);
 create index if not exists fee_invoices_tenant_status on public.fee_invoices(tenant_id, status);
 create index if not exists message_outbox_status_created on public.message_outbox(status, created_at);
