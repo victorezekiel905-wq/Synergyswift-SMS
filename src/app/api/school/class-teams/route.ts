@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, readJson, jsonError, ROLES } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { appUrl } from "@/lib/school";
+import { appUrl, forgetSchoolData } from "@/lib/school";
 import { runAccountAutomation, resendStudentKey, ensureGuardianInvite } from "@/lib/accounts-server";
 import { onboardingList, type OnboardRow } from "@/lib/staff-onboarding-server";
 
@@ -62,7 +62,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("invite_parent"), guardian_id: z.string().uuid() })
 ]);
 
-export async function POST(req: NextRequest) {
+async function POST_write(req: NextRequest) {
   const ctx = await requireCtx(ROLES.admin);
   if (ctx instanceof NextResponse) return ctx;
   const parsed = Body.safeParse(await readJson(req));
@@ -135,4 +135,9 @@ export async function POST(req: NextRequest) {
     }
   }
   return jsonError("unknown action");
+}
+
+/** Terms, grading schemes and classes changed here: the remembered school data is read fresh next time. */
+export async function POST(...args: Parameters<typeof POST_write>) {
+  try { return await POST_write(...args); } finally { forgetSchoolData(); }
 }

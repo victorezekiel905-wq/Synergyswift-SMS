@@ -1,3 +1,4 @@
+import { forgetSchoolData } from "@/lib/school";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
@@ -61,7 +62,7 @@ const SchemeBody = z.object({
  * already-entered scores stay attached; removed components are deleted only
  * if no scores reference them.
  */
-export async function PUT(req: NextRequest) {
+async function PUT_write(req: NextRequest) {
   const ctx = await requireCtx(ROLES.admin);
   if (ctx instanceof NextResponse) return ctx;
   const body = await readJson(req);
@@ -137,7 +138,7 @@ export async function PUT(req: NextRequest) {
 }
 
 /** Delete a grading system nobody has entered marks against. Its classes go back to the school default. */
-export async function DELETE(req: NextRequest) {
+async function DELETE_write(req: NextRequest) {
   const ctx = await requireCtx(ROLES.admin);
   if (ctx instanceof NextResponse) return ctx;
   const id = new URL(req.url).searchParams.get("id");
@@ -156,4 +157,14 @@ export async function DELETE(req: NextRequest) {
   if (error) return jsonError(error.message);
   await sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "grading.deleted", target: id, meta: { name: (scheme as any).name } });
   return NextResponse.json({ ok: true });
+}
+
+/** Terms, grading schemes and classes changed here: the remembered school data is read fresh next time. */
+export async function PUT(...args: Parameters<typeof PUT_write>) {
+  try { return await PUT_write(...args); } finally { forgetSchoolData(); }
+}
+
+/** Terms, grading schemes and classes changed here: the remembered school data is read fresh next time. */
+export async function DELETE(...args: Parameters<typeof DELETE_write>) {
+  try { return await DELETE_write(...args); } finally { forgetSchoolData(); }
 }

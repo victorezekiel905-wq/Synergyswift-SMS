@@ -4,6 +4,7 @@
  * RLS-bound client or the service client.
  */
 import type { Component, Scheme } from "./grading";
+import { cached, forget } from "./memo";
 
 export function studentName(s: { first_name?: string | null; last_name?: string | null; other_names?: string | null } | null | undefined) {
   if (!s) return "Student";
@@ -22,7 +23,25 @@ export function appUrl(req?: Request): string {
   return (env ?? "http://localhost:3000").replace(/\/$/, "");
 }
 
-export async function currentTerm(sb: any, tenantId: string) {
+/**
+ * School data read on almost every results, report and dashboard request (the current term, a
+ * class's grading scheme) is remembered for SCHOOL_DATA_TTL. Every page that changes terms, schemes
+ * or a class's scheme calls forgetSchoolData, so the change shows at once on this server (and within
+ * the TTL on any other). Nothing is remembered when nothing was found.
+ */
+export const SCHOOL_DATA_TTL = 30_000;
+export function forgetSchoolData(tenantId?: string) { forget(tenantId ? `sd:${tenantId}:` : "sd:"); }
+async function remembered<T>(key: string, load: () => Promise<T | null>): Promise<T | null> {
+  const v = await cached(key, SCHOOL_DATA_TTL, load);
+  if (v === null || v === undefined) forget(key);
+  return v;
+}
+
+type TermRow = { id: string; name: string; session_id: string; academic_sessions: { name: string } | null };
+export async function currentTerm(sb: any, tenantId: string): Promise<TermRow | null> {
+  return remembered(`sd:${tenantId}:term`, () => currentTermFresh(sb, tenantId));
+}
+async function currentTermFresh(sb: any, tenantId: string) {
   const { data } = await sb.from("terms")
     .select("id,name,session_id,starts_on,ends_on,next_term_begins,academic_sessions(name)")
     .eq("tenant_id", tenantId).eq("is_current", true).maybeSingle();
@@ -36,7 +55,11 @@ export async function termLabel(sb: any, tenantId: string, termId: string) {
 }
 
 /** Scheme for a class group: its own scheme, else the tenant default, else the first one. */
-export async function schemeFor(sb: any, tenantId: string, classGroupId: string | null): Promise<(Scheme & { id: string; name: string; show_class_average: boolean; template: "nigerian" | "british" | "american" | "early_years"; show_cumulative: boolean; subject_parts: boolean }) | null> {
+type SchemeFull = Scheme & { id: string; name: string; show_class_average: boolean; template: "nigerian" | "british" | "american" | "early_years"; show_cumulative: boolean; subject_parts: boolean };
+export async function schemeFor(sb: any, tenantId: string, classGroupId: string | null): Promise<SchemeFull | null> {
+  return remembered(`sd:${tenantId}:scheme:${classGroupId ?? "default"}`, () => schemeForFresh(sb, tenantId, classGroupId));
+}
+async function schemeForFresh(sb: any, tenantId: string, classGroupId: string | null): Promise<SchemeFull | null> {
   let schemeId: string | null = null;
   if (classGroupId) {
     const { data: g } = await sb.from("class_groups").select("scheme_id").eq("tenant_id", tenantId).eq("id", classGroupId).maybeSingle();

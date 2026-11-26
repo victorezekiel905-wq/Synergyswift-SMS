@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { DEFAULT_SCHEME } from "@/lib/grading";
 import { emailDomain } from "@/lib/security";
 import { staffRows, enqueue, tryDispatch } from "@/lib/messaging/outbox";
-import { appUrl } from "@/lib/school";
+import { appUrl, forgetSchoolData } from "@/lib/school";
 import { hashSchoolCode, isSchoolCodeShape } from "@/lib/school-codes";
 
 /**
@@ -19,7 +19,7 @@ import { hashSchoolCode, isSchoolCodeShape } from "@/lib/school-codes";
  * Profile rows are written with the service role because users can no longer
  * insert their own profile (that let anyone join any tenant with any role).
  */
-export async function POST(req: NextRequest) {
+async function POST_write(req: NextRequest) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
@@ -170,4 +170,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `The school couldn't be set up: ${(e as Error).message}. Your code still works; sign in again to retry.` }, { status: 400 });
   }
   return NextResponse.json({ ok: true, role: "school_admin", next: "/school" });
+}
+
+/** Terms, grading schemes and classes changed here: the remembered school data is read fresh next time. */
+export async function POST(...args: Parameters<typeof POST_write>) {
+  try { return await POST_write(...args); } finally { forgetSchoolData(); }
 }

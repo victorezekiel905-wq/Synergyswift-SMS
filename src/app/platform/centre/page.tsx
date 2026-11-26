@@ -139,7 +139,9 @@ function SupportAccess() {
 
 type Perf = { budgets: Record<string, number>; total: number; ok: boolean;
   vitals: { name: string; p75: number | null; samples: number; budget: number; within: boolean | null }[];
-  pages: { path: string; lcp_p75: number; samples: number; within: boolean }[]; calls: { name: string; count: number; p95: number; worst: number }[] };
+  pages: { path: string; lcp_p75: number; samples: number; within: boolean }[]; calls: { name: string; count: number; p95: number; worst: number }[];
+  /** The error log (migration 11100); null before that update. */
+  errors?: { fingerprint: string; source: string; message: string; location: string | null; detail: string | null; count: number; first_at: string; last_at: string }[] | null };
 const VITAL_WORDS: Record<string, string> = { LCP: "Main content shown", INP: "Response to a tap or click", CLS: "Layout shifting (score)", FCP: "First thing on screen", TTFB: "Server first byte" };
 const fmtV = (name: string, v: number | null) => v === null ? "—" : name === "CLS" ? v.toFixed(2) : v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)} ms`;
 
@@ -160,6 +162,21 @@ function Performance() {
           {!data.pages.length ? <p className="text-slate-500">Not enough visits yet.</p> : <ul>{data.pages.map(p => <li key={p.path} className="flex justify-between gap-2 py-0.5"><span className="truncate font-mono text-xs">{p.path}</span><span className={p.within ? "" : "font-semibold text-red-700"}>{fmtV("LCP", p.lcp_p75)}</span></li>)}</ul>}</div>
         <div><h3 className="mb-1 text-[13px] font-medium text-slate-500">Slow database calls (over {fmtV("x", data.budgets.slow_call)})</h3>
           {!data.calls.length ? <p className="text-slate-500">None. Good.</p> : <ul>{data.calls.map(c => <li key={c.name} className="flex justify-between gap-2 py-0.5"><span className="truncate font-mono text-xs">{c.name}</span><span>{c.count}× · worst {fmtV("x", c.worst)}</span></li>)}</ul>}</div>
+      </div>
+      <div className="mt-5 border-t border-slate-100 pt-4">
+        <div className="flex items-center gap-2"><h3 className="mr-auto font-semibold">Errors, last 7 days</h3>
+          {data.errors && <Badge tone={data.errors.length ? "amber" : "green"}>{data.errors.length ? `${data.errors.length} kind${data.errors.length === 1 ? "" : "s"}` : "none"}</Badge>}</div>
+        <p className="mt-1 text-slate-600">Crashes on the server and in browsers, grouped by kind. Platform admins are emailed the first time a kind appears.</p>
+        {data.errors === null ? <p className="mt-2 text-slate-500">The error log needs the latest database update (migration 20260101011100).</p>
+          : !data.errors?.length ? <p className="mt-2 text-slate-500">None. Good.</p>
+          : <table className="mt-2 w-full"><thead className="text-left text-[13px] text-slate-500"><tr><th className="py-1">What</th><th>Where</th><th className="text-right">Times</th><th className="text-right">Last seen</th></tr></thead>
+              <tbody>{data.errors.map(e => (
+                <tr key={e.fingerprint} className="border-t border-slate-100 align-top">
+                  <td className="py-1 pr-3"><span className="font-medium">{e.message}</span>{e.detail && <details className="text-xs text-slate-500"><summary className="cursor-pointer">details</summary><pre className="whitespace-pre-wrap">{e.detail}</pre></details>}</td>
+                  <td className="pr-3"><span className="font-mono text-xs">{e.location}</span><span className="block text-xs text-slate-400">{e.source}</span></td>
+                  <td className="text-right tabular-nums">{e.count}</td>
+                  <td className="text-right text-xs text-slate-500">{new Date(e.last_at).toLocaleString()}</td>
+                </tr>))}</tbody></table>}
       </div>
     </section>
   );

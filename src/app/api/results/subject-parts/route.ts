@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError, hasAny } from "@/lib/auth";
-import { schemeFor, subjectPartsFor } from "@/lib/school";
+import { schemeFor, subjectPartsFor, forgetSchoolData } from "@/lib/school";
 import { validateScheme } from "@/lib/grading";
 
 export const dynamic = "force-dynamic";
@@ -83,7 +83,7 @@ const Put = z.object({
 });
 
 /** Set this subject's own parts in this class (and, if asked, in the same subject's other classes of the year). */
-export async function PUT(req: NextRequest) {
+async function PUT_write(req: NextRequest) {
   const ctx = await requireCtx(ROLES.staff, "results");
   if (ctx instanceof NextResponse) return ctx;
   const parsed = Put.safeParse(await readJson(req));
@@ -137,7 +137,7 @@ export async function PUT(req: NextRequest) {
 }
 
 /** Go back to the school's parts for this subject in this class (only while its own parts have no marks). */
-export async function DELETE(req: NextRequest) {
+async function DELETE_write(req: NextRequest) {
   const ctx = await requireCtx(ROLES.staff, "results");
   if (ctx instanceof NextResponse) return ctx;
   const u = new URL(req.url);
@@ -156,4 +156,14 @@ export async function DELETE(req: NextRequest) {
   if (error) return jsonError(error.message);
   await ctx.sb.from("audit_logs").insert({ tenant_id: ctx.tenant.id, actor_id: ctx.userId, action: "subject_parts.reset", meta: { subject_id: subjectId, class_group_id: classId } });
   return NextResponse.json({ ok: true });
+}
+
+/** Terms, grading schemes and classes changed here: the remembered school data is read fresh next time. */
+export async function PUT(...args: Parameters<typeof PUT_write>) {
+  try { return await PUT_write(...args); } finally { forgetSchoolData(); }
+}
+
+/** Terms, grading schemes and classes changed here: the remembered school data is read fresh next time. */
+export async function DELETE(...args: Parameters<typeof DELETE_write>) {
+  try { return await DELETE_write(...args); } finally { forgetSchoolData(); }
 }

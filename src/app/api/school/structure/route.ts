@@ -1,3 +1,4 @@
+import { forgetSchoolData } from "@/lib/school";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
@@ -54,7 +55,7 @@ const Body = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("delete"), table: z.enum(["class_groups", "subjects", "subject_offerings", "departments"]), id: z.string().uuid() })
 ]);
 
-export async function POST(req: NextRequest) {
+async function POST_write(req: NextRequest) {
   const ctx = await requireCtx(ROLES.admin);
   if (ctx instanceof NextResponse) return ctx;
   const parsed = Body.safeParse(await readJson(req));
@@ -106,4 +107,9 @@ export async function POST(req: NextRequest) {
   }
   const { error } = await sb.from(b.table).delete().eq("tenant_id", tid).eq("id", b.id);
   return error ? jsonError(error.message) : NextResponse.json({ ok: true });
+}
+
+/** Terms, grading schemes and classes changed here: the remembered school data is read fresh next time. */
+export async function POST(...args: Parameters<typeof POST_write>) {
+  try { return await POST_write(...args); } finally { forgetSchoolData(); }
 }

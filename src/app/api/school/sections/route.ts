@@ -1,3 +1,4 @@
+import { forgetSchoolData } from "@/lib/school";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
@@ -36,7 +37,7 @@ const Body = z.discriminatedUnion("action", [
     subjects: z.boolean().default(true), grading: z.boolean().default(true) })
 ]);
 
-export async function POST(req: NextRequest) {
+async function POST_write(req: NextRequest) {
   const ctx = await requireCtx(ROLES.admin);
   if (ctx instanceof NextResponse) return ctx;
   const parsed = Body.safeParse(await readJson(req));
@@ -142,4 +143,9 @@ export async function POST(req: NextRequest) {
   await sb.from("tenant_settings").upsert({ tenant_id: tid, curriculum: frameworks.length === 1 ? frameworks[0] : "mixed" }, { onConflict: "tenant_id" });
   await sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "curriculum.applied", meta: { stages: b.stages, classes: plan.classes.length, subjects: plan.subjects.length } });
   return NextResponse.json({ ok: true, sections: plan.sections.length, classes: plan.classes.length, subjects: b.subjects ? plan.subjects.length : 0, offerings: offered, grading: schemeId.size });
+}
+
+/** Terms, grading schemes and classes changed here: the remembered school data is read fresh next time. */
+export async function POST(...args: Parameters<typeof POST_write>) {
+  try { return await POST_write(...args); } finally { forgetSchoolData(); }
 }

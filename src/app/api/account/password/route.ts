@@ -3,7 +3,7 @@ import { createClient as createPlainClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { beginRequest } from "@/lib/request-actor";
-import { readJson, jsonError } from "@/lib/auth";
+import { readJson, jsonError, forgetUser } from "@/lib/auth";
 import { checkPassword, passwordRulesText, passwordDaysLeft, tokenClaims, type PasswordPolicy } from "@/lib/security";
 
 /**
@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
   if (error) return jsonError(error.message);
   if (w.profile) {
     await w.svc.from("users").update({ password_changed_at: new Date().toISOString(), must_change_password: false }).eq("id", w.user.id);
+    forgetUser(w.user.id); // their remembered profile still says "must change password"
     await w.svc.from("audit_logs").insert({ tenant_id: w.profile.tenant_id, actor_id: w.user.id, action: "account.password_changed" });
   }
   if (b.sign_out_others) {

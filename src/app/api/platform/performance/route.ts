@@ -15,8 +15,12 @@ export async function GET() {
   const { data: b } = await svc.from("platform_settings").select("value").eq("key", "perf.budgets").maybeSingle();
   const budgets: Budgets = { ...DEFAULT_BUDGETS, ...((b?.value as Partial<Budgets>) ?? {}) };
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
-  const samples = await fetchAll<Sample>(() => svc.from("perf_samples").select("id,kind,name,path,value").gte("at", since).order("id")).catch(() => [] as Sample[]);
-  return NextResponse.json({ budgets, ...perfReport(samples.slice(-100000), budgets), total: samples.length });
+  const [samples, errs] = await Promise.all([
+    fetchAll<Sample>(() => svc.from("perf_samples").select("id,kind,name,path,value").gte("at", since).order("id")).catch(() => [] as Sample[]),
+    // The error log (migration 11100): every kind seen in the last 7 days, most recent first.
+    svc.from("error_events").select("fingerprint,source,message,location,detail,count,first_at,last_at").gte("last_at", since).order("last_at", { ascending: false }).limit(100)
+  ]);
+  return NextResponse.json({ budgets, ...perfReport(samples.slice(-100000), budgets), total: samples.length, errors: errs.error ? null : errs.data ?? [] });
 }
 
 const Body = z.object({ LCP: z.number().min(500).max(10000), INP: z.number().min(50).max(2000), CLS: z.number().min(0.01).max(1), FCP: z.number().min(300).max(10000),

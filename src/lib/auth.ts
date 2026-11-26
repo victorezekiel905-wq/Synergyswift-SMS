@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { beginRequest } from "@/lib/request-actor";
 import { checkAccess } from "@/lib/access";
+import { cached, forget } from "@/lib/memo";
 import { effectiveRoles, permitted, moduleBlockedForUser, platformAtLeast, type CustomRole, type Permission, type PlatformRole, type ModuleKey } from "@/lib/saas";
 export type { ModuleKey } from "@/lib/saas";
 
@@ -108,35 +109,51 @@ export async function resolveCtx(): Promise<Ctx | CtxError> {
   const supportUntil = (user.app_metadata as { support_until?: string } | undefined)?.support_until;
   if (supportUntil && Date.parse(supportUntil) <= Date.now()) return { error: "This support session has ended.", status: 403, code: "support_ended" };
   const { data: { session } } = await sb.auth.getSession();
-  // The access rules and the profile at the same time (one wait instead of two on every request).
-  const [access, { data: profile }] = await Promise.all([
+  // The access rules (network and device; they keep their own short memory and still check this
+  // request's address) and the profile at the same time. The profile, the school and a custom role are
+  // remembered for a few seconds (lib/memo.ts): every request a person makes asked for them again, and
+  // that was most of the database work behind each click. Changes show within PROFILE_TTL / SCHOOL_TTL;
+  // setting one's own password clears it at once (forgetUser).
+  const [access, profile] = await Promise.all([
     checkAccess(user.id, session?.access_token ?? null),
-    sb.from("users").select("id,tenant_id,email,full_name,role,extra_roles,custom_role_id,must_change_password").eq("id", user.id).maybeSingle()
+    cached(`ctx-user:${user.id}`, PROFILE_TTL, async () =>
+      (await sb.from("users").select("id,tenant_id,email,full_name,role,extra_roles,custom_role_id,must_change_password").eq("id", user.id).maybeSingle()).data as (Profile & { must_change_password?: boolean }) | null)
   ]);
   if (!access.ok) return { error: access.message, status: 403, code: "access_restricted" };
-  // Signed in with a one-time (or starting) password: nothing opens until they choose their own.
-  if (profile?.must_change_password) return { error: "Choose your own password to continue.", status: 403, code: "password_change_required" };
-  if (profile) delete (profile as { must_change_password?: boolean }).must_change_password;
   if (!profile) {
+    forget(`ctx-user:${user.id}`); // not set up yet: never remembered
     const { data: st } = await sb.rpc("my_account_state");
     const e = STATE_ERRORS[st?.state as string];
     return e ? { ...e, code: st.state } : { error: "unauthenticated", status: 401 };
   }
+  // Signed in with a one-time (or starting) password: nothing opens until they choose their own.
+  if (profile.must_change_password) return { error: "Choose your own password to continue.", status: 403, code: "password_change_required" };
+  const { must_change_password: _m, ...me } = profile;
   // The school and any custom role at the same time.
-  const [{ data: tenant }, roleRes] = await Promise.all([
-    sb.from("tenants").select("id,name,status,modules,timezone,allowed_roles").eq("id", profile.tenant_id).maybeSingle(),
-    profile.custom_role_id
-      ? sb.from("tenant_roles").select("id,name,grants,deny_modules,deny_permissions").eq("id", profile.custom_role_id).maybeSingle()
-      : Promise.resolve({ data: null })
+  const [tenant, customRole] = await Promise.all([
+    cached(`ctx-school:${me.tenant_id}`, SCHOOL_TTL, async () =>
+      (await sb.from("tenants").select("id,name,status,modules,timezone,allowed_roles").eq("id", me.tenant_id).maybeSingle()).data as Tenant | null),
+    me.custom_role_id
+      ? cached(`ctx-role:${me.custom_role_id}`, SCHOOL_TTL, async () =>
+          ((await sb.from("tenant_roles").select("id,name,grants,deny_modules,deny_permissions").eq("id", me.custom_role_id).maybeSingle()).data ?? null) as CustomRole | null)
+      : Promise.resolve(null)
   ]);
-  if (!tenant) return { error: "unauthenticated", status: 401 };
-  const customRole: CustomRole | null = (roleRes as { data: CustomRole | null }).data ?? null;
+  if (!tenant) { forget(`ctx-school:${me.tenant_id}`); return { error: "unauthenticated", status: 401 }; }
+  const profileOut = me as Profile;
   // Own role and extra roles, plus a custom role's grants, within the roles the platform allows this school.
-  const roles = effectiveRoles([profile.role, ...(profile.extra_roles ?? [])], customRole, tenant.allowed_roles ?? null);
+  const roles = effectiveRoles([profileOut.role, ...(profileOut.extra_roles ?? [])], customRole, tenant.allowed_roles ?? null);
   store.tenantId = tenant.id;
   store.userId = user.id;
-  return { sb, userId: user.id, profile: { ...profile, extra_roles: profile.extra_roles ?? [] }, tenant, roles, customRole };
+  return { sb, userId: user.id, profile: { ...profileOut, extra_roles: profileOut.extra_roles ?? [] }, tenant, roles, customRole };
 }
+
+/** How long a person's profile, and their school and custom role, are remembered between requests. */
+export const PROFILE_TTL = 20_000;
+export const SCHOOL_TTL = 30_000;
+
+/** After a change that must show at once (a person's own new password): read them fresh next time. */
+export function forgetUser(userId: string) { forget(`ctx-user:${userId}`); }
+export function forgetSchool(tenantId: string) { forget(`ctx-school:${tenantId}`); }
 
 /** The signed-in user's context, or null when signed out, not provisioned or blocked. */
 export async function getCtx(): Promise<Ctx | null> {

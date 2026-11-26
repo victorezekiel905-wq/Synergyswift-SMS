@@ -1,3 +1,4 @@
+import { forgetSchoolData } from "@/lib/school";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCtx, ROLES, readJson, jsonError } from "@/lib/auth";
@@ -56,7 +57,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("clear"), class_group_id: z.string().uuid(), keep_locked: z.boolean().default(true) })
 ]);
 
-export async function POST(req: NextRequest) {
+async function POST_write(req: NextRequest) {
   const ctx = await requireCtx(ROLES.staff, "timetable");
   if (ctx instanceof NextResponse) return ctx;
   const parsed = Body.safeParse(await readJson(req));
@@ -178,4 +179,9 @@ export async function POST(req: NextRequest) {
   const nm = new Map((names ?? []).map((s: any) => [s.id, s.name]));
   await sb.from("audit_logs").insert({ tenant_id: tid, actor_id: ctx.userId, action: "timetable.generated", meta: { classes: targets.size, placed: rows.length, unplaced: result.unplaced.length } });
   return NextResponse.json({ placed: rows.length, unplaced: result.unplaced.map(u => ({ ...u, subject: nm.get(u.subjectId) ?? u.subjectId })) });
+}
+
+/** Terms, grading schemes and classes changed here: the remembered school data is read fresh next time. */
+export async function POST(...args: Parameters<typeof POST_write>) {
+  try { return await POST_write(...args); } finally { forgetSchoolData(); }
 }

@@ -5,6 +5,7 @@ import AppShell from "@/components/AppShell";
 import RegisterServiceWorker from "@/components/RegisterServiceWorker";
 import EmbedResize from "@/components/EmbedResize";
 import WebVitals from "@/components/WebVitals";
+import ErrorReporter from "@/components/ErrorReporter";
 import Toaster from "@/components/Toaster";
 import NavProgress from "@/components/NavProgress";
 import { BRAND_BOOT_SCRIPT } from "@/lib/theme";
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head><script dangerouslySetInnerHTML={{ __html: BRAND_BOOT_SCRIPT }} /></head>
       <body className="min-h-screen bg-canvas font-sans text-[15px] text-slate-900 antialiased sm:text-sm">
         <WebVitals />
+        <ErrorReporter />
         <NavProgress />
         <AppShell>{children}</AppShell>
         <Toaster />
