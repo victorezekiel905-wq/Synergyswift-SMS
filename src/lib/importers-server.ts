@@ -55,31 +55,55 @@ export async function runImport(sb: any, tid: string, entityKey: string, rows: R
     for (const g of gs) { if (digits(g.phone)) byPhone.set(digits(g.phone), g.id); if (g.email) byEmail.set(lc(g.email), g.id); }
     return { byPhone, byEmail };
   };
-  /** Finds a parent by phone or email, creating one when new. */
+  /**
+   * Finds a parent by phone or email, creating one when new. Rows are worked on several at a time,
+   * so a parent being created is remembered at once: brothers and sisters in the same file share the
+   * one new parent instead of making two.
+   */
+  const making = new Map<string, Promise<string | null>>();
   const guardianFor = async (gi: Awaited<ReturnType<typeof guardianIndex>>, v: { name: string; phone: string | null; email: string | null; whatsapp?: string | null }, row: number) => {
+    const keys = [v.phone && digits(v.phone) ? `p:${digits(v.phone)}` : null, v.email ? `e:${lc(v.email)}` : null].filter(Boolean) as string[];
     const found = (v.phone && gi.byPhone.get(digits(v.phone))) || (v.email && gi.byEmail.get(lc(v.email)));
     if (found) return { id: found, created: false };
+    const pending = keys.map(k => making.get(k)).find(Boolean);
+    if (pending) { const id = await pending; return id ? { id, created: false } : null; }
     if (o.dryRun) return { id: `new:${row}`, created: true };
-    const { data, error } = await sb.from("guardians").insert({ tenant_id: tid, full_name: v.name, phone: v.phone, email: v.email, whatsapp_phone: v.whatsapp ?? null }).select("id").single();
-    if (error) { fail(row, `parent: ${error.message}`); return null; }
-    if (v.phone) gi.byPhone.set(digits(v.phone), data.id);
-    if (v.email) gi.byEmail.set(lc(v.email), data.id);
-    return { id: data.id as string, created: true };
+    const p = (async () => {
+      const { data, error } = await sb.from("guardians").insert({ tenant_id: tid, full_name: v.name, phone: v.phone, email: v.email, whatsapp_phone: v.whatsapp ?? null }).select("id").single();
+      if (error) { fail(row, `parent: ${error.message}`); return null; }
+      if (v.phone) gi.byPhone.set(digits(v.phone), data.id);
+      if (v.email) gi.byEmail.set(lc(v.email), data.id);
+      return data.id as string;
+    })();
+    for (const k of keys) making.set(k, p);
+    const id = await p;
+    return id ? { id, created: true } : null;
+  };
+  /** Works on the rows 10 at a time: a school's whole list fits well inside the 100 seconds a request may take. */
+  const each = async <T,>(items: T[], fn: (x: T) => Promise<void>) => {
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(10, items.length) }, async () => { while (next < items.length) await fn(items[next++]); }));
   };
 
   switch (entityKey) {
     case "students": {
       const [cls, adm, gi] = await Promise.all([classes(), studentsByAdm(), guardianIndex()]);
-      for (const x of unique) {
+      // New classes first, one at a time (a few), so the students can then be saved 10 at a time.
+      const classError = new Map<string, string>();
+      if (!o.dryRun) {
+        for (const name of [...new Set(unique.map(x => x.values.class).filter(Boolean).map(String))]) {
+          if (cls.has(lc(name))) continue;
+          const { data, error } = await sb.from("class_groups").insert({ tenant_id: tid, name }).select("id").single();
+          if (error) classError.set(lc(name), error.message); else cls.set(lc(name), data.id);
+        }
+      }
+      await each(unique, async x => {
         const v = x.values;
         let classId: string | null = null;
         if (v.class) {
+          const err = classError.get(lc(v.class));
+          if (err) { fail(x.row, `class: ${err}`); return; }
           classId = cls.get(lc(v.class)) ?? null;
-          if (!classId && !o.dryRun) {
-            const { data, error } = await sb.from("class_groups").insert({ tenant_id: tid, name: v.class }).select("id").single();
-            if (error) { fail(x.row, `class: ${error.message}`); continue; }
-            classId = data.id; cls.set(lc(v.class), data.id);
-          }
         }
         const row = { admission_no: v.admission_no, first_name: v.first_name, last_name: v.last_name, other_names: v.other_names, gender: v.gender,
           date_of_birth: v.date_of_birth, address: v.address, ...(v.class ? { class_group_id: classId } : {}) };
@@ -87,31 +111,31 @@ export async function runImport(sb: any, tid: string, entityKey: string, rows: R
         const w = existing
           ? await write(sb.from("students").update(row).eq("tenant_id", tid).eq("id", existing).select("id").single(), x.row)
           : await write(sb.from("students").insert({ ...row, tenant_id: tid }).select("id").single(), x.row);
-        if (!w.ok) continue;
+        if (!w.ok) return;
         if (existing) r.updated++; else r.created++;
         const studentId = existing ?? w.data?.id;
         if (v.guardian_name && (v.guardian_phone || v.guardian_email)) {
           const g = await guardianFor(gi, { name: String(v.guardian_name), phone: v.guardian_phone as string | null, email: v.guardian_email as string | null }, x.row);
           if (g && studentId && !o.dryRun) await sb.from("student_guardians").upsert({ tenant_id: tid, student_id: studentId, guardian_id: g.id, relation: v.guardian_relation || "parent", is_primary: true }, { onConflict: "student_id,guardian_id" });
         }
-      }
+      });
       break;
     }
     case "guardians": {
       const [adm, gi] = await Promise.all([studentsByAdm(), guardianIndex()]);
-      for (const x of unique) {
+      await each(unique, async x => {
         const v = x.values;
         const studentId = adm.get(lc(v.admission_no));
-        if (!studentId) { fail(x.row, `no student with admission number "${v.admission_no}"`); continue; }
-        if (!v.phone && !v.email) { fail(x.row, "add a phone or email so the parent can be reached"); continue; }
+        if (!studentId) { fail(x.row, `no student with admission number "${v.admission_no}"`); return; }
+        if (!v.phone && !v.email) { fail(x.row, "add a phone or email so the parent can be reached"); return; }
         const g = await guardianFor(gi, { name: String(v.full_name), phone: v.phone as string | null, email: v.email as string | null, whatsapp: v.whatsapp_phone as string | null }, x.row);
-        if (!g) continue;
+        if (!g) return;
         if (g.created) r.created++; else r.updated++;
         if (!o.dryRun) {
           if (!g.created) await sb.from("guardians").update({ full_name: v.full_name, ...(v.whatsapp_phone ? { whatsapp_phone: v.whatsapp_phone } : {}) }).eq("tenant_id", tid).eq("id", g.id);
           await sb.from("student_guardians").upsert({ tenant_id: tid, student_id: studentId, guardian_id: g.id, relation: v.relation || "parent", is_primary: v.is_primary === true }, { onConflict: "student_id,guardian_id" });
         }
-      }
+      });
       break;
     }
     case "staff": {

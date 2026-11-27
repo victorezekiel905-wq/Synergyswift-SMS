@@ -96,7 +96,13 @@ export async function ensureGuardianInvite(svc: Svc, guardianId: string, baseUrl
  * The cron's part: new students get logins, new parents get invited, for
  * schools that have the switches on. A few at a time so the run stays short.
  */
-export async function runAccountAutomation(svc: Svc, baseUrl: string, limit = 25, onlyTenant: string | null = null) {
+/** Runs fn over the items 5 at a time (sign-in accounts are made by Supabase Auth; 5 keeps it steady). */
+async function fiveAtATime<T>(items: T[], fn: (x: T) => Promise<void>) {
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(5, items.length) }, async () => { while (next < items.length) await fn(items[next++]); }));
+}
+
+export async function runAccountAutomation(svc: Svc, baseUrl: string, limit = 60, onlyTenant: string | null = null) {
   const out = { student_logins: 0, parent_invites: 0, errors: 0 };
   let sq = svc.from("tenant_settings").select("tenant_id,auto_student_logins,auto_parent_invites").or("auto_student_logins.eq.true,auto_parent_invites.eq.true");
   if (onlyTenant) sq = sq.eq("tenant_id", onlyTenant);
@@ -106,17 +112,23 @@ export async function runAccountAutomation(svc: Svc, baseUrl: string, limit = 25
   const parentsOn = (settings ?? []).filter((s: any) => s.auto_parent_invites && active.has(s.tenant_id)).map((s: any) => s.tenant_id);
   if (studentsOn.length) {
     const { data: kids } = await svc.from("students").select("id").in("tenant_id", studentsOn).eq("status", "active").is("user_id", null).is("login_sent_at", null).limit(limit);
-    for (const k of kids ?? []) {
+    await fiveAtATime<{ id: string }>(kids ?? [], async k => {
       try { await ensureStudentLogin(svc, k.id, baseUrl); out.student_logins++; }
-      catch { out.errors++; await svc.from("students").update({ login_sent_at: new Date().toISOString() }).eq("id", k.id); } // do not retry forever
-    }
+      catch (e) {
+        // Two students made at the same moment can reach for the same free username: try once more.
+        if (/already|exists|registered|duplicate/i.test((e as Error).message)) {
+          try { await ensureStudentLogin(svc, k.id, baseUrl); out.student_logins++; return; } catch { /* counted below */ }
+        }
+        out.errors++; await svc.from("students").update({ login_sent_at: new Date().toISOString() }).eq("id", k.id); // do not retry forever
+      }
+    });
   }
   if (parentsOn.length) {
     const { data: gs } = await svc.from("guardians").select("id").in("tenant_id", parentsOn).is("user_id", null).is("invited_at", null).limit(limit);
-    for (const g of gs ?? []) {
+    await fiveAtATime<{ id: string }>(gs ?? [], async g => {
       try { const r = await ensureGuardianInvite(svc, g.id, baseUrl); if (r.invited) out.parent_invites++; else await svc.from("guardians").update({ invited_at: new Date().toISOString() }).eq("id", g.id); }
       catch { out.errors++; await svc.from("guardians").update({ invited_at: new Date().toISOString() }).eq("id", g.id); }
-    }
+    });
   }
   return out;
 }

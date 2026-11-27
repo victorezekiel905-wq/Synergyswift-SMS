@@ -3,6 +3,8 @@
  * longer than the budget is written to perf_samples straight through the REST API (not through a
  * wrapped client, so recording never records itself). At most 30 a minute per server.
  */
+import { withInsertDefaults } from "@/lib/supabase/insert-defaults";
+
 const SLOW_MS = 800;
 let windowStart = 0, inWindow = 0;
 
@@ -28,7 +30,7 @@ export function callName(input: RequestInfo | URL): string | null {
 export function timedFetch(base: typeof fetch = fetch): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const start = Date.now();
-    const res = await base(input, init);
+    const res = await base(input, withInsertDefaults(input, init));
     const ms = Date.now() - start;
     if (ms > SLOW_MS) { const name = callName(input); if (name && name !== "perf_samples") record(name, ms); }
     return res;

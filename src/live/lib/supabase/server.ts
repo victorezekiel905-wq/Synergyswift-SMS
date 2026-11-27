@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { insertDefaultsFetch } from "@/lib/supabase/insert-defaults";
 
 /**
  * RLS-bound client for Server Components and Route Handlers (acts as the caller).
@@ -14,6 +15,7 @@ export async function createClient(): Promise<SupabaseClient> {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       db: { schema: "live" },
+      global: { fetch: insertDefaultsFetch() },
       cookies: {
         getAll() {
           return cookieStore.getAll();

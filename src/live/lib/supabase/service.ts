@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient as createBaseClient, type SupabaseClient } from "@supabase/supabase-js";
+import { insertDefaultsFetch } from "@/lib/supabase/insert-defaults";
 
 /** The service key as configured, without the quotes, spaces or "Bearer " that copying sometimes adds. */
 function serviceKey(): string | null {
@@ -18,6 +19,7 @@ export function createServiceClient(): SupabaseClient {
   if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured on the server.");
   return createBaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
     db: { schema: "live" },
+    global: { fetch: insertDefaultsFetch() },
     auth: { persistSession: false, autoRefreshToken: false }
   }) as unknown as SupabaseClient;
 }
@@ -26,6 +28,7 @@ export function createServiceClient(): SupabaseClient {
 export function createAnonClient(): SupabaseClient {
   return createBaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     db: { schema: "live" },
+    global: { fetch: insertDefaultsFetch() },
     auth: { persistSession: false, autoRefreshToken: false }
   }) as unknown as SupabaseClient;
 }
