@@ -53,6 +53,17 @@ export default function StudentDetail(props: { params: Promise<{ id: string }> }
     if (r.ok) reload();
   }
 
+  // A student who forgot their password (or never got it): a new starting password, sent to the
+  // parents and shown here once, with the username to sign in with on the Student tab.
+  async function resetLogin() {
+    if (!confirm("Give this student a new starting password? Their old password stops working, and the new one goes to their parents.")) return;
+    const r = await send<{ username: string | null; password?: string; sent: number }>("/api/school/class-teams", { action: "resend_key", student_id: params.id });
+    setMsg({ ok: r.ok, text: r.ok
+      ? `Sign in on the Student tab. Username: ${r.data.username} · New password: ${r.data.password} (shown only now${r.data.sent ? `; also sent to the parents in ${r.data.sent} message${r.data.sent === 1 ? "" : "s"}` : ""}). They choose their own password when they sign in.`
+      : r.error ?? "failed" });
+    if (r.ok) reload();
+  }
+
   if (error) return <Page><Alert>{error}</Alert></Page>;
   if (!data || !edit) return <Page><Loading /></Page>;
   const s = data.student;
@@ -67,6 +78,7 @@ export default function StudentDetail(props: { params: Promise<{ id: string }> }
           <HousePicker studentId={s.id} houseId={s.house_id ?? null} onChange={reload} />
           <button className="btn btn-outline" onClick={() => setCard(true)}>ID card / QR</button>
           {!s.user_id && <button className="btn btn-outline" onClick={createLogin}>Create student login</button>}
+          {s.user_id && admin && <button className="btn btn-outline" onClick={resetLogin} title="New starting password, sent to the parents">Reset sign-in</button>}
           <a className="btn btn-outline" href={`/school/students/${s.id}/transcript`} target="_blank" rel="noreferrer">Transcript</a>
           <a className="btn btn-outline" href={`/api/sims/students/${s.id}/export`} title="Everything held about this student, for a data access request">Export data</a>
         </>} />
