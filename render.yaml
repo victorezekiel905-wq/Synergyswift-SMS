@@ -27,6 +27,11 @@ services:
         value: "22"
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
+      # Starter has 512 MB. Once every page and API has been used the app needs about 430 MB; without a
+      # cap Node lets its heap grow until Render kills the instance (502s for 2-4 minutes while it
+      # restarts). Tested: 320 stays up under repeated full load; 256 runs out. On Standard (2 GB) use 1400.
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=320"
       # ---- Required ----
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
