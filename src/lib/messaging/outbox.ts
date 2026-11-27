@@ -96,13 +96,16 @@ export async function guardiansByStudent(svc: any, tenantId: string, studentIds:
 
 export async function enqueue(svc: any, input: OutboxRow[]): Promise<string[]> {
   const ids: string[] = [];
+  // Rows inserted together are sent with the same columns: one without template_params (an email)
+  // next to one with it (WhatsApp, push) sent null, which the column refuses, and the whole batch
+  // failed. Every row says it, empty when unused.
   // Schools in "always" SMS mode get an SMS copy of every WhatsApp message.
-  const rows = [...input];
+  const rows = input.map(r => ({ ...r, template_params: r.template_params ?? [] }));
   const tenants = [...new Set(input.filter(r => r.channel === "whatsapp").map(r => r.tenant_id))];
   if (tenants.length) {
     const { data: modes } = await svc.from("tenant_settings").select("tenant_id,sms_mode").in("tenant_id", tenants);
     const always = new Set((modes ?? []).filter((m: { sms_mode: string }) => m.sms_mode === "always").map((m: { tenant_id: string }) => m.tenant_id));
-    for (const r of input) {
+    for (const r of [...rows]) {
       if (r.channel !== "whatsapp" || !always.has(r.tenant_id)) continue;
       if (rows.some(x => x.channel === "sms" && x.to_address === r.to_address && x.kind === r.kind && x.ref_id === r.ref_id)) continue;
       rows.push({ ...r, channel: "sms", body_text: smsText(r.body_text), template_name: null, template_params: [] });

@@ -42,10 +42,11 @@ export async function ensureStudentLogin(svc: Svc, studentId: string, baseUrl: s
   const rows = (links ?? []).flatMap((l: any) => l.guardians ? rowsForGuardian(s.tenant_id, l.guardians, "account_key",
     studentKeyMessage(brand, { guardianName: l.guardians.full_name, studentName: studentName(s), username, password, link: `${baseUrl}/login` }), s.id, actor)
     .map(r => ({ ...r, recipient_guardian_id: l.guardians.id })) : []);
-  if (rows.length) await enqueue(svc, rows);
-  await svc.from("audit_logs").insert({ tenant_id: s.tenant_id, actor_id: actor, action: "student.login_created", target: s.id, meta: { username, sent_to: rows.length } });
+  // The login exists now: if the message cannot be queued, the school still gets the password below.
+  const sent = rows.length ? await enqueue(svc, rows).then(() => rows.length, () => 0) : 0;
+  await svc.from("audit_logs").insert({ tenant_id: s.tenant_id, actor_id: actor, action: "student.login_created", target: s.id, meta: { username, sent_to: sent } });
   // The school sees the one-time password once too (to print or read out), as for staff.
-  return { created: true, username, password, sent: rows.length };
+  return { created: true, username, password, sent };
 }
 
 /** Resets a student's password to a new starting one and sends it to their parents. */
@@ -63,9 +64,10 @@ export async function resendStudentKey(svc: Svc, studentId: string, baseUrl: str
   const rows = (links ?? []).flatMap((l: any) => l.guardians ? rowsForGuardian(s.tenant_id, l.guardians, "account_key",
     studentKeyMessage(brand, { guardianName: l.guardians.full_name, studentName: studentName(s), username: u.username, password, link: `${baseUrl}/login` }), s.id, actor)
     .map(r => ({ ...r, recipient_guardian_id: l.guardians.id })) : []);
-  if (rows.length) await enqueue(svc, rows);
-  await svc.from("audit_logs").insert({ tenant_id: s.tenant_id, actor_id: actor, action: "student.login_reset", target: s.id, meta: { sent_to: rows.length } });
-  return { username: u.username, password, sent: rows.length };
+  // The password has already changed: never lose it because the message could not be queued.
+  const sent = rows.length ? await enqueue(svc, rows).then(() => rows.length, () => 0) : 0;
+  await svc.from("audit_logs").insert({ tenant_id: s.tenant_id, actor_id: actor, action: "student.login_reset", target: s.id, meta: { sent_to: sent } });
+  return { username: u.username, password, sent };
 }
 
 /** Invites one parent: an account invitation by email, or the private portal link by WhatsApp/SMS. */
