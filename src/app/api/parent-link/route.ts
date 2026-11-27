@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/auth";
 
 type LinkRow = {
   id: string;
@@ -25,7 +26,7 @@ type AttendanceRow = {
 // only their own linked students via their RLS policy.
 export async function POST(req: NextRequest) {
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();
   if (!body.parent_user_id || !body.student_user_id)
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json().catch(() => ({}));
   const { data, error } = await sb.from("parent_links").update({ revoked_at: new Date().toISOString() })
@@ -64,7 +65,7 @@ export async function DELETE(req: NextRequest) {
 
 export async function GET() {
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   const { data: rawLinks, error } = await sb.from("parent_links")

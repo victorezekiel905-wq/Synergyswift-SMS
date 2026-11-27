@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/auth";
 
 const VALID = new Set(["present", "absent", "tardy", "excused"]);
 
 export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   const days = Math.min(31, Math.max(1, Number(req.nextUrl.searchParams.get("days") ?? "7")));
@@ -63,7 +64,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));

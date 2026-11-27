@@ -84,11 +84,12 @@ export type CtxError = { error: string; status: number; code?: string };
  * the cached public key, so most requests make no call to Supabase Auth; with
  * the legacy shared secret, getClaims asks Auth, exactly as getUser did.
  */
-export async function sessionUser(sb: any): Promise<{ id: string; app_metadata?: Record<string, unknown> } | null> {
+export type SessionUser = { id: string; email?: string; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> };
+export async function sessionUser(sb: any): Promise<SessionUser | null> {
   if (typeof sb.auth.getClaims === "function") {
     const { data, error } = await sb.auth.getClaims();
-    const c = data?.claims as { sub?: string; app_metadata?: Record<string, unknown> } | undefined;
-    if (!error && c?.sub) return { id: c.sub, app_metadata: c.app_metadata ?? {} };
+    const c = data?.claims as { sub?: string; email?: string; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> } | undefined;
+    if (!error && c?.sub) return { id: c.sub, email: c.email, app_metadata: c.app_metadata ?? {}, user_metadata: c.user_metadata ?? {} };
     return null;
   }
   const { data: { user } } = await sb.auth.getUser();

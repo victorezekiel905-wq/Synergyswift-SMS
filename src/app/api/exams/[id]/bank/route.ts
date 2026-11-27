@@ -76,7 +76,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (error) return jsonError(error.message);
   // Usage counts are informational (service client: teachers may use colleagues' questions).
   const svc = createServiceClient();
-  for (const r of bankRows) await svc.from("question_bank").update({ times_used: (r.times_used ?? 0) + 1 }).eq("id", r.id);
+  // 20 at a time instead of one after another (60 questions took about 5 seconds).
+  for (let i = 0; i < bankRows.length; i += 20) {
+    await Promise.all(bankRows.slice(i, i + 20).map(r => svc.from("question_bank").update({ times_used: (r.times_used ?? 0) + 1 }).eq("id", r.id)));
+  }
 
   if (b.action === "random" && b.per_student && b.section) {
     const draw = { ...(exam.settings?.draw ?? {}), [b.section]: b.per_student };

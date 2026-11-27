@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/auth";
 
 // §18 — Server-rendered PDF/CSV export. CSV is generated inline here; PDF uses
 // a minimal hand-rolled PDF generator (text-mode) so no extra npm dep is
@@ -7,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const { data: rep } = await sb.from("reports").select("*").eq("id", params.id).maybeSingle();
   if (!rep) return NextResponse.json({ error: "report not found" }, { status: 404 });

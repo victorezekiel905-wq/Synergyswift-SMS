@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { jsonError } from "@/lib/auth";
+import { jsonError, sessionUser } from "@/lib/auth";
 import { toCsv } from "@/lib/school";
 
 /**
@@ -11,7 +11,7 @@ import { toCsv } from "@/lib/school";
  */
 export async function GET(req: NextRequest) {
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return jsonError("unauthenticated", 401);
   const { data: groupIds } = await sb.rpc("my_group_ids");
   if (!groupIds?.length) return jsonError("not found", 404);

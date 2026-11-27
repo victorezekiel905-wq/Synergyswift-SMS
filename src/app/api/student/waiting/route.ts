@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { sessionUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const svc = createServiceClient();
   const { data: profile } = await svc.from("users").select("id").eq("id", user.id).maybeSingle();

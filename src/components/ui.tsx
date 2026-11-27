@@ -3,6 +3,27 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { notify, noticeFor } from "@/components/Toaster";
 import { isSecurityCheck, announceSecurityCheck, SECURITY_CHECK_TEXT, freshReload } from "@/lib/client-errors";
 
+/**
+ * One request shared by everything on the page that asks for the same address within a few seconds.
+ * Every page asks /api/me ("who am I") in its frame and often again in the page itself; this makes it
+ * one trip to the server. The original answer is never read, each caller gets its own copy (clone).
+ */
+const sharedRequests = new Map<string, { at: number; p: Promise<Response> }>();
+const SHARED = new Set(["/api/me"]);
+export function sharedFetch(url: string, ttlMs = 5_000): Promise<Response> {
+  const now = Date.now();
+  const hit = sharedRequests.get(url);
+  if (!hit || now - hit.at > ttlMs) {
+    const ctl = new AbortController();
+    const timer = window.setTimeout(() => ctl.abort(), 40_000);
+    const p = fetch(url, { cache: "no-store", signal: ctl.signal }).finally(() => window.clearTimeout(timer));
+    p.catch(() => { if (sharedRequests.get(url)?.p === p) sharedRequests.delete(url); });
+    sharedRequests.set(url, { at: now, p });
+    return p.then(r => r.clone());
+  }
+  return hit.p.then(r => r.clone());
+}
+
 /** Fetch JSON with loading / error state. `reload()` re-fetches. */
 export function useApi<T>(url: string | null, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
@@ -21,7 +42,7 @@ export function useApi<T>(url: string | null, deps: unknown[] = []) {
     const ctl = new AbortController();
     const timer = window.setTimeout(() => ctl.abort(), 40_000);
     try {
-      const r = await fetch(url, { cache: "no-store", signal: ctl.signal });
+      const r = SHARED.has(url) ? await sharedFetch(url) : await fetch(url, { cache: "no-store", signal: ctl.signal });
       if (!current()) return;
       if (isSecurityCheck(r)) { announceSecurityCheck(); setError(SECURITY_CHECK_TEXT); return; }
       const j = await r.json().catch(() => ({}));

@@ -6,7 +6,7 @@ import ReferralCard from "@/components/parent/ReferralCard";
 import ToSign from "@/components/ToSign";
 import AskTheSchool from "@/components/parent/AskTheSchool";
 import AddChild from "@/components/parent/AddChild";
-import { Page, PageHeader, Loading, type Me } from "@/components/ui";
+import { Page, PageHeader, Loading, sharedFetch, type Me } from "@/components/ui";
 
 /**
  * Logged-in parent portal: children, live sign-in status, results, exam timetables, referral link and pickup codes.
@@ -15,7 +15,7 @@ import { Page, PageHeader, Loading, type Me } from "@/components/ui";
  */
 export default function ParentPage() {
   const [me, setMe] = useState<Me | null>(null);
-  useEffect(() => { fetch("/api/me").then(r => r.json()).then(setMe).catch(() => setMe({} as Me)); }, []);
+  useEffect(() => { sharedFetch("/api/me").then(r => r.json()).then(setMe).catch(() => setMe({} as Me)); }, []);
   if (!me) return <Page><Loading /></Page>;
   if (me.new_parent) {
     const first = me.new_parent.full_name.trim().split(/\s+/)[0];

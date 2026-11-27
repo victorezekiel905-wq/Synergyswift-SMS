@@ -78,7 +78,11 @@ export async function POST(req: NextRequest) {
   const used = rows.map(r => r.bank_question_id as string);
   for (let i = 0; i < used.length; i += 200) {
     const { data: cur } = await svc.from("question_bank").select("id,times_used").in("id", used.slice(i, i + 200));
-    for (const c of cur ?? []) await svc.from("question_bank").update({ times_used: (c.times_used ?? 0) + 1 }).eq("id", c.id);
+    const list: { id: string; times_used: number | null }[] = cur ?? [];
+    // 20 at a time instead of one after another.
+    for (let j = 0; j < list.length; j += 20) {
+      await Promise.all(list.slice(j, j + 20).map(c => svc.from("question_bank").update({ times_used: (c.times_used ?? 0) + 1 }).eq("id", c.id)));
+    }
   }
   return NextResponse.json({ id: exam.id, questions: rows.length, shortfalls }, { status: 201 });
 }

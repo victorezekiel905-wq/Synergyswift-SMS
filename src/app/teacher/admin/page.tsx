@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import PolicyForm from "@/components/admin/PolicyForm";
+import { sessionUser } from "@/lib/auth";
 
 export default async function AdminPage() {
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) redirect("/login");
   const [{ data: policies }, { data: logs }] = await Promise.all([
     sb.from("environment_policies").select("*").order("created_at", { ascending: false }).limit(20),

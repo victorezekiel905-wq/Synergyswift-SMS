@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/auth";
 
 export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const { data: members, error } = await sb.from("class_members")
     .select("id,role,joined_at,users(id,full_name,email)")
@@ -17,7 +18,7 @@ export async function GET(_req: NextRequest, props: { params: Promise<{ id: stri
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();
   if (!body.email) return NextResponse.json({ error: "email required" }, { status: 400 });
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();
   if (!body.user_id) return NextResponse.json({ error: "user_id required" }, { status: 400 });

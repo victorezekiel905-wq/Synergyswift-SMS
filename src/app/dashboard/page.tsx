@@ -5,10 +5,11 @@ import MyExamTimetable from "@/components/exams/MyExamTimetable";
 import NoticeBoard from "@/components/comms/NoticeBoard";
 import MyTeaching from "@/components/portal/MyTeaching";
 import MyAccess from "@/components/portal/MyAccess";
+import { sessionUser } from "@/lib/auth";
 
 export default async function Dashboard() {
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) redirect("/login");
   const { data: me } = await sb.from("users").select("id,tenant_id,role,full_name,must_change_password").eq("id", user.id).maybeSingle();
   // A one-time password must be replaced first.

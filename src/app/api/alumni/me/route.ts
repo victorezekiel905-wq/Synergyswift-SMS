@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { beginRequest } from "@/lib/request-actor";
-import { readJson, jsonError } from "@/lib/auth";
+import { readJson, jsonError, sessionUser } from "@/lib/auth";
 import { normalizePhone } from "@/lib/crm";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ const COLS = "full_name,graduation_year,last_class,email,phone,occupation,employ
 async function me() {
   const store = beginRequest();
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return null;
   store.actor = `user:${user.id}`;
   const svc = createServiceClient();

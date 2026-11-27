@@ -4,6 +4,7 @@ import { createServiceClient as createLiveService } from "@/live/lib/supabase/se
 import { createServiceClient } from "@/lib/supabase/service";
 import { verifySeb, absoluteRequestUrl, buildSebConfig } from "@/lib/exams/seb";
 import { appUrl } from "@/lib/school";
+import { sessionUser } from "@/lib/auth";
 
 /** The locked lesson behind a join code, with the school's Safe Exam Browser keys. */
 async function lessonFor(code: string) {
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as { code?: string };
   const code = String(body.code ?? "");
   const sb = await createLiveClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   const s = await lessonFor(code);
   if (!s) return NextResponse.json({ error: "No live lesson with that code." }, { status: 404 });

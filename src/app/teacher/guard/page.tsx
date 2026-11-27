@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import EnrollForm from "@/components/guard/EnrollForm";
+import { sessionUser } from "@/lib/auth";
 
 export default async function GuardPage() {
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) redirect("/login");
   const [{ data: devices }, { data: events }] = await Promise.all([
     sb.from("devices").select("*").order("last_seen_at", { ascending: false }).limit(50),

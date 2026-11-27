@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/auth";
 
 type AttendanceRow = {
   id: string;
@@ -13,7 +14,7 @@ type AttendanceRow = {
 // for a class, then persist a tenant-scoped row in `reports`.
 export async function POST(req: NextRequest) {
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();
   if (!body.class_id || !body.kind)
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const { data: profile } = await sb.from("users").select("id,role").eq("id", user.id).maybeSingle();
   if (!profile) return NextResponse.json({ error: "profile not set up" }, { status: 400 });

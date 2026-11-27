@@ -22,6 +22,26 @@ describe("who is signed in, remembered for a few seconds", () => {
   });
 });
 
+describe("who am I: fast on every page", () => {
+  it("/api/me checks the session token locally and reads in two rounds", () => {
+    const me = read("src/app/api/me/route.ts");
+    expect(me).toMatch(/const user = await sessionUser\(sb\)/);
+    expect(me).not.toMatch(/auth\.getUser\(\)/);
+    expect(me).toMatch(/checkAccess\(user\.id, session\?\.access_token \?\? null\),\s*sb\.from\("users"\)/);
+  });
+  it("the page frame and the page share one /api/me request", () => {
+    expect(read("src/components/ui.tsx")).toMatch(/const SHARED = new Set\(\["\/api\/me"\]\)/);
+    expect(read("src/components/AppShell.tsx")).toMatch(/sharedFetch\("\/api\/me"\)/);
+  });
+  it("busy routes no longer ask Supabase Auth on every request", () => {
+    for (const f of ["api/classes/route.ts", "api/classes/[id]/attendance/route.ts", "api/classes/[id]/roster/route.ts", "api/reports/route.ts", "dashboard/page.tsx", "api/parent-link/route.ts"]) {
+      const t = read(`src/app/${f}`);
+      expect(t, f).not.toMatch(/auth\.getUser\(\)/);
+      expect(t, f).toMatch(/sessionUser\(sb\)/);
+    }
+  });
+});
+
 describe("school data remembered, and forgotten when it changes", () => {
   it("the current term and a class's grading scheme are remembered", () => {
     const school = read("src/lib/school.ts");

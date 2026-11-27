@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { sessionUser } from "@/lib/auth";
 
 // §19 — Bulk roster import. CSV is parsed client-side; rows sent here as JSONB.
 // Server applies the rows under the existing security-definer RPC, dedup'd.
 export async function POST(req: NextRequest) {
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const body = await req.json();
   if (!body.class_id || !Array.isArray(body.rows))

@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { beginRequest } from "@/lib/request-actor";
 import { checkAccess } from "@/lib/access";
 import { passwordDaysLeft } from "@/lib/security";
+import { sessionUser } from "@/lib/auth";
 
 // Account states that stop the app and send the user somewhere specific.
 const BLOCKING = ["suspended", "paused", "deactivated", "mfa_required", "password_expired", "sso_required", "session_expired", "access_restricted", "alumni"];
@@ -11,50 +12,36 @@ const BLOCKING = ["suspended", "paused", "deactivated", "mfa_required", "passwor
 export async function GET() {
   const store = beginRequest();
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  // Every page asks this first, so it is kept to two rounds of database work: the session token is
+  // checked locally (sessionUser), the access rules run beside the profile, and everything that
+  // depends on the profile is read at the same time.
+  const user = await sessionUser(sb);
   if (!user) return NextResponse.json({ user: null, profile: null }, { status: 200 });
   store.actor = `user:${user.id}`;
   const { data: { session } } = await sb.auth.getSession();
-  const access = await checkAccess(user.id, session?.access_token ?? null);
+  const [access, { data: profile }] = await Promise.all([
+    checkAccess(user.id, session?.access_token ?? null),
+    sb.from("users").select("id,tenant_id,email,full_name,role,extra_roles").eq("id", user.id).maybeSingle()
+  ]);
   const who = { id: user.id, email: user.email };
   if (!access.ok) {
     return NextResponse.json({ user: who, profile: null, tenant: null, platform: false, group: false, account: { state: "access_restricted", message: access.message, reason: access.reason, device: access.device } });
   }
-  const { data: profile } = await sb.from("users")
-    .select("id,tenant_id,email,full_name,role,extra_roles").eq("id", user.id).maybeSingle();
   let tenant = null;
   let platform = false;
   let group = false;
-  if (profile) {
-    const { data } = await sb.from("tenants").select("id,name,status,modules").eq("id", profile.tenant_id).maybeSingle();
-    tenant = data;
-  } else {
-    const { data: state } = await sb.rpc("my_account_state");
-    if (BLOCKING.includes(state?.state)) {
-      return NextResponse.json({ user: who, profile: null, tenant: null, platform: false, group: false, account: state });
-    }
-    const { data: pstate } = await sb.rpc("platform_admin_state");
-    platform = pstate === "ok";
-    if (pstate === "mfa_required") {
-      return NextResponse.json({ user: who, profile: null, tenant: null, platform: false, group: false, platform_mfa: true });
-    }
-    const { data: g } = await sb.rpc("my_group_ids");
-    group = Array.isArray(g) && g.length > 0;
-  }
-  const [{ data: guardian }, { data: staff }] = profile ? await Promise.all([
-    sb.from("guardians").select("id").eq("user_id", user.id).maybeSingle(),
-    sb.from("staff").select("id").eq("user_id", user.id).maybeSingle()
-  ]) : [{ data: null }, { data: null }];
-  // School-wide preferences the app needs on every page.
-  let prefs = null;
-  let mustChange = false;
+  let guardian: unknown = null, staff: unknown = null, prefs = null, mustChange = false;
   if (profile) {
     const svc = createServiceClient();
     const base = "currency,session_idle_minutes,password_max_age_days,password_policy_scope,brand_color,logo_url";
-    const [first, { data: u }] = await Promise.all([
+    const [t, g, st, first, { data: u }] = await Promise.all([
+      sb.from("tenants").select("id,name,status,modules").eq("id", profile.tenant_id).maybeSingle(),
+      sb.from("guardians").select("id").eq("user_id", user.id).maybeSingle(),
+      sb.from("staff").select("id").eq("user_id", user.id).maybeSingle(),
       svc.from("tenant_settings").select(`${base},brand_color_2`).eq("tenant_id", profile.tenant_id).maybeSingle(),
       svc.from("users").select("password_changed_at,must_change_password").eq("id", user.id).maybeSingle()
     ]);
+    tenant = t.data; guardian = g.data; staff = st.data;
     // Before the database update (migration 10000) there is no second colour yet: read the rest.
     const s: any = first.error ? (await svc.from("tenant_settings").select(base).eq("tenant_id", profile.tenant_id).maybeSingle()).data : first.data;
     const staffRole = !["student", "parent"].includes(profile.role);
@@ -71,6 +58,18 @@ export async function GET() {
     };
     // A starting password (sent to the parents) must be replaced at the first sign-in.
     if (u?.must_change_password) mustChange = true;
+  } else {
+    const { data: state } = await sb.rpc("my_account_state");
+    if (BLOCKING.includes(state?.state)) {
+      return NextResponse.json({ user: who, profile: null, tenant: null, platform: false, group: false, account: state });
+    }
+    const { data: pstate } = await sb.rpc("platform_admin_state");
+    platform = pstate === "ok";
+    if (pstate === "mfa_required") {
+      return NextResponse.json({ user: who, profile: null, tenant: null, platform: false, group: false, platform_mfa: true });
+    }
+    const { data: g } = await sb.rpc("my_group_ids");
+    group = Array.isArray(g) && g.length > 0;
   }
   // A parent who signed up on their own and has not added a child yet: no school, only "Add a child".
   const newParent = !profile && !platform && !group && (user.user_metadata as { signup_as?: string } | null)?.signup_as === "parent";

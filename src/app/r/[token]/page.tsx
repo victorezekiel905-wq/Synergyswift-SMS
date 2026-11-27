@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { verifyCard } from "@/lib/report-sign";
 import ReportCardView from "@/components/results/ReportCardView";
 import PrintButton from "./PrintButton";
+import { sessionUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Report card", robots: { index: false, follow: false } };
@@ -29,7 +30,7 @@ export default async function ReportCardPage(props: { params: Promise<{ token: s
     // Drafts are only visible to signed-in staff of the same school.
     const { createClient } = await import("@/lib/supabase/server");
     const sb = await createClient();
-    const { data: { user } } = await sb.auth.getUser();
+    const user = await sessionUser(sb); // checked locally, no call to Supabase Auth
     const { data: me } = user ? await sb.from("users").select("tenant_id,role").eq("id", user.id).maybeSingle() : { data: null };
     if (!me || me.tenant_id !== card.tenant_id || ["student", "parent"].includes(me.role)) notFound();
   }

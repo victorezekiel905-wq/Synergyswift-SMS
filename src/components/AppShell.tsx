@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { Icon, rolesOf, type Me } from "@/components/ui";
+import { Icon, rolesOf, sharedFetch, type Me } from "@/components/ui";
 // Loaded after the page shows: the search box and the emergency banner are not needed for the first paint.
 const SearchPalette = dynamic(() => import("@/components/SearchPalette"), { ssr: false });
 const EmergencyBanner = dynamic(() => import("@/components/comms/NoticeBoard").then(m => m.EmergencyBanner), { ssr: false });
@@ -40,7 +40,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (bare && !landing) return;
-    fetch("/api/me").then(r => r.json()).catch(() => ({})).then(async (j: Me) => {
+    sharedFetch("/api/me").then(r => r.json()).catch(() => ({})).then(async (j: Me) => {
       // Design review builds show the shell with a sample head teacher.
       if (process.env.NEXT_PUBLIC_DESIGN_PREVIEW === "1" && pathname.startsWith("/design-preview") && !j?.profile) { setMe(PREVIEW_ME); return; }
       setMe(j);

@@ -93,7 +93,8 @@ async function POST_write(req: NextRequest) {
     for (const p of b.periods) if (p.ends_at <= p.starts_at) return jsonError(`${p.name}: end time must be after start time`);
     const keep = b.periods.filter(p => p.id).map(p => p.id!);
     const { data: existing } = await sb.from("timetable_periods").select("id").eq("tenant_id", tid);
-    for (const e of existing ?? []) if (!keep.includes(e.id)) await sb.from("timetable_periods").delete().eq("id", e.id);
+    const gone = ((existing ?? []) as { id: string }[]).map(e => e.id).filter(id => !keep.includes(id));
+    if (gone.length) await sb.from("timetable_periods").delete().in("id", gone);
     for (let i = 0; i < b.periods.length; i++) {
       const p = b.periods[i];
       const row = { tenant_id: tid, name: p.name, starts_at: p.starts_at, ends_at: p.ends_at, is_break: p.is_break, position: i + 1 };
